@@ -1,3 +1,3 @@
-# dtrpg-client.rs
+# dtrpg-sdk.rs
 
-A client library for DriveThru RPG API in Rust
+An SDK for DriveThru RPG API in Rust
