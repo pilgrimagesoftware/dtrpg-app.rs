@@ -1,0 +1,13 @@
+[package]
+name = "dtrpg-app-rust"
+version = "0.1.0"
+edition = "2024"
+description = "DriveThruRPG desktop frontend in Rust"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+gpui = "0.2.2"
+
+[dev-dependencies]
+pretty_assertions = "1"
