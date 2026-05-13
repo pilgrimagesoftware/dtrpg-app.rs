@@ -5,6 +5,6 @@
 
 ## 2. Rust Baseline Implementation
 
-- [ ] 2.1 Implement shared baseline layout and state behavior in Rust frontend
-- [ ] 2.2 Implement Rust stub adapters for list/detail/filter/refresh behavior
-- [ ] 2.3 Verify implementation remains backend-stubbed in this phase
+- [x] 2.1 Implement shared baseline layout and state behavior in Rust frontend
+- [x] 2.2 Implement Rust stub adapters for list/detail/filter/refresh behavior
+- [x] 2.3 Verify implementation remains backend-stubbed in this phase
