@@ -16,6 +16,12 @@ pub struct LibraryItem {
     pub title: String,
     /// Product publisher shown as metadata.
     pub publisher: String,
+    /// Product type used by alternative grouping modes.
+    pub product_type: String,
+    /// Relative insertion order used by "most recently added" sorting.
+    pub added_order: u32,
+    /// Relative update order used by "most recently updated" sorting.
+    pub updated_order: u32,
     /// Short summary text shown in detail pane.
     pub summary: String,
 }

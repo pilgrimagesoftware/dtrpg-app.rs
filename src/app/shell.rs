@@ -72,10 +72,7 @@ impl AppShell {
         self.library_vm.items()
     }
 
-    /// Returns the selected detail item if one is active.
-    pub fn selected_item(&self) -> Option<&LibraryItem> {
-        self.library_vm.selected()
-    }
+
 
     /// Routes a shell command and synchronizes shell state from view model changes.
     pub fn dispatch(&mut self, command: AppCommand) {
