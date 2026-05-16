@@ -7,6 +7,8 @@ pub enum LibraryViewMode {
     FlatList,
     TreeByPublisher,
     TreeByProductType,
+    GridByPublisher,
+    GridByProductType,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,7 +63,17 @@ pub fn mode_label(mode: LibraryViewMode) -> &'static str {
         LibraryViewMode::FlatList => "Flat list",
         LibraryViewMode::TreeByPublisher => "Tree by publisher",
         LibraryViewMode::TreeByProductType => "Tree by product type",
+        LibraryViewMode::GridByPublisher => "Grid by publisher",
+        LibraryViewMode::GridByProductType => "Grid by product type",
     }
+}
+
+/// Returns whether the view mode renders library content as grid cells.
+pub fn mode_is_grid(mode: LibraryViewMode) -> bool {
+    matches!(
+        mode,
+        LibraryViewMode::GridByPublisher | LibraryViewMode::GridByProductType
+    )
 }
 
 pub fn filter_presets() -> [&'static str; 4] {
@@ -85,7 +97,9 @@ pub fn grouped_items(
     for item in items.iter().cloned() {
         let key = match mode {
             LibraryViewMode::TreeByPublisher => item.publisher.clone(),
+            LibraryViewMode::GridByPublisher => item.publisher.clone(),
             LibraryViewMode::TreeByProductType => item.product_type.clone(),
+            LibraryViewMode::GridByProductType => item.product_type.clone(),
             LibraryViewMode::FlatList => item.publisher.clone(),
         };
         groups.entry(key).or_default().push(item);

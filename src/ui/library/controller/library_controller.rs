@@ -7,7 +7,7 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 use crate::ui::library::model::library_data::{
     FilterScope, LibraryViewMode, MatchPresentation, SortMethod, TreeNode, filter_presets,
-    grouped_items, item_matches, mode_label, next_sort, root_matches, sort_label,
+    grouped_items, item_matches, mode_is_grid, mode_label, next_sort, root_matches, sort_label,
     sorted_flat_items,
 };
 
@@ -25,6 +25,54 @@ pub enum SortPopup {
     Inner,
 }
 
+/// UI state for the compact DriveThruRPG account menu.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccountMenuState {
+    /// User-facing account label shown in the account button/menu.
+    pub display_name: String,
+    /// Human-readable connection or token status.
+    pub connection_status: String,
+    /// Whether an access token is currently configured.
+    pub token_configured: bool,
+    /// Whether the compact account menu is visible.
+    pub menu_open: bool,
+}
+
+impl AccountMenuState {
+    fn signed_out() -> Self {
+        Self {
+            display_name: "DriveThruRPG account".to_string(),
+            connection_status: "Access token required".to_string(),
+            token_configured: std::env::var("DTRPG_ACCESS_TOKEN").is_ok(),
+            menu_open: false,
+        }
+    }
+}
+
+/// UI state for low-profile library sync/update reporting.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyncStatus {
+    /// Whether a sync or refresh operation is currently active.
+    pub active: bool,
+    /// Human-readable progress summary.
+    pub progress_label: String,
+    /// Human-readable network latency summary.
+    pub latency_label: String,
+    /// Human-readable last-update summary.
+    pub last_update_label: String,
+}
+
+impl SyncStatus {
+    fn idle() -> Self {
+        Self {
+            active: false,
+            progress_label: "Idle".to_string(),
+            latency_label: "Latency unavailable".to_string(),
+            last_update_label: "Not synced this session".to_string(),
+        }
+    }
+}
+
 pub struct LibraryController {
     pub shell: AppShell,
     pub view_mode: LibraryViewMode,
@@ -35,8 +83,11 @@ pub struct LibraryController {
     pub inner_sort: SortMethod,
     pub filter_query: String,
     pub search_editing: bool,
+    pub controls_disclosed: bool,
     pub open_sort_popup: Option<SortPopup>,
     pub selection: Option<Selection>,
+    pub account: AccountMenuState,
+    pub sync_status: SyncStatus,
 }
 
 impl LibraryController {
@@ -73,6 +124,9 @@ impl LibraryController {
             search_editing: false,
             open_sort_popup: None,
             selection,
+            controls_disclosed: true,
+            account: AccountMenuState::signed_out(),
+            sync_status: SyncStatus::idle(),
         }
     }
 
@@ -80,7 +134,9 @@ impl LibraryController {
         self.view_mode = match self.view_mode {
             LibraryViewMode::FlatList => LibraryViewMode::TreeByPublisher,
             LibraryViewMode::TreeByPublisher => LibraryViewMode::TreeByProductType,
-            LibraryViewMode::TreeByProductType => LibraryViewMode::FlatList,
+            LibraryViewMode::TreeByProductType => LibraryViewMode::GridByPublisher,
+            LibraryViewMode::GridByPublisher => LibraryViewMode::GridByProductType,
+            LibraryViewMode::GridByProductType => LibraryViewMode::FlatList,
         };
         self.selection = None;
         self.shell.dispatch(AppCommand::ClearSelection);
@@ -155,6 +211,31 @@ impl LibraryController {
         self.open_sort_popup = None;
     }
 
+    pub fn toggle_controls_disclosure(&mut self) {
+        self.controls_disclosed = !self.controls_disclosed;
+    }
+
+    pub fn toggle_account_menu(&mut self) {
+        self.account.menu_open = !self.account.menu_open;
+    }
+
+    pub fn mark_token_set_action(&mut self) {
+        self.account.token_configured = true;
+        self.account.connection_status = "Access token action selected".to_string();
+        self.account.menu_open = false;
+    }
+
+    pub fn mark_token_reset_action(&mut self) {
+        self.account.token_configured = false;
+        self.account.connection_status = "Access token reset requested".to_string();
+        self.account.menu_open = false;
+    }
+
+    pub fn open_settings_action(&mut self) {
+        self.account.connection_status = "Settings action selected".to_string();
+        self.account.menu_open = false;
+    }
+
     pub fn cycle_filter_query(&mut self) {
         let presets = filter_presets();
         let current = presets
@@ -227,11 +308,25 @@ impl LibraryController {
     }
 
     pub fn refresh(&mut self) {
+        self.sync_status = SyncStatus {
+            active: true,
+            progress_label: "Refreshing library metadata".to_string(),
+            latency_label: "Last request pending".to_string(),
+            last_update_label: "Refresh in progress".to_string(),
+        };
+
         self.shell.dispatch(AppCommand::RefreshLibrary);
 
         if let Some(Selection::Item(item_id)) = self.selection {
             self.shell.dispatch(AppCommand::SelectLibraryItem(item_id));
         }
+
+        self.sync_status = SyncStatus {
+            active: false,
+            progress_label: "Library metadata current".to_string(),
+            latency_label: "Last request completed".to_string(),
+            last_update_label: "Updated this session".to_string(),
+        };
     }
 
     pub fn set_item_selection(&mut self, item_id: u64) {
@@ -263,6 +358,63 @@ impl LibraryController {
 
     pub fn inner_sort_label(&self) -> &'static str {
         sort_label(self.inner_sort)
+    }
+
+    pub fn controls_summary(&self) -> String {
+        format!(
+            "{} | query: {} | {} | sections: {}",
+            self.mode_label(),
+            self.active_query_label(),
+            self.active_sort_summary(),
+            self.section_count()
+        )
+    }
+
+    pub fn active_sort_summary(&self) -> String {
+        match self.view_mode {
+            LibraryViewMode::FlatList => format!("sort: {}", self.flat_sort_label()),
+            _ => format!(
+                "outer: {}, inner: {}",
+                self.outer_sort_label(),
+                self.inner_sort_label()
+            ),
+        }
+    }
+
+    pub fn account_summary(&self) -> String {
+        let token_status = if self.account.token_configured {
+            "token set"
+        } else {
+            "token missing"
+        };
+
+        format!("{} ({token_status})", self.account.display_name)
+    }
+
+    pub fn sync_status_summary(&self) -> String {
+        if self.sync_status.active {
+            format!("Syncing: {}", self.sync_status.progress_label)
+        } else {
+            format!("Sync: {}", self.sync_status.progress_label)
+        }
+    }
+
+    pub fn sync_status_detail(&self) -> String {
+        format!(
+            "{} | {} | {}",
+            self.sync_status.progress_label,
+            self.sync_status.latency_label,
+            self.sync_status.last_update_label
+        )
+    }
+
+    pub fn view_summary(&self) -> String {
+        format!(
+            "{} total | {} matched | {} sections",
+            self.shell.items().len(),
+            self.filtered_item_count(),
+            self.section_count()
+        )
     }
 
     pub fn match_presentation_label(&self) -> &'static str {
@@ -337,6 +489,10 @@ impl LibraryController {
         nodes
     }
 
+    pub fn grid_sections(&self) -> Vec<TreeNode> {
+        self.tree_items()
+    }
+
     pub fn is_item_match(&self, item: &LibraryItem) -> bool {
         item_matches(item, &self.filter_query)
     }
@@ -354,6 +510,17 @@ impl LibraryController {
                 .map(|node| node.children.len())
                 .sum(),
         }
+    }
+
+    pub fn section_count(&self) -> usize {
+        match self.view_mode {
+            LibraryViewMode::FlatList => 0,
+            _ => self.tree_items().len(),
+        }
+    }
+
+    pub fn renders_grid(&self) -> bool {
+        mode_is_grid(self.view_mode)
     }
 
     pub fn detail_lines(&self) -> Vec<String> {
@@ -405,5 +572,110 @@ impl LibraryController {
             }
             None => vec!["Select a publisher or catalog item to view details.".to_string()],
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::stub::{StubLibraryService, StubMode};
+
+    fn make_controller() -> LibraryController {
+        let library = LibraryViewModel::new(Box::new(StubLibraryService::new(StubMode::Seeded)));
+        let mut shell = AppShell::new(
+            AppShellState {
+                session: SessionPresentationState::SignedIn,
+                library: LibraryPaneState::Loading,
+                selected_item_id: None,
+                status_message: "Loading your library…".to_string(),
+            },
+            library,
+        );
+        shell.dispatch(AppCommand::LoadLibrary);
+
+        LibraryController {
+            shell,
+            view_mode: LibraryViewMode::TreeByPublisher,
+            filter_scope: FilterScope::ChildOnly,
+            match_presentation: MatchPresentation::HideNonMatching,
+            flat_sort: SortMethod::AtoZ,
+            outer_sort: SortMethod::AtoZ,
+            inner_sort: SortMethod::AtoZ,
+            filter_query: String::new(),
+            search_editing: false,
+            controls_disclosed: true,
+            open_sort_popup: None,
+            selection: None,
+            account: AccountMenuState::signed_out(),
+            sync_status: SyncStatus::idle(),
+        }
+    }
+
+    #[test]
+    fn controls_disclosure_preserves_browsing_summary() {
+        let mut controller = make_controller();
+        controller.set_filter_query("atlas");
+        controller.set_view_mode(LibraryViewMode::GridByPublisher);
+
+        let expanded_summary = controller.controls_summary();
+        controller.toggle_controls_disclosure();
+
+        assert!(!controller.controls_disclosed);
+        assert_eq!(controller.filter_query, "atlas");
+        assert_eq!(controller.controls_summary(), expanded_summary);
+        assert!(controller.controls_summary().contains("Grid by publisher"));
+    }
+
+    #[test]
+    fn grid_and_tree_presentations_share_filtered_result_state() {
+        let mut controller = make_controller();
+        controller.set_filter_query("atlas");
+
+        controller.set_view_mode(LibraryViewMode::TreeByPublisher);
+        let tree_count = controller.filtered_item_count();
+        let tree_sections = controller.section_count();
+
+        controller.set_view_mode(LibraryViewMode::GridByPublisher);
+
+        assert!(controller.renders_grid());
+        assert_eq!(controller.filtered_item_count(), tree_count);
+        assert_eq!(controller.section_count(), tree_sections);
+    }
+
+    #[test]
+    fn account_actions_do_not_store_raw_token_values() {
+        let mut controller = make_controller();
+
+        controller.toggle_account_menu();
+        assert!(controller.account.menu_open);
+
+        controller.mark_token_set_action();
+        assert!(controller.account.token_configured);
+        assert!(!controller.account.menu_open);
+        assert!(!controller.account_summary().contains("DTRPG_ACCESS_TOKEN"));
+
+        controller.mark_token_reset_action();
+        assert!(!controller.account.token_configured);
+        assert!(!controller.account_summary().contains("DTRPG_ACCESS_TOKEN"));
+    }
+
+    #[test]
+    fn refresh_updates_sync_status_without_changing_browsing_state() {
+        let mut controller = make_controller();
+        controller.set_filter_query("atlas");
+        controller.set_view_mode(LibraryViewMode::GridByProductType);
+        let summary = controller.controls_summary();
+
+        controller.refresh();
+
+        assert!(!controller.sync_status.active);
+        assert_eq!(controller.filter_query, "atlas");
+        assert_eq!(controller.view_mode, LibraryViewMode::GridByProductType);
+        assert_eq!(controller.controls_summary(), summary);
+        assert!(
+            controller
+                .sync_status_summary()
+                .contains("Library metadata")
+        );
     }
 }

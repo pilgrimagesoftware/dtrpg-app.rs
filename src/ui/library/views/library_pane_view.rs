@@ -57,7 +57,7 @@ pub(crate) fn render_library_pane(
                     }))
             }))
         }
-        _ => {
+        LibraryViewMode::TreeByPublisher | LibraryViewMode::TreeByProductType => {
             let nodes = root.controller.tree_items();
             div().flex().flex_col().gap_2().children(nodes.into_iter().map(|node| {
                 let root_label = node.root_label.clone();
@@ -91,7 +91,9 @@ pub(crate) fn render_library_pane(
                         LibraryViewMode::TreeByProductType => {
                             this.controller.set_product_type_selection(root_label.clone())
                         }
-                        LibraryViewMode::FlatList => {}
+                        LibraryViewMode::FlatList
+                        | LibraryViewMode::GridByPublisher
+                        | LibraryViewMode::GridByProductType => {}
                     }));
 
                 let child_rows =
@@ -121,6 +123,83 @@ pub(crate) fn render_library_pane(
                 div().flex().flex_col().gap_1().child(root_row).child(child_rows)
             }))
         }
+        LibraryViewMode::GridByPublisher | LibraryViewMode::GridByProductType => {
+            let sections = root.controller.grid_sections();
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .children(sections.into_iter().map(|section| {
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .child(
+                            div()
+                                .px_2()
+                                .py_1()
+                                .bg(rgb(0x1f2937))
+                                .rounded_sm()
+                                .child(format!(
+                                    "{} ({})",
+                                    section.root_label,
+                                    section.children.len()
+                                )),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .gap_2()
+                                .children(section.children.into_iter().map(|item| {
+                                    let item_id = item.id;
+                                    let selected = matches!(
+                                        root.controller.selection,
+                                        Some(Selection::Item(id)) if id == item_id
+                                    );
+                                    let matches = root.controller.is_item_match(&item);
+
+                                    div()
+                                        .id(("grid-item", item_id))
+                                        .w_1_4()
+                                        .p_2()
+                                        .rounded_sm()
+                                        .border_1()
+                                        .border_color(rgb(0x374151))
+                                        .cursor_pointer()
+                                        .when(selected, |d| d.bg(rgb(0x334155)))
+                                        .when(
+                                            !selected
+                                                && matches
+                                                && root.controller.match_presentation
+                                                    == MatchPresentation::HighlightMatching,
+                                            |d| d.bg(rgb(0x1e3a8a)),
+                                        )
+                                        .when(
+                                            !selected
+                                                && !(matches
+                                                    && root.controller.match_presentation
+                                                        == MatchPresentation::HighlightMatching),
+                                            |d| d.bg(rgb(0x0f172a)),
+                                        )
+                                        .child(
+                                            div()
+                                                .h_16()
+                                                .rounded_sm()
+                                                .bg(rgb(0x1e293b))
+                                                .child("Thumbnail"),
+                                        )
+                                        .child(div().pt_2().child(item.title))
+                                        .child(div().text_color(rgb(0x93c5fd)).child(format!(
+                                            "{} | updated {}",
+                                            item.product_type, item.updated_order
+                                        )))
+                                        .on_click(cx.listener(move |this, _, _, _| {
+                                            this.controller.set_item_selection(item_id);
+                                        }))
+                                })),
+                        )
+                }))
+        }
     };
 
     div()
@@ -134,7 +213,11 @@ pub(crate) fn render_library_pane(
         .flex()
         .flex_col()
         .gap_2()
-        .child("Library")
+        .child(if root.controller.renders_grid() {
+            "Library grid"
+        } else {
+            "Library"
+        })
         .child(left_content)
 }
 

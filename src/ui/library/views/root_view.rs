@@ -60,6 +60,19 @@ impl Render for LibraryRootView {
                     .child("DriveThruRPG Library")
                     .child(
                         div()
+                            .id("account-menu")
+                            .px_2()
+                            .py_1()
+                            .bg(rgb(0x1f2937))
+                            .rounded_sm()
+                            .cursor_pointer()
+                            .child(self.controller.account_summary())
+                            .on_click(
+                                cx.listener(|this, _, _, _| this.controller.toggle_account_menu()),
+                            ),
+                    )
+                    .child(
+                        div()
                             .id("refresh-library")
                             .px_2()
                             .py_1()
@@ -70,6 +83,60 @@ impl Render for LibraryRootView {
                             .on_click(cx.listener(|this, _, _, _| this.controller.refresh())),
                     ),
             )
+            .when(self.controller.account.menu_open, |view| {
+                view.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .p_2()
+                        .bg(rgb(0x111827))
+                        .border_1()
+                        .border_color(rgb(0x374151))
+                        .rounded_sm()
+                        .child(self.controller.account.display_name.clone())
+                        .child(self.controller.account.connection_status.clone())
+                        .child(
+                            div()
+                                .id("set-access-token")
+                                .px_2()
+                                .py_1()
+                                .bg(rgb(0x1d4ed8))
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .child("Set access token")
+                                .on_click(cx.listener(|this, _, _, _| {
+                                    this.controller.mark_token_set_action()
+                                })),
+                        )
+                        .child(
+                            div()
+                                .id("reset-access-token")
+                                .px_2()
+                                .py_1()
+                                .bg(rgb(0x334155))
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .child("Reset access token")
+                                .on_click(cx.listener(|this, _, _, _| {
+                                    this.controller.mark_token_reset_action()
+                                })),
+                        )
+                        .child(
+                            div()
+                                .id("open-settings")
+                                .px_2()
+                                .py_1()
+                                .bg(rgb(0x334155))
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .child("Application settings")
+                                .on_click(cx.listener(|this, _, _, _| {
+                                    this.controller.open_settings_action()
+                                })),
+                        ),
+                )
+            })
             .child(render_controls_row(self, cx))
             .child(
                 div()
@@ -79,9 +146,21 @@ impl Render for LibraryRootView {
                     .child(render_library_pane(self, cx))
                     .child(render_detail_pane(self)),
             )
-            .child(div().text_color(rgb(0x93c5fd)).child(format!(
-                "Status: {}",
-                self.controller.shell.state().status_message
-            )))
+            .child(
+                div()
+                    .flex()
+                    .justify_between()
+                    .text_color(rgb(0x93c5fd))
+                    .child(format!("View: {}", self.controller.view_summary()))
+                    .child(format!(
+                        "{} | {}",
+                        self.controller.sync_status_summary(),
+                        self.controller.sync_status_detail()
+                    ))
+                    .child(format!(
+                        "Status: {}",
+                        self.controller.shell.state().status_message
+                    )),
+            )
     }
 }
