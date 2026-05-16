@@ -1,8 +1,9 @@
-//! Service boundaries for baseline library behavior.
+//! Service boundaries for library behavior.
 //!
 //! This module defines backend-agnostic service interfaces and entities used by the
-//! Rust frontend baseline. Implementations in this phase are stubbed and in-memory.
+//! Rust frontend. Implementations can be deterministic test stubs or SDK-backed adapters.
 
+pub mod sdk;
 pub mod stub;
 
 use core::fmt;
@@ -26,10 +27,10 @@ pub struct LibraryItem {
     pub summary: String,
 }
 
-/// The type of deterministic service failure returned by stub operations.
+/// The type of service failure returned by library operations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LibraryServiceErrorKind {
-    /// Request failed due to transient connectivity behavior.
+    /// Request failed due to transient connectivity or SDK configuration behavior.
     Network,
     /// Request failed due to session/auth state.
     Session,

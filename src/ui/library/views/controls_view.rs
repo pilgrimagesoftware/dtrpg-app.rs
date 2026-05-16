@@ -1,8 +1,11 @@
 //! Top control strip rendering for the library view.
 
+use std::hash::{Hash, Hasher};
+
 use gpui::{Context, IntoElement, div, prelude::*, rgb};
 
-use crate::ui::library::model::library_data::{FilterScope, LibraryViewMode};
+use crate::ui::library::controller::library_controller::{LibraryController, SortPopup};
+use crate::ui::library::model::library_data::{LibraryViewMode, MatchPresentation, SortMethod};
 
 use super::root_view::LibraryRootView;
 
@@ -14,6 +17,11 @@ pub(crate) fn render_controls_row(
     let active_query = root.controller.active_query_label();
     let count = root.controller.filtered_item_count();
 
+    let search_mode = match root.controller.match_presentation {
+        MatchPresentation::HideNonMatching => "Hide non-matching",
+        MatchPresentation::HighlightMatching => "Highlight matches",
+    };
+
     div()
         .flex()
         .flex_col()
@@ -24,64 +32,28 @@ pub(crate) fn render_controls_row(
                 .gap_2()
                 .items_center()
                 .child("View mode")
-                .child(
-                    div()
-                        .id("view-flat")
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(root.controller.view_mode == LibraryViewMode::FlatList, |d| {
-                            d.bg(rgb(0x2563eb))
-                        })
-                        .when(root.controller.view_mode != LibraryViewMode::FlatList, |d| {
-                            d.bg(rgb(0x1f2937))
-                        })
-                        .child("Flat")
-                        .on_click(cx.listener(|this, _, _, _| {
-                            this.controller.set_view_mode(LibraryViewMode::FlatList)
-                        })),
-                )
-                .child(
-                    div()
-                        .id("view-publisher")
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(
-                            root.controller.view_mode == LibraryViewMode::TreeByPublisher,
-                            |d| d.bg(rgb(0x2563eb)),
-                        )
-                        .when(
-                            root.controller.view_mode != LibraryViewMode::TreeByPublisher,
-                            |d| d.bg(rgb(0x1f2937)),
-                        )
-                        .child("Tree: Publisher")
-                        .on_click(cx.listener(|this, _, _, _| {
-                            this.controller.set_view_mode(LibraryViewMode::TreeByPublisher)
-                        })),
-                )
-                .child(
-                    div()
-                        .id("view-product-type")
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(
-                            root.controller.view_mode == LibraryViewMode::TreeByProductType,
-                            |d| d.bg(rgb(0x2563eb)),
-                        )
-                        .when(
-                            root.controller.view_mode != LibraryViewMode::TreeByProductType,
-                            |d| d.bg(rgb(0x1f2937)),
-                        )
-                        .child("Tree: Product Type")
-                        .on_click(cx.listener(|this, _, _, _| {
-                            this.controller.set_view_mode(LibraryViewMode::TreeByProductType)
-                        })),
-                )
+                .child(view_mode_button(
+                                    1,
+                                    "Flat",
+                                    root.controller.view_mode == LibraryViewMode::FlatList,
+                                    cx.listener(|this, _, _, _| this.controller.set_view_mode(LibraryViewMode::FlatList)),
+                                ))
+                .child(view_mode_button(
+                                    2,
+                                    "Tree: Publisher",
+                                    root.controller.view_mode == LibraryViewMode::TreeByPublisher,
+                                    cx.listener(|this, _, _, _| {
+                                        this.controller.set_view_mode(LibraryViewMode::TreeByPublisher)
+                                    }),
+                                ))
+                .child(view_mode_button(
+                                    3,
+                                    "Tree: Product Type",
+                                    root.controller.view_mode == LibraryViewMode::TreeByProductType,
+                                    cx.listener(|this, _, _, _| {
+                                        this.controller.set_view_mode(LibraryViewMode::TreeByProductType)
+                                    }),
+                                ))
                 .child(
                     div()
                         .id("view-mode-cycle")
@@ -106,9 +78,20 @@ pub(crate) fn render_controls_row(
                         .py_1()
                         .bg(rgb(0x111827))
                         .border_1()
-                        .border_color(rgb(0x374151))
+                        .border_color(if root.controller.search_editing {
+                            rgb(0x2563eb)
+                        } else {
+                            rgb(0x374151)
+                        })
                         .rounded_sm()
-                        .child(format!("Search: {active_query}")),
+                        .child(format!(
+                            "Search: {active_query} (type; Esc to stop; Cmd/Ctrl+F focus)"
+                        ))
+                        .on_click(cx.listener(|this, _, _, _| this.controller.begin_search_editing()))
+                        .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _, _| {
+                            this.controller
+                                .handle_global_key(&event.keystroke.key, &event.keystroke.modifiers);
+                        })),
                 )
                 .child(
                     div()
@@ -138,6 +121,17 @@ pub(crate) fn render_controls_row(
                 )
                 .child(
                     div()
+                        .id("search-mode")
+                        .px_2()
+                        .py_1()
+                        .bg(rgb(0x1f2937))
+                        .rounded_sm()
+                        .cursor_pointer()
+                        .child(format!("Search mode: {search_mode}"))
+                        .on_click(cx.listener(|this, _, _, _| this.controller.toggle_match_presentation())),
+                )
+                .child(
+                    div()
                         .px_2()
                         .py_1()
                         .bg(rgb(0x0f172a))
@@ -145,111 +139,214 @@ pub(crate) fn render_controls_row(
                         .child(format!("Visible items: {count}")),
                 ),
         )
+        // .child(
+        //     div()
+        //         .flex()
+        //         .gap_2()
+        //         .items_center()
+        //         .child("Tree filter scope")
+        //         .child(scope_button(
+        //                             1,
+        //                             "Child only",
+        //                             root.controller.filter_scope == FilterScope::ChildOnly,
+        //                             cx.listener(|this, _, _, _| {
+        //                                 this.controller.set_filter_scope(FilterScope::ChildOnly)
+        //                             }),
+        //                         ))
+        //         .child(scope_button(
+        //                             2,
+        //                             "Root + child",
+        //                             root.controller.filter_scope == FilterScope::RootAndChild,
+        //                             cx.listener(|this, _, _, _| {
+        //                                 this.controller.set_filter_scope(FilterScope::RootAndChild)
+        //                             }),
+        //                         ))
+        //         .child(scope_button(
+        //                             3,
+        //                             "Root only",
+        //                             root.controller.filter_scope == FilterScope::RootOnly,
+        //                             cx.listener(|this, _, _, _| {
+        //                                 this.controller.set_filter_scope(FilterScope::RootOnly)
+        //                             }),
+        //                         ))
+        //         .child(
+        //             div()
+        //                 .id("scope-cycle")
+        //                 .px_2()
+        //                 .py_1()
+        //                 .bg(rgb(0x1f2937))
+        //                 .rounded_sm()
+        //                 .cursor_pointer()
+        //                 .child("Cycle scope")
+        //                 .on_click(cx.listener(|this, _, _, _| this.controller.cycle_filter_scope())),
+        //         )
+        //         .child(render_sort_controls(root, cx)),
+        // )
         .child(
             div()
-                .flex()
-                .gap_2()
-                .items_center()
-                .child("Tree filter scope")
-                .child(
-                    div()
-                        .id("scope-child")
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(root.controller.filter_scope == FilterScope::ChildOnly, |d| {
-                            d.bg(rgb(0x2563eb))
-                        })
-                        .when(root.controller.filter_scope != FilterScope::ChildOnly, |d| {
-                            d.bg(rgb(0x1f2937))
-                        })
-                        .child("Child only")
-                        .on_click(cx.listener(|this, _, _, _| {
-                            this.controller.set_filter_scope(FilterScope::ChildOnly)
-                        })),
-                )
-                .child(
-                    div()
-                        .id("scope-root-child")
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(root.controller.filter_scope == FilterScope::RootAndChild, |d| {
-                            d.bg(rgb(0x2563eb))
-                        })
-                        .when(root.controller.filter_scope != FilterScope::RootAndChild, |d| {
-                            d.bg(rgb(0x1f2937))
-                        })
-                        .child("Root + child")
-                        .on_click(cx.listener(|this, _, _, _| {
-                            this.controller.set_filter_scope(FilterScope::RootAndChild)
-                        })),
-                )
-                .child(
-                    div()
-                        .id("scope-root-only")
-                        .px_2()
-                        .py_1()
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .when(root.controller.filter_scope == FilterScope::RootOnly, |d| {
-                            d.bg(rgb(0x2563eb))
-                        })
-                        .when(root.controller.filter_scope != FilterScope::RootOnly, |d| {
-                            d.bg(rgb(0x1f2937))
-                        })
-                        .child("Root only")
-                        .on_click(cx.listener(|this, _, _, _| {
-                            this.controller.set_filter_scope(FilterScope::RootOnly)
-                        })),
-                )
-                .child(
-                    div()
-                        .id("scope-cycle")
-                        .px_2()
-                        .py_1()
-                        .bg(rgb(0x1f2937))
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .child("Cycle scope")
-                        .on_click(cx.listener(|this, _, _, _| this.controller.cycle_filter_scope())),
-                )
-                .child(
-                    div()
-                        .id("flat-sort")
-                        .px_2()
-                        .py_1()
-                        .bg(rgb(0x1f2937))
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .child(format!("Flat sort: {}", root.controller.flat_sort_label()))
-                        .on_click(cx.listener(|this, _, _, _| this.controller.cycle_flat_sort())),
-                )
-                .child(
-                    div()
-                        .id("outer-sort")
-                        .px_2()
-                        .py_1()
-                        .bg(rgb(0x1f2937))
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .child(format!("Tree outer: {}", root.controller.outer_sort_label()))
-                        .on_click(cx.listener(|this, _, _, _| this.controller.cycle_outer_sort())),
-                )
-                .child(
-                    div()
-                        .id("inner-sort")
-                        .px_2()
-                        .py_1()
-                        .bg(rgb(0x1f2937))
-                        .rounded_sm()
-                        .cursor_pointer()
-                        .child(format!("Tree inner: {}", root.controller.inner_sort_label()))
-                        .on_click(cx.listener(|this, _, _, _| this.controller.cycle_inner_sort())),
-                ),
+                .text_color(rgb(0x93c5fd))
+                .child("Keyboard: / or Cmd/Ctrl+F focuses search, Esc exits search editing, Cmd/Ctrl+L clears search."),
         )
+}
+
+fn render_sort_controls(
+    root: &LibraryRootView,
+    cx: &mut Context<LibraryRootView>,
+) -> impl IntoElement {
+    match root.controller.view_mode {
+        LibraryViewMode::FlatList => div().child(sort_selector(
+            "Sort",
+            root.controller.flat_sort,
+            root.controller.open_sort_popup == Some(SortPopup::Flat),
+            cx.listener(|this, _, _, _| this.controller.toggle_sort_popup(SortPopup::Flat)),
+            |controller, sort| controller.set_flat_sort(sort),
+            root,
+            cx,
+        )),
+        _ => div()
+            .child(sort_selector(
+                "Tree outer",
+                root.controller.outer_sort,
+                root.controller.open_sort_popup == Some(SortPopup::Outer),
+                cx.listener(|this, _, _, _| this.controller.toggle_sort_popup(SortPopup::Outer)),
+                |controller, sort| controller.set_outer_sort(sort),
+                root,
+                cx,
+            ))
+            .child(sort_selector(
+                "Tree inner",
+                root.controller.inner_sort,
+                root.controller.open_sort_popup == Some(SortPopup::Inner),
+                cx.listener(|this, _, _, _| this.controller.toggle_sort_popup(SortPopup::Inner)),
+                |controller, sort| controller.set_inner_sort(sort),
+                root,
+                cx,
+            )),
+    }
+}
+
+fn sort_selector(
+    label: &str,
+    current: SortMethod,
+    open: bool,
+    toggle: impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
+    set_sort: impl Fn(&mut LibraryController, SortMethod) + Copy + 'static,
+    root: &LibraryRootView,
+    cx: &mut Context<LibraryRootView>,
+) -> impl IntoElement {
+    let mut menu = div().flex().flex_col().gap_1().child(
+        div()
+            .id(("sort-selector", stable_id(label)))
+            .px_2()
+            .py_1()
+            .bg(rgb(0x1f2937))
+            .rounded_sm()
+            .cursor_pointer()
+            .child(format!("{label}: {}", sort_label(current)))
+            .on_click(toggle),
+    );
+
+    if open {
+        menu = menu
+            .child(sort_option(SortMethod::AtoZ, current, set_sort, root, cx))
+            .child(sort_option(SortMethod::ZtoA, current, set_sort, root, cx))
+            .child(sort_option(
+                SortMethod::MostRecentlyAdded,
+                current,
+                set_sort,
+                root,
+                cx,
+            ))
+            .child(sort_option(
+                SortMethod::MostRecentlyUpdated,
+                current,
+                set_sort,
+                root,
+                cx,
+            ))
+            .child(
+                div()
+                    .id(("sort-close", 1_u64))
+                    .px_2()
+                    .py_1()
+                    .bg(rgb(0x0f172a))
+                    .rounded_sm()
+                    .cursor_pointer()
+                    .child("Close")
+                    .on_click(cx.listener(|this, _, _, _| this.controller.close_sort_popup())),
+            );
+    }
+
+    menu
+}
+
+fn sort_option(
+    sort: SortMethod,
+    current: SortMethod,
+    set_sort: impl Fn(&mut LibraryController, SortMethod) + Copy + 'static,
+    _root: &LibraryRootView,
+    cx: &mut Context<LibraryRootView>,
+) -> impl IntoElement {
+    div()
+        .id(("sort-option", sort as u64))
+        .px_2()
+        .py_1()
+        .rounded_sm()
+        .cursor_pointer()
+        .when(sort == current, |d| d.bg(rgb(0x2563eb)))
+        .when(sort != current, |d| d.bg(rgb(0x1e293b)))
+        .child(sort_label(sort))
+        .on_click(cx.listener(move |this, _, _, _| set_sort(&mut this.controller, sort)))
+}
+
+fn sort_label(sort: SortMethod) -> &'static str {
+    match sort {
+        SortMethod::AtoZ => "A-Z",
+        SortMethod::ZtoA => "Z-A",
+        SortMethod::MostRecentlyAdded => "Most recently added",
+        SortMethod::MostRecentlyUpdated => "Most recently updated",
+    }
+}
+
+fn view_mode_button(
+    id: u64,
+    label: &str,
+    active: bool,
+    on_click: impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(("view-mode-button", id))
+        .px_2()
+        .py_1()
+        .rounded_sm()
+        .cursor_pointer()
+        .when(active, |d| d.bg(rgb(0x2563eb)))
+        .when(!active, |d| d.bg(rgb(0x1f2937)))
+        .child(label.to_string())
+        .on_click(on_click)
+}
+
+fn scope_button(
+    label: &str,
+    active: bool,
+    on_click: impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(("scope-button", stable_id(label)))
+        .px_2()
+        .py_1()
+        .rounded_sm()
+        .cursor_pointer()
+        .when(active, |d| d.bg(rgb(0x2563eb)))
+        .when(!active, |d| d.bg(rgb(0x1f2937)))
+        .child(label.to_string())
+        .on_click(on_click)
+}
+
+fn stable_id(label: &str) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    label.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn search_chip(

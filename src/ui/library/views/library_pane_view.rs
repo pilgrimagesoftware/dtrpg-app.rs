@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 
 use gpui::{Context, IntoElement, div, prelude::*, rgb};
 
-use crate::ui::library::model::library_data::LibraryViewMode;
+use crate::ui::library::model::library_data::{LibraryViewMode, MatchPresentation};
 
 use crate::ui::library::controller::library_controller::Selection;
 
@@ -17,16 +17,35 @@ pub(crate) fn render_library_pane(
     let left_content = match root.controller.view_mode {
         LibraryViewMode::FlatList => {
             let items = root.controller.flat_items();
-            div().flex().flex_col().gap_1().children(items.into_iter().map(|item| {
+            div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .children(items.into_iter().map(|item| {
                 let item_id = item.id;
-                let selected = matches!(root.controller.selection, Some(Selection::Item(id)) if id == item_id);
+                let selected =
+                    matches!(root.controller.selection, Some(Selection::Item(id)) if id == item_id);
+                let matches = root.controller.is_item_match(&item);
                 div()
                     .id(("flat-item", item_id))
                     .flex()
                     .justify_between()
                     .p_2()
                     .when(selected, |d| d.bg(rgb(0x334155)))
-                    .when(!selected, |d| d.bg(rgb(0x111827)))
+                    .when(
+                        !selected
+                            && matches
+                            && root.controller.match_presentation
+                                == MatchPresentation::HighlightMatching,
+                        |d| d.bg(rgb(0x1e3a8a)),
+                    )
+                    .when(
+                        !selected
+                            && !(matches
+                                && root.controller.match_presentation
+                                    == MatchPresentation::HighlightMatching),
+                        |d| d.bg(rgb(0x111827)),
+                    )
                     .border_1()
                     .border_color(rgb(0x374151))
                     .rounded_sm()
@@ -52,6 +71,7 @@ pub(crate) fn render_library_pane(
                     _ => false,
                 };
 
+                let root_matches = root.controller.is_root_match(&root_label);
                 let root_id = stable_root_id(&root_label);
                 let root_row = div()
                     .id(("tree-root", root_id))
@@ -59,7 +79,10 @@ pub(crate) fn render_library_pane(
                     .rounded_sm()
                     .cursor_pointer()
                     .when(root_selected, |d| d.bg(rgb(0x334155)))
-                    .when(!root_selected, |d| d.bg(rgb(0x1f2937)))
+                    .when(!root_selected && root_matches && root.controller.match_presentation == MatchPresentation::HighlightMatching, |d| {
+                        d.bg(rgb(0x1e3a8a))
+                    })
+                    .when(!root_selected && !(root_matches && root.controller.match_presentation == MatchPresentation::HighlightMatching), |d| d.bg(rgb(0x1f2937)))
                     .child(format!("{} ({})", root_label, node.children.len()))
                     .on_click(cx.listener(move |this, _, _, _| match this.controller.view_mode {
                         LibraryViewMode::TreeByPublisher => {
@@ -77,13 +100,17 @@ pub(crate) fn render_library_pane(
                             let item_id = item.id;
                             let selected =
                                 matches!(root.controller.selection, Some(Selection::Item(id)) if id == item_id);
+                            let matches = root.controller.is_item_match(&item);
                             div()
                                 .id(("tree-item", item_id))
                                 .p_1()
                                 .rounded_sm()
                                 .cursor_pointer()
                                 .when(selected, |d| d.bg(rgb(0x475569)))
-                                .when(!selected, |d| d.bg(rgb(0x0f172a)))
+                                .when(!selected && matches && root.controller.match_presentation == MatchPresentation::HighlightMatching, |d| {
+                                    d.bg(rgb(0x1e3a8a))
+                                })
+                                .when(!selected && !(matches && root.controller.match_presentation == MatchPresentation::HighlightMatching), |d| d.bg(rgb(0x0f172a)))
                                 .child(item.title)
                                 .on_click(cx.listener(move |this, _, _, _| {
                                     this.controller.set_item_selection(item_id);

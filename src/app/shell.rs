@@ -1,4 +1,4 @@
-//! Baseline app shell state and command routing.
+//! App shell state and command routing.
 
 use crate::services::{LibraryItem, LibraryServiceErrorKind};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
@@ -72,23 +72,21 @@ impl AppShell {
         self.library_vm.items()
     }
 
-
-
     /// Routes a shell command and synchronizes shell state from view model changes.
     pub fn dispatch(&mut self, command: AppCommand) {
         match command {
             AppCommand::LoadLibrary => {
                 self.library_vm.load_list();
-                self.sync_from_library("Library loaded in baseline stub mode.");
+                self.sync_from_library("Library loaded through the Rust SDK.");
             }
             AppCommand::RefreshLibrary => {
                 self.library_vm.refresh();
-                self.sync_from_library("Library refreshed in baseline stub mode.");
+                self.sync_from_library("Library refreshed through the Rust SDK.");
             }
             AppCommand::SelectLibraryItem(id) => {
                 self.library_vm.select_item(id);
                 self.state.selected_item_id = self.library_vm.selected().map(|item| item.id);
-                self.sync_from_library("Library item selected in baseline stub mode.");
+                self.sync_from_library("Library item loaded through the Rust SDK.");
             }
             AppCommand::ClearSelection => {
                 self.state.selected_item_id = None;
@@ -108,7 +106,7 @@ impl AppShell {
                 self.state.status_message = loaded_message.to_string();
             }
             LibraryPaneState::Empty => {
-                self.state.status_message = "No library items found in baseline stub mode.".to_string();
+                self.state.status_message = "No library items found.".to_string();
             }
             LibraryPaneState::Error => {
                 self.state.status_message = self
@@ -160,7 +158,7 @@ mod tests {
         assert_eq!(shell.state().library, LibraryPaneState::Loaded);
         assert_eq!(
             shell.state().status_message,
-            "Library loaded in baseline stub mode."
+            "Library loaded through the Rust SDK."
         );
     }
 
@@ -171,10 +169,7 @@ mod tests {
         shell.dispatch(AppCommand::LoadLibrary);
 
         assert_eq!(shell.state().library, LibraryPaneState::Empty);
-        assert_eq!(
-            shell.state().status_message,
-            "No library items found in baseline stub mode."
-        );
+        assert_eq!(shell.state().status_message, "No library items found.");
     }
 
     #[test]
@@ -184,7 +179,10 @@ mod tests {
         shell.dispatch(AppCommand::LoadLibrary);
 
         assert_eq!(shell.state().library, LibraryPaneState::Error);
-        assert_eq!(shell.state().session, SessionPresentationState::NeedsRecovery);
+        assert_eq!(
+            shell.state().session,
+            SessionPresentationState::NeedsRecovery
+        );
         assert_eq!(
             shell.state().status_message,
             "Session recovery required before loading library."

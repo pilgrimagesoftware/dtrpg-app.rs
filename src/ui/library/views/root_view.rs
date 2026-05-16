@@ -1,8 +1,8 @@
 //! GPUI root view and window bootstrap for the library feature.
 
 use gpui::{
-    App, Application, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    App, Application, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, rgb, size,
 };
 
 use crate::ui::library::controller::library_controller::LibraryController;
@@ -34,7 +34,7 @@ pub(crate) struct LibraryRootView {
 }
 
 impl LibraryRootView {
-    /// Creates a new root view with seeded stub state.
+    /// Creates a new root view with SDK-backed library state.
     fn new() -> Self {
         Self {
             controller: LibraryController::new(),
@@ -57,7 +57,7 @@ impl Render for LibraryRootView {
                     .flex()
                     .gap_2()
                     .items_center()
-                    .child("DriveThruRPG UI – stubbed library data")
+                    .child("DriveThruRPG Library")
                     .child(
                         div()
                             .id("refresh-library")
@@ -79,10 +79,9 @@ impl Render for LibraryRootView {
                     .child(render_library_pane(self, cx))
                     .child(render_detail_pane(self)),
             )
-            .child(
-                div()
-                    .text_color(rgb(0x93c5fd))
-                    .child(format!("Status: {}", self.controller.shell.state().status_message)),
-            )
+            .child(div().text_color(rgb(0x93c5fd)).child(format!(
+                "Status: {}",
+                self.controller.shell.state().status_message
+            )))
     }
 }

@@ -5,6 +5,6 @@
 
 ## 2. Rust Integration Implementation
 
-- [ ] 2.1 Replace Rust baseline stubs with Rust SDK-backed adapters
-- [ ] 2.2 Preserve shared request lifecycle and recovery behavior
-- [ ] 2.3 Add tests for Rust adapter behavior and view-state transitions
+- [x] 2.1 Replace Rust baseline stubs with Rust SDK-backed adapters
+- [x] 2.2 Preserve shared request lifecycle and recovery behavior
+- [x] 2.3 Add tests for Rust adapter behavior and view-state transitions

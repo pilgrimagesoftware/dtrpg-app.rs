@@ -17,6 +17,14 @@ pub enum FilterScope {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MatchPresentation {
+    /// Hide non-matching items and show only matching results.
+    HideNonMatching,
+    /// Keep all items and visually highlight matching results.
+    HighlightMatching,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SortMethod {
     AtoZ,
     ZtoA,
@@ -56,28 +64,12 @@ pub fn mode_label(mode: LibraryViewMode) -> &'static str {
     }
 }
 
-
-
 pub fn filter_presets() -> [&'static str; 4] {
     ["", "atlas", "sandbox", "tabletop"]
 }
 
-pub fn sorted_filtered_flat_items(
-    items: &[LibraryItem],
-    query: &str,
-    sort: SortMethod,
-) -> Vec<LibraryItem> {
+pub fn sorted_flat_items(items: &[LibraryItem], sort: SortMethod) -> Vec<LibraryItem> {
     let mut result = items.to_vec();
-    let query = query.to_lowercase();
-
-    if !query.is_empty() {
-        result.retain(|item| {
-            item.title.to_lowercase().contains(&query)
-                || item.publisher.to_lowercase().contains(&query)
-                || item.product_type.to_lowercase().contains(&query)
-        });
-    }
-
     sort_items(&mut result, sort);
     result
 }
@@ -85,8 +77,6 @@ pub fn sorted_filtered_flat_items(
 pub fn grouped_items(
     items: &[LibraryItem],
     mode: LibraryViewMode,
-    query: &str,
-    scope: FilterScope,
     outer_sort: SortMethod,
     inner_sort: SortMethod,
 ) -> Vec<TreeNode> {
@@ -101,32 +91,9 @@ pub fn grouped_items(
         groups.entry(key).or_default().push(item);
     }
 
-    let query = query.to_lowercase();
     let mut nodes = Vec::new();
 
     for (root_label, mut children) in groups {
-        let root_matches = query.is_empty() || root_label.to_lowercase().contains(&query);
-
-        if !query.is_empty() {
-            match scope {
-                FilterScope::ChildOnly => {
-                    children.retain(|item| item.title.to_lowercase().contains(&query));
-                }
-                FilterScope::RootAndChild => {
-                    children.retain(|item| root_matches || item.title.to_lowercase().contains(&query));
-                }
-                FilterScope::RootOnly => {
-                    if !root_matches {
-                        children.clear();
-                    }
-                }
-            }
-        }
-
-        if children.is_empty() {
-            continue;
-        }
-
         sort_items(&mut children, inner_sort);
         nodes.push(TreeNode {
             root_label,
@@ -136,6 +103,25 @@ pub fn grouped_items(
 
     nodes.sort_by(|a, b| compare_roots(&a.root_label, &b.root_label, outer_sort));
     nodes
+}
+
+pub fn item_matches(item: &LibraryItem, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+
+    let query = query.to_lowercase();
+    item.title.to_lowercase().contains(&query)
+        || item.publisher.to_lowercase().contains(&query)
+        || item.product_type.to_lowercase().contains(&query)
+}
+
+pub fn root_matches(root_label: &str, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+
+    root_label.to_lowercase().contains(&query.to_lowercase())
 }
 
 fn sort_items(items: &mut [LibraryItem], sort: SortMethod) {

@@ -1,6 +1,6 @@
 //! DriveThruRPG Rust desktop application entry point.
 //!
-//! This binary boots the GPUI desktop shell with stubbed library data.
+//! This binary boots the GPUI desktop shell with SDK-backed library data.
 
 mod app;
 mod services;
