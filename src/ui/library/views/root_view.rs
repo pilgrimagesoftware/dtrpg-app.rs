@@ -48,29 +48,42 @@ impl Render for LibraryRootView {
             .size_full()
             .bg(rgb(0x0b1220))
             .text_color(rgb(0xf8fafc))
-            .p_3()
             .flex()
             .flex_col()
-            .gap_3()
+            .p_0()
+            .gap_0()
+            .relative()
             .child(
                 div()
                     .flex()
                     .justify_between()
                     .items_center()
-                    .child("DriveThruRPG Library")
+                    .px_4()
+                    .py_1()
+                    .bg(rgb(0x0b1220))
+                    .border_b_1()
+                    .border_color(rgb(0x1e293b))
+                    .w_full()
+                    .child(
+                        div()
+                            .text_xs()
+                            .child("DriveThruRPG Library")
+                    )
                     .child(
                         div()
                             .flex()
-                            .gap_2()
+                            .gap_1()
                             .items_center()
+                            .relative()
                             .child(
                                 div()
                                     .id("refresh-library")
                                     .px_2()
                                     .py_1()
-                                    .bg(rgb(0x1d4ed8))
+                                    .bg(rgb(0x1e40af))
                                     .rounded_sm()
                                     .cursor_pointer()
+                                    .text_xs()
                                     .child("Refresh")
                                     .on_click(cx.listener(|this, _, _, _| this.controller.refresh())),
                             )
@@ -79,94 +92,108 @@ impl Render for LibraryRootView {
                                     .id("account-menu")
                                     .px_2()
                                     .py_1()
-                                    .bg(rgb(0x1f2937))
+                                    .bg(rgb(0x374151))
                                     .rounded_sm()
                                     .cursor_pointer()
+                                    .text_xs()
                                     .child(self.controller.account_summary())
                                     .on_click(
                                         cx.listener(|this, _, _, _| this.controller.toggle_account_menu()),
                                     ),
-                            ),
+                            )
+                            .when(self.controller.account.menu_open, |view| {
+                                view.child(
+                                    div()
+                                        .absolute()
+                                        .top_full()
+                                        .right_0()
+                                        .mt_1()
+                                        .flex()
+                                        .flex_col()
+                                        .gap_1()
+                                        .p_2()
+                                        .bg(rgb(0x111827))
+                                        .border_1()
+                                        .border_color(rgb(0x374151))
+                                        .rounded_sm()
+                                        // .z_index(1000)
+                                        .child(self.controller.account.display_name.clone())
+                                        .child(self.controller.account.connection_status.clone())
+                                        .child(
+                                            div()
+                                                .id("set-access-token")
+                                                .px_2()
+                                                .py_1()
+                                                .bg(rgb(0x1d4ed8))
+                                                .rounded_sm()
+                                                .cursor_pointer()
+                                                .child("Set access token")
+                                                .on_click(cx.listener(|this, _, _, _| {
+                                                    this.controller.mark_token_set_action()
+                                                })),
+                                        )
+                                        .child(
+                                            div()
+                                                .id("reset-access-token")
+                                                .px_2()
+                                                .py_1()
+                                                .bg(rgb(0x334155))
+                                                .rounded_sm()
+                                                .cursor_pointer()
+                                                .child("Reset access token")
+                                                .on_click(cx.listener(|this, _, _, _| {
+                                                    this.controller.mark_token_reset_action()
+                                                })),
+                                        )
+                                        .child(
+                                            div()
+                                                .id("open-settings")
+                                                .px_2()
+                                                .py_1()
+                                                .bg(rgb(0x334155))
+                                                .rounded_sm()
+                                                .cursor_pointer()
+                                                .child("Application settings")
+                                                .on_click(cx.listener(|this, _, _, _| {
+                                                    this.controller.open_settings_action()
+                                                })),
+                                        ),
+                                )
+                            }),
                     ),
             )
-            .when(self.controller.account.menu_open, |view| {
-                view.child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .p_2()
-                        .bg(rgb(0x111827))
-                        .border_1()
-                        .border_color(rgb(0x374151))
-                        .rounded_sm()
-                        .child(self.controller.account.display_name.clone())
-                        .child(self.controller.account.connection_status.clone())
-                        .child(
-                            div()
-                                .id("set-access-token")
-                                .px_2()
-                                .py_1()
-                                .bg(rgb(0x1d4ed8))
-                                .rounded_sm()
-                                .cursor_pointer()
-                                .child("Set access token")
-                                .on_click(cx.listener(|this, _, _, _| {
-                                    this.controller.mark_token_set_action()
-                                })),
-                        )
-                        .child(
-                            div()
-                                .id("reset-access-token")
-                                .px_2()
-                                .py_1()
-                                .bg(rgb(0x334155))
-                                .rounded_sm()
-                                .cursor_pointer()
-                                .child("Reset access token")
-                                .on_click(cx.listener(|this, _, _, _| {
-                                    this.controller.mark_token_reset_action()
-                                })),
-                        )
-                        .child(
-                            div()
-                                .id("open-settings")
-                                .px_2()
-                                .py_1()
-                                .bg(rgb(0x334155))
-                                .rounded_sm()
-                                .cursor_pointer()
-                                .child("Application settings")
-                                .on_click(cx.listener(|this, _, _, _| {
-                                    this.controller.open_settings_action()
-                                })),
-                        ),
-                )
-            })
-            .child(render_controls_row(self, cx))
             .child(
                 div()
                     .flex()
+                    .flex_col()
+                    .flex_1()
                     .gap_3()
-                    .size_full()
-                    .child(render_library_pane(self, cx))
-                    .child(render_detail_pane(self)),
-            )
-            .child(
-                div()
-                    .flex()
-                    .justify_between()
-                    .text_color(rgb(0x93c5fd))
-                    .child(format!("View: {}", self.controller.view_summary()))
-                    .child(format!(
-                        "{} | {}",
-                        self.controller.sync_status_summary(),
-                        self.controller.sync_status_detail()
-                    ))
-                    .child(format!(
-                        "Status: {}",
-                        self.controller.shell.state().status_message
-                    )),
+                    .p_3()
+                    .child(render_controls_row(self, cx))
+                    .child(
+                        div()
+                            .flex()
+                            .gap_3()
+                            .size_full()
+                            .child(render_library_pane(self, cx))
+                            .child(render_detail_pane(self)),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .justify_between()
+                            .text_color(rgb(0x93c5fd))
+                            .child(format!("View: {}", self.controller.view_summary()))
+                            .child(format!(
+                                "{} | {}",
+                                self.controller.sync_status_summary(),
+                                self.controller.sync_status_detail()
+                            ))
+                            .child(format!(
+                                "Status: {}",
+                                self.controller.shell.state().status_message
+                            )),
+                    ),
             )
     }
 }
