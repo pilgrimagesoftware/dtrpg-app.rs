@@ -55,32 +55,38 @@ impl Render for LibraryRootView {
             .child(
                 div()
                     .flex()
-                    .gap_2()
+                    .justify_between()
                     .items_center()
                     .child("DriveThruRPG Library")
                     .child(
                         div()
-                            .id("account-menu")
-                            .px_2()
-                            .py_1()
-                            .bg(rgb(0x1f2937))
-                            .rounded_sm()
-                            .cursor_pointer()
-                            .child(self.controller.account_summary())
-                            .on_click(
-                                cx.listener(|this, _, _, _| this.controller.toggle_account_menu()),
+                            .flex()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                div()
+                                    .id("refresh-library")
+                                    .px_2()
+                                    .py_1()
+                                    .bg(rgb(0x1d4ed8))
+                                    .rounded_sm()
+                                    .cursor_pointer()
+                                    .child("Refresh")
+                                    .on_click(cx.listener(|this, _, _, _| this.controller.refresh())),
+                            )
+                            .child(
+                                div()
+                                    .id("account-menu")
+                                    .px_2()
+                                    .py_1()
+                                    .bg(rgb(0x1f2937))
+                                    .rounded_sm()
+                                    .cursor_pointer()
+                                    .child(self.controller.account_summary())
+                                    .on_click(
+                                        cx.listener(|this, _, _, _| this.controller.toggle_account_menu()),
+                                    ),
                             ),
-                    )
-                    .child(
-                        div()
-                            .id("refresh-library")
-                            .px_2()
-                            .py_1()
-                            .bg(rgb(0x1d4ed8))
-                            .rounded_sm()
-                            .cursor_pointer()
-                            .child("Refresh")
-                            .on_click(cx.listener(|this, _, _, _| this.controller.refresh())),
                     ),
             )
             .when(self.controller.account.menu_open, |view| {
