@@ -1,8 +1,7 @@
 //! GPUI root view and window bootstrap for the library feature.
 
 use gpui::{
-    App, Application, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size,
+    App, Application, Bounds, Context, Render, TitlebarOptions, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, size
 };
 
 use crate::ui::library::controller::library_controller::LibraryController;
@@ -19,6 +18,10 @@ pub fn launch() {
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
+                titlebar: Some(TitlebarOptions {
+                    appears_transparent: true,
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             |_, cx| cx.new(|_| LibraryRootView::new()),
