@@ -13,6 +13,8 @@ gpui.workspace = true
 gpui_platform.workspace = true
 gpui-component = { workspace = true }
 
+[dev-dependencies]
+pretty_assertions = "1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block = "0.1"
@@ -34,3 +36,4 @@ foreign-types = "0.5"
 # mach2.workspace = true
 #TODO: replace with "objc2"
 metal.workspace = true
+gpui-component-assets.workspace = true

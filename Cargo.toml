@@ -39,6 +39,4 @@ core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.5.2", features = ["metal"] }
 metal = "0.33"
-
-[workspace.dev-dependencies]
-pretty_assertions = "1"
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
