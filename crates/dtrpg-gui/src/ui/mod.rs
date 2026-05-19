@@ -1,5 +1,7 @@
 //! UI layer modules.
 
-pub mod library;
 pub mod app;
-pub mod window;
+pub mod controllers;
+pub mod models;
+pub mod views;
+pub mod windows;

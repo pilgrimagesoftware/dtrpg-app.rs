@@ -1,8 +1,7 @@
 
 use gpui::*;
 use gpui_component::*;
-use crate::ui::window::AppWindow;
-
+use crate::ui::windows::app::AppWindow;
 
 pub fn setup(cx: &mut App) {
     init(cx);

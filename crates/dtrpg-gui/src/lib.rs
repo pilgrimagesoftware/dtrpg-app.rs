@@ -4,6 +4,6 @@
 
 pub mod ui {
     pub mod app;
-    pub mod window;
+    pub mod windows;
 }
 pub mod view_models;
