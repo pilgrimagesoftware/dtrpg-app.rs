@@ -1,15 +1,44 @@
-[package]
-name = "dtrpg-app-rust"
+[workspace]
+default-members = ["crates/dtrpg-core", "crates/dtrpg-gui"]
+members = [
+    "crates/dtrpg-core",
+    "crates/dtrpg-gui",
+]
+resolver = "2"
+
+[workspace.package]
 version = "0.0.1"
 edition = "2024"
 description = "DriveThruRPG desktop frontend in Rust"
 license = "MIT"
+rust-version = "1.93"
 
-[dependencies]
+[workspace.lints.rust]
+unsafe_code           = "deny"
+unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+expect_used = "deny"
+unwrap_used = "deny"
+
+[workspace.dependencies]
 dtrpg-sdk = { path = "../../dtrpg-sdk/rust" }
+dtrpg-gui = { path = "crates/dtrpg-gui" }
+dtrpg-core = { path = "crates/dtrpg-core" }
 anyhow = "1"
-gpui = "0.2.2"
+# gpui = "0.2.2"
 tokio = { version = "1", features = ["rt-multi-thread"] }
+gpui = { git = "https://github.com/zed-industries/zed" }
+gpui_platform = { git = "https://github.com/zed-industries/zed" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+cocoa = "=0.26.0"
+cocoa-foundation = "=0.2.0"
+const_format = "0.2"
+convert_case = "0.8.0"
+core-foundation = "=0.10.0"
+core-foundation-sys = "0.8.6"
+core-video = { version = "0.5.2", features = ["metal"] }
+metal = "0.33"
 
-[dev-dependencies]
+[workspace.dev-dependencies]
 pretty_assertions = "1"

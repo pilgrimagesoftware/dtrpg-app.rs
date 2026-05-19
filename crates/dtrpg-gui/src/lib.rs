@@ -2,11 +2,8 @@
 //!
 //! This binary boots the GPUI desktop shell with SDK-backed library data.
 
-mod app;
-mod services;
-mod ui;
-mod view_models;
-
-fn main() {
-    ui::library::launch();
+pub mod ui {
+    pub mod app;
+    pub mod window;
 }
+pub mod view_models;
