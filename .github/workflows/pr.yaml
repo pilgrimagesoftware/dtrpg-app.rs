@@ -1,0 +1,37 @@
+name: PR Validation
+
+on:
+    pull_request:
+        branches:
+            - master
+            - develop
+
+permissions:
+    contents: read
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    validate:
+        name: Build check
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Set up Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Cache dependencies
+              uses: Swatinem/rust-cache@v2
+
+            - name: Check formatting
+              run: cargo fmt --check
+
+            - name: Lint
+              run: cargo clippy -- -D warnings
+
+            - name: Build
+              run: cargo build
