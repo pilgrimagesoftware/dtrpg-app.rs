@@ -18,9 +18,7 @@ Use a modular architecture. Do not place substantial UI, state, and data logic i
 - `src/ui/` owns GPUI view composition and rendering concerns.
 - `src/ui/<feature>/state.rs` owns feature interaction/state controller logic.
 - `src/ui/<feature>/data.rs` owns sorting/filtering/grouping helpers and presentation transforms.
-- `src/services/` owns backend-facing traits and implementations (stubbed or SDK-backed).
 - `src/view_models/` owns domain-facing view models that mediate service data into UI state.
-- `src/app/` owns shell-level command routing and cross-feature app/session presentation state.
 
 When adding features, prefer new focused modules over expanding existing files into monoliths.
 
