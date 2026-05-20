@@ -22,7 +22,7 @@ expect_used = "deny"
 unwrap_used = "deny"
 
 [workspace.dependencies]
-dtrpg-sdk = { git = "ssh://git@github.com/Pilgrimagesoftware/dtrpg-sdk.rs" }
+dtrpg-sdk = { git = "https://github.com/pilgrimagesoftware/dtrpg-sdk.rs" }
 dtrpg-gui = { path = "crates/dtrpg-gui" }
 dtrpg-core = { path = "crates/dtrpg-core" }
 anyhow = "1"
