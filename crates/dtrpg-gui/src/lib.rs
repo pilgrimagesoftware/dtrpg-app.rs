@@ -5,6 +5,7 @@
 pub mod ui {
     pub mod app;
     pub mod controllers;
+    pub mod library;
     pub mod models;
     pub mod views;
     pub mod windows;
