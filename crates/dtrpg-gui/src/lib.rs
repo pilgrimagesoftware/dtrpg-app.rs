@@ -4,6 +4,9 @@
 
 pub mod ui {
     pub mod app;
+    pub mod controllers;
+    pub mod models;
+    pub mod views;
     pub mod windows;
 }
 pub mod view_models;
