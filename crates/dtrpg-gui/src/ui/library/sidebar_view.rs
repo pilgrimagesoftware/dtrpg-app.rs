@@ -2,12 +2,13 @@
 
 use std::sync::Arc;
 
+use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
 use crate::ui::library::{
-    data::{format_total_size, PublisherEntry, SectionCounts, SidebarFilter},
+    data::{PublisherEntry, SectionCounts, SidebarFilter},
     state::LibraryController,
-    theme::{ColorTokens, LibriTheme},
+    theme::ColorTokens,
 };
 
 /// Renders the full sidebar column.
@@ -19,7 +20,7 @@ pub fn render_sidebar(
     total_mb: f64,
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
     let surface_alt = colors.surface_alt;
     let border = colors.border;
     let text_primary = colors.text_primary;
@@ -54,29 +55,29 @@ pub fn render_sidebar(
                 .items_center()
                 .gap(px(16.0))
                 .px(px(16.0))
-                .child(
-                    div()
-                        .flex()
-                        .gap(px(8.0))
-                        .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0xFF5F57)))
-                        .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0xFEBC2E)))
-                        .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0x28C840))),
-                )
+                // .child(
+                //     div()
+                //         .flex()
+                //         .gap(px(8.0))
+                //         .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0xFF5F57)))
+                //         .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0xFEBC2E)))
+                //         .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0x28C840))),
+                // )
                 .child(
                     div()
                         .flex()
                         .items_center()
                         .gap(px(8.0))
+                        // Logo mark: filled square in accent color (no CSS rotate available)
+                        // .child(
+                        //     div()
+                        //         .size(px(13.0))
+                        //         .bg(accent)
+                        //         .rounded(px(2.0)),
+                        // )
                         .child(
                             div()
-                                .size(px(13.0))
-                                .bg(accent)
-                                .rotate(gpui::degrees(45.0))
-                                .rounded(px(2.0)),
-                        )
-                        .child(
-                            div()
-                                .text_color(text_primary)
+                                // .text_color(text_primary)
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
                                 .text_lg()
                                 .child("Libri"),
@@ -88,7 +89,7 @@ pub fn render_sidebar(
             div()
                 .flex_1()
                 .min_h_0()
-                .overflow_y_auto()
+                .overflow_y_hidden()
                 .py(px(6.0))
                 // Library smart section
                 .child(
@@ -99,56 +100,32 @@ pub fn render_sidebar(
                             "All Titles",
                             Some(counts.all),
                             active_filter == SidebarFilter::AllTitles,
-                            {
-                                let e = entity.clone();
-                                move |cx| {
-                                    e.update(cx, |ctrl, cx| {
-                                        ctrl.set_filter(SidebarFilter::AllTitles, cx);
-                                    });
-                                }
-                            },
+                            SidebarFilter::AllTitles,
+                            entity.clone(),
                             accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                         ))
                         .child(render_nav_row(
                             "Recently Added",
                             Some(counts.recently_added),
                             active_filter == SidebarFilter::RecentlyAdded,
-                            {
-                                let e = entity.clone();
-                                move |cx| {
-                                    e.update(cx, |ctrl, cx| {
-                                        ctrl.set_filter(SidebarFilter::RecentlyAdded, cx);
-                                    });
-                                }
-                            },
+                            SidebarFilter::RecentlyAdded,
+                            entity.clone(),
                             accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                         ))
                         .child(render_nav_row(
                             "On This Device",
                             Some(counts.on_device),
                             active_filter == SidebarFilter::OnDevice,
-                            {
-                                let e = entity.clone();
-                                move |cx| {
-                                    e.update(cx, |ctrl, cx| {
-                                        ctrl.set_filter(SidebarFilter::OnDevice, cx);
-                                    });
-                                }
-                            },
+                            SidebarFilter::OnDevice,
+                            entity.clone(),
                             accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                         ))
                         .child(render_nav_row(
                             "In the Cloud",
                             Some(counts.in_cloud),
                             active_filter == SidebarFilter::InCloud,
-                            {
-                                let e = entity.clone();
-                                move |cx| {
-                                    e.update(cx, |ctrl, cx| {
-                                        ctrl.set_filter(SidebarFilter::InCloud, cx);
-                                    });
-                                }
-                            },
+                            SidebarFilter::InCloud,
+                            entity.clone(),
                             accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                         )),
                 )
@@ -171,19 +148,13 @@ pub fn render_sidebar(
                         .children(publishers.iter().map(|entry| {
                             let is_active = active_filter
                                 == SidebarFilter::Publisher(Arc::clone(&entry.name));
-                            let e = entity.clone();
-                            let name = Arc::clone(&entry.name);
-                            let count = entry.count;
+                            let filter = SidebarFilter::Publisher(Arc::clone(&entry.name));
                             render_nav_row(
                                 entry.name.as_ref(),
-                                Some(count),
+                                Some(entry.count),
                                 is_active,
-                                move |cx| {
-                                    let n = Arc::clone(&name);
-                                    e.update(cx, |ctrl, cx| {
-                                        ctrl.set_filter(SidebarFilter::Publisher(n), cx);
-                                    });
-                                },
+                                filter,
+                                entity.clone(),
                                 accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                             )
                         })),
@@ -213,14 +184,15 @@ fn render_nav_row(
     label: &str,
     count: Option<usize>,
     is_active: bool,
-    on_click: impl Fn(&mut gpui::WindowContext) + 'static,
+    filter: SidebarFilter,
+    entity: Entity<LibraryController>,
     accent: gpui::Hsla,
     accent_soft: gpui::Hsla,
-    hover_color: gpui::Hsla,
-    text_primary: gpui::Hsla,
+    _hover_color: gpui::Hsla,
+    _text_primary: gpui::Hsla,
     text_secondary: gpui::Hsla,
     text_tertiary: gpui::Hsla,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
     let label_color = if is_active { accent } else { text_secondary };
     let count_color = if is_active { accent } else { text_tertiary };
     let bg = if is_active {
@@ -228,9 +200,11 @@ fn render_nav_row(
     } else {
         gpui::hsla(0.0, 0.0, 0.0, 0.0)
     };
+    let label_id = label.to_string();
     let label = label.to_string();
 
     div()
+        .id(label_id)
         .flex()
         .items_center()
         .justify_between()
@@ -241,7 +215,10 @@ fn render_nav_row(
         .rounded(px(7.0))
         .bg(bg)
         .cursor_pointer()
-        .on_click(move |_, cx| on_click(cx))
+        .on_click(move |_, _, cx| {
+            let f = filter.clone();
+            entity.update(cx, |ctrl, cx| ctrl.set_filter(f, cx));
+        })
         .child(
             div()
                 .flex_1()

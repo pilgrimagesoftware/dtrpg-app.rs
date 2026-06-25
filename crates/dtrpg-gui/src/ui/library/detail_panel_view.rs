@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
+use gpui::prelude::*;
+use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
 
 use crate::ui::library::{
     cover::render_generative_cover,
@@ -16,9 +17,9 @@ pub fn render_detail_panel(
     selected_item: Option<&LibraryItem>,
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
-) -> impl IntoElement {
+) -> AnyElement {
     let Some(item) = selected_item else {
-        return div().into_any();
+        return div().into_any_element();
     };
 
     let surface = colors.surface;
@@ -54,6 +55,7 @@ pub fn render_detail_panel(
                 .absolute()
                 .top(px(12.0))
                 .right(px(12.0))
+                .id("detail-close")
                 .size(px(24.0))
                 .rounded_full()
                 .bg(hover)
@@ -63,7 +65,7 @@ pub fn render_detail_panel(
                 .cursor_pointer()
                 .text_sm()
                 .text_color(text_secondary)
-                .on_click(move |_, cx| {
+                .on_click(move |_, _, cx| {
                     entity_close.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
                 })
                 .child("✕"),
@@ -83,7 +85,7 @@ pub fn render_detail_panel(
             div()
                 .flex_1()
                 .min_h_0()
-                .overflow_y_auto()
+                .overflow_y_hidden()
                 .p(px(20.0))
                 .flex()
                 .flex_col()
@@ -147,6 +149,7 @@ pub fn render_detail_panel(
                         )
                         .child(
                             div()
+                                .id("detail-download")
                                 .h(px(36.0))
                                 .px(px(16.0))
                                 .rounded(px(8.0))
@@ -156,7 +159,7 @@ pub fn render_detail_panel(
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
-                                .on_click(move |_, cx| {
+                                .on_click(move |_, _, cx| {
                                     let id = Arc::clone(&item_id);
                                     entity_download.update(cx, |ctrl, cx| {
                                         ctrl.toggle_download(&id, cx);
@@ -173,11 +176,11 @@ pub fn render_detail_panel(
                 // Metadata table
                 .child(render_metadata_table(&item, colors)),
         )
-        .into_any()
+        .into_any_element()
 }
 
-fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens) -> impl IntoElement {
-    let rows: &[(&str, String)] = &[
+fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
+    let rows: Vec<(&'static str, String)> = vec![
         ("System",    item.line.to_string()),
         ("Category",  item.kind.to_string()),
         ("Format",    item.format.to_string()),
@@ -201,8 +204,6 @@ fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens) -> impl IntoE
         .border_color(border);
 
     for (label, value) in rows {
-        let label = *label;
-        let value = value.clone();
         table = table.child(
             div()
                 .flex()

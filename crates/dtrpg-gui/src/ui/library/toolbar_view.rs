@@ -1,5 +1,6 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout switcher.
 
+use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
 use crate::ui::library::{
@@ -29,14 +30,13 @@ pub fn render_toolbar(
     presentation: CatalogPresentation,
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
     let border_strong = colors.border_strong;
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
     let bg = colors.surface_alt;
-    let hover = colors.hover;
     let accent = colors.accent;
     let accent_soft = colors.accent_soft;
 
@@ -130,7 +130,7 @@ fn render_search(
     border: gpui::Hsla,
     text_primary: gpui::Hsla,
     text_tertiary: gpui::Hsla,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static {
     let has_query = !query.is_empty();
     let entity_clear = entity.clone();
 
@@ -158,10 +158,11 @@ fn render_search(
         .when(has_query, |el| {
             el.child(
                 div()
+                    .id("search-clear")
                     .text_xs()
                     .text_color(text_tertiary)
                     .cursor_pointer()
-                    .on_click(move |_, cx| {
+                    .on_click(move |_, _, cx| {
                         entity_clear.update(cx, |ctrl, cx| {
                             ctrl.clear_search_query(cx);
                         });
@@ -180,7 +181,7 @@ fn render_sort_selector(
     border: gpui::Hsla,
     text_primary: gpui::Hsla,
     text_tertiary: gpui::Hsla,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static {
     let label = match current {
         SortMethod::Title => "Title",
         SortMethod::Publisher => "Publisher",
@@ -195,6 +196,7 @@ fn render_sort_selector(
     };
 
     div()
+        .id("sort-selector")
         .h(px(30.0))
         .px(px(11.0))
         .rounded(px(8.0))
@@ -205,7 +207,7 @@ fn render_sort_selector(
         .items_center()
         .gap(px(4.0))
         .cursor_pointer()
-        .on_click(move |_, cx| {
+        .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.set_sort(next_sort, cx));
         })
         .child(div().text_sm().text_color(text_primary).child(label))
@@ -222,11 +224,12 @@ fn render_group_toggle(
     text_primary: gpui::Hsla,
     accent: gpui::Hsla,
     accent_soft: gpui::Hsla,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static {
     let btn_bg = if grouped { accent_soft } else { bg };
     let text_color = if grouped { accent } else { text_primary };
 
     div()
+        .id("group-toggle")
         .h(px(30.0))
         .px(px(11.0))
         .rounded(px(8.0))
@@ -236,7 +239,7 @@ fn render_group_toggle(
         .flex()
         .items_center()
         .cursor_pointer()
-        .on_click(move |_, cx| {
+        .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
         })
         .child(div().text_sm().text_color(text_color).child("Group"))
@@ -252,12 +255,13 @@ fn render_layout_switcher(
     text_primary: gpui::Hsla,
     accent: gpui::Hsla,
     accent_soft: gpui::Hsla,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static {
     let modes = [
-        (CatalogPresentation::List, "List"),
-        (CatalogPresentation::Thumbs, "Thumbs"),
-        (CatalogPresentation::Grid, "Grid"),
+        (CatalogPresentation::List, "layout-list"),
+        (CatalogPresentation::Thumbs, "layout-thumbs"),
+        (CatalogPresentation::Grid, "layout-grid"),
     ];
+    let labels = ["List", "Thumbs", "Grid"];
 
     let mut row = div()
         .flex()
@@ -267,7 +271,7 @@ fn render_layout_switcher(
         .bg(bg)
         .overflow_hidden();
 
-    for (mode, label) in modes {
+    for ((mode, id_str), label) in modes.into_iter().zip(labels.into_iter()) {
         let is_active = current == mode;
         let btn_bg = if is_active {
             accent_soft
@@ -279,13 +283,14 @@ fn render_layout_switcher(
 
         row = row.child(
             div()
+                .id(id_str)
                 .h(px(28.0))
                 .px(px(10.0))
                 .bg(btn_bg)
                 .flex()
                 .items_center()
                 .cursor_pointer()
-                .on_click(move |_, cx| {
+                .on_click(move |_, _, cx| {
                     e.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
                 })
                 .child(div().text_sm().text_color(text).child(label)),

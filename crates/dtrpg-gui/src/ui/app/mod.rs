@@ -1,6 +1,6 @@
 
 use gpui::*;
-use gpui_component::*;
+use gpui_component::init;
 
 use crate::ui::library::{root_view::LibraryRootView, state::init_globals};
 
@@ -17,11 +17,7 @@ pub fn setup(cx: &mut App) {
             }),
             ..Default::default()
         },
-        |window, cx| {
-            let view = cx.new(|cx| LibraryRootView::new(window, cx));
-
-            cx.new(|cx| Root::new(view, window, cx).bg(cx.theme().background))
-        },
+        |window, cx| cx.new(|cx| LibraryRootView::new(window, cx)),
     )
     .expect("failed to open window");
 

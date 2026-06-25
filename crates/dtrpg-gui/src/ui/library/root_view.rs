@@ -1,6 +1,6 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{div, px, Context, IntoElement, ParentElement, Render, Styled};
+use gpui::{div, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled};
 
 use crate::ui::library::{
     catalog_view::render_catalog,
@@ -78,39 +78,24 @@ impl Render for LibraryRootView {
         let catalog = render_catalog(items, presentation, grouped, entity.clone(), colors, density);
         let panel = render_detail_panel(selected_item.as_ref(), entity.clone(), colors);
 
-        let desktop_bg = colors.desktop_bg;
         let surface = colors.surface;
 
         div()
             .size_full()
-            .bg(desktop_bg)
+            // .bg(surface)
             .flex()
-            .items_center()
-            .justify_center()
-            .p(px(24.0))
+            .relative()
+            .child(sidebar)
             .child(
                 div()
-                    .max_w(px(1320.0))
-                    .max_h(px(862.0))
-                    .w_full()
-                    .h_full()
-                    .rounded(px(14.0))
-                    .overflow_hidden()
-                    .bg(surface)
+                    .flex_1()
+                    .min_w_0()
                     .flex()
-                    .relative()
-                    .child(sidebar)
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .bg(surface)
-                            .child(toolbar)
-                            .child(catalog),
-                    )
-                    .child(panel),
+                    .flex_col()
+                    .bg(surface)
+                    .child(toolbar)
+                    .child(catalog),
             )
+            .child(panel)
     }
 }

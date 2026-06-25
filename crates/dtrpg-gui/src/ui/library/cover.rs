@@ -159,18 +159,19 @@ pub fn cover_style(item: &LibraryItem) -> CoverStyle {
 fn render_motif(motif: Motif, fg: Hsla) -> impl IntoElement {
     let size = px(24.0);
     match motif {
+        // ○ circle outline
         Motif::Circle => div()
-            .size(size)
-            .rounded_full()
-            .border_1()
-            .border_color(fg)
+            .text_xl()
+            .text_color(fg)
+            .child("○")
             .into_any_element(),
+        // ◇ diamond outline (Unicode avoids CSS rotate)
         Motif::Diamond => div()
-            .size(size)
-            .border_1()
-            .border_color(fg)
-            .rotate(gpui::degrees(45.0))
+            .text_xl()
+            .text_color(fg)
+            .child("◇")
             .into_any_element(),
+        // two horizontal rules
         Motif::DoubleRule => div()
             .flex()
             .flex_col()
@@ -178,17 +179,17 @@ fn render_motif(motif: Motif, fg: Hsla) -> impl IntoElement {
             .child(div().w(size).h(px(1.0)).bg(fg))
             .child(div().w(size).h(px(1.0)).bg(fg))
             .into_any_element(),
+        // △ triangle outline (Unicode avoids CSS rotate)
         Motif::Triangle => div()
-            .size(size)
-            .border_1()
-            .border_color(fg)
-            .rotate(gpui::degrees(45.0))
+            .text_xl()
+            .text_color(fg)
+            .child("△")
             .into_any_element(),
     }
 }
 
 /// Renders a generative cover tile at the given pixel dimensions.
-pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32) -> impl IntoElement {
+pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32) -> impl IntoElement + 'static + use<> {
     let style = cover_style(item);
     let bg = style.background;
     let fg = style.foreground;

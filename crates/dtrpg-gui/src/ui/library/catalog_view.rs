@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
+use gpui::prelude::*;
+use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
 
 use crate::ui::library::{
     cover::render_generative_cover,
@@ -21,7 +22,7 @@ pub fn render_catalog(
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
     density: &DensityConstants,
-) -> impl IntoElement {
+) -> AnyElement {
     let pad_top = density.catalog_pad_top;
     let pad_side = density.catalog_pad_side;
     let pad_bottom = density.catalog_pad_bottom;
@@ -29,14 +30,14 @@ pub fn render_catalog(
     let root = div()
         .flex_1()
         .min_h_0()
-        .overflow_y_auto()
+        .overflow_y_hidden()
         .pt(pad_top)
         .pb(pad_bottom);
 
     if items.is_empty() {
         return root
             .child(render_empty_state(colors.text_tertiary))
-            .into_any();
+            .into_any_element();
     }
 
     let colors = colors.clone();
@@ -49,7 +50,7 @@ pub fn render_catalog(
             .children(items.iter().map(|item| {
                 render_list_row(item, &colors, &density, entity.clone())
             }))
-            .into_any(),
+            .into_any_element(),
 
         (CatalogPresentation::List, true) => {
             let groups = group_by_publisher(items);
@@ -61,11 +62,11 @@ pub fn render_catalog(
                     div()
                         .child(render_group_header(&g.publisher, g.items.len(), &c))
                         .child(render_list_header(&c))
-                        .children(g.items.iter().map(move |item| {
-                            render_list_row(item, &c, &d, e.clone())
+                        .children(g.items.into_iter().map(move |item| {
+                            render_list_row(&item, &c, &d, e.clone())
                         }))
                 }))
-                .into_any()
+                .into_any_element()
         }
 
         (CatalogPresentation::Thumbs, false) => root
@@ -73,7 +74,7 @@ pub fn render_catalog(
             .children(items.iter().map(|item| {
                 render_thumb_row(item, &colors, &density, entity.clone())
             }))
-            .into_any(),
+            .into_any_element(),
 
         (CatalogPresentation::Thumbs, true) => {
             let groups = group_by_publisher(items);
@@ -84,17 +85,17 @@ pub fn render_catalog(
                     let e = entity.clone();
                     div()
                         .child(render_group_header(&g.publisher, g.items.len(), &c))
-                        .children(g.items.iter().map(move |item| {
-                            render_thumb_row(item, &c, &d, e.clone())
+                        .children(g.items.into_iter().map(move |item| {
+                            render_thumb_row(&item, &c, &d, e.clone())
                         }))
                 }))
-                .into_any()
+                .into_any_element()
         }
 
         (CatalogPresentation::Grid, false) => root
             .px(pad_side)
-            .child(render_grid(items, &colors, &density, entity))
-            .into_any(),
+            .child(render_grid(items, colors, density, entity))
+            .into_any_element(),
 
         (CatalogPresentation::Grid, true) => {
             let groups = group_by_publisher(items);
@@ -105,16 +106,16 @@ pub fn render_catalog(
                     let e = entity.clone();
                     div()
                         .child(render_group_header(&g.publisher, g.items.len(), &c))
-                        .child(render_grid(g.items, &c, &d, e))
+                        .child(render_grid(g.items, c, d, e))
                 }))
-                .into_any()
+                .into_any_element()
         }
     }
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-fn render_empty_state(text_color: gpui::Hsla) -> impl IntoElement {
+fn render_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'static {
     div()
         .flex()
         .flex_col()
@@ -137,7 +138,10 @@ fn render_group_header(
     publisher: &str,
     count: usize,
     colors: &ColorTokens,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
+    let text_primary = colors.text_primary;
+    let text_tertiary = colors.text_tertiary;
+    let publisher = publisher.to_string();
     div()
         .flex()
         .items_center()
@@ -147,47 +151,51 @@ fn render_group_header(
             div()
                 .text_sm()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_color(colors.text_primary)
-                .child(publisher.to_string()),
+                .text_color(text_primary)
+                .child(publisher),
         )
         .child(
             div()
                 .text_xs()
-                .text_color(colors.text_tertiary)
+                .text_color(text_tertiary)
                 .child(count.to_string()),
         )
 }
 
 // ── Status glyph ──────────────────────────────────────────────────────────────
 
-fn render_status(status: ItemStatus, colors: &ColorTokens) -> impl IntoElement {
+fn render_status(status: ItemStatus, colors: &ColorTokens) -> AnyElement {
+    let accent = colors.accent;
+    let text_tertiary = colors.text_tertiary;
     match status {
         ItemStatus::Downloaded => div()
             .size(px(7.0))
             .rounded_full()
-            .bg(colors.accent)
+            .bg(accent)
             .flex_none()
-            .into_any(),
+            .into_any_element(),
         ItemStatus::Cloud => div()
             .text_xs()
-            .text_color(colors.text_tertiary)
+            .text_color(text_tertiary)
             .flex_none()
             .child("☁")
-            .into_any(),
+            .into_any_element(),
     }
 }
 
 // ── List layout ───────────────────────────────────────────────────────────────
 
-fn render_list_header(colors: &ColorTokens) -> impl IntoElement {
+fn render_list_header(colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
+    let border = colors.border;
+    let text_tertiary = colors.text_tertiary;
     div()
         .flex()
         .items_center()
         .h(px(28.0))
         .border_b_1()
-        .border_color(colors.border)
+        .border_color(border)
         .text_xs()
-        .text_color(colors.text_tertiary)
+        .text_color(text_tertiary)
         .child(div().flex_1().child("Title / Kind"))
         .child(div().w(px(130.0)).child("Publisher"))
         .child(div().w(px(110.0)).child("System"))
@@ -202,7 +210,7 @@ fn render_list_row(
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
     let kind = item.kind.to_string();
@@ -213,17 +221,17 @@ fn render_list_row(
     let year = item.year;
     let status = item.status;
     let h = density.row_text_height;
-
     let colors = colors.clone();
 
     div()
+        .id(Arc::clone(&id))
         .flex()
         .items_center()
         .h(h)
         .border_b_1()
         .border_color(colors.border)
         .cursor_pointer()
-        .on_click(move |_, cx| {
+        .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
         })
         .child(
@@ -295,7 +303,7 @@ fn render_thumb_row(
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
     let publisher = item.publisher.to_string();
@@ -305,14 +313,15 @@ fn render_thumb_row(
     let size_mb = item.size_mb;
     let year = item.year;
     let status = item.status;
-    let thumb_w = density.thumb_width.0;
+    let thumb_w = density.thumb_width;
     let thumb_h = thumb_w * 10.0 / 7.0;
     let row_h = density.row_text_height + px(6.0);
-
-    let cover = render_generative_cover(item, thumb_w, thumb_h);
     let colors = colors.clone();
 
+    let cover = render_generative_cover(item, thumb_w, thumb_h);
+
     div()
+        .id(Arc::clone(&id))
         .flex()
         .items_center()
         .gap(px(12.0))
@@ -320,7 +329,7 @@ fn render_thumb_row(
         .border_b_1()
         .border_color(colors.border)
         .cursor_pointer()
-        .on_click(move |_, cx| {
+        .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
         })
         .child(
@@ -381,10 +390,10 @@ fn render_thumb_row(
 
 fn render_grid(
     items: Vec<LibraryItem>,
-    colors: &ColorTokens,
-    density: &DensityConstants,
+    colors: ColorTokens,
+    density: DensityConstants,
     entity: Entity<LibraryController>,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
     let min_w = density.card_min_width;
@@ -395,7 +404,7 @@ fn render_grid(
         .gap(gap_x)
         .mb(gap_y)
         .children(items.into_iter().map(move |item| {
-            render_grid_card(&item, colors, min_w.0, entity.clone())
+            render_grid_card(&item, &colors, min_w, entity.clone())
         }))
 }
 
@@ -404,7 +413,7 @@ fn render_grid_card(
     colors: &ColorTokens,
     card_w: f32,
     entity: Entity<LibraryController>,
-) -> impl IntoElement {
+) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
     let publisher = item.publisher.to_string();
@@ -415,13 +424,14 @@ fn render_grid_card(
     let colors = colors.clone();
 
     div()
+        .id(Arc::clone(&id))
         .w(px(card_w))
         .flex()
         .flex_col()
         .rounded(px(6.0))
         .overflow_hidden()
         .cursor_pointer()
-        .on_click(move |_, cx| {
+        .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
         })
         .child(div().w(px(card_w)).h(px(cover_h)).child(cover))

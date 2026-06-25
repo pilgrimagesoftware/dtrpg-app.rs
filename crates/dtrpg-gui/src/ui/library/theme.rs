@@ -1,6 +1,6 @@
 //! Libri theme system: four color themes and two density variants.
 
-use gpui::{px, Hsla, Pixels};
+use gpui::{px, Hsla, Pixels}; // Pixels kept for GPUI layout fields
 
 // ── Color tokens ──────────────────────────────────────────────────────────────
 
@@ -52,10 +52,10 @@ pub enum Density {
 pub struct DensityConstants {
     /// Height of a text-list row.
     pub row_text_height: Pixels,
-    /// Width of a thumbnail in a thumbs-list row.
-    pub thumb_width: Pixels,
-    /// Minimum width of a grid card.
-    pub card_min_width: Pixels,
+    /// Width of a thumbnail in a thumbs-list row (plain f32 for arithmetic).
+    pub thumb_width: f32,
+    /// Minimum width of a grid card (plain f32 for arithmetic).
+    pub card_min_width: f32,
     /// Horizontal gap between grid cards.
     pub card_gap_x: Pixels,
     /// Vertical gap between grid cards.
@@ -70,8 +70,8 @@ impl DensityConstants {
     fn comfortable() -> Self {
         Self {
             row_text_height: px(44.0),
-            thumb_width: px(46.0),
-            card_min_width: px(158.0),
+            thumb_width: 46.0,
+            card_min_width: 158.0,
             card_gap_x: px(22.0),
             card_gap_y: px(26.0),
             catalog_pad_top: px(18.0),
@@ -83,8 +83,8 @@ impl DensityConstants {
     fn compact() -> Self {
         Self {
             row_text_height: px(33.0),
-            thumb_width: px(40.0),
-            card_min_width: px(132.0),
+            thumb_width: 40.0,
+            card_min_width: 132.0,
             card_gap_x: px(16.0),
             card_gap_y: px(18.0),
             catalog_pad_top: px(12.0),
