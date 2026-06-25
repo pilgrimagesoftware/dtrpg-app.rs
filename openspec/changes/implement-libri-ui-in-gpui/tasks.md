@@ -30,7 +30,7 @@
 - [x] 3.7 Implement the generative cover GPUI element: colored background, publisher text (top), motif element (center), title text (center), game line text (bottom)
 - [x] 3.8 Implement all four motif variants: circle, diamond, double horizontal rule, triangle
 - [x] 3.9 Write unit tests for `cover_style` asserting: same input → same motif, luminance threshold for light and dark color fields
-- [ ] 3.10 Verify that catalog scrolling and interaction remain unblocked while cover downloads are in flight
+- [x] 3.10 Verify that catalog scrolling and interaction remain unblocked while cover downloads are in flight
 
 ## 4. Sidebar
 
@@ -97,11 +97,11 @@
 
 - [ ] 10.1 Smoke test all four themes: parchment, slate, sage, ink — confirm token coverage with no hardcoded colors remaining
 - [ ] 10.2 Smoke test comfortable and compact density variants across all three catalog layouts
-- [ ] 10.3 Verify search filters title, publisher, and game line fields case-insensitively
-- [ ] 10.4 Verify empty state appears when no items match the active query
-- [ ] 10.5 Verify group-by-publisher sections appear and disappear correctly across all three layouts
+- [x] 10.3 Verify search filters title, publisher, and game line fields case-insensitively
+- [x] 10.4 Verify empty state appears when no items match the active query
+- [x] 10.5 Verify group-by-publisher sections appear and disappear correctly across all three layouts
 - [ ] 10.6 Verify detail panel opens and closes via click and Escape; confirm metadata table values are correct
 - [ ] 10.7 Verify Download/Downloaded button toggles item status and the status glyph updates in the catalog
-- [ ] 10.8 Verify generative covers are deterministic: same item always produces the same motif and foreground color
+- [x] 10.8 Verify generative covers are deterministic: same item always produces the same motif and foreground color
 - [ ] 10.9 Verify that real thumbnail images replace the generative fallback after a successful background download
 - [ ] 10.10 Verify that duplicate cover download tasks are not enqueued when multiple cards for the same item are visible simultaneously
