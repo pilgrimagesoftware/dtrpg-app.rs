@@ -55,14 +55,6 @@ pub fn render_sidebar(
                 .items_center()
                 .gap(px(16.0))
                 .px(px(16.0))
-                // .child(
-                //     div()
-                //         .flex()
-                //         .gap(px(8.0))
-                //         .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0xFF5F57)))
-                //         .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0xFEBC2E)))
-                //         .child(div().size(px(12.0)).rounded_full().bg(gpui::rgb(0x28C840))),
-                // )
                 .child(
                     div()
                         .flex()
@@ -77,7 +69,7 @@ pub fn render_sidebar(
                         // )
                         .child(
                             div()
-                                // .text_color(text_primary)
+                                .text_color(text_primary)
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
                                 .text_lg()
                                 .child("Libri"),

@@ -79,10 +79,12 @@ impl Render for LibraryRootView {
         let panel = render_detail_panel(selected_item.as_ref(), entity.clone(), colors);
 
         let surface = colors.surface;
+        let text_primary = colors.text_primary;
 
         div()
             .size_full()
-            // .bg(surface)
+            .bg(surface)
+            .text_color(text_primary)
             .flex()
             .relative()
             .child(sidebar)
