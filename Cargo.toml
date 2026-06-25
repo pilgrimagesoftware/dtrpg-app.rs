@@ -1,8 +1,8 @@
 [workspace]
-default-members = ["crates/dtrpg-core", "crates/dtrpg-gui"]
+default-members = ["crates/dtrpg-core", "crates/dtrpg-ui"]
 members = [
     "crates/dtrpg-core",
-    "crates/dtrpg-gui",
+    "crates/dtrpg-ui",
 ]
 resolver = "2"
 
@@ -23,7 +23,7 @@ unwrap_used = "deny"
 
 [workspace.dependencies]
 dtrpg-sdk = { git = "https://github.com/pilgrimagesoftware/dtrpg-sdk.rs" }
-dtrpg-gui = { path = "crates/dtrpg-gui" }
+dtrpg-ui = { path = "crates/dtrpg-ui" }
 dtrpg-core = { path = "crates/dtrpg-core" }
 anyhow = "1"
 # gpui = "0.2.2"

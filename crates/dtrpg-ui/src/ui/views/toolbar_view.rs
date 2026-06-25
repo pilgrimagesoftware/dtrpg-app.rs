@@ -3,7 +3,7 @@
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
-use crate::ui::library::{
+use crate::data::{
     data::{CatalogPresentation, SidebarFilter, SortMethod},
     state::LibraryController,
     theme::ColorTokens,

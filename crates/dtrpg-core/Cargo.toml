@@ -10,7 +10,7 @@ workspace = true
 
 [dependencies]
 tokio.workspace = true
-dtrpg-gui.workspace = true
+dtrpg-ui.workspace = true
 gpui_platform.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true

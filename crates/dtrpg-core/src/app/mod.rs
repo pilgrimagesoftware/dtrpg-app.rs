@@ -2,7 +2,7 @@
 
 use gpui::*;
 
-use dtrpg_gui::ui::*;
+use dtrpg_ui::ui::*;
 
 pub fn run() {
     gpui_platform::application()

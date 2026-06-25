@@ -5,12 +5,10 @@ use std::sync::Arc;
 use gpui::prelude::*;
 use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
 
-use crate::ui::library::{
-    cover::render_generative_cover,
-    data::{ItemStatus, LibraryItem},
-    state::LibraryController,
-    theme::ColorTokens,
-};
+use crate::ui::library::cover::render_generative_cover;
+use crate::data::data::{ItemStatus, LibraryItem};
+use crate::data::state::LibraryController;
+use crate::data::theme::ColorTokens;
 
 /// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
 pub fn render_detail_panel(

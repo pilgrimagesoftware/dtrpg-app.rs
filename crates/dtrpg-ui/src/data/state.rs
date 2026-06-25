@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use gpui::{App, Context, EventEmitter};
 
-use crate::ui::library::{
-    cover::CoverCache,
+use crate::ui::library::cover::CoverCache;
+use crate::data::{
     data::{
         item_matches_filter, item_matches_query, publisher_entries, section_counts, sort_items,
         CatalogPresentation, LibraryItem, PublisherEntry, SectionCounts, SidebarFilter, SortMethod,
@@ -212,7 +212,7 @@ impl LibraryController {
 
     /// Toggles the download status of the item with the given id.
     pub fn toggle_download(&mut self, id: &str, cx: &mut Context<Self>) {
-        use crate::ui::library::data::ItemStatus;
+        use crate::data::data::ItemStatus;
         if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id) {
             item.status = match item.status {
                 ItemStatus::Downloaded => ItemStatus::Cloud,

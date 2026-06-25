@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use gpui::{div, px, rgb, Hsla, IntoElement, ParentElement, Styled};
 
-use crate::ui::library::data::LibraryItem;
+use crate::data::data::LibraryItem;
 
 // ── CoverCache ────────────────────────────────────────────────────────────────
 
@@ -250,7 +250,7 @@ pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32) -> i
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ui::library::data::{stub_catalog, ItemStatus};
+    use crate::data::data::{stub_catalog, ItemStatus};
 
     fn make_item(id: &str, title: &str, color: &str) -> LibraryItem {
         LibraryItem {

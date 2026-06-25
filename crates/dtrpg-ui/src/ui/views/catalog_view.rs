@@ -7,10 +7,10 @@ use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
 
 use crate::ui::library::{
     cover::render_generative_cover,
-    data::{group_by_publisher, CatalogPresentation, ItemStatus, LibraryItem},
-    state::LibraryController,
-    theme::{ColorTokens, DensityConstants},
 };
+use crate::data::data::{group_by_publisher, CatalogPresentation, ItemStatus, LibraryItem};
+use crate::data::state::LibraryController;
+use crate::data::theme::{ColorTokens, DensityConstants};
 
 // ── Public entry point ────────────────────────────────────────────────────────
 

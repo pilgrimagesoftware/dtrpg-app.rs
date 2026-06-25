@@ -2,13 +2,15 @@
 
 use gpui::{div, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled};
 
-use crate::ui::library::{
+use crate::data::{
+    state::{LibraryChanged, LibraryController},
+    theme::LibriTheme,
+};
+use crate::ui::views::{
     catalog_view::render_catalog,
     detail_panel_view::render_detail_panel,
     sidebar_view::render_sidebar,
-    state::{LibraryChanged, LibraryController},
     toolbar_view::render_toolbar,
-    theme::LibriTheme,
 };
 
 /// Top-level GPUI view for the Libri library window.
@@ -85,6 +87,7 @@ impl Render for LibraryRootView {
             .size_full()
             .bg(surface)
             .text_color(text_primary)
+            .font_family("Helvetica")
             .flex()
             .relative()
             .child(sidebar)

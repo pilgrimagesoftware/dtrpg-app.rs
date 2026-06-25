@@ -5,7 +5,7 @@ use std::sync::Arc;
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
-use crate::ui::library::{
+use crate::data::{
     data::{PublisherEntry, SectionCounts, SidebarFilter},
     state::LibraryController,
     theme::ColorTokens,
