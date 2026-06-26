@@ -25,6 +25,8 @@ unwrap_used = "deny"
 dtrpg-sdk = { git = "https://github.com/pilgrimagesoftware/dtrpg-sdk.rs" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
+keyring = "3"
+thiserror = "2"
 dtrpg-ui = { path = "crates/dtrpg-ui" }
 dtrpg-core = { path = "crates/dtrpg-core" }
 anyhow = "1"

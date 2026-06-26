@@ -1,7 +1,7 @@
 //! Settings panel overlay: tab strip + active section content.
 
 use gpui::prelude::*;
-use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui::{div, px, AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled};
 
 use crate::controllers::settings::{SettingsController, SettingsTab};
 use crate::data::file_openers::FileOpenerEntry;
@@ -23,6 +23,7 @@ pub fn render_settings_panel(
     active_tab: SettingsTab,
     file_openers: &[FileOpenerEntry],
     entity: Entity<SettingsController>,
+    focus_handle: &FocusHandle,
     colors: &ColorTokens,
 ) -> AnyElement {
     let surface = colors.surface;
@@ -32,10 +33,17 @@ pub fn render_settings_panel(
 
     let entity_close = entity.clone();
     let entity_tab = entity.clone();
+    let entity_escape = entity.clone();
 
     div()
         .id("settings-backdrop")
+        .track_focus(focus_handle)
         .occlude()
+        .on_key_down(move |event, _window, cx| {
+            if event.keystroke.key == "escape" {
+                entity_escape.update(cx, |ctrl, cx| ctrl.close(cx));
+            }
+        })
         .absolute()
         .inset_0()
         .bg(backdrop)

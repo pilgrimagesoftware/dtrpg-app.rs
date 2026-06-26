@@ -8,6 +8,7 @@ pub mod ui {
     pub mod views;
     pub mod windows;
 }
+pub mod credentials;
 pub mod models;
 pub mod data;
 pub mod controllers;

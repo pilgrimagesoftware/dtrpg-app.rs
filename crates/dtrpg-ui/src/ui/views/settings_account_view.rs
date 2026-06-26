@@ -1,17 +1,36 @@
 //! Account settings section: identity display, log-out, and API key reset.
 //!
-//! Credential store integration is stubbed until `secure-credential-storage` is complete.
+//! `is_authenticated` is stubbed as `true` until `secure-credential-storage` wires
+//! real auth state into `SettingsSnapshot`.
 
-use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
+use gpui::{AnyElement, div, px, Entity, IntoElement, ParentElement, Styled};
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
 
 /// Renders the Account settings section.
+///
+/// `is_authenticated` controls which branch is shown: authenticated identity +
+/// log-out actions, or a "not signed in" prompt. Pass the value from
+/// `SettingsSnapshot::is_authenticated` once that field exists; for now it is
+/// stubbed to `true`.
 pub fn render_account_section(
     _entity: Entity<SettingsController>,
     colors: &ColorTokens,
-) -> impl IntoElement + 'static + use<> {
+) -> AnyElement {
+    // Stubbed until `secure-credential-storage` supplies real auth state.
+    let is_authenticated = true;
+
+    if is_authenticated {
+        render_authenticated(colors).into_any_element()
+    } else {
+        render_unauthenticated(colors).into_any_element()
+    }
+}
+
+// ── Authenticated state ───────────────────────────────────────────────────────
+
+fn render_authenticated(colors: &ColorTokens) -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let text_tertiary = colors.text_tertiary;
@@ -63,6 +82,61 @@ pub fn render_account_section(
                 )
                 .child(render_action_button("Log Out", accent, accent_on))
                 .child(render_action_button("Reset API Key", accent, accent_on)),
+        )
+}
+
+// ── Unauthenticated state ─────────────────────────────────────────────────────
+
+fn render_unauthenticated(colors: &ColorTokens) -> impl IntoElement + 'static {
+    let text_primary = colors.text_primary;
+    let text_secondary = colors.text_secondary;
+    let text_tertiary = colors.text_tertiary;
+    let border = colors.border;
+    let accent = colors.accent;
+    let accent_on = colors.accent_on;
+
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(24.0))
+        .p(px(24.0))
+        // ── Status row ────────────────────────────────────────────────────
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(6.0))
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(text_primary)
+                        .child("Account"),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(text_secondary)
+                        .child("Not signed in to DriveThruRPG"),
+                ),
+        )
+        // ── Divider ───────────────────────────────────────────────────────
+        .child(div().h(px(1.0)).bg(border))
+        // ── Authenticate prompt ───────────────────────────────────────────
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.0))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(text_tertiary)
+                        .child(
+                            "Sign in with your DriveThruRPG API key to access your library.",
+                        ),
+                )
+                .child(render_action_button("Sign In with API Key…", accent, accent_on)),
         )
 }
 

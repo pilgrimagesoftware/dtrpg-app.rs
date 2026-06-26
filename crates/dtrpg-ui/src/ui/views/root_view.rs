@@ -1,6 +1,6 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{div, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled};
+use gpui::{div, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled};
 
 use crate::{
     controllers::{library::LibraryController, settings::SettingsController},
@@ -21,6 +21,9 @@ use crate::ui::views::{
 pub struct LibraryRootView {
     controller: Entity<LibraryController>,
     settings: Entity<SettingsController>,
+    /// Focus handle for the settings overlay; grabbed when the panel opens so
+    /// Escape key events route to the backdrop instead of the catalog.
+    settings_focus: FocusHandle,
 }
 
 impl LibraryRootView {
@@ -28,6 +31,7 @@ impl LibraryRootView {
     pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>) -> Self {
         let controller = cx.new(|_| LibraryController::new());
         let settings = cx.new(|_| SettingsController::new());
+        let settings_focus = cx.focus_handle();
 
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
             cx.notify();
@@ -39,12 +43,12 @@ impl LibraryRootView {
         })
         .detach();
 
-        Self { controller, settings }
+        Self { controller, settings, settings_focus }
     }
 }
 
 impl Render for LibraryRootView {
-    fn render(&mut self, _window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lib_entity = self.controller.clone();
         let settings_entity = self.settings.clone();
 
@@ -109,10 +113,13 @@ impl Render for LibraryRootView {
                 .child(catalog);
 
             if settings_snap.is_open {
+                // Grab keyboard focus so Escape routes to the backdrop, not the catalog.
+                window.focus(&self.settings_focus, cx);
                 let overlay = render_settings_panel(
                     settings_snap.active_tab,
                     &settings_snap.file_openers,
                     settings_entity,
+                    &self.settings_focus,
                     colors,
                 );
                 content = content.child(overlay);
