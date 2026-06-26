@@ -295,7 +295,7 @@ fn render_layout_switcher(
         .bg(bg)
         .overflow_hidden();
 
-    for ((mode, id_str, tooltip_text), label) in modes.into_iter().zip(labels.into_iter()) {
+    for ((mode, id_str, tooltip_text), label) in modes.into_iter().zip(labels) {
         let is_active = current == mode;
         let btn_bg = if is_active {
             accent_soft

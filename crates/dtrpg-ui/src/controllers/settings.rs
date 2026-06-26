@@ -83,7 +83,15 @@ impl SettingsController {
             .is_some();
         Self { is_open: false, active_tab, file_openers, is_authenticated }
     }
+}
 
+impl Default for SettingsController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SettingsController {
     /// Emits `LogoutRequested` so the library root view can coordinate the logout flow.
     pub fn request_logout(&mut self, cx: &mut Context<Self>) {
         cx.emit(LogoutRequested);

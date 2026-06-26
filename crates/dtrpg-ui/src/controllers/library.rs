@@ -101,37 +101,24 @@ impl LibraryController {
     // ── Snapshot ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the root view for one render pass.
-    pub fn snapshot(&self) -> (
-        SidebarFilter,
-        SectionCounts,
-        Vec<PublisherEntry>,
-        usize,
-        f64,
-        usize,
-        String,
-        SortMethod,
-        bool,
-        CatalogPresentation,
-        Option<LibraryItem>,
-        Vec<LibraryItem>,
-    ) {
+    pub fn snapshot(&self) -> LibrarySnapshot {
         let items = self.visible_items();
         let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
-        (
-            self.filter.clone(),
-            self.section_counts,
-            self.publishers.clone(),
-            self.section_counts.all,
-            self.total_size_mb(),
+        LibrarySnapshot {
+            filter: self.filter.clone(),
+            counts: self.section_counts,
+            publishers: self.publishers.clone(),
+            total_count: self.section_counts.all,
+            total_mb: self.total_size_mb(),
             matched_count,
-            self.search_query.clone(),
-            self.sort,
-            self.grouped,
-            self.presentation,
+            search_query: self.search_query.clone(),
+            sort: self.sort,
+            grouped: self.grouped,
+            presentation: self.presentation,
             selected_item,
             items,
-        )
+        }
     }
 
     // ── Filtered result set ───────────────────────────────────────────────────

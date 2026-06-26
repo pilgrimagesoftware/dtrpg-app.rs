@@ -61,6 +61,7 @@ impl RustSdkLibraryService {
     /// Creates the default service from environment-provided SDK configuration.
     ///
     /// Falls back to [`UnavailableSdkGateway`] when environment variables are absent.
+    #[allow(dead_code)]
     pub fn from_environment() -> Self {
         match HttpSdkLibraryGateway::from_environment() {
             Ok(gateway) => Self::new(Box::new(gateway)),
@@ -174,6 +175,7 @@ impl HttpSdkLibraryGateway {
         Self::build(application_key, access_token, refresh_token, refresh_token_ttl)
     }
 
+    #[allow(dead_code)]
     fn from_environment() -> Result<Self, LibraryServiceError> {
         let application_key = std::env::var(APPLICATION_KEY_ENV).map_err(|_| {
             LibraryServiceError::new(
@@ -387,6 +389,7 @@ fn map_sdk_error(error: SdkError) -> LibraryServiceError {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use dtrpg_sdk::{
         FileChecksum, OrderProductAttributes, OrderProductFile, PaginationLinks, PaginationMeta,

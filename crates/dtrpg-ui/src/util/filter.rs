@@ -5,17 +5,12 @@ use std::sync::Arc;
 // ── Filtering ─────────────────────────────────────────────────────────────────
 
 /// Active filter applied in the sidebar.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum SidebarFilter {
+    #[default]
     AllTitles,
     RecentlyAdded,
     OnDevice,
     InCloud,
     Publisher(Arc<str>),
-}
-
-impl Default for SidebarFilter {
-    fn default() -> Self {
-        Self::AllTitles
-    }
 }

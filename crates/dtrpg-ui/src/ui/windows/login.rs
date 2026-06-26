@@ -7,6 +7,7 @@ use crate::controllers::login::LoginController;
 use crate::ui::views::login_view::LoginView;
 
 /// Opens the login window centered on screen.
+#[allow(clippy::expect_used)]
 pub fn open_login_window(cx: &mut App) {
     cx.open_window(
         WindowOptions {

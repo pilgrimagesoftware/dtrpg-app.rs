@@ -35,6 +35,7 @@ pub struct LibraryItem {
 }
 
 impl LibraryItem {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: &str,
         title: &str,

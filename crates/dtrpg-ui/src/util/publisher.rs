@@ -2,8 +2,6 @@
 
 use std::sync::Arc;
 use crate::data::library::LibraryItem;
-use crate::data::enums::ItemStatus;
-use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
 
 // ── Publisher aggregation ─────────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ unwrap_used = "deny"
 dtrpg-sdk = { path = "../../dtrpg-sdk/rust" }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
-keyring = "3"
+keyring = { version = "3", features = ["apple-native"] }
 thiserror = "2"
 tracing = "0.1"
 dtrpg-ui = { path = "crates/dtrpg-ui" }

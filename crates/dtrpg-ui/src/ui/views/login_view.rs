@@ -53,7 +53,7 @@ impl LoginView {
         // When login succeeds, open the library window and close this one.
         cx.subscribe(&login, |_this, _ctrl, event: &LoginStateChanged, cx| {
             if let LoginStateChanged::Succeeded = event {
-                open_library_window(&mut **cx);
+                open_library_window(cx);
                 cx.with_window(cx.entity_id(), |window, _cx| window.remove_window());
             }
         })

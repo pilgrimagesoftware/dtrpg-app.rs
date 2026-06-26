@@ -21,6 +21,7 @@ impl Global for ServiceFactory {}
 /// # Panics
 ///
 /// Panics if the window cannot be opened or if `ServiceFactory` has not been set.
+#[allow(clippy::expect_used)]
 pub fn open_library_window(cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)();
     cx.open_window(

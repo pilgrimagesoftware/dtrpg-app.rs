@@ -55,9 +55,7 @@ impl LibraryRootView {
                 }
             }
             let entity_id = cx.entity_id();
-            cx.defer(|cx| {
-                open_login_window(cx);
-            });
+            open_login_window(cx);
             cx.with_window(entity_id, |window, _cx| window.remove_window());
         })
         .detach();
@@ -71,20 +69,13 @@ impl Render for LibraryRootView {
         let lib_entity = self.controller.clone();
         let settings_entity = self.settings.clone();
 
-        let (
-            filter,
-            counts,
-            publishers,
-            total_count,
-            total_mb,
-            matched_count,
-            search_query,
-            sort,
-            grouped,
-            presentation,
-            selected_item,
-            items,
-        ) = self.controller.read(cx).snapshot();
+        let snap = self.controller.read(cx).snapshot();
+        let (filter, counts, publishers, total_count, total_mb, matched_count,
+             search_query, sort, grouped, presentation, selected_item, items) = (
+            snap.filter, snap.counts, snap.publishers, snap.total_count, snap.total_mb,
+            snap.matched_count, snap.search_query, snap.sort, snap.grouped,
+            snap.presentation, snap.selected_item, snap.items,
+        );
 
         let settings_snap = self.settings.read(cx).snapshot();
 
