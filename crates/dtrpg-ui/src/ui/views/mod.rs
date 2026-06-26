@@ -1,5 +1,6 @@
 pub mod catalog_view;
 pub mod detail_panel_view;
+pub mod login_view;
 pub mod root_view;
 pub mod settings_account_view;
 pub mod settings_file_openers_view;

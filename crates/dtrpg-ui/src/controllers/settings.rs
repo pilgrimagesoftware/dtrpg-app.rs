@@ -2,7 +2,8 @@
 
 use gpui::{Context, EventEmitter};
 
-use crate::data::events::SettingsChanged;
+use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
+use crate::data::events::{LogoutRequested, SettingsChanged};
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 
 // ── SettingsTab ───────────────────────────────────────────────────────────────
@@ -53,6 +54,8 @@ pub struct SettingsSnapshot {
     pub is_open: bool,
     pub active_tab: SettingsTab,
     pub file_openers: Vec<FileOpenerEntry>,
+    /// `true` when an API key is present in the keyring.
+    pub is_authenticated: bool,
 }
 
 /// Owns all mutable settings state: panel visibility, active tab, file-opener overrides.
@@ -60,17 +63,30 @@ pub struct SettingsController {
     is_open: bool,
     active_tab: SettingsTab,
     file_openers: FileOpenerConfig,
+    is_authenticated: bool,
 }
 
 impl SettingsController {
     /// Creates a controller, restoring the last-active tab and file-opener list from disk.
+    ///
+    /// Checks the platform keyring to determine initial auth state.
     pub fn new() -> Self {
         let (file_openers, tab_name) = FileOpenerConfig::load_with_tab();
         let active_tab = tab_name
             .as_deref()
             .and_then(SettingsTab::from_name)
             .unwrap_or_default();
-        Self { is_open: false, active_tab, file_openers }
+        let is_authenticated = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
+            .load()
+            .ok()
+            .flatten()
+            .is_some();
+        Self { is_open: false, active_tab, file_openers, is_authenticated }
+    }
+
+    /// Emits `LogoutRequested` so the library root view can coordinate the logout flow.
+    pub fn request_logout(&mut self, cx: &mut Context<Self>) {
+        cx.emit(LogoutRequested);
     }
 
     // ── Panel visibility ──────────────────────────────────────────────────────
@@ -146,8 +162,10 @@ impl SettingsController {
             is_open: self.is_open,
             active_tab: self.active_tab,
             file_openers: self.file_openers.entries().to_vec(),
+            is_authenticated: self.is_authenticated,
         }
     }
 }
 
 impl EventEmitter<SettingsChanged> for SettingsController {}
+impl EventEmitter<LogoutRequested> for SettingsController {}

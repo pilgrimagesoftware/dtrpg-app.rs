@@ -10,6 +10,7 @@ use dtrpg_sdk::{
 use tokio::runtime::{Builder, Runtime};
 
 use dtrpg_ui::{
+    credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
         enums::ItemStatus,
         library::LibraryItem,
@@ -62,6 +63,18 @@ impl RustSdkLibraryService {
     /// Falls back to [`UnavailableSdkGateway`] when environment variables are absent.
     pub fn from_environment() -> Self {
         match HttpSdkLibraryGateway::from_environment() {
+            Ok(gateway) => Self::new(Box::new(gateway)),
+            Err(error) => Self::new(Box::new(UnavailableSdkGateway::new(error))),
+        }
+    }
+
+    /// Creates the service from credentials stored in the platform keyring.
+    ///
+    /// Keyring values take precedence; falls back to environment variables so
+    /// development environments that set env vars still work. Falls back to
+    /// [`UnavailableSdkGateway`] when neither source provides the required credentials.
+    pub fn from_keyring() -> Self {
+        match HttpSdkLibraryGateway::from_keyring() {
             Ok(gateway) => Self::new(Box::new(gateway)),
             Err(error) => Self::new(Box::new(UnavailableSdkGateway::new(error))),
         }
@@ -123,6 +136,44 @@ struct HttpSdkLibraryGateway {
 }
 
 impl HttpSdkLibraryGateway {
+    fn from_keyring() -> Result<Self, LibraryServiceError> {
+        let application_key = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
+            .load()
+            .ok()
+            .flatten()
+            .map(|c| c.secret)
+            .or_else(|| std::env::var(APPLICATION_KEY_ENV).ok())
+            .ok_or_else(|| LibraryServiceError::new(
+                LibraryServiceErrorKind::Session,
+                "No API key found in keyring or environment. Sign in to continue.",
+            ))?;
+
+        let access_token = KeyringCredentialStore::new(keys::SERVICE, keys::ACCESS_TOKEN)
+            .load()
+            .ok()
+            .flatten()
+            .map(|c| c.secret)
+            .or_else(|| std::env::var(ACCESS_TOKEN_ENV).ok())
+            .ok_or_else(|| LibraryServiceError::new(
+                LibraryServiceErrorKind::Session,
+                "No access token found. Full authentication is pending a future update.",
+            ))?;
+
+        let refresh_token = KeyringCredentialStore::new(keys::SERVICE, keys::REFRESH_TOKEN)
+            .load()
+            .ok()
+            .flatten()
+            .map(|c| c.secret)
+            .unwrap_or_else(|| std::env::var(REFRESH_TOKEN_ENV).unwrap_or_default());
+
+        let refresh_token_ttl = std::env::var(REFRESH_TOKEN_TTL_ENV)
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(u64::MAX);
+
+        Self::build(application_key, access_token, refresh_token, refresh_token_ttl)
+    }
+
     fn from_environment() -> Result<Self, LibraryServiceError> {
         let application_key = std::env::var(APPLICATION_KEY_ENV).map_err(|_| {
             LibraryServiceError::new(
@@ -142,6 +193,15 @@ impl HttpSdkLibraryGateway {
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(u64::MAX);
 
+        Self::build(application_key, access_token, refresh_token, refresh_token_ttl)
+    }
+
+    fn build(
+        application_key: String,
+        access_token: String,
+        refresh_token: String,
+        refresh_token_ttl: u64,
+    ) -> Result<Self, LibraryServiceError> {
         let config = match std::env::var(API_BASE_URL_ENV) {
             Ok(base_url) => Config::with_base_url(application_key, base_url),
             Err(_) => Config::new(application_key),

@@ -11,6 +11,12 @@ pub enum LibraryServiceErrorKind {
     Session,
     /// Request referenced a non-existent item.
     NotFound,
+    /// Session has expired and re-authentication is required.
+    ///
+    /// # TODO
+    ///
+    /// Full token-refresh handling is deferred until `connect-sdk-to-rust-app` lands.
+    NeedsReauth,
 }
 
 /// Error returned by library service operations.

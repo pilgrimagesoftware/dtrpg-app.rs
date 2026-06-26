@@ -1,11 +1,12 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{div, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled};
+use gpui::{AppContext, div, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled};
 
 use crate::{
     controllers::{library::LibraryController, settings::SettingsController},
+    credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
-        events::{LibraryChanged, SettingsChanged},
+        events::{LibraryChanged, LogoutRequested, SettingsChanged},
         theme::LibriTheme,
     },
     services::LibraryService,
@@ -17,6 +18,7 @@ use crate::ui::views::{
     sidebar_view::render_sidebar,
     toolbar_view::render_toolbar,
 };
+use crate::ui::windows::login::open_login_window;
 
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
@@ -41,6 +43,22 @@ impl LibraryRootView {
 
         cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
             cx.notify();
+        })
+        .detach();
+
+        // Handle logout: delete credentials, open login window, close library window.
+        cx.subscribe(&settings, |_this, _ctrl, _event: &LogoutRequested, cx| {
+            for account in [keys::API_KEY, keys::ACCESS_TOKEN, keys::REFRESH_TOKEN] {
+                let store = KeyringCredentialStore::new(keys::SERVICE, account);
+                if let Err(e) = store.delete() {
+                    tracing::warn!("credential delete ({account}): {e}");
+                }
+            }
+            let entity_id = cx.entity_id();
+            cx.defer(|cx| {
+                open_login_window(cx);
+            });
+            cx.with_window(entity_id, |window, _cx| window.remove_window());
         })
         .detach();
 
@@ -119,6 +137,7 @@ impl Render for LibraryRootView {
                 let overlay = render_settings_panel(
                     settings_snap.active_tab,
                     &settings_snap.file_openers,
+                    settings_snap.is_authenticated,
                     settings_entity,
                     &self.settings_focus,
                     colors,

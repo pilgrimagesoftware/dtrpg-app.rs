@@ -22,6 +22,7 @@ use crate::ui::views::{
 pub fn render_settings_panel(
     active_tab: SettingsTab,
     file_openers: &[FileOpenerEntry],
+    is_authenticated: bool,
     entity: Entity<SettingsController>,
     focus_handle: &FocusHandle,
     colors: &ColorTokens,
@@ -107,7 +108,7 @@ pub fn render_settings_panel(
                         .flex_1()
                         .min_h_0()
                         .overflow_y_hidden()
-                        .child(render_active_section(active_tab, file_openers, entity, colors)),
+                        .child(render_active_section(active_tab, file_openers, is_authenticated, entity, colors)),
                 ),
         )
         .into_any_element()
@@ -178,11 +179,12 @@ fn render_tab_strip(
 fn render_active_section(
     active_tab: SettingsTab,
     file_openers: &[FileOpenerEntry],
+    is_authenticated: bool,
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
 ) -> AnyElement {
     match active_tab {
-        SettingsTab::Account => render_account_section(entity, colors).into_any_element(),
+        SettingsTab::Account => render_account_section(is_authenticated, entity, colors).into_any_element(),
         SettingsTab::Storage => render_storage_section(entity, colors).into_any_element(),
         SettingsTab::FileOpeners => {
             render_file_openers_section(file_openers, entity, colors).into_any_element()

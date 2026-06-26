@@ -27,6 +27,7 @@ serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 keyring = "3"
 thiserror = "2"
+tracing = "0.1"
 dtrpg-ui = { path = "crates/dtrpg-ui" }
 dtrpg-core = { path = "crates/dtrpg-core" }
 anyhow = "1"

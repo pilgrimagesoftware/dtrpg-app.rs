@@ -3,6 +3,17 @@
 use crate::data::library::LibraryItem;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
 
+/// Returns `true` when `error` indicates the session has expired.
+///
+/// # TODO
+///
+/// Full re-authentication handling (token refresh → login window) is deferred
+/// until `connect-sdk-to-rust-app` lands. For now, callers log a warning and
+/// show a generic error state.
+pub fn is_needs_reauth(error: &LibraryServiceError) -> bool {
+    matches!(error.kind, LibraryServiceErrorKind::NeedsReauth)
+}
+
 /// High-level pane state for the library view.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LibraryPaneState {
@@ -76,6 +87,11 @@ impl LibraryViewModel {
                 self.pane = LibraryPaneState::Loaded;
             }
             Err(error) => {
+                if is_needs_reauth(&error) {
+                    // TODO: trigger full re-auth (token refresh → login window) once
+                    // connect-sdk-to-rust-app lands. For now, log and show error state.
+                    tracing::warn!("session expired, returning to login");
+                }
                 self.items = Vec::new();
                 self.selected = None;
                 self.last_error = Some(error);
