@@ -2,10 +2,9 @@
 
 use gpui::{div, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled};
 
-use crate::data::{
-    state::{LibraryChanged, LibraryController},
-    theme::LibriTheme,
-};
+use crate::{controllers::library::LibraryController, data::{
+    events::LibraryChanged, theme::LibriTheme,
+}};
 use crate::ui::views::{
     catalog_view::render_catalog,
     detail_panel_view::render_detail_panel,

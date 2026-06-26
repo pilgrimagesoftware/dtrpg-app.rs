@@ -3,7 +3,7 @@ use gpui::*;
 use gpui_component::init;
 
 use crate::ui::views::root_view::LibraryRootView;
-use crate::data::state::init_globals;
+use crate::util::init::init_globals;
 
 pub fn setup(cx: &mut App) {
     init(cx);

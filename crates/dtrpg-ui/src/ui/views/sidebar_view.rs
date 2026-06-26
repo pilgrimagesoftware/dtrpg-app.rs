@@ -5,11 +5,13 @@ use std::sync::Arc;
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
+use crate::controllers::library::LibraryController;
 use crate::data::{
-    data::{PublisherEntry, SectionCounts, SidebarFilter},
-    state::LibraryController,
+    library::SectionCounts,
     theme::ColorTokens,
 };
+use crate::util::filter::SidebarFilter;
+use crate::util::publisher::PublisherEntry;
 
 /// Renders the full sidebar column.
 pub fn render_sidebar(

@@ -3,11 +3,13 @@
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
+use crate::controllers::library::LibraryController;
 use crate::data::{
-    data::{CatalogPresentation, SidebarFilter, SortMethod},
-    state::LibraryController,
+    enums::{CatalogPresentation},
     theme::ColorTokens,
 };
+use crate::util::filter::*;
+use crate::util::sort::*;
 
 fn section_title_for(filter: &SidebarFilter) -> &str {
     match filter {
