@@ -71,9 +71,9 @@ pub fn render_sidebar(
                         // )
                         .child(
                             div()
-                                .text_color(text_primary)
+                                .text_xl()
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .text_lg()
+                                .text_color(text_primary)
                                 .child("Libri"),
                         ),
                 ),

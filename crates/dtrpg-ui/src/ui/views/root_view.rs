@@ -86,7 +86,6 @@ impl Render for LibraryRootView {
             .size_full()
             .bg(surface)
             .text_color(text_primary)
-            .font_family("Helvetica")
             .flex()
             .relative()
             .child(sidebar)
