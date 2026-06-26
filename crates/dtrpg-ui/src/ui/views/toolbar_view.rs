@@ -2,6 +2,9 @@
 
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::library::LibraryController;
 use crate::data::{
@@ -179,10 +182,10 @@ fn render_search(
 fn render_sort_selector(
     current: SortMethod,
     entity: Entity<LibraryController>,
-    bg: gpui::Hsla,
-    border: gpui::Hsla,
-    text_primary: gpui::Hsla,
-    text_tertiary: gpui::Hsla,
+    _bg: gpui::Hsla,
+    _border: gpui::Hsla,
+    _text_primary: gpui::Hsla,
+    _text_tertiary: gpui::Hsla,
 ) -> impl IntoElement + 'static {
     let label = match current {
         SortMethod::Title => "Title",
@@ -190,30 +193,45 @@ fn render_sort_selector(
         SortMethod::DateAdded => "Date Added",
         SortMethod::PageCount => "Pages",
     };
-    let next_sort = match current {
-        SortMethod::Title => SortMethod::Publisher,
-        SortMethod::Publisher => SortMethod::DateAdded,
-        SortMethod::DateAdded => SortMethod::PageCount,
-        SortMethod::PageCount => SortMethod::Title,
-    };
 
-    div()
-        .id("sort-selector")
-        .h(px(30.0))
-        .px(px(11.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(border)
-        .bg(bg)
-        .flex()
-        .items_center()
-        .gap(px(4.0))
-        .cursor_pointer()
-        .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.set_sort(next_sort, cx));
+    Button::new("sort-selector")
+        .label(label)
+        .ghost()
+        .tooltip("Sort order")
+        .dropdown_menu(move |menu, _, _| {
+            let e = entity.clone();
+            let e2 = entity.clone();
+            let e3 = entity.clone();
+            let e4 = entity.clone();
+            menu.item(
+                PopupMenuItem::new("Title")
+                    .checked(current == SortMethod::Title)
+                    .on_click(move |_, _, cx| {
+                        e.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
+                    }),
+            )
+            .item(
+                PopupMenuItem::new("Publisher")
+                    .checked(current == SortMethod::Publisher)
+                    .on_click(move |_, _, cx| {
+                        e2.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
+                    }),
+            )
+            .item(
+                PopupMenuItem::new("Date Added")
+                    .checked(current == SortMethod::DateAdded)
+                    .on_click(move |_, _, cx| {
+                        e3.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
+                    }),
+            )
+            .item(
+                PopupMenuItem::new("Pages")
+                    .checked(current == SortMethod::PageCount)
+                    .on_click(move |_, _, cx| {
+                        e4.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
+                    }),
+            )
         })
-        .child(div().text_sm().text_color(text_primary).child(label))
-        .child(div().text_xs().text_color(text_tertiary).child("↕"))
 }
 
 // ── Group toggle ──────────────────────────────────────────────────────────────
@@ -241,6 +259,7 @@ fn render_group_toggle(
         .flex()
         .items_center()
         .cursor_pointer()
+        .tooltip(|window, cx| Tooltip::new("Group by publisher").build(window, cx))
         .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
         })
@@ -259,9 +278,9 @@ fn render_layout_switcher(
     accent_soft: gpui::Hsla,
 ) -> impl IntoElement + 'static {
     let modes = [
-        (CatalogPresentation::List, "layout-list"),
-        (CatalogPresentation::Thumbs, "layout-thumbs"),
-        (CatalogPresentation::Grid, "layout-grid"),
+        (CatalogPresentation::List, "layout-list", "List view"),
+        (CatalogPresentation::Thumbs, "layout-thumbs", "Thumbnail view"),
+        (CatalogPresentation::Grid, "layout-grid", "Grid view"),
     ];
     let labels = ["List", "Thumbs", "Grid"];
 
@@ -273,7 +292,7 @@ fn render_layout_switcher(
         .bg(bg)
         .overflow_hidden();
 
-    for ((mode, id_str), label) in modes.into_iter().zip(labels.into_iter()) {
+    for ((mode, id_str, tooltip_text), label) in modes.into_iter().zip(labels.into_iter()) {
         let is_active = current == mode;
         let btn_bg = if is_active {
             accent_soft
@@ -292,6 +311,7 @@ fn render_layout_switcher(
                 .flex()
                 .items_center()
                 .cursor_pointer()
+                .tooltip(move |window, cx| Tooltip::new(tooltip_text).build(window, cx))
                 .on_click(move |_, _, cx| {
                     e.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
                 })

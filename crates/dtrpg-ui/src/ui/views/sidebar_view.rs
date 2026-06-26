@@ -56,7 +56,8 @@ pub fn render_sidebar(
                 .flex()
                 .items_center()
                 .gap(px(16.0))
-                .px(px(16.0))
+                .pl(px(76.0))
+                .pr(px(16.0))
                 .child(
                     div()
                         .flex()
