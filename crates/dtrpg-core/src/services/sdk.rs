@@ -1,403 +1,472 @@
-// //! Rust SDK-backed implementation of [`LibraryService`].
+//! Rust SDK-backed implementation of [`LibraryService`].
 
-// use std::collections::HashMap;
+use std::collections::HashMap;
 
-// use dtrpg_sdk::{
-//     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
-//     LibraryItemsParams, OrderProductItem, OrderProductItemResponse, OrderProductListResponse,
-//     PublisherItem, SdkError,
-// };
-// use tokio::runtime::{Builder, Runtime};
+use dtrpg_sdk::{
+    AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
+    LibraryItemsParams, OrderProductItem, OrderProductItemResponse, OrderProductListResponse,
+    PublisherItem, SdkError,
+};
+use tokio::runtime::{Builder, Runtime};
 
-// use super::{LibraryItem, LibraryService, LibraryServiceError, LibraryServiceErrorKind};
+use dtrpg_ui::{
+    data::{
+        enums::ItemStatus,
+        library::LibraryItem,
+    },
+    services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
+};
 
-// const APPLICATION_KEY_ENV: &str = "DTRPG_APPLICATION_KEY";
-// const ACCESS_TOKEN_ENV: &str = "DTRPG_ACCESS_TOKEN";
-// const REFRESH_TOKEN_ENV: &str = "DTRPG_REFRESH_TOKEN";
-// const REFRESH_TOKEN_TTL_ENV: &str = "DTRPG_REFRESH_TOKEN_TTL";
-// const API_BASE_URL_ENV: &str = "DTRPG_API_BASE_URL";
+const APPLICATION_KEY_ENV: &str = "DTRPG_APPLICATION_KEY";
+const ACCESS_TOKEN_ENV: &str = "DTRPG_ACCESS_TOKEN";
+const REFRESH_TOKEN_ENV: &str = "DTRPG_REFRESH_TOKEN";
+const REFRESH_TOKEN_TTL_ENV: &str = "DTRPG_REFRESH_TOKEN_TTL";
+const API_BASE_URL_ENV: &str = "DTRPG_API_BASE_URL";
 
-// /// SDK operation boundary used by the Rust library service adapter.
-// pub trait SdkLibraryGateway: Send + Sync {
-//     /// Lists ordered products through the Rust SDK.
-//     fn list_order_products(
-//         &self,
-//         params: LibraryItemsParams,
-//     ) -> Result<OrderProductListResponse, LibraryServiceError>;
+const DEFAULT_COLOR: &str = "#2E3A45";
+const BYTES_PER_MB: f64 = 1_048_576.0;
 
-//     /// Loads an ordered product detail through the Rust SDK.
-//     fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError>;
-// }
+/// SDK operation boundary used by the Rust library service adapter.
+pub trait SdkLibraryGateway: Send + Sync {
+    /// Lists ordered products with optional pagination params.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LibraryServiceError`] on network or session failures.
+    fn list_order_products(
+        &self,
+        params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError>;
 
-// /// Library service adapter backed by the Rust SDK.
-// pub struct RustSdkLibraryService {
-//     gateway: Box<dyn SdkLibraryGateway>,
-// }
+    /// Loads an ordered product detail by its numeric id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LibraryServiceError`] on network, session, or not-found failures.
+    fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError>;
+}
 
-// impl RustSdkLibraryService {
-//     /// Creates a service from an SDK gateway implementation.
-//     pub fn new(gateway: Box<dyn SdkLibraryGateway>) -> Self {
-//         Self { gateway }
-//     }
+/// Library service adapter backed by the Rust SDK.
+pub struct RustSdkLibraryService {
+    gateway: Box<dyn SdkLibraryGateway>,
+}
 
-//     /// Creates the default service from environment-provided SDK configuration and session.
-//     pub fn from_environment() -> Self {
-//         match HttpSdkLibraryGateway::from_environment() {
-//             Ok(gateway) => Self::new(Box::new(gateway)),
-//             Err(error) => Self::new(Box::new(UnavailableSdkGateway::new(error))),
-//         }
-//     }
-// }
+impl RustSdkLibraryService {
+    /// Creates a service from an SDK gateway implementation.
+    pub fn new(gateway: Box<dyn SdkLibraryGateway>) -> Self {
+        Self { gateway }
+    }
 
-// impl LibraryService for RustSdkLibraryService {
-//     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError> {
-//         let params = LibraryItemsParams {
-//             page: Some(1),
-//             page_size: Some(100),
-//             get_checksum: Some(false),
-//             get_filters: Some(true),
-//             library: Some(true),
-//             archived: Some(false),
-//             updated_date_after: None,
-//         };
+    /// Creates the default service from environment-provided SDK configuration.
+    ///
+    /// Falls back to [`UnavailableSdkGateway`] when environment variables are absent.
+    pub fn from_environment() -> Self {
+        match HttpSdkLibraryGateway::from_environment() {
+            Ok(gateway) => Self::new(Box::new(gateway)),
+            Err(error) => Self::new(Box::new(UnavailableSdkGateway::new(error))),
+        }
+    }
+}
 
-//         let response = self.gateway.list_order_products(params)?;
-//         let publishers = publisher_lookup(response.included.as_deref().unwrap_or(&[]));
+impl LibraryService for RustSdkLibraryService {
+    fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError> {
+        let mut all_items: Vec<OrderProductItem> = Vec::new();
+        let mut all_included: Vec<PublisherItem> = Vec::new();
+        let mut page: u32 = 1;
 
-//         Ok(response
-//             .data
-//             .iter()
-//             .enumerate()
-//             .map(|(index, item)| map_order_product(item, &publishers, index as u32))
-//             .collect())
-//     }
+        loop {
+            let params = LibraryItemsParams {
+                page: Some(page),
+                page_size: Some(100),
+                get_checksum: Some(false),
+                get_filters: Some(true),
+                library: Some(true),
+                archived: Some(false),
+                updated_date_after: None,
+            };
 
-//     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {
-//         let response = self.gateway.get_order_product(id)?;
-//         Ok(map_order_product(&response.data, &HashMap::new(), 0))
-//     }
-// }
+            let response = self.gateway.list_order_products(params)?;
 
-// struct HttpSdkLibraryGateway {
-//     client: SdkLibraryClient,
-//     runtime: Runtime,
-// }
+            all_items.extend(response.data);
+            if let Some(included) = response.included {
+                for publisher in included {
+                    let id = publisher.attributes.publisher_id;
+                    if !all_included.iter().any(|p| p.attributes.publisher_id == id) {
+                        all_included.push(publisher);
+                    }
+                }
+            }
 
-// impl HttpSdkLibraryGateway {
-//     fn from_environment() -> Result<Self, LibraryServiceError> {
-//         let application_key = std::env::var(APPLICATION_KEY_ENV).map_err(|_| {
-//             LibraryServiceError::new(
-//                 LibraryServiceErrorKind::Network,
-//                 format!(
-//                     "{APPLICATION_KEY_ENV} is required before loading SDK-backed library data."
-//                 ),
-//             )
-//         })?;
-//         let access_token = std::env::var(ACCESS_TOKEN_ENV).map_err(|_| {
-//             LibraryServiceError::new(
-//                 LibraryServiceErrorKind::Session,
-//                 format!("{ACCESS_TOKEN_ENV} is required before loading SDK-backed library data."),
-//             )
-//         })?;
-//         let refresh_token = std::env::var(REFRESH_TOKEN_ENV).unwrap_or_default();
-//         let refresh_token_ttl = std::env::var(REFRESH_TOKEN_TTL_ENV)
-//             .ok()
-//             .and_then(|value| value.parse::<u64>().ok())
-//             .unwrap_or(u64::MAX);
+            if response.links.next.is_none() {
+                break;
+            }
+            page += 1;
+        }
 
-//         let config = match std::env::var(API_BASE_URL_ENV) {
-//             Ok(base_url) => Config::with_base_url(application_key, base_url),
-//             Err(_) => Config::new(application_key),
-//         };
+        let publishers = publisher_lookup(&all_included);
+        Ok(all_items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| map_order_product(item, &publishers, index as u32))
+            .collect())
+    }
 
-//         let mut sdk = DriveThruRpgSdk::with_config(config);
-//         sdk.apply_auth_response(AuthTokenResponse::new(
-//             access_token,
-//             refresh_token,
-//             refresh_token_ttl,
-//         ))
-//         .map_err(map_sdk_error)?;
+    fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {
+        let response = self.gateway.get_order_product(id)?;
+        Ok(map_order_product(&response.data, &HashMap::new(), 0))
+    }
+}
 
-//         let client = sdk.library_client().map_err(map_sdk_error)?;
-//         let runtime = Builder::new_multi_thread()
-//             .enable_all()
-//             .build()
-//             .map_err(|error| {
-//                 LibraryServiceError::new(
-//                     LibraryServiceErrorKind::Network,
-//                     format!("Unable to start Rust SDK runtime: {error}"),
-//                 )
-//             })?;
+struct HttpSdkLibraryGateway {
+    client: SdkLibraryClient,
+    runtime: Runtime,
+}
 
-//         Ok(Self { client, runtime })
-//     }
-// }
+impl HttpSdkLibraryGateway {
+    fn from_environment() -> Result<Self, LibraryServiceError> {
+        let application_key = std::env::var(APPLICATION_KEY_ENV).map_err(|_| {
+            LibraryServiceError::new(
+                LibraryServiceErrorKind::Network,
+                format!("{APPLICATION_KEY_ENV} is required to load SDK-backed library data."),
+            )
+        })?;
+        let access_token = std::env::var(ACCESS_TOKEN_ENV).map_err(|_| {
+            LibraryServiceError::new(
+                LibraryServiceErrorKind::Session,
+                format!("{ACCESS_TOKEN_ENV} is required to load SDK-backed library data."),
+            )
+        })?;
+        let refresh_token = std::env::var(REFRESH_TOKEN_ENV).unwrap_or_default();
+        let refresh_token_ttl = std::env::var(REFRESH_TOKEN_TTL_ENV)
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(u64::MAX);
 
-// impl SdkLibraryGateway for HttpSdkLibraryGateway {
-//     fn list_order_products(
-//         &self,
-//         params: LibraryItemsParams,
-//     ) -> Result<OrderProductListResponse, LibraryServiceError> {
-//         self.runtime
-//             .block_on(self.client.list_order_products(params))
-//             .map_err(map_client_error)
-//     }
+        let config = match std::env::var(API_BASE_URL_ENV) {
+            Ok(base_url) => Config::with_base_url(application_key, base_url),
+            Err(_) => Config::new(application_key),
+        };
 
-//     fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
-//         self.runtime
-//             .block_on(self.client.get_order_product(id))
-//             .map_err(map_client_error)
-//     }
-// }
+        let mut sdk = DriveThruRpgSdk::with_config(config);
+        sdk.apply_auth_response(AuthTokenResponse::new(
+            access_token,
+            refresh_token,
+            refresh_token_ttl,
+        ))
+        .map_err(map_sdk_error)?;
 
-// struct UnavailableSdkGateway {
-//     error: LibraryServiceError,
-// }
+        let client = sdk.library_client().map_err(map_sdk_error)?;
+        let runtime = Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| {
+                LibraryServiceError::new(
+                    LibraryServiceErrorKind::Network,
+                    format!("Unable to start Rust SDK runtime: {error}"),
+                )
+            })?;
 
-// impl UnavailableSdkGateway {
-//     fn new(error: LibraryServiceError) -> Self {
-//         Self { error }
-//     }
-// }
+        Ok(Self { client, runtime })
+    }
+}
 
-// impl SdkLibraryGateway for UnavailableSdkGateway {
-//     fn list_order_products(
-//         &self,
-//         _params: LibraryItemsParams,
-//     ) -> Result<OrderProductListResponse, LibraryServiceError> {
-//         Err(self.error.clone())
-//     }
+impl SdkLibraryGateway for HttpSdkLibraryGateway {
+    fn list_order_products(
+        &self,
+        params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError> {
+        self.runtime
+            .block_on(self.client.list_order_products(params))
+            .map_err(map_client_error)
+    }
 
-//     fn get_order_product(&self, _id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
-//         Err(self.error.clone())
-//     }
-// }
+    fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
+        self.runtime
+            .block_on(self.client.get_order_product(id))
+            .map_err(map_client_error)
+    }
+}
 
-// fn publisher_lookup(included: &[PublisherItem]) -> HashMap<u64, String> {
-//     included
-//         .iter()
-//         .map(|publisher| {
-//             (
-//                 publisher.attributes.publisher_id,
-//                 publisher.attributes.name.clone(),
-//             )
-//         })
-//         .collect()
-// }
+struct UnavailableSdkGateway {
+    error: LibraryServiceError,
+}
 
-// fn map_order_product(
-//     item: &OrderProductItem,
-//     publishers: &HashMap<u64, String>,
-//     order: u32,
-// ) -> LibraryItem {
-//     let attributes = &item.attributes;
-//     let id = attributes
-//         .order_product_id
-//         .max(item.id.parse::<u64>().unwrap_or_default())
-//         .max(attributes.product_id);
-//     let publisher = publishers
-//         .get(&attributes.royalty_publisher_id)
-//         .cloned()
-//         .unwrap_or_else(|| format!("Publisher {}", attributes.royalty_publisher_id));
-//     let product_type = attributes
-//         .filters
-//         .as_ref()
-//         .and_then(|filters| filters.first())
-//         .map(|filter| filter.parent_name.clone())
-//         .filter(|name| !name.is_empty())
-//         .unwrap_or_else(|| "Library item".to_string());
+impl UnavailableSdkGateway {
+    fn new(error: LibraryServiceError) -> Self {
+        Self { error }
+    }
+}
 
-//     LibraryItem {
-//         id,
-//         title: attributes.name.clone(),
-//         publisher,
-//         product_type,
-//         added_order: order,
-//         updated_order: order,
-//         summary: summary_for_order_product(item),
-//     }
-// }
+impl SdkLibraryGateway for UnavailableSdkGateway {
+    fn list_order_products(
+        &self,
+        _params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError> {
+        Err(self.error.clone())
+    }
 
-// fn summary_for_order_product(item: &OrderProductItem) -> String {
-//     let attributes = &item.attributes;
-//     let mut parts = Vec::new();
+    fn get_order_product(&self, _id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
+        Err(self.error.clone())
+    }
+}
 
-//     if let Some(date) = &attributes.date_purchased {
-//         parts.push(format!("Purchased {date}"));
-//     }
-//     if let Some(date) = &attributes.file_last_modified {
-//         parts.push(format!("Updated {date}"));
-//     }
-//     parts.push(format!("{} downloadable file(s)", attributes.files.len()));
-//     parts.push(format!("Final price {:.2}", attributes.final_price));
+fn publisher_lookup(included: &[PublisherItem]) -> HashMap<u64, String> {
+    included
+        .iter()
+        .map(|publisher| {
+            (
+                publisher.attributes.publisher_id,
+                publisher.attributes.name.clone(),
+            )
+        })
+        .collect()
+}
 
-//     parts.join(". ")
-// }
+fn map_order_product(
+    item: &OrderProductItem,
+    publishers: &HashMap<u64, String>,
+    order: u32,
+) -> LibraryItem {
+    let attributes = &item.attributes;
 
-// fn map_client_error(error: ClientError) -> LibraryServiceError {
-//     match error {
-//         ClientError::Sdk(error) => map_sdk_error(error),
-//         ClientError::Http(error) => {
-//             let kind = match error.status().map(|status| status.as_u16()) {
-//                 Some(401 | 403) => LibraryServiceErrorKind::Session,
-//                 _ => LibraryServiceErrorKind::Network,
-//             };
+    let numeric_id = attributes
+        .order_product_id
+        .max(item.id.parse::<u64>().unwrap_or_default())
+        .max(attributes.product_id);
 
-//             LibraryServiceError::new(kind, format!("Rust SDK library request failed: {error}"))
-//         }
-//     }
-// }
+    let publisher = publishers
+        .get(&attributes.royalty_publisher_id)
+        .cloned()
+        .unwrap_or_else(|| format!("Publisher {}", attributes.royalty_publisher_id));
 
-// fn map_sdk_error(error: SdkError) -> LibraryServiceError {
-//     let kind = match error {
-//         SdkError::Unauthenticated | SdkError::AuthSession(_) => LibraryServiceErrorKind::Session,
-//         SdkError::Unconfigured => LibraryServiceErrorKind::Network,
-//     };
+    let kind = attributes
+        .filters
+        .as_ref()
+        .and_then(|filters| filters.iter().find(|f| f.parent_filter_id == 0))
+        .map(|f| if f.parent_name.is_empty() { f.name.clone() } else { f.parent_name.clone() })
+        .unwrap_or_else(|| "Library item".to_string());
 
-//     LibraryServiceError::new(kind, format!("Rust SDK is not ready: {error}"))
-// }
+    let mut format_parts: Vec<String> = attributes
+        .files
+        .iter()
+        .map(|f| f.title.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    format_parts.sort();
+    let format = if format_parts.is_empty() {
+        "PDF".to_string()
+    } else {
+        format_parts.join(" + ")
+    };
 
-// #[cfg(test)]
-// mod tests {
-//     use dtrpg_sdk::{
-//         FileChecksum, OrderProductAttributes, OrderProductFile, PaginationLinks, PaginationMeta,
-//         PublisherAttributes,
-//     };
+    let size_mb = attributes
+        .files
+        .iter()
+        .map(|f| f.size as f64)
+        .sum::<f64>()
+        / BYTES_PER_MB;
 
-//     use super::*;
+    let year = attributes
+        .file_last_modified
+        .as_deref()
+        .or(attributes.date_purchased.as_deref())
+        .and_then(|date| date.get(..4))
+        .and_then(|y| y.parse::<u32>().ok())
+        .unwrap_or(0);
 
-//     struct FakeSdkGateway {
-//         list_result: Result<OrderProductListResponse, LibraryServiceError>,
-//         detail_result: Result<OrderProductItemResponse, LibraryServiceError>,
-//     }
+    let desc = {
+        let mut parts = Vec::new();
+        if let Some(date) = &attributes.date_purchased {
+            parts.push(format!("Purchased {date}"));
+        }
+        if let Some(date) = &attributes.file_last_modified {
+            parts.push(format!("Updated {date}"));
+        }
+        parts.join(". ")
+    };
 
-//     impl FakeSdkGateway {
-//         fn seeded() -> Self {
-//             let item = order_product_item(42, "A Better Dungeon");
-//             Self {
-//                 list_result: Ok(OrderProductListResponse {
-//                     links: pagination_links(),
-//                     meta: PaginationMeta {
-//                         items_per_page: 100,
-//                         current_page: 1,
-//                     },
-//                     data: vec![item.clone()],
-//                     included: Some(vec![PublisherItem {
-//                         id: "7".to_string(),
-//                         resource_type: "publisher".to_string(),
-//                         attributes: PublisherAttributes {
-//                             name: "Lantern Press".to_string(),
-//                             publisher_id: 7,
-//                             slug: "lantern-press".to_string(),
-//                         },
-//                     }]),
-//                 }),
-//                 detail_result: Ok(OrderProductItemResponse { data: item }),
-//             }
-//         }
+    LibraryItem {
+        id: item.id.as_str().into(),
+        numeric_id,
+        title: attributes.name.as_str().into(),
+        publisher: publisher.as_str().into(),
+        line: "".into(),
+        kind: kind.as_str().into(),
+        format: format.as_str().into(),
+        pages: 0,
+        size_mb,
+        year,
+        added_order: order,
+        status: ItemStatus::Cloud,
+        color: DEFAULT_COLOR.into(),
+        desc: desc.as_str().into(),
+        cover_url: None,
+    }
+}
 
-//         fn session_error() -> Self {
-//             let error = LibraryServiceError::new(
-//                 LibraryServiceErrorKind::Session,
-//                 "SDK session expired in test.",
-//             );
-//             Self {
-//                 list_result: Err(error.clone()),
-//                 detail_result: Err(error),
-//             }
-//         }
-//     }
+fn map_client_error(error: ClientError) -> LibraryServiceError {
+    match error {
+        ClientError::Sdk(error) => map_sdk_error(error),
+        ClientError::Http(error) => {
+            let kind = match error.status().map(|s| s.as_u16()) {
+                Some(401 | 403) => LibraryServiceErrorKind::Session,
+                _ => LibraryServiceErrorKind::Network,
+            };
+            LibraryServiceError::new(kind, format!("Rust SDK library request failed: {error}"))
+        }
+    }
+}
 
-//     impl SdkLibraryGateway for FakeSdkGateway {
-//         fn list_order_products(
-//             &self,
-//             _params: LibraryItemsParams,
-//         ) -> Result<OrderProductListResponse, LibraryServiceError> {
-//             self.list_result.clone()
-//         }
+fn map_sdk_error(error: SdkError) -> LibraryServiceError {
+    let kind = match error {
+        SdkError::Unauthenticated | SdkError::AuthSession(_) => LibraryServiceErrorKind::Session,
+        SdkError::Unconfigured => LibraryServiceErrorKind::Network,
+    };
+    LibraryServiceError::new(kind, format!("Rust SDK is not ready: {error}"))
+}
 
-//         fn get_order_product(
-//             &self,
-//             _id: u64,
-//         ) -> Result<OrderProductItemResponse, LibraryServiceError> {
-//             self.detail_result.clone()
-//         }
-//     }
+#[cfg(test)]
+mod tests {
+    use dtrpg_sdk::{
+        FileChecksum, OrderProductAttributes, OrderProductFile, PaginationLinks, PaginationMeta,
+        PublisherAttributes,
+    };
 
-//     #[test]
-//     fn sdk_service_maps_order_products_to_library_items() {
-//         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+    use super::*;
 
-//         let items = service.list_items().expect("list items");
+    struct FakeSdkGateway {
+        list_result: Result<OrderProductListResponse, LibraryServiceError>,
+        detail_result: Result<OrderProductItemResponse, LibraryServiceError>,
+    }
 
-//         assert_eq!(items.len(), 1);
-//         assert_eq!(items[0].id, 42);
-//         assert_eq!(items[0].title, "A Better Dungeon");
-//         assert_eq!(items[0].publisher, "Lantern Press");
-//         assert_eq!(items[0].product_type, "Adventure");
-//     }
+    impl FakeSdkGateway {
+        fn seeded() -> Self {
+            let item = order_product_item(42, "A Better Dungeon");
+            Self {
+                list_result: Ok(OrderProductListResponse {
+                    links: pagination_links(),
+                    meta: PaginationMeta {
+                        items_per_page: 100,
+                        current_page: 1,
+                    },
+                    data: vec![item.clone()],
+                    included: Some(vec![PublisherItem {
+                        id: "7".to_string(),
+                        resource_type: "publisher".to_string(),
+                        attributes: PublisherAttributes {
+                            name: "Lantern Press".to_string(),
+                            publisher_id: 7,
+                            slug: "lantern-press".to_string(),
+                        },
+                    }]),
+                }),
+                detail_result: Ok(OrderProductItemResponse { data: item }),
+            }
+        }
 
-//     #[test]
-//     fn sdk_service_preserves_session_error_classification() {
-//         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
+        fn session_error() -> Self {
+            let error = LibraryServiceError::new(
+                LibraryServiceErrorKind::Session,
+                "SDK session expired in test.",
+            );
+            Self {
+                list_result: Err(error.clone()),
+                detail_result: Err(error),
+            }
+        }
+    }
 
-//         let error = service.list_items().expect_err("session error");
+    impl SdkLibraryGateway for FakeSdkGateway {
+        fn list_order_products(
+            &self,
+            _params: LibraryItemsParams,
+        ) -> Result<OrderProductListResponse, LibraryServiceError> {
+            self.list_result.clone()
+        }
 
-//         assert_eq!(error.kind, LibraryServiceErrorKind::Session);
-//     }
+        fn get_order_product(
+            &self,
+            _id: u64,
+        ) -> Result<OrderProductItemResponse, LibraryServiceError> {
+            self.detail_result.clone()
+        }
+    }
 
-//     fn order_product_item(id: u64, name: &str) -> OrderProductItem {
-//         OrderProductItem {
-//             id: id.to_string(),
-//             resource_type: "order_product".to_string(),
-//             attributes: OrderProductAttributes {
-//                 order_id: 900,
-//                 product_id: id,
-//                 royalty_publisher_id: 7,
-//                 isbn: None,
-//                 name: name.to_string(),
-//                 date_purchased: Some("2026-01-01".to_string()),
-//                 filesize: Some(1024),
-//                 final_price: 12.5,
-//                 quantity: 1,
-//                 bundle_id: 0,
-//                 archived: 0,
-//                 add_on_info: None,
-//                 order_product_id: id,
-//                 customer_id: 123,
-//                 file_last_modified: Some("2026-01-02".to_string()),
-//                 file_last_downloaded: None,
-//                 files: vec![OrderProductFile {
-//                     index: 0,
-//                     order_product_download_id: 1234,
-//                     title: "PDF".to_string(),
-//                     filename: "better-dungeon.pdf".to_string(),
-//                     size: 1024,
-//                     size_mb: "0.001".to_string(),
-//                     checksums: vec![FileChecksum {
-//                         checksum: "abc123".to_string(),
-//                         checksum_date: "2026-01-02".to_string(),
-//                     }],
-//                 }],
-//                 filters: Some(vec![dtrpg_sdk::OrderProductFilter {
-//                     filter_id: 1,
-//                     parent_filter_id: 0,
-//                     name: "Dungeon".to_string(),
-//                     parent_name: "Adventure".to_string(),
-//                 }]),
-//                 history: None,
-//                 attributes: None,
-//             },
-//         }
-//     }
+    #[test]
+    fn sdk_service_maps_order_products_to_library_items() {
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
 
-//     fn pagination_links() -> PaginationLinks {
-//         PaginationLinks {
-//             self_: "self".to_string(),
-//             first: None,
-//             last: None,
-//             prev: None,
-//             next: None,
-//         }
-//     }
-// }
+        let items = service.list_items().expect("list items");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].numeric_id, 42);
+        assert_eq!(items[0].title.as_ref(), "A Better Dungeon");
+        assert_eq!(items[0].publisher.as_ref(), "Lantern Press");
+        assert_eq!(items[0].kind.as_ref(), "Adventure");
+    }
+
+    #[test]
+    fn sdk_service_preserves_session_error_classification() {
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
+
+        let error = service.list_items().expect_err("session error");
+
+        assert_eq!(error.kind, LibraryServiceErrorKind::Session);
+    }
+
+    fn order_product_item(id: u64, name: &str) -> OrderProductItem {
+        OrderProductItem {
+            id: id.to_string(),
+            resource_type: "order_product".to_string(),
+            attributes: OrderProductAttributes {
+                order_id: 900,
+                product_id: id,
+                royalty_publisher_id: 7,
+                isbn: None,
+                name: name.to_string(),
+                date_purchased: Some("2026-01-01".to_string()),
+                filesize: Some(1024),
+                final_price: 12.5,
+                quantity: 1,
+                bundle_id: 0,
+                archived: 0,
+                add_on_info: None,
+                order_product_id: id,
+                customer_id: 123,
+                file_last_modified: Some("2026-01-02".to_string()),
+                file_last_downloaded: None,
+                files: vec![OrderProductFile {
+                    index: 0,
+                    order_product_download_id: 1234,
+                    title: "PDF".to_string(),
+                    filename: "better-dungeon.pdf".to_string(),
+                    size: 1_048_576,
+                    size_mb: "1.0".to_string(),
+                    checksums: vec![FileChecksum {
+                        checksum: "abc123".to_string(),
+                        checksum_date: "2026-01-02".to_string(),
+                    }],
+                }],
+                filters: Some(vec![dtrpg_sdk::OrderProductFilter {
+                    filter_id: 1,
+                    parent_filter_id: 0,
+                    name: "Dungeon".to_string(),
+                    parent_name: "Adventure".to_string(),
+                }]),
+                history: None,
+                attributes: None,
+            },
+        }
+    }
+
+    fn pagination_links() -> PaginationLinks {
+        PaginationLinks {
+            self_: "self".to_string(),
+            first: None,
+            last: None,
+            prev: None,
+            next: None,
+        }
+    }
+}

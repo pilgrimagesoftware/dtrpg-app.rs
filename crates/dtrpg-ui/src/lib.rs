@@ -12,5 +12,6 @@ pub mod credentials;
 pub mod models;
 pub mod data;
 pub mod controllers;
+pub mod services;
 pub mod view_models;
 pub mod util;

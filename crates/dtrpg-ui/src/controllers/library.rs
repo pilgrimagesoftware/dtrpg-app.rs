@@ -1,7 +1,7 @@
-//! TODO: update this description
+//! Library UI state and interaction controller.
 
 use std::sync::Arc;
-use gpui::{div, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled};
+use gpui::Context;
 use crate::data::theme::LibriTheme;
 use crate::data::enums::*;
 use crate::data::theme::*;
@@ -10,9 +10,10 @@ use crate::data::selection::Selection;
 use crate::data::library::*;
 use crate::util::sort::*;
 use crate::util::publisher::*;
-use crate::util::stubs::*;
 use crate::util::matching::*;
 use crate::data::events::*;
+use crate::services::LibraryService;
+use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 // ── LibraryController ─────────────────────────────────────────────────────────
 
@@ -34,6 +35,8 @@ pub struct LibrarySnapshot {
 
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
+    /// View model that owns the service and pane state.
+    vm: LibraryViewModel,
     /// Full catalog — never filtered.
     catalog: Vec<LibraryItem>,
     /// Active sidebar filter.
@@ -55,12 +58,19 @@ pub struct LibraryController {
 }
 
 impl LibraryController {
-    /// Creates a controller loaded with the stub catalog.
-    pub fn new() -> Self {
-        let catalog = stub_catalog();
+    /// Creates a controller that loads its catalog from `service`.
+    ///
+    /// # Panics
+    ///
+    /// Does not panic; service errors are reflected in [`pane_state`].
+    pub fn new(service: Box<dyn LibraryService>) -> Self {
+        let mut vm = LibraryViewModel::new(service);
+        vm.load_list();
+        let catalog = vm.items().to_vec();
         let section_counts = section_counts(&catalog);
         let publishers = publisher_entries(&catalog);
         Self {
+            vm,
             catalog,
             filter: SidebarFilter::default(),
             search_query: String::new(),
@@ -71,6 +81,21 @@ impl LibraryController {
             section_counts,
             publishers,
         }
+    }
+
+    /// Returns the current pane state from the service layer.
+    pub fn pane_state(&self) -> &LibraryPaneState {
+        self.vm.pane_state()
+    }
+
+    /// Reloads catalog from the service and resets selection.
+    pub fn reload(&mut self, cx: &mut Context<Self>) {
+        self.vm.refresh();
+        self.catalog = self.vm.items().to_vec();
+        self.section_counts = section_counts(&self.catalog);
+        self.publishers = publisher_entries(&self.catalog);
+        self.selection = Selection::default();
+        cx.emit(LibraryChanged);
     }
 
     // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -237,11 +262,6 @@ impl LibraryController {
     }
 }
 
-impl Default for LibraryController {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 
 // //! Library UI state and interaction controller.

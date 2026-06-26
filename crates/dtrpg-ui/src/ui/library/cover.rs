@@ -256,6 +256,7 @@ mod tests {
     fn make_item(id: &str, title: &str, color: &str) -> LibraryItem {
         LibraryItem {
             id: id.into(),
+            numeric_id: 0,
             title: title.into(),
             publisher: "Test".into(),
             line: "Test Line".into(),

@@ -11,6 +11,8 @@ use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
 pub struct LibraryItem {
     /// Stable unique identifier (e.g. `"b1"`).
     pub id: Arc<str>,
+    /// Numeric API identifier used for SDK detail fetches.
+    pub numeric_id: u64,
     pub title: Arc<str>,
     pub publisher: Arc<str>,
     /// Game line / series name.
@@ -50,6 +52,7 @@ impl LibraryItem {
     ) -> Self {
         Self {
             id: id.into(),
+            numeric_id: 0,
             title: title.into(),
             publisher: publisher.into(),
             line: line.into(),

@@ -2,10 +2,12 @@
 use gpui::*;
 use gpui_component::{init, Root};
 
+use crate::services::LibraryService;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::util::init::init_globals;
 
-pub fn setup(cx: &mut App) {
+/// Initializes the GPUI application and opens the library window backed by `service`.
+pub fn setup(cx: &mut App, service: Box<dyn LibraryService>) {
     init(cx);
     // .SystemUIFont resolves to .AppleSystemUIFont via font_name_with_fallbacks,
     // which does not resolve on macOS 26 via NSFontFamilyAttribute. Use the
@@ -24,8 +26,8 @@ pub fn setup(cx: &mut App) {
             }),
             ..Default::default()
         },
-        |window, cx| {
-            let view = cx.new(|cx| LibraryRootView::new(window, cx));
+        move |window, cx| {
+            let view = cx.new(|cx| LibraryRootView::new(window, cx, service));
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
     )

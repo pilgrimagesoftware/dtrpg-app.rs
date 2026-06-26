@@ -8,6 +8,7 @@ use crate::{
         events::{LibraryChanged, SettingsChanged},
         theme::LibriTheme,
     },
+    services::LibraryService,
 };
 use crate::ui::views::{
     catalog_view::render_catalog,
@@ -28,8 +29,8 @@ pub struct LibraryRootView {
 
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
-    pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>) -> Self {
-        let controller = cx.new(|_| LibraryController::new());
+    pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
+        let controller = cx.new(|_| LibraryController::new(service));
         let settings = cx.new(|_| SettingsController::new());
         let settings_focus = cx.focus_handle();
 
