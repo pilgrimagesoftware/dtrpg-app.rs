@@ -34,6 +34,8 @@ pub fn render_settings_panel(
     let entity_tab = entity.clone();
 
     div()
+        .id("settings-backdrop")
+        .occlude()
         .absolute()
         .inset_0()
         .bg(backdrop)
