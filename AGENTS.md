@@ -26,3 +26,15 @@ When adding features, prefer new focused modules over expanding existing files i
 
 - Preserve the separation between UI rendering, interaction state, and service adapters.
 - Keep code structured so stubs can be replaced by SDK adapters without rewriting views.
+
+## Credential Storage
+
+All DriveThruRPG account credentials (API key, access token, refresh token) MUST be stored
+exclusively in the platform-native secure store via `dtrpg_ui::credentials::KeyringCredentialStore`.
+
+- Service namespace: `com.pilgrimagesoftware.dtrpg` (constant: `credentials::keys::SERVICE`)
+- Account keys: `api-key`, `access-token`, `refresh-token` (constants in `credentials::keys`)
+- Never write credentials to config files, environment variables, or unencrypted databases.
+- On Linux, the app requires `libsecret` (GNOME Keyring or KWallet). Add `libsecret-1-dev`
+  to the Linux CI build environment.
+- The SDK (`dtrpg-sdk`) does NOT persist credentials — that is the app's responsibility.
