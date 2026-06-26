@@ -7,6 +7,7 @@ use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::library::LibraryController;
+use crate::controllers::settings::SettingsController;
 use crate::data::{
     enums::{CatalogPresentation},
     theme::ColorTokens,
@@ -34,6 +35,7 @@ pub fn render_toolbar(
     grouped: bool,
     presentation: CatalogPresentation,
     entity: Entity<LibraryController>,
+    settings: Entity<SettingsController>,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
@@ -122,7 +124,8 @@ pub fn render_toolbar(
                     text_primary,
                     accent,
                     accent_soft,
-                )),
+                ))
+                .child(render_settings_button(settings, text_primary, border_strong)),
         )
 }
 
@@ -320,4 +323,29 @@ fn render_layout_switcher(
     }
 
     row
+}
+
+// ── Settings gear button ──────────────────────────────────────────────────────
+
+fn render_settings_button(
+    settings: Entity<SettingsController>,
+    text_primary: gpui::Hsla,
+    border: gpui::Hsla,
+) -> impl IntoElement + 'static {
+    div()
+        .id("settings-gear")
+        .h(px(30.0))
+        .w(px(30.0))
+        .rounded(px(8.0))
+        .border_1()
+        .border_color(border)
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor_pointer()
+        .tooltip(|window, cx| Tooltip::new("Settings").build(window, cx))
+        .on_click(move |_, _, cx| {
+            settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
+        })
+        .child(div().text_sm().text_color(text_primary).child("⚙"))
 }

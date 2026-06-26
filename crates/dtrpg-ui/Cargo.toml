@@ -12,6 +12,8 @@ workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
 gpui-component = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1"

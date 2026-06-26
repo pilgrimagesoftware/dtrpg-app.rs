@@ -1480,6 +1480,8 @@ dependencies = [
  "gpui_platform",
  "metal",
  "pretty_assertions",
+ "serde",
+ "toml 0.8.23",
  "zed-font-kit",
 ]
 

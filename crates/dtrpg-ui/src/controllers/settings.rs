@@ -1,0 +1,153 @@
+//! Settings controller: owns open/closed state, active tab, and file-opener overrides.
+
+use gpui::{Context, EventEmitter};
+
+use crate::data::events::SettingsChanged;
+use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+
+// ── SettingsTab ───────────────────────────────────────────────────────────────
+
+/// The three tabs available in the settings panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SettingsTab {
+    #[default]
+    Account,
+    Storage,
+    FileOpeners,
+}
+
+impl SettingsTab {
+    /// Human-readable label used in the tab strip.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Account => "Account",
+            Self::Storage => "Storage",
+            Self::FileOpeners => "File Openers",
+        }
+    }
+
+    /// Parses a persisted tab name back to a `SettingsTab`.
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "Account" => Some(Self::Account),
+            "Storage" => Some(Self::Storage),
+            "FileOpeners" => Some(Self::FileOpeners),
+            _ => None,
+        }
+    }
+
+    /// The string written to disk when persisting the active tab.
+    fn to_name(self) -> &'static str {
+        match self {
+            Self::Account => "Account",
+            Self::Storage => "Storage",
+            Self::FileOpeners => "FileOpeners",
+        }
+    }
+}
+
+// ── SettingsController ────────────────────────────────────────────────────────
+
+/// Snapshot of settings state needed by the views for a single render pass.
+pub struct SettingsSnapshot {
+    pub is_open: bool,
+    pub active_tab: SettingsTab,
+    pub file_openers: Vec<FileOpenerEntry>,
+}
+
+/// Owns all mutable settings state: panel visibility, active tab, file-opener overrides.
+pub struct SettingsController {
+    is_open: bool,
+    active_tab: SettingsTab,
+    file_openers: FileOpenerConfig,
+}
+
+impl SettingsController {
+    /// Creates a controller, restoring the last-active tab and file-opener list from disk.
+    pub fn new() -> Self {
+        let (file_openers, tab_name) = FileOpenerConfig::load_with_tab();
+        let active_tab = tab_name
+            .as_deref()
+            .and_then(SettingsTab::from_name)
+            .unwrap_or_default();
+        Self { is_open: false, active_tab, file_openers }
+    }
+
+    // ── Panel visibility ──────────────────────────────────────────────────────
+
+    /// Returns `true` when the settings panel is visible.
+    pub fn is_open(&self) -> bool {
+        self.is_open
+    }
+
+    /// Opens the settings panel.
+    pub fn open(&mut self, cx: &mut Context<Self>) {
+        if !self.is_open {
+            self.is_open = true;
+            cx.emit(SettingsChanged);
+        }
+    }
+
+    /// Closes the settings panel.
+    pub fn close(&mut self, cx: &mut Context<Self>) {
+        if self.is_open {
+            self.is_open = false;
+            cx.emit(SettingsChanged);
+        }
+    }
+
+    /// Toggles the settings panel open/closed.
+    pub fn toggle(&mut self, cx: &mut Context<Self>) {
+        self.is_open = !self.is_open;
+        cx.emit(SettingsChanged);
+    }
+
+    // ── Tab navigation ────────────────────────────────────────────────────────
+
+    /// Returns the currently active settings tab.
+    pub fn active_tab(&self) -> SettingsTab {
+        self.active_tab
+    }
+
+    /// Sets the active tab and persists it to disk.
+    pub fn set_tab(&mut self, tab: SettingsTab, cx: &mut Context<Self>) {
+        self.active_tab = tab;
+        self.file_openers.save(Some(tab.to_name()));
+        cx.emit(SettingsChanged);
+    }
+
+    // ── File-opener overrides ─────────────────────────────────────────────────
+
+    /// Returns a shared reference to the file-opener config.
+    pub fn file_openers(&self) -> &FileOpenerConfig {
+        &self.file_openers
+    }
+
+    /// Adds or replaces a file-opener entry and persists the change.
+    pub fn add_file_opener(&mut self, entry: FileOpenerEntry, cx: &mut Context<Self>) -> AddOutcome {
+        let outcome = self.file_openers.add(entry);
+        self.file_openers.save(Some(self.active_tab.to_name()));
+        cx.emit(SettingsChanged);
+        outcome
+    }
+
+    /// Removes the file-opener entry for `extension` and persists the change.
+    pub fn remove_file_opener(&mut self, extension: &str, cx: &mut Context<Self>) {
+        self.file_openers.remove(extension);
+        self.file_openers.save(Some(self.active_tab.to_name()));
+        cx.emit(SettingsChanged);
+    }
+
+    // ── Snapshot ──────────────────────────────────────────────────────────────
+
+    /// Returns all data needed by the views for one render pass.
+    pub fn snapshot(&self) -> SettingsSnapshot {
+        SettingsSnapshot {
+            is_open: self.is_open,
+            active_tab: self.active_tab,
+            file_openers: self.file_openers.entries().to_vec(),
+        }
+    }
+}
+
+impl EventEmitter<SettingsChanged> for SettingsController {}

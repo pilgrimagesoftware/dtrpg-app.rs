@@ -2,12 +2,17 @@
 
 use gpui::{div, AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled};
 
-use crate::{controllers::library::LibraryController, data::{
-    events::LibraryChanged, theme::LibriTheme,
-}};
+use crate::{
+    controllers::{library::LibraryController, settings::SettingsController},
+    data::{
+        events::{LibraryChanged, SettingsChanged},
+        theme::LibriTheme,
+    },
+};
 use crate::ui::views::{
     catalog_view::render_catalog,
     detail_panel_view::render_detail_panel,
+    settings_view::render_settings_panel,
     sidebar_view::render_sidebar,
     toolbar_view::render_toolbar,
 };
@@ -15,28 +20,34 @@ use crate::ui::views::{
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
     controller: Entity<LibraryController>,
+    settings: Entity<SettingsController>,
 }
 
 impl LibraryRootView {
-    /// Constructs the root view and wires up the controller subscription.
+    /// Constructs the root view and wires up the controller subscriptions.
     pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>) -> Self {
         let controller = cx.new(|_| LibraryController::new());
+        let settings = cx.new(|_| SettingsController::new());
 
-        // Re-render whenever the controller emits a change.
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
             cx.notify();
         })
         .detach();
 
-        Self { controller }
+        cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        Self { controller, settings }
     }
 }
 
 impl Render for LibraryRootView {
     fn render(&mut self, _window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let entity = self.controller.clone();
+        let lib_entity = self.controller.clone();
+        let settings_entity = self.settings.clone();
 
-        // Read immutable controller state.
         let (
             filter,
             counts,
@@ -52,7 +63,8 @@ impl Render for LibraryRootView {
             items,
         ) = self.controller.read(cx).snapshot();
 
-        // Read theme global.
+        let settings_snap = self.settings.read(cx).snapshot();
+
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
         let density = &theme.density_constants;
@@ -63,7 +75,7 @@ impl Render for LibraryRootView {
             &publishers,
             total_count,
             total_mb,
-            entity.clone(),
+            lib_entity.clone(),
             colors,
         );
         let toolbar = render_toolbar(
@@ -73,14 +85,41 @@ impl Render for LibraryRootView {
             sort,
             grouped,
             presentation,
-            entity.clone(),
+            lib_entity.clone(),
+            settings_entity.clone(),
             colors,
         );
-        let catalog = render_catalog(items, presentation, grouped, entity.clone(), colors, density);
-        let panel = render_detail_panel(selected_item.as_ref(), entity.clone(), colors);
+        let catalog = render_catalog(items, presentation, grouped, lib_entity.clone(), colors, density);
+        let panel = render_detail_panel(selected_item.as_ref(), lib_entity, colors);
 
         let surface = colors.surface;
         let text_primary = colors.text_primary;
+
+        // Settings overlay is rendered inside the main content area so the
+        // sidebar remains visible behind it.
+        let main_content = {
+            let mut content = div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .relative()
+                .bg(surface)
+                .child(toolbar)
+                .child(catalog);
+
+            if settings_snap.is_open {
+                let overlay = render_settings_panel(
+                    settings_snap.active_tab,
+                    &settings_snap.file_openers,
+                    settings_entity,
+                    colors,
+                );
+                content = content.child(overlay);
+            }
+
+            content
+        };
 
         div()
             .size_full()
@@ -89,16 +128,7 @@ impl Render for LibraryRootView {
             .flex()
             .relative()
             .child(sidebar)
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .flex_col()
-                    .bg(surface)
-                    .child(toolbar)
-                    .child(catalog),
-            )
+            .child(main_content)
             .child(panel)
     }
 }
