@@ -1,7 +1,8 @@
 //! Library UI state and interaction controller.
 
 use std::sync::Arc;
-use gpui::Context;
+use gpui::{Context, Entity};
+use crate::controllers::activity::ActivityController;
 use crate::data::theme::LibriTheme;
 use crate::data::enums::*;
 use crate::data::theme::*;
@@ -37,6 +38,10 @@ pub struct LibrarySnapshot {
 pub struct LibraryController {
     /// View model that owns the service and pane state.
     vm: LibraryViewModel,
+    /// Keeps the `ActivityController` entity alive so the weak reference in
+    /// background task closures remains valid for the lifetime of this controller.
+    #[allow(dead_code)]
+    activity: Entity<ActivityController>,
     /// Full catalog — never filtered.
     catalog: Vec<LibraryItem>,
     /// Active sidebar filter.
@@ -66,23 +71,40 @@ impl LibraryController {
     /// # Panics
     ///
     /// Does not panic; service errors are reflected in [`pane_state`].
-    pub fn new(service: Box<dyn LibraryService>, cx: &mut Context<Self>) -> Self {
+    pub fn new(service: Box<dyn LibraryService>, activity: Entity<ActivityController>, cx: &mut Context<Self>) -> Self {
         let vm = LibraryViewModel::new(service);
         let service_arc = vm.service_arc();
+        let weak_activity = activity.downgrade();
 
         // Load catalog off the main thread so the UI remains responsive during the
         // potentially multi-page HTTP fetch.
         cx.spawn(async move |this, async_cx| {
+            let activity_id = weak_activity
+                .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", cx))
+                .unwrap_or(0);
+
             let result = async_cx
                 .background_executor()
                 .spawn(async move { service_arc.list_items() })
                 .await;
+
+            match &result {
+                Ok(_) => {
+                    weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    weak_activity.update(async_cx, |a, cx| a.error(activity_id, msg, cx)).ok();
+                }
+            }
+
             this.update(async_cx, |ctrl, cx| ctrl.apply_load_result(result, cx)).ok();
         })
         .detach();
 
         Self {
             vm,
+            activity,
             catalog: Vec::new(),
             filter: SidebarFilter::default(),
             search_query: String::new(),

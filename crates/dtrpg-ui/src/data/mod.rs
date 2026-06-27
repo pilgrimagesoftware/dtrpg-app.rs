@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod enums;
 pub mod events;
 pub mod file_openers;

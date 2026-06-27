@@ -3,15 +3,16 @@
 use gpui::{AppContext, div, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled};
 
 use crate::{
-    controllers::{library::LibraryController, settings::SettingsController},
+    controllers::{activity::ActivityController, library::LibraryController, settings::SettingsController},
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
-        events::{LibraryChanged, LogoutRequested, SettingsChanged},
+        events::{ActivityChanged, LibraryChanged, LogoutRequested, SettingsChanged},
         theme::LibriTheme,
     },
     services::LibraryService,
 };
 use crate::ui::views::{
+    activity_panel_view::render_activity_panel,
     catalog_view::render_catalog,
     detail_panel_view::render_detail_panel,
     settings_view::render_settings_panel,
@@ -24,6 +25,7 @@ use crate::ui::windows::login::open_login_window;
 pub struct LibraryRootView {
     controller: Entity<LibraryController>,
     settings: Entity<SettingsController>,
+    activity: Entity<ActivityController>,
     /// Focus handle for the settings overlay; grabbed when the panel opens so
     /// Escape key events route to the backdrop instead of the catalog.
     settings_focus: FocusHandle,
@@ -32,11 +34,17 @@ pub struct LibraryRootView {
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
     pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
-        let controller = cx.new(|cx| LibraryController::new(service, cx));
+        let activity = cx.new(|_| ActivityController::new());
+        let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let settings = cx.new(|_| SettingsController::new());
         let settings_focus = cx.focus_handle();
 
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        cx.subscribe(&activity, |_this, _ctrl, _event: &ActivityChanged, cx| {
             cx.notify();
         })
         .detach();
@@ -60,7 +68,7 @@ impl LibraryRootView {
         })
         .detach();
 
-        Self { controller, settings, settings_focus }
+        Self { controller, settings, activity, settings_focus }
     }
 }
 
@@ -68,6 +76,7 @@ impl Render for LibraryRootView {
     fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lib_entity = self.controller.clone();
         let settings_entity = self.settings.clone();
+        let activity_entity = self.activity.clone();
 
         let snap = self.controller.read(cx).snapshot();
         let (filter, counts, publishers, total_count, total_mb, matched_count,
@@ -78,6 +87,7 @@ impl Render for LibraryRootView {
         );
 
         let settings_snap = self.settings.read(cx).snapshot();
+        let activity_snap = self.activity.read(cx).snapshot();
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
@@ -90,6 +100,8 @@ impl Render for LibraryRootView {
             total_count,
             total_mb,
             lib_entity.clone(),
+            activity_entity.clone(),
+            activity_snap.in_progress_count,
             colors,
         );
         let toolbar = render_toolbar(
@@ -140,13 +152,25 @@ impl Render for LibraryRootView {
             content
         };
 
+        // Wrap the sidebar in a relative container so the activity panel overlay
+        // (which is absolute-positioned) is anchored within the sidebar column.
+        let mut sidebar_col = div()
+            .flex_none()
+            .relative()
+            .child(sidebar);
+
+        if activity_snap.panel_open {
+            let overlay = render_activity_panel(&activity_snap, activity_entity, colors);
+            sidebar_col = sidebar_col.child(overlay);
+        }
+
         div()
             .size_full()
             .bg(surface)
             .text_color(text_primary)
             .flex()
             .relative()
-            .child(sidebar)
+            .child(sidebar_col)
             .child(main_content)
             .child(panel)
     }

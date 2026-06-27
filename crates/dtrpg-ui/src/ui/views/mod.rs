@@ -1,3 +1,4 @@
+pub mod activity_panel_view;
 pub mod catalog_view;
 pub mod detail_panel_view;
 pub mod login_view;

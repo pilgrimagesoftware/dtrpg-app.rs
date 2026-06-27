@@ -1,6 +1,7 @@
 //! Controller events emitted when state changes.
 
 use gpui::EventEmitter;
+use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
 
 // ── LibraryChanged ────────────────────────────────────────────────────────────
@@ -9,6 +10,13 @@ use crate::controllers::library::LibraryController;
 pub struct LibraryChanged;
 
 impl EventEmitter<LibraryChanged> for LibraryController {}
+
+// ── ActivityChanged ───────────────────────────────────────────────────────────
+
+/// Emitted when the activity item list changes (item added, completed, or errored).
+pub struct ActivityChanged;
+
+impl EventEmitter<ActivityChanged> for ActivityController {}
 
 // ── SettingsChanged ───────────────────────────────────────────────────────────
 

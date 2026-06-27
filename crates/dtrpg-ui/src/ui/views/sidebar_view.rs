@@ -5,6 +5,7 @@ use std::sync::Arc;
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
 
+use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
 use crate::data::{
     library::SectionCounts,
@@ -14,6 +15,7 @@ use crate::util::filter::SidebarFilter;
 use crate::util::publisher::PublisherEntry;
 
 /// Renders the full sidebar column.
+#[allow(clippy::too_many_arguments)]
 pub fn render_sidebar(
     filter: &SidebarFilter,
     counts: SectionCounts,
@@ -21,6 +23,8 @@ pub fn render_sidebar(
     total_count: usize,
     total_mb: f64,
     entity: Entity<LibraryController>,
+    activity_entity: Entity<ActivityController>,
+    activity_in_progress: usize,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
     let surface_alt = colors.surface_alt;
@@ -161,15 +165,48 @@ pub fn render_sidebar(
                 .flex_none()
                 .border_t_1()
                 .border_color(border)
-                .px(px(18.0))
-                .py(px(11.0))
                 .flex()
-                .justify_between()
-                .text_xs()
-                .text_color(text_tertiary)
-                .child(format!("{total_count} titles"))
-                .child(total_size_str),
+                .flex_col()
+                .child(
+                    div()
+                        .px(px(18.0))
+                        .pt(px(11.0))
+                        .pb(px(6.0))
+                        .flex()
+                        .justify_between()
+                        .text_xs()
+                        .text_color(text_tertiary)
+                        .child(format!("{total_count} titles"))
+                        .child(total_size_str),
+                )
+                .child(render_activity_button(activity_entity, activity_in_progress, text_tertiary)),
         )
+}
+
+// ── Activity button ───────────────────────────────────────────────────────────
+
+fn render_activity_button(
+    entity: Entity<ActivityController>,
+    in_progress: usize,
+    text_color: gpui::Hsla,
+) -> impl IntoElement + 'static + use<> {
+    let label = if in_progress > 0 {
+        format!("↻ ({in_progress})")
+    } else {
+        "✓".to_string()
+    };
+
+    div()
+        .id("activity-button")
+        .px(px(18.0))
+        .pb(px(11.0))
+        .text_xs()
+        .text_color(text_color)
+        .cursor_pointer()
+        .child(label)
+        .on_click(move |_, _, cx| {
+            entity.update(cx, |a, cx| a.toggle_panel(cx));
+        })
 }
 
 // ── Nav row ───────────────────────────────────────────────────────────────────
