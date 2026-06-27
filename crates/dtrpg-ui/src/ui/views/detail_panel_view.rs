@@ -1,19 +1,22 @@
 //! Detail panel: slide-over showing full item metadata and actions.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use gpui::prelude::*;
-use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement,
+           StatefulInteractiveElement, Styled};
 use crate::data::library::LibraryItem;
 
 use crate::ui::library::cover::render_generative_cover;
-use crate::data::enums::{ItemStatus};
+use crate::data::enums::ItemStatus;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
+use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
 pub fn render_detail_panel(
     selected_item: Option<&LibraryItem>,
+    storage_root_path: PathBuf,
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
 ) -> AnyElement {
@@ -34,6 +37,7 @@ pub fn render_detail_panel(
     let entity_close = entity.clone();
     let entity_download = entity.clone();
     let item_id = Arc::clone(&item.id);
+    let reveal_item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
 
     div()
@@ -170,12 +174,58 @@ pub fn render_detail_panel(
                                         .text_color(text_primary)
                                         .child(if is_downloaded { "Downloaded" } else { "Download" }),
                                 ),
-                        ),
+                        )
+                        .child(if is_downloaded {
+                            let item_path = storage_root_path
+                                .join("items")
+                                .join(reveal_item_id.as_ref());
+                            div()
+                                .id("detail-reveal")
+                                .h(px(36.0))
+                                .px(px(16.0))
+                                .rounded(px(8.0))
+                                .border_1()
+                                .border_color(border)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .on_click(move |_, _, _cx| {
+                                    if !item_path.exists() {
+                                        tracing::warn!(
+                                            path = %item_path.display(),
+                                            "reveal: file not found — item may need re-download"
+                                        );
+                                        return;
+                                    }
+                                    if let Err(e) = reveal_in_file_manager(&item_path) {
+                                        tracing::warn!("reveal_in_file_manager failed: {e}");
+                                    }
+                                })
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_primary)
+                                        .child(platform_reveal_label()),
+                                )
+                                .into_any_element()
+                        } else {
+                            div().into_any_element()
+                        }),
                 )
                 // Metadata table
                 .child(render_metadata_table(&item, colors)),
         )
         .into_any_element()
+}
+
+fn platform_reveal_label() -> &'static str {
+    #[cfg(target_os = "macos")]
+    return "Show in Finder";
+    #[cfg(target_os = "windows")]
+    return "Show in Explorer";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return "Show in Files";
 }
 
 fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens) -> impl IntoElement + 'static + use<> {

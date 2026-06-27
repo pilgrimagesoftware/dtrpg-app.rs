@@ -1,5 +1,6 @@
 //! Catalog view: list, thumbs, and grid layouts with grouping and empty state.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::prelude::*;
@@ -11,6 +12,7 @@ use crate::ui::library::{
 };
 use crate::data::enums::{CatalogPresentation};
 use crate::util::publisher::{group_by_publisher};
+use crate::util::reveal::reveal_in_file_manager;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, DensityConstants};
 
@@ -24,6 +26,7 @@ pub fn render_catalog(
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
     density: &DensityConstants,
+    storage_root_path: PathBuf,
 ) -> AnyElement {
     let pad_top = density.catalog_pad_top;
     let pad_side = density.catalog_pad_side;
@@ -50,7 +53,7 @@ pub fn render_catalog(
             .px(pad_side)
             .child(render_list_header(&colors))
             .children(items.iter().map(|item| {
-                render_list_row(item, &colors, &density, entity.clone())
+                render_list_row(item, &colors, &density, entity.clone(), storage_root_path.clone())
             }))
             .into_any_element(),
 
@@ -61,11 +64,12 @@ pub fn render_catalog(
                     let c = colors.clone();
                     let d = density.clone();
                     let e = entity.clone();
+                    let s = storage_root_path.clone();
                     div()
                         .child(render_group_header(&g.publisher, g.items.len(), &c))
                         .child(render_list_header(&c))
                         .children(g.items.into_iter().map(move |item| {
-                            render_list_row(&item, &c, &d, e.clone())
+                            render_list_row(&item, &c, &d, e.clone(), s.clone())
                         }))
                 }))
                 .into_any_element()
@@ -96,7 +100,7 @@ pub fn render_catalog(
 
         (CatalogPresentation::Grid, false) => root
             .px(pad_side)
-            .child(render_grid(items, colors, density, entity))
+            .child(render_grid(items, colors, density, entity, storage_root_path))
             .into_any_element(),
 
         (CatalogPresentation::Grid, true) => {
@@ -106,9 +110,10 @@ pub fn render_catalog(
                     let c = colors.clone();
                     let d = density.clone();
                     let e = entity.clone();
+                    let s = storage_root_path.clone();
                     div()
                         .child(render_group_header(&g.publisher, g.items.len(), &c))
-                        .child(render_grid(g.items, c, d, e))
+                        .child(render_grid(g.items, c, d, e, s))
                 }))
                 .into_any_element()
         }
@@ -185,6 +190,17 @@ fn render_status(status: ItemStatus, colors: &ColorTokens) -> AnyElement {
     }
 }
 
+// ── Reveal action ─────────────────────────────────────────────────────────────
+
+fn platform_reveal_label() -> &'static str {
+    #[cfg(target_os = "macos")]
+    return "Show in Finder";
+    #[cfg(target_os = "windows")]
+    return "Show in Explorer";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return "Show in Files";
+}
+
 // ── List layout ───────────────────────────────────────────────────────────────
 
 fn render_list_header(colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
@@ -205,6 +221,7 @@ fn render_list_header(colors: &ColorTokens) -> impl IntoElement + 'static + use<
         .child(div().w(px(60.0)).child("Size"))
         .child(div().w(px(80.0)).child("Added"))
         .child(div().w(px(24.0)).child(""))
+        .child(div().w(px(28.0)).child(""))
 }
 
 fn render_list_row(
@@ -212,6 +229,7 @@ fn render_list_row(
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
+    storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -224,6 +242,35 @@ fn render_list_row(
     let status = item.status;
     let h = density.row_text_height;
     let colors = colors.clone();
+    let reveal_item_id = Arc::clone(&item.id);
+
+    let reveal_col: AnyElement = if status == ItemStatus::Downloaded {
+        let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
+        let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-row-{}", &*reveal_item_id));
+        div()
+            .id(reveal_elem_id)
+            .w(px(28.0))
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor_pointer()
+            .on_click(move |_, _, _cx| {
+                if !item_reveal_path.exists() {
+                    tracing::warn!(
+                        path = %item_reveal_path.display(),
+                        "reveal: file not found — item may need re-download"
+                    );
+                    return;
+                }
+                if let Err(e) = reveal_in_file_manager(&item_reveal_path) {
+                    tracing::warn!("reveal_in_file_manager failed: {e}");
+                }
+            })
+            .child(div().text_xs().text_color(colors.text_tertiary).child("↗"))
+            .into_any_element()
+    } else {
+        div().w(px(28.0)).into_any_element()
+    };
 
     div()
         .id(Arc::clone(&id))
@@ -296,6 +343,7 @@ fn render_list_row(
                 .child(year.to_string()),
         )
         .child(render_status(status, &colors))
+        .child(reveal_col)
 }
 
 // ── Thumbs layout ─────────────────────────────────────────────────────────────
@@ -395,6 +443,7 @@ fn render_grid(
     colors: ColorTokens,
     density: DensityConstants,
     entity: Entity<LibraryController>,
+    storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -406,7 +455,7 @@ fn render_grid(
         .gap(gap_x)
         .mb(gap_y)
         .children(items.into_iter().map(move |item| {
-            render_grid_card(&item, &colors, min_w, entity.clone())
+            render_grid_card(&item, &colors, min_w, entity.clone(), storage_root_path.clone())
         }))
 }
 
@@ -415,15 +464,47 @@ fn render_grid_card(
     colors: &ColorTokens,
     card_w: f32,
     entity: Entity<LibraryController>,
+    storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
     let publisher = item.publisher.to_string();
     let status = item.status;
     let cover_h = card_w * 10.0 / 7.0;
+    let reveal_item_id = Arc::clone(&item.id);
 
     let cover = render_generative_cover(item, card_w, cover_h);
     let colors = colors.clone();
+
+    let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
+        let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
+        let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-grid-{}", &*reveal_item_id));
+        div()
+            .id(reveal_elem_id)
+            .mt(px(2.0))
+            .cursor_pointer()
+            .on_click(move |_, _, _cx| {
+                if !item_reveal_path.exists() {
+                    tracing::warn!(
+                        path = %item_reveal_path.display(),
+                        "reveal: file not found — item may need re-download"
+                    );
+                    return;
+                }
+                if let Err(e) = reveal_in_file_manager(&item_reveal_path) {
+                    tracing::warn!("reveal_in_file_manager failed: {e}");
+                }
+            })
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(colors.text_tertiary)
+                    .child(platform_reveal_label()),
+            )
+            .into_any_element()
+    } else {
+        div().into_any_element()
+    };
 
     div()
         .id(Arc::clone(&id))
@@ -466,6 +547,7 @@ fn render_grid_card(
                                 .child(publisher),
                         )
                         .child(render_status(status, &colors)),
-                ),
+                )
+                .child(reveal_row),
         )
 }

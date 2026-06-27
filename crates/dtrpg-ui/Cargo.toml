@@ -17,6 +17,8 @@ toml = { workspace = true }
 keyring = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+dirs = { workspace = true }
+rfd = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1"

@@ -12,7 +12,7 @@ use crate::util::sort::*;
 use crate::util::publisher::*;
 use crate::util::matching::*;
 use crate::data::events::*;
-use crate::services::LibraryService;
+use crate::services::{LibraryService, LibraryServiceError};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 // ── LibraryController ─────────────────────────────────────────────────────────
@@ -58,29 +58,54 @@ pub struct LibraryController {
 }
 
 impl LibraryController {
-    /// Creates a controller that loads its catalog from `service`.
+    /// Creates a controller and immediately schedules catalog loading on a background thread.
+    ///
+    /// The controller starts in the `Loading` pane state with an empty catalog. When the
+    /// background fetch completes, [`apply_load_result`] is called and [`LibraryChanged`] emitted.
     ///
     /// # Panics
     ///
     /// Does not panic; service errors are reflected in [`pane_state`].
-    pub fn new(service: Box<dyn LibraryService>) -> Self {
-        let mut vm = LibraryViewModel::new(service);
-        vm.load_list();
-        let catalog = vm.items().to_vec();
-        let section_counts = section_counts(&catalog);
-        let publishers = publisher_entries(&catalog);
+    pub fn new(service: Box<dyn LibraryService>, cx: &mut Context<Self>) -> Self {
+        let vm = LibraryViewModel::new(service);
+        let service_arc = vm.service_arc();
+
+        // Load catalog off the main thread so the UI remains responsive during the
+        // potentially multi-page HTTP fetch.
+        cx.spawn(async move |this, async_cx| {
+            let result = async_cx
+                .background_executor()
+                .spawn(async move { service_arc.list_items() })
+                .await;
+            this.update(async_cx, |ctrl, cx| ctrl.apply_load_result(result, cx)).ok();
+        })
+        .detach();
+
         Self {
             vm,
-            catalog,
+            catalog: Vec::new(),
             filter: SidebarFilter::default(),
             search_query: String::new(),
             sort: SortMethod::default(),
             grouped: false,
             presentation: CatalogPresentation::default(),
             selection: Selection::default(),
-            section_counts,
-            publishers,
+            section_counts: SectionCounts::default(),
+            publishers: Vec::new(),
         }
+    }
+
+    /// Applies a completed load result from the background task.
+    fn apply_load_result(
+        &mut self,
+        result: Result<Vec<LibraryItem>, LibraryServiceError>,
+        cx: &mut Context<Self>,
+    ) {
+        self.vm.apply_list_result(result);
+        self.catalog = self.vm.items().to_vec();
+        self.section_counts = section_counts(&self.catalog);
+        self.publishers = publisher_entries(&self.catalog);
+        cx.emit(LibraryChanged);
     }
 
     /// Returns the current pane state from the service layer.

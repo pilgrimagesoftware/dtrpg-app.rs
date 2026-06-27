@@ -1,10 +1,13 @@
 //! Settings controller: owns open/closed state, active tab, and file-opener overrides.
 
+use std::path::PathBuf;
+
 use gpui::{Context, EventEmitter};
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
 use crate::data::events::{LogoutRequested, SettingsChanged};
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 
 // ── SettingsTab ───────────────────────────────────────────────────────────────
 
@@ -56,20 +59,28 @@ pub struct SettingsSnapshot {
     pub file_openers: Vec<FileOpenerEntry>,
     /// `true` when an API key is present in the keyring.
     pub is_authenticated: bool,
+    /// Resolved storage root path (override or platform default).
+    pub storage_root_path: PathBuf,
+    /// `true` when the configured storage root is unreachable (e.g. unmounted volume).
+    pub storage_unavailable: bool,
 }
 
-/// Owns all mutable settings state: panel visibility, active tab, file-opener overrides.
+/// Owns all mutable settings state: panel visibility, active tab, file-opener overrides,
+/// and catalog storage configuration.
 pub struct SettingsController {
     is_open: bool,
     active_tab: SettingsTab,
     file_openers: FileOpenerConfig,
     is_authenticated: bool,
+    storage: StorageConfig,
+    storage_unavailable: bool,
 }
 
 impl SettingsController {
     /// Creates a controller, restoring the last-active tab and file-opener list from disk.
     ///
-    /// Checks the platform keyring to determine initial auth state.
+    /// Checks the platform keyring to determine initial auth state, and verifies the
+    /// configured storage root is accessible.
     pub fn new() -> Self {
         let (file_openers, tab_name) = FileOpenerConfig::load_with_tab();
         let active_tab = tab_name
@@ -81,7 +92,15 @@ impl SettingsController {
             .ok()
             .flatten()
             .is_some();
-        Self { is_open: false, active_tab, file_openers, is_authenticated }
+        let storage = StorageConfig::load();
+        let storage_unavailable = !storage.is_accessible();
+        if storage_unavailable {
+            tracing::warn!(
+                path = %storage.root_path().display(),
+                "configured storage root is not accessible"
+            );
+        }
+        Self { is_open: false, active_tab, file_openers, is_authenticated, storage, storage_unavailable }
     }
 }
 
@@ -95,6 +114,46 @@ impl SettingsController {
     /// Emits `LogoutRequested` so the library root view can coordinate the logout flow.
     pub fn request_logout(&mut self, cx: &mut Context<Self>) {
         cx.emit(LogoutRequested);
+    }
+
+    // ── Storage ───────────────────────────────────────────────────────────────
+
+    /// Returns the resolved storage root path.
+    pub fn storage_root_path(&self) -> PathBuf {
+        self.storage.root_path()
+    }
+
+    /// Validates `path` for writability and saves it as the new storage root.
+    ///
+    /// Emits [`SettingsChanged`] on success. Returns the validation error on failure
+    /// so the caller can surface it to the user.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`StorageError`] if `path` is missing, unwritable, or on an
+    /// unavailable volume.
+    pub fn apply_storage_path(
+        &mut self,
+        path: PathBuf,
+        cx: &mut Context<Self>,
+    ) -> Result<(), StorageError> {
+        validate_writable(&path)?;
+        self.storage.set_root_path(path);
+        self.storage_unavailable = false;
+        cx.emit(SettingsChanged);
+        Ok(())
+    }
+
+    /// Opens the OS file manager at the configured storage root, creating the
+    /// directory first if it does not exist.
+    pub fn reveal_storage_location(&self) {
+        let path = self.storage.root_path();
+        if !path.exists() {
+            let _ = std::fs::create_dir_all(&path);
+        }
+        if let Err(e) = crate::util::reveal::reveal_in_file_manager(&path) {
+            tracing::warn!("reveal_in_file_manager failed: {e}");
+        }
     }
 
     // ── Panel visibility ──────────────────────────────────────────────────────
@@ -171,6 +230,8 @@ impl SettingsController {
             active_tab: self.active_tab,
             file_openers: self.file_openers.entries().to_vec(),
             is_authenticated: self.is_authenticated,
+            storage_root_path: self.storage.root_path(),
+            storage_unavailable: self.storage_unavailable,
         }
     }
 }

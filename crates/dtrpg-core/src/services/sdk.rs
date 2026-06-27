@@ -391,6 +391,8 @@ fn map_sdk_error(error: SdkError) -> LibraryServiceError {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
     use dtrpg_sdk::{
         FileChecksum, OrderProductAttributes, OrderProductFile, PaginationLinks, PaginationMeta,
         PublisherAttributes,
@@ -408,7 +410,7 @@ mod tests {
             let item = order_product_item(42, "A Better Dungeon");
             Self {
                 list_result: Ok(OrderProductListResponse {
-                    links: pagination_links(),
+                    links: pagination_links(None),
                     meta: PaginationMeta {
                         items_per_page: 100,
                         current_page: 1,
@@ -453,6 +455,44 @@ mod tests {
             _id: u64,
         ) -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
+        }
+    }
+
+    /// Returns pages in order: first call gets page 1 with a `next` link,
+    /// second call gets page 2 with no `next` link.
+    struct TwoPageGateway {
+        call_count: AtomicU32,
+    }
+
+    impl SdkLibraryGateway for TwoPageGateway {
+        fn list_order_products(
+            &self,
+            _params: LibraryItemsParams,
+        ) -> Result<OrderProductListResponse, LibraryServiceError> {
+            let call = self.call_count.fetch_add(1, Ordering::Relaxed);
+
+            if call == 0 {
+                Ok(OrderProductListResponse {
+                    links: pagination_links(Some("page=2".to_string())),
+                    meta: PaginationMeta { items_per_page: 1, current_page: 1 },
+                    data: vec![order_product_item(42, "Item Page One")],
+                    included: None,
+                })
+            } else {
+                Ok(OrderProductListResponse {
+                    links: pagination_links(None),
+                    meta: PaginationMeta { items_per_page: 1, current_page: 2 },
+                    data: vec![order_product_item(99, "Item Page Two")],
+                    included: None,
+                })
+            }
+        }
+
+        fn get_order_product(
+            &self,
+            _id: u64,
+        ) -> Result<OrderProductItemResponse, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
     }
 
@@ -523,13 +563,31 @@ mod tests {
         }
     }
 
-    fn pagination_links() -> PaginationLinks {
+    fn pagination_links(next: Option<String>) -> PaginationLinks {
         PaginationLinks {
             self_: "self".to_string(),
             first: None,
             last: None,
             prev: None,
-            next: None,
+            next,
         }
+    }
+
+    #[test]
+    fn sdk_service_fetches_all_pages_via_pagination() {
+        let gateway = TwoPageGateway { call_count: AtomicU32::new(0) };
+        let service = RustSdkLibraryService::new(Box::new(gateway));
+
+        let items = service.list_items().expect("list items");
+
+        assert_eq!(items.len(), 2, "should have items from both pages");
+        assert!(
+            items.iter().any(|i| i.numeric_id == 42),
+            "page 1 item should be present"
+        );
+        assert!(
+            items.iter().any(|i| i.numeric_id == 99),
+            "page 2 item should be present"
+        );
     }
 }

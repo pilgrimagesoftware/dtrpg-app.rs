@@ -32,7 +32,7 @@ pub struct LibraryRootView {
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
     pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
-        let controller = cx.new(|_| LibraryController::new(service));
+        let controller = cx.new(|cx| LibraryController::new(service, cx));
         let settings = cx.new(|_| SettingsController::new());
         let settings_focus = cx.focus_handle();
 
@@ -103,8 +103,8 @@ impl Render for LibraryRootView {
             settings_entity.clone(),
             colors,
         );
-        let catalog = render_catalog(items, presentation, grouped, lib_entity.clone(), colors, density);
-        let panel = render_detail_panel(selected_item.as_ref(), lib_entity, colors);
+        let catalog = render_catalog(items, presentation, grouped, lib_entity.clone(), colors, density, settings_snap.storage_root_path.clone());
+        let panel = render_detail_panel(selected_item.as_ref(), settings_snap.storage_root_path.clone(), lib_entity, colors);
 
         let surface = colors.surface;
         let text_primary = colors.text_primary;
@@ -129,6 +129,7 @@ impl Render for LibraryRootView {
                     settings_snap.active_tab,
                     &settings_snap.file_openers,
                     settings_snap.is_authenticated,
+                    settings_snap.storage_root_path,
                     settings_entity,
                     &self.settings_focus,
                     colors,

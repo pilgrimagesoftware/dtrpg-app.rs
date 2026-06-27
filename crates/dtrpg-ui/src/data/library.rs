@@ -74,7 +74,7 @@ impl LibraryItem {
 // ── Smart section counts ──────────────────────────────────────────────────────
 
 /// Counts for each smart sidebar section given the full catalog.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SectionCounts {
     pub all: usize,
     pub recently_added: usize,

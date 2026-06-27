@@ -1,5 +1,7 @@
 //! Library view model for Rust frontend pane state management.
 
+use std::sync::Arc;
+
 use crate::data::library::LibraryItem;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
 
@@ -29,7 +31,7 @@ pub enum LibraryPaneState {
 
 /// UI-facing library view model that mediates between the service and the controller.
 pub struct LibraryViewModel {
-    service: Box<dyn LibraryService>,
+    service: Arc<dyn LibraryService>,
     items: Vec<LibraryItem>,
     selected: Option<LibraryItem>,
     pane: LibraryPaneState,
@@ -40,12 +42,17 @@ impl LibraryViewModel {
     /// Creates a new view model from a backend-agnostic service implementation.
     pub fn new(service: Box<dyn LibraryService>) -> Self {
         Self {
-            service,
+            service: Arc::from(service),
             items: Vec::new(),
             selected: None,
             pane: LibraryPaneState::Loading,
             last_error: None,
         }
+    }
+
+    /// Returns a cloneable reference to the service for use in background tasks.
+    pub fn service_arc(&self) -> Arc<dyn LibraryService> {
+        Arc::clone(&self.service)
     }
 
     /// Returns the current high-level pane state.
@@ -68,14 +75,12 @@ impl LibraryViewModel {
         self.last_error.as_ref()
     }
 
-    /// Loads the library list and updates pane state based on the outcome.
+    /// Applies a pre-fetched list result, updating pane state accordingly.
     ///
-    /// This call blocks while the service fetches data.
-    pub fn load_list(&mut self) {
-        self.pane = LibraryPaneState::Loading;
-        self.last_error = None;
-
-        match self.service.list_items() {
+    /// Called either from [`load_list`] (synchronous path) or directly from a
+    /// background task that fetched items off the main thread.
+    pub fn apply_list_result(&mut self, result: Result<Vec<LibraryItem>, LibraryServiceError>) {
+        match result {
             Ok(items) if items.is_empty() => {
                 self.items = Vec::new();
                 self.selected = None;
@@ -98,6 +103,17 @@ impl LibraryViewModel {
                 self.pane = LibraryPaneState::Error;
             }
         }
+    }
+
+    /// Loads the library list and updates pane state based on the outcome.
+    ///
+    /// This call blocks the calling thread while the service fetches data.
+    /// Prefer spawning this on a background executor when called from the UI thread.
+    pub fn load_list(&mut self) {
+        self.pane = LibraryPaneState::Loading;
+        self.last_error = None;
+        let result = self.service.list_items();
+        self.apply_list_result(result);
     }
 
     /// Reloads list data using the same baseline behavior as the initial load.
