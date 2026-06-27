@@ -37,6 +37,10 @@ pub struct ColorTokens {
     pub scrim: Hsla,
     /// Error / destructive state (red).
     pub error: Hsla,
+    /// Warning banner background (amber, low opacity).
+    pub warning_bg: Hsla,
+    /// Warning banner text / icon color (amber, full opacity).
+    pub warning_text: Hsla,
 }
 
 // ── Density ───────────────────────────────────────────────────────────────────
@@ -180,6 +184,8 @@ fn parchment_colors() -> ColorTokens {
         shadow:         hex_a(0x3A, 0x2E, 0x1A, 0.18),
         scrim:          hex_a(0x1E, 0x16, 0x0A, 0.26),
         error:          hex(0xB0, 0x30, 0x28),
+        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
+        warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0),
     }
 }
 
@@ -207,6 +213,8 @@ fn slate_colors() -> ColorTokens {
         shadow:         hex_a(0x1C, 0x2A, 0x3A, 0.18),
         scrim:          hex_a(0x12, 0x1C, 0x28, 0.26),
         error:          hex(0xB0, 0x30, 0x28),
+        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
+        warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0),
     }
 }
 
@@ -234,6 +242,8 @@ fn sage_colors() -> ColorTokens {
         shadow:         hex_a(0x26, 0x30, 0x1C, 0.18),
         scrim:          hex_a(0x18, 0x20, 0x12, 0.26),
         error:          hex(0xB0, 0x30, 0x28),
+        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
+        warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0),
     }
 }
 
@@ -261,5 +271,7 @@ fn ink_colors() -> ColorTokens {
         shadow:         hex_a(0x00, 0x00, 0x00, 0.50),
         scrim:          hex_a(0x00, 0x00, 0x00, 0.45),
         error:          hex(0xE0, 0x58, 0x58),
+        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.10),
+        warning_text:   gpui::hsla(0.10, 0.90, 0.65, 1.0),
     }
 }

@@ -3,7 +3,7 @@ use gpui_component::{init, Root};
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
-use crate::services::LibraryService;
+use crate::services::{LibraryService, LoginService};
 use crate::ui::views::root_view::LibraryRootView;
 use crate::ui::windows::login::open_login_window;
 use crate::util::init::init_globals;
@@ -15,6 +15,14 @@ use crate::util::init::init_globals;
 pub struct ServiceFactory(pub Box<dyn Fn() -> Box<dyn LibraryService> + Send + Sync + 'static>);
 
 impl Global for ServiceFactory {}
+
+/// Holds the factory closure used to create a [`LoginService`] on demand.
+///
+/// Set this global before calling [`setup`] so the login window can obtain a service
+/// instance to exchange the user's API key for session tokens.
+pub struct LoginServiceFactory(pub Box<dyn Fn() -> Box<dyn LoginService> + Send + Sync + 'static>);
+
+impl Global for LoginServiceFactory {}
 
 /// Opens a new library window backed by a freshly created service from [`ServiceFactory`].
 ///

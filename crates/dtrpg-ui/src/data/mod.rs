@@ -1,4 +1,6 @@
 pub mod activity;
+pub mod auth_state;
+pub mod notification;
 pub mod avatar;
 pub mod enums;
 pub mod events;

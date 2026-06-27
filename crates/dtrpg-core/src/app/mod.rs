@@ -2,7 +2,7 @@
 
 use gpui::*;
 
-use dtrpg_ui::ui::app::{ServiceFactory, setup};
+use dtrpg_ui::ui::app::{LoginServiceFactory, ServiceFactory, setup};
 
 /// Boots the GPUI application with a keyring-backed library service.
 pub fn run() {
@@ -13,6 +13,9 @@ pub fn run() {
             cx.set_global(ServiceFactory(Box::new(|| {
                 Box::new(crate::services::sdk::RustSdkLibraryService::from_keyring())
             })));
+            cx.set_global(LoginServiceFactory(Box::new(
+                crate::services::login::build_login_service,
+            )));
             setup(cx);
         });
 }

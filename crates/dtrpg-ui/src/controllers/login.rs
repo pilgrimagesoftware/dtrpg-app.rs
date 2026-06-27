@@ -1,10 +1,13 @@
 //! Login controller: owns API key draft input and authentication state.
 
+use std::sync::Arc;
+
 use gpui::{Context, EventEmitter};
 use tracing::warn;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore, keys};
 use crate::data::events::LoginStateChanged;
+use crate::services::LoginService;
 
 // ── LoginState ────────────────────────────────────────────────────────────────
 
@@ -23,14 +26,16 @@ pub enum LoginState {
 pub struct LoginController {
     api_key_draft: String,
     state: LoginState,
+    service: Arc<dyn LoginService>,
 }
 
 impl LoginController {
     /// Creates a controller in the idle state with an empty draft.
-    pub fn new() -> Self {
+    pub fn new(service: Box<dyn LoginService>) -> Self {
         Self {
             api_key_draft: String::new(),
             state: LoginState::Idle,
+            service: Arc::from(service),
         }
     }
 
@@ -50,9 +55,12 @@ impl LoginController {
         cx.emit(LoginStateChanged::Changed);
     }
 
-    /// Validates the draft, stores the API key in the keyring, and emits `Succeeded`.
+    /// Validates the draft, authenticates with the API, stores all credentials, and
+    /// emits `Succeeded`.
     ///
-    /// Emits `Changed` with an `Error` state if the draft is blank or storage fails.
+    /// The authentication call runs on a background thread. `Changed` events are emitted
+    /// while in progress and on failure; `Succeeded` is emitted only after all credentials
+    /// are persisted to the keyring.
     pub fn submit(&mut self, cx: &mut Context<Self>) {
         let key = self.api_key_draft.trim().to_string();
         if key.is_empty() {
@@ -64,23 +72,61 @@ impl LoginController {
         self.state = LoginState::InProgress;
         cx.emit(LoginStateChanged::Changed);
 
-        let credential = Credential {
-            service: keys::SERVICE.into(),
-            account: keys::API_KEY.into(),
-            secret: key,
-        };
+        let service = self.service.clone();
 
-        let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
-        match store.store(&credential) {
-            Ok(()) => {
-                self.state = LoginState::Idle;
-                cx.emit(LoginStateChanged::Succeeded);
-            }
-            Err(e) => {
-                self.state = LoginState::Error(format!("Could not save API key: {e}"));
-                cx.emit(LoginStateChanged::Changed);
-            }
-        }
+        cx.spawn(async move |this, async_cx| {
+            let result = async_cx
+                .background_executor()
+                .spawn(async move { service.authenticate(&key) })
+                .await;
+
+            this.update(async_cx, |ctrl, cx| {
+                match result {
+                    Ok(tokens) => {
+                        // Persist API key (applicationKey).
+                        let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
+                        if let Err(e) = store.store(&Credential {
+                            service: keys::SERVICE.into(),
+                            account: keys::API_KEY.into(),
+                            secret: ctrl.api_key_draft.trim().to_string(),
+                        }) {
+                            ctrl.state = LoginState::Error(format!("Could not save API key: {e}"));
+                            cx.emit(LoginStateChanged::Changed);
+                            return;
+                        }
+
+                        // Persist access token.
+                        let store = KeyringCredentialStore::new(keys::SERVICE, keys::ACCESS_TOKEN);
+                        if let Err(e) = store.store(&Credential {
+                            service: keys::SERVICE.into(),
+                            account: keys::ACCESS_TOKEN.into(),
+                            secret: tokens.access_token,
+                        }) {
+                            ctrl.state = LoginState::Error(format!("Could not save access token: {e}"));
+                            cx.emit(LoginStateChanged::Changed);
+                            return;
+                        }
+
+                        // Persist refresh token (best-effort; not required for immediate use).
+                        let store = KeyringCredentialStore::new(keys::SERVICE, keys::REFRESH_TOKEN);
+                        if let Err(e) = store.store(&Credential {
+                            service: keys::SERVICE.into(),
+                            account: keys::REFRESH_TOKEN.into(),
+                            secret: tokens.refresh_token,
+                        }) {
+                            warn!("could not save refresh token: {e}");
+                        }
+
+                        ctrl.state = LoginState::Idle;
+                        cx.emit(LoginStateChanged::Succeeded);
+                    }
+                    Err(e) => {
+                        ctrl.state = LoginState::Error(e.to_string());
+                        cx.emit(LoginStateChanged::Changed);
+                    }
+                }
+            }).ok();
+        }).detach();
     }
 
     /// Deletes all stored credentials from the keyring and emits `LoggedOut`.
@@ -99,11 +145,6 @@ impl LoginController {
     }
 }
 
-impl Default for LoginController {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl EventEmitter<LoginStateChanged> for LoginController {}
 
@@ -114,6 +155,7 @@ impl EventEmitter<LoginStateChanged> for LoginController {}
 mod tests {
     use super::*;
     use crate::credentials::CredentialError;
+    use crate::services::{LoginError, LoginTokens};
 
     struct FakeStore {
         stored: std::sync::Mutex<Option<String>>,
@@ -172,9 +214,25 @@ mod tests {
         }
     }
 
+    struct FakeLoginService;
+
+    impl LoginService for FakeLoginService {
+        fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
+            Ok(LoginTokens {
+                access_token: "fake-token".into(),
+                refresh_token: "fake-refresh".into(),
+                refresh_token_ttl: u64::MAX,
+            })
+        }
+    }
+
+    fn make_ctrl() -> LoginController {
+        LoginController::new(Box::new(FakeLoginService))
+    }
+
     #[test]
     fn set_api_key_updates_draft() {
-        let mut ctrl = LoginController::new();
+        let mut ctrl = make_ctrl();
         ctrl.api_key_draft = String::new(); // start empty
         // Simulate set_api_key without ctx
         ctrl.api_key_draft = "test-key".into();
@@ -185,7 +243,7 @@ mod tests {
     fn blank_submit_sets_error_state() {
         // We can't easily call submit() without a Context in pure unit tests,
         // but we can verify the guard logic by inspecting the initial state.
-        let ctrl = LoginController::new();
+        let ctrl = make_ctrl();
         assert!(ctrl.api_key_draft().is_empty());
         assert_eq!(*ctrl.state(), LoginState::Idle);
     }

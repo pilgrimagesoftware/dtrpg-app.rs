@@ -1525,6 +1525,7 @@ dependencies = [
  "gpui-component-assets",
  "gpui_platform",
  "tokio",
+ "tracing",
  "tracing-appender",
  "tracing-subscriber",
 ]
@@ -1536,6 +1537,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]

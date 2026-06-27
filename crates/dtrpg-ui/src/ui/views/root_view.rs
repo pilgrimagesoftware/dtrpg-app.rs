@@ -3,10 +3,15 @@
 use gpui::{AppContext, div, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled};
 
 use crate::{
-    controllers::{activity::ActivityController, library::LibraryController, settings::SettingsController},
+    controllers::{
+        activity::ActivityController,
+        auth_state::AuthStateController,
+        library::LibraryController,
+        settings::SettingsController,
+    },
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
-        events::{ActivityChanged, LibraryChanged, LogoutRequested, SettingsChanged},
+        events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged},
         theme::LibriTheme,
     },
     services::LibraryService,
@@ -15,6 +20,7 @@ use crate::ui::views::{
     activity_panel_view::render_activity_panel,
     catalog_view::render_catalog,
     detail_panel_view::render_detail_panel,
+    notification_banner_view::render_notification_banner,
     settings_view::render_settings_panel,
     sidebar_view::render_sidebar,
     toolbar_view::render_toolbar,
@@ -26,6 +32,7 @@ pub struct LibraryRootView {
     controller: Entity<LibraryController>,
     settings: Entity<SettingsController>,
     activity: Entity<ActivityController>,
+    auth_state: Entity<AuthStateController>,
     /// Focus handle for the settings overlay; grabbed when the panel opens so
     /// Escape key events route to the backdrop instead of the catalog.
     settings_focus: FocusHandle,
@@ -37,6 +44,7 @@ impl LibraryRootView {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let settings = cx.new(|_| SettingsController::new());
+        let auth_state = cx.new(|_| AuthStateController::new());
         let settings_focus = cx.focus_handle();
 
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
@@ -50,6 +58,11 @@ impl LibraryRootView {
         .detach();
 
         cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
+            cx.notify();
+        })
+        .detach();
+
+        cx.subscribe(&auth_state, |_this, _ctrl, _event: &AuthStateChanged, cx| {
             cx.notify();
         })
         .detach();
@@ -74,7 +87,7 @@ impl LibraryRootView {
             ctrl.set_logged_in("test@example.com".into(), cx);
         });
 
-        Self { controller, settings, activity, settings_focus }
+        Self { controller, settings, activity, auth_state, settings_focus }
     }
 }
 
@@ -83,6 +96,7 @@ impl Render for LibraryRootView {
         let lib_entity = self.controller.clone();
         let settings_entity = self.settings.clone();
         let activity_entity = self.activity.clone();
+        let auth_entity = self.auth_state.clone();
 
         let snap = self.controller.read(cx).snapshot();
         let (filter, counts, publishers, total_count, total_mb, matched_count,
@@ -94,6 +108,10 @@ impl Render for LibraryRootView {
 
         let settings_snap = self.settings.read(cx).snapshot();
         let activity_snap = self.activity.read(cx).snapshot();
+        let notices: Vec<_> = self.auth_state.read(cx).active_notices()
+            .into_iter()
+            .cloned()
+            .collect();
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
@@ -124,6 +142,7 @@ impl Render for LibraryRootView {
             &settings_snap.auth,
             colors,
         );
+        let banner = render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
         let catalog = render_catalog(items, presentation, grouped, lib_entity.clone(), colors, density, settings_snap.storage_root_path.clone());
         let panel = render_detail_panel(selected_item.as_ref(), settings_snap.storage_root_path.clone(), lib_entity, colors);
 
@@ -141,6 +160,7 @@ impl Render for LibraryRootView {
                 .relative()
                 .bg(surface)
                 .child(toolbar)
+                .child(banner)
                 .child(catalog);
 
             if settings_snap.is_open {

@@ -85,5 +85,39 @@ pub trait LibraryService: Send + Sync + 'static {
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError>;
 }
 
+// ── LoginService ──────────────────────────────────────────────────────────────
+
+/// Tokens returned by a successful login.
+pub struct LoginTokens {
+    /// Short-lived JWT bearer token for API requests.
+    pub access_token: String,
+    /// Long-lived token used to refresh the access token.
+    pub refresh_token: String,
+    /// Unix timestamp (seconds) at which the refresh token expires.
+    pub refresh_token_ttl: u64,
+}
+
+/// Error returned by [`LoginService::authenticate`].
+#[derive(Debug, Clone)]
+pub struct LoginError(pub String);
+
+impl std::fmt::Display for LoginError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// Service boundary for the login flow.
+///
+/// Implementations exchange a DriveThruRPG API key for JWT session tokens.
+pub trait LoginService: Send + Sync + 'static {
+    /// Authenticates with the given API key and returns session tokens.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LoginError`] if authentication fails (network error, invalid key, etc.).
+    fn authenticate(&self, api_key: &str) -> Result<LoginTokens, LoginError>;
+}
+
 #[cfg(test)]
 pub mod stub;

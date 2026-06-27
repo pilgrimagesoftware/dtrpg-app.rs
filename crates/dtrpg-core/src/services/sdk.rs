@@ -371,10 +371,22 @@ fn map_order_product(
 fn map_client_error(error: ClientError) -> LibraryServiceError {
     match error {
         ClientError::Sdk(error) => map_sdk_error(error),
+        ClientError::DecodeFailed { url, status, cause, .. } => {
+            let kind = match status {
+                401 => LibraryServiceErrorKind::NeedsReauth,
+                403 => LibraryServiceErrorKind::Session,
+                _ => LibraryServiceErrorKind::Network,
+            };
+            LibraryServiceError::new(
+                kind,
+                format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"),
+            )
+        }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());
             let kind = match status {
-                Some(401 | 403) => LibraryServiceErrorKind::Session,
+                Some(401) => LibraryServiceErrorKind::NeedsReauth,
+                Some(403) => LibraryServiceErrorKind::Session,
                 _ => LibraryServiceErrorKind::Network,
             };
 
@@ -387,7 +399,6 @@ fn map_client_error(error: ClientError) -> LibraryServiceError {
             }
             msg.push_str(&format!(": {error}"));
 
-            // Walk the source chain so serde decode errors include the field/line detail.
             let mut source: Option<&dyn StdError> = StdError::source(&error);
             while let Some(cause) = source {
                 msg.push_str(&format!(": {cause}"));

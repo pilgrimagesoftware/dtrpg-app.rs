@@ -2,6 +2,7 @@
 
 use gpui::EventEmitter;
 use crate::controllers::activity::ActivityController;
+use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::library::LibraryController;
 
 // ── LibraryChanged ────────────────────────────────────────────────────────────
@@ -27,6 +28,13 @@ pub struct SettingsChanged;
 
 /// Emitted by `SettingsController` when the user requests to log out.
 pub struct LogoutRequested;
+
+// ── AuthStateChanged ──────────────────────────────────────────────────────────
+
+/// Emitted when authentication state or the active notice list changes.
+pub struct AuthStateChanged;
+
+impl EventEmitter<AuthStateChanged> for AuthStateController {}
 
 // ── LoginStateChanged ─────────────────────────────────────────────────────────
 
