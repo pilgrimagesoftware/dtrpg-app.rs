@@ -76,6 +76,27 @@ pub trait LibraryService: Send + Sync + 'static {
     /// Returns a [`LibraryServiceError`] if the request fails or the session is invalid.
     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError>;
 
+    /// Loads library items page-by-page, invoking `on_page` after each page arrives.
+    ///
+    /// The default implementation calls [`list_items`] and delivers all items in a
+    /// single `on_page` call. Implementations that have access to pagination should
+    /// override this to call `on_page` incrementally so callers can update the UI
+    /// without waiting for all pages.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LibraryServiceError`] if any page request fails. Items delivered
+    /// to `on_page` before the failure are not rolled back.
+    ///
+    /// [`list_items`]: LibraryService::list_items
+    fn list_items_paged(
+        &self,
+        on_page: &mut dyn FnMut(Vec<LibraryItem>),
+    ) -> Result<(), LibraryServiceError> {
+        on_page(self.list_items()?);
+        Ok(())
+    }
+
     /// Loads detail data for a selected item by its numeric API identifier.
     ///
     /// # Errors

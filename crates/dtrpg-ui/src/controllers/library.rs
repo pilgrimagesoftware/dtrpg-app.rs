@@ -13,7 +13,7 @@ use crate::util::sort::*;
 use crate::util::publisher::*;
 use crate::util::matching::*;
 use crate::data::events::*;
-use crate::services::{LibraryService, LibraryServiceError};
+use crate::services::LibraryService;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 // ── LibraryController ─────────────────────────────────────────────────────────
@@ -77,19 +77,49 @@ impl LibraryController {
         let weak_activity = activity.downgrade();
 
         // Load catalog off the main thread so the UI remains responsive during the
-        // potentially multi-page HTTP fetch.
+        // potentially multi-page HTTP fetch. Pages are delivered incrementally via an
+        // mpsc channel so each page triggers a UI update before the next page arrives.
         cx.spawn(async move |this, async_cx| {
             let activity_id = weak_activity
                 .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", cx))
                 .unwrap_or(0);
 
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { service_arc.list_items() })
-                .await;
+            let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
 
-            match &result {
-                Ok(_) => {
+            // Run the paginated fetch on the background executor. Each page is sent
+            // through the channel as it arrives; the result indicates overall success/failure.
+            let fetch = async_cx
+                .background_executor()
+                .spawn(async move { service_arc.list_items_paged(&mut |page| { tx.send(page).ok(); }) });
+
+            // Receive pages one at a time, updating the controller after each.
+            // Each recv() blocks the background thread it runs on, not the async task.
+            let mut rx = Some(rx);
+            loop {
+                let receiver = rx.take().expect("receiver is always present in loop");
+                let (msg, returned_rx) = async_cx
+                    .background_executor()
+                    .spawn(async move {
+                        let msg = receiver.recv();
+                        (msg, receiver)
+                    })
+                    .await;
+
+                match msg {
+                    Ok(items) => {
+                        this.update(async_cx, |ctrl, cx| ctrl.append_catalog_page(items, cx)).ok();
+                        rx = Some(returned_rx);
+                    }
+                    Err(_) => break, // sender dropped — all pages have been sent
+                }
+            }
+
+            // Wait for the fetch task to complete and surface any error.
+            // On success: dismiss the loading indicator.
+            // On error: show the error in the activity panel but leave any
+            //   items that were already appended to the catalog visible.
+            match fetch.await {
+                Ok(()) => {
                     weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                 }
                 Err(e) => {
@@ -98,8 +128,6 @@ impl LibraryController {
                     weak_activity.update(async_cx, |a, cx| a.error(activity_id, detail, cx)).ok();
                 }
             }
-
-            this.update(async_cx, |ctrl, cx| ctrl.apply_load_result(result, cx)).ok();
         })
         .detach();
 
@@ -118,14 +146,12 @@ impl LibraryController {
         }
     }
 
-    /// Applies a completed load result from the background task.
-    fn apply_load_result(
-        &mut self,
-        result: Result<Vec<LibraryItem>, LibraryServiceError>,
-        cx: &mut Context<Self>,
-    ) {
-        self.vm.apply_list_result(result);
-        self.catalog = self.vm.items().to_vec();
+    /// Appends a page of items received incrementally from the background load task.
+    ///
+    /// Called once per API page as results arrive. Recomputes sidebar state and
+    /// notifies the view after each append so the catalog populates progressively.
+    fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
+        self.catalog.extend(items);
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
         cx.emit(LibraryChanged);

@@ -76,7 +76,7 @@ impl LibraryRootView {
                 }
             }
             let entity_id = cx.entity_id();
-            open_login_window(cx);
+            open_login_window(None, cx);
             cx.with_window(entity_id, |window, _cx| window.remove_window());
         })
         .detach();

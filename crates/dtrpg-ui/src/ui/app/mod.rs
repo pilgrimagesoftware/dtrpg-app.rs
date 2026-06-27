@@ -2,7 +2,7 @@ use gpui::*;
 use gpui_component::{init, Root};
 use tracing::warn;
 
-use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
+use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore, keys};
 use crate::services::{LibraryService, LoginService};
 use crate::ui::views::root_view::LibraryRootView;
 use crate::ui::windows::login::open_login_window;
@@ -60,20 +60,51 @@ pub fn setup(cx: &mut App) {
     });
     init_globals(cx);
 
-    let api_key_result = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY).load();
-    let has_credentials = match &api_key_result {
-        Ok(Some(_)) => true,
-        Ok(None) => false,
+    let api_key = match KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY).load() {
+        Ok(Some(cred)) => Some(cred.secret),
+        Ok(None) => None,
         Err(e) => {
             warn!("keyring check failed: {e}");
-            false
+            None
         }
     };
 
-    if has_credentials {
-        open_library_window(cx);
-    } else {
-        open_login_window(cx);
+    match api_key {
+        Some(key) => {
+            // Always re-authenticate on startup so the access token is guaranteed fresh.
+            let login_service = (cx.global::<LoginServiceFactory>().0)();
+            match login_service.authenticate(&key) {
+                Ok(tokens) => {
+                    let store = KeyringCredentialStore::new(keys::SERVICE, keys::ACCESS_TOKEN);
+                    if let Err(e) = store.store(&Credential {
+                        service: keys::SERVICE.into(),
+                        account: keys::ACCESS_TOKEN.into(),
+                        secret: tokens.access_token,
+                    }) {
+                        warn!("failed to store new access token: {e}");
+                    }
+                    let store = KeyringCredentialStore::new(keys::SERVICE, keys::REFRESH_TOKEN);
+                    if let Err(e) = store.store(&Credential {
+                        service: keys::SERVICE.into(),
+                        account: keys::REFRESH_TOKEN.into(),
+                        secret: tokens.refresh_token,
+                    }) {
+                        warn!("failed to store refresh token: {e}");
+                    }
+                    open_library_window(cx);
+                }
+                Err(e) => {
+                    warn!("silent re-authentication failed: {e}");
+                    if let Err(del_err) = KeyringCredentialStore::new(keys::SERVICE, keys::ACCESS_TOKEN).delete() {
+                        warn!("failed to delete stale access token: {del_err}");
+                    }
+                    open_login_window(Some(key), cx);
+                }
+            }
+        }
+        None => {
+            open_login_window(None, cx);
+        }
     }
 
     cx.activate(true);

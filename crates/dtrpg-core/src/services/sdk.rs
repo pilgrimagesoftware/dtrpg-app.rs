@@ -85,9 +85,18 @@ impl RustSdkLibraryService {
 
 impl LibraryService for RustSdkLibraryService {
     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError> {
-        let mut all_items: Vec<OrderProductItem> = Vec::new();
+        let mut all_items: Vec<LibraryItem> = Vec::new();
+        self.list_items_paged(&mut |page_items| all_items.extend(page_items))?;
+        Ok(all_items)
+    }
+
+    fn list_items_paged(
+        &self,
+        on_page: &mut dyn FnMut(Vec<LibraryItem>),
+    ) -> Result<(), LibraryServiceError> {
         let mut all_included: Vec<PublisherItem> = Vec::new();
         let mut page: u32 = 1;
+        let mut global_index: u32 = 0;
 
         loop {
             let params = LibraryItemsParams {
@@ -102,7 +111,6 @@ impl LibraryService for RustSdkLibraryService {
 
             let response = self.gateway.list_order_products(params)?;
 
-            all_items.extend(response.data);
             if let Some(included) = response.included {
                 for publisher in included {
                     let id = publisher.attributes.publisher_id;
@@ -112,18 +120,25 @@ impl LibraryService for RustSdkLibraryService {
                 }
             }
 
-            if response.links.next.is_none() {
+            let has_next = response.links.next.is_some();
+            let publishers = publisher_lookup(&all_included);
+            let page_items: Vec<LibraryItem> = response
+                .data
+                .iter()
+                .enumerate()
+                .map(|(i, item)| map_order_product(item, &publishers, global_index + i as u32))
+                .collect();
+
+            global_index += page_items.len() as u32;
+            on_page(page_items);
+
+            if !has_next {
                 break;
             }
             page += 1;
         }
 
-        let publishers = publisher_lookup(&all_included);
-        Ok(all_items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| map_order_product(item, &publishers, index as u32))
-            .collect())
+        Ok(())
     }
 
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {

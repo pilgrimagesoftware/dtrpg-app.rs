@@ -30,10 +30,13 @@ pub struct LoginController {
 }
 
 impl LoginController {
-    /// Creates a controller in the idle state with an empty draft.
-    pub fn new(service: Box<dyn LoginService>) -> Self {
+    /// Creates a controller in the idle state.
+    ///
+    /// If `prefilled_key` is `Some`, the API key draft is pre-populated (e.g. when
+    /// falling back to the login window after a failed silent re-authentication on startup).
+    pub fn new(service: Box<dyn LoginService>, prefilled_key: Option<String>) -> Self {
         Self {
-            api_key_draft: String::new(),
+            api_key_draft: prefilled_key.unwrap_or_default(),
             state: LoginState::Idle,
             service: Arc::from(service),
         }
@@ -227,7 +230,7 @@ mod tests {
     }
 
     fn make_ctrl() -> LoginController {
-        LoginController::new(Box::new(FakeLoginService))
+        LoginController::new(Box::new(FakeLoginService), None)
     }
 
     #[test]
