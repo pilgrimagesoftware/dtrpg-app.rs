@@ -4,10 +4,7 @@ use tokio::runtime::{Builder, Runtime};
 
 use dtrpg_sdk::{auth_client, config::Config};
 
-use dtrpg_ui::{
-    credentials::keys,
-    services::{LoginError, LoginService, LoginTokens},
-};
+use dtrpg_ui::services::{LoginError, LoginService, LoginTokens};
 
 const API_BASE_URL_ENV: &str = "DTRPG_API_BASE_URL";
 
