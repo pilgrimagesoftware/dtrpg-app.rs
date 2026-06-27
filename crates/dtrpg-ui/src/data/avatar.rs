@@ -14,17 +14,19 @@ pub fn gravatar_url(email: &str) -> String {
 
 /// Fetches raw avatar image bytes from Gravatar for the given email.
 ///
-/// Returns `None` if the request fails, times out, or the server returns
-/// a non-success status (including 404 for unregistered emails).
-pub async fn fetch_avatar_bytes(email: String) -> Option<Vec<u8>> {
+/// Uses a blocking HTTP client — safe to call from gpui background executor threads,
+/// which do not run a Tokio reactor.  Returns `None` if the request fails, times
+/// out, or the server returns a non-success status (including 404 for unregistered
+/// emails).
+pub fn fetch_avatar_bytes(email: String) -> Option<Vec<u8>> {
     let url = gravatar_url(&email);
-    let client = reqwest::Client::builder()
+    let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
         .ok()?;
-    let response = client.get(&url).send().await.ok()?;
+    let response = client.get(&url).send().ok()?;
     if !response.status().is_success() {
         return None;
     }
-    response.bytes().await.ok().map(|b| b.to_vec())
+    response.bytes().ok().map(|b| b.to_vec())
 }

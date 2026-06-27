@@ -170,7 +170,7 @@ impl SettingsController {
         cx.spawn(async move |this, async_cx| {
             let bytes = async_cx
                 .background_executor()
-                .spawn(async move { fetch_avatar_bytes(email).await })
+                .spawn(async move { fetch_avatar_bytes(email) })
                 .await;
             this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx)).ok();
         })
