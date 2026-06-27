@@ -276,6 +276,7 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
 fn publisher_lookup(included: &[PublisherItem]) -> HashMap<u64, String> {
     included
         .iter()
+        .filter(|item| item.attributes.publisher_id > 0)
         .map(|publisher| {
             (
                 publisher.attributes.publisher_id,
