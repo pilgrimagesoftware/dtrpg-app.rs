@@ -1,13 +1,13 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout switcher.
 
 use gpui::prelude::*;
-use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
+use gpui::{AnyElement, div, px, Entity, IntoElement, ParentElement, Styled};
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::SettingsController;
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::{
     enums::{CatalogPresentation},
     theme::ColorTokens,
@@ -36,6 +36,7 @@ pub fn render_toolbar(
     presentation: CatalogPresentation,
     entity: Entity<LibraryController>,
     settings: Entity<SettingsController>,
+    auth: &AuthStateSnapshot,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
@@ -125,7 +126,8 @@ pub fn render_toolbar(
                     accent,
                     accent_soft,
                 ))
-                .child(render_settings_button(settings, text_primary, border_strong)),
+                .child(render_settings_button(settings.clone(), text_primary, border_strong))
+                .child(render_avatar_button(auth, settings, colors)),
         )
 }
 
@@ -348,4 +350,47 @@ fn render_settings_button(
             settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
         })
         .child(div().text_sm().text_color(text_primary).child("⚙"))
+}
+
+// ── Avatar button ─────────────────────────────────────────────────────────────
+
+fn render_avatar_button(
+    auth: &AuthStateSnapshot,
+    settings: Entity<SettingsController>,
+    colors: &ColorTokens,
+) -> AnyElement {
+    if !auth.is_logged_in {
+        return div()
+            .id("avatar-btn")
+            .h(px(30.0))
+            .w(px(30.0))
+            .rounded_full()
+            .bg(colors.surface_alt)
+            .border_1()
+            .border_color(colors.border_strong)
+            .flex()
+            .items_center()
+            .justify_center()
+            .tooltip(|window, cx| Tooltip::new("Not signed in").build(window, cx))
+            .child(div().text_xs().text_color(colors.text_tertiary).child("👤"))
+            .into_any_element();
+    }
+
+    let initial_text = auth
+        .display_initial
+        .map(|c| c.to_string())
+        .unwrap_or_else(|| "?".to_string());
+
+    Button::new("avatar-btn")
+        .label(initial_text)
+        .tooltip("Account")
+        .dropdown_menu(move |menu, _, _| {
+            let s = settings.clone();
+            menu.item(
+                PopupMenuItem::new("Log Out").on_click(move |_, _, cx| {
+                    s.update(cx, |ctrl, cx| ctrl.logout(cx));
+                }),
+            )
+        })
+        .into_any_element()
 }

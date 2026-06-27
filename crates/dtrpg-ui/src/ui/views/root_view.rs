@@ -68,6 +68,12 @@ impl LibraryRootView {
         })
         .detach();
 
+        // Stub: simulate a signed-in user so the avatar button renders during development.
+        #[cfg(debug_assertions)]
+        settings.update(cx, |ctrl, cx| {
+            ctrl.set_logged_in("test@example.com".into(), cx);
+        });
+
         Self { controller, settings, activity, settings_focus }
     }
 }
@@ -113,6 +119,7 @@ impl Render for LibraryRootView {
             presentation,
             lib_entity.clone(),
             settings_entity.clone(),
+            &settings_snap.auth,
             colors,
         );
         let catalog = render_catalog(items, presentation, grouped, lib_entity.clone(), colors, density, settings_snap.storage_root_path.clone());

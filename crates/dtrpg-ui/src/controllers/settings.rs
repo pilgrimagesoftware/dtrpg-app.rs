@@ -1,13 +1,41 @@
 //! Settings controller: owns open/closed state, active tab, and file-opener overrides.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use gpui::{Context, EventEmitter};
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
+use crate::data::avatar::fetch_avatar_bytes;
 use crate::data::events::{LogoutRequested, SettingsChanged};
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
+
+// ── AuthState ─────────────────────────────────────────────────────────────────
+
+/// Tracks the current authentication state and cached avatar data.
+#[derive(Clone)]
+pub enum AuthState {
+    /// No user is signed in.
+    LoggedOut,
+    /// A user is signed in; avatar bytes are fetched asynchronously after login.
+    LoggedIn {
+        /// Account email address.
+        email: String,
+        /// Cached Gravatar image bytes, or `None` while the fetch is in flight or unavailable.
+        avatar_bytes: Option<Arc<Vec<u8>>>,
+    },
+}
+
+/// Snapshot of auth state for a single render pass.
+pub struct AuthStateSnapshot {
+    /// `true` when a user is signed in.
+    pub is_logged_in: bool,
+    /// First character of the email, uppercased — used as the avatar fallback initial.
+    pub display_initial: Option<char>,
+    /// Cached avatar image bytes from Gravatar, or `None`.
+    pub avatar_bytes: Option<Arc<Vec<u8>>>,
+}
 
 // ── SettingsTab ───────────────────────────────────────────────────────────────
 
@@ -63,6 +91,8 @@ pub struct SettingsSnapshot {
     pub storage_root_path: PathBuf,
     /// `true` when the configured storage root is unreachable (e.g. unmounted volume).
     pub storage_unavailable: bool,
+    /// Current auth state for the toolbar avatar button.
+    pub auth: AuthStateSnapshot,
 }
 
 /// Owns all mutable settings state: panel visibility, active tab, file-opener overrides,
@@ -72,6 +102,7 @@ pub struct SettingsController {
     active_tab: SettingsTab,
     file_openers: FileOpenerConfig,
     is_authenticated: bool,
+    auth_state: AuthState,
     storage: StorageConfig,
     storage_unavailable: bool,
 }
@@ -100,7 +131,15 @@ impl SettingsController {
                 "configured storage root is not accessible"
             );
         }
-        Self { is_open: false, active_tab, file_openers, is_authenticated, storage, storage_unavailable }
+        Self {
+            is_open: false,
+            active_tab,
+            file_openers,
+            is_authenticated,
+            auth_state: AuthState::LoggedOut,
+            storage,
+            storage_unavailable,
+        }
     }
 }
 
@@ -113,6 +152,49 @@ impl Default for SettingsController {
 impl SettingsController {
     /// Emits `LogoutRequested` so the library root view can coordinate the logout flow.
     pub fn request_logout(&mut self, cx: &mut Context<Self>) {
+        cx.emit(LogoutRequested);
+    }
+
+    // ── Auth state ────────────────────────────────────────────────────────────
+
+    /// Marks the user as signed in with the given email, then spawns a background
+    /// task to fetch the Gravatar avatar.
+    ///
+    /// Emits [`SettingsChanged`] immediately (for the initial letter fallback) and
+    /// again once the avatar bytes arrive.
+    pub fn set_logged_in(&mut self, email: String, cx: &mut Context<Self>) {
+        self.is_authenticated = true;
+        self.auth_state = AuthState::LoggedIn { email: email.clone(), avatar_bytes: None };
+        cx.emit(SettingsChanged);
+
+        cx.spawn(async move |this, async_cx| {
+            let bytes = async_cx
+                .background_executor()
+                .spawn(async move { fetch_avatar_bytes(email).await })
+                .await;
+            this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx)).ok();
+        })
+        .detach();
+    }
+
+    /// Stores fetched avatar bytes and re-renders.
+    ///
+    /// No-op if the user is not currently signed in.
+    pub fn set_avatar_bytes(&mut self, bytes: Option<Vec<u8>>, cx: &mut Context<Self>) {
+        if let AuthState::LoggedIn { avatar_bytes, .. } = &mut self.auth_state {
+            *avatar_bytes = bytes.map(Arc::new);
+            cx.emit(SettingsChanged);
+        }
+    }
+
+    /// Clears the auth state and triggers the full logout flow.
+    ///
+    /// Emits [`SettingsChanged`] to update the UI, then [`LogoutRequested`] to
+    /// prompt the root view to delete credentials and open the login window.
+    pub fn logout(&mut self, cx: &mut Context<Self>) {
+        self.is_authenticated = false;
+        self.auth_state = AuthState::LoggedOut;
+        cx.emit(SettingsChanged);
         cx.emit(LogoutRequested);
     }
 
@@ -225,6 +307,19 @@ impl SettingsController {
 
     /// Returns all data needed by the views for one render pass.
     pub fn snapshot(&self) -> SettingsSnapshot {
+        let auth = match &self.auth_state {
+            AuthState::LoggedOut => AuthStateSnapshot {
+                is_logged_in: false,
+                display_initial: None,
+                avatar_bytes: None,
+            },
+            AuthState::LoggedIn { email, avatar_bytes } => AuthStateSnapshot {
+                is_logged_in: true,
+                display_initial: email.trim().chars().next().map(|c| c.to_ascii_uppercase()),
+                avatar_bytes: avatar_bytes.clone(),
+            },
+        };
+
         SettingsSnapshot {
             is_open: self.is_open,
             active_tab: self.active_tab,
@@ -232,6 +327,7 @@ impl SettingsController {
             is_authenticated: self.is_authenticated,
             storage_root_path: self.storage.root_path(),
             storage_unavailable: self.storage_unavailable,
+            auth,
         }
     }
 }

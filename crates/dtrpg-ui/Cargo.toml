@@ -19,6 +19,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 dirs = { workspace = true }
 rfd = { workspace = true }
+md5 = { workspace = true }
+reqwest = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1"
