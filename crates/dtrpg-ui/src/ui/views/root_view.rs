@@ -108,6 +108,8 @@ impl Render for LibraryRootView {
             lib_entity.clone(),
             activity_entity.clone(),
             activity_snap.in_progress_count,
+            activity_snap.recent_count,
+            activity_snap.recent_error_count,
             colors,
         );
         let toolbar = render_toolbar(

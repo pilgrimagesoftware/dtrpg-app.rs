@@ -35,6 +35,8 @@ pub struct ColorTokens {
     pub shadow: Hsla,
     /// Overlay scrim.
     pub scrim: Hsla,
+    /// Error / destructive state (red).
+    pub error: Hsla,
 }
 
 // ── Density ───────────────────────────────────────────────────────────────────
@@ -177,6 +179,7 @@ fn parchment_colors() -> ColorTokens {
         accent_on:      hex(0xFC, 0xF9, 0xF3),
         shadow:         hex_a(0x3A, 0x2E, 0x1A, 0.18),
         scrim:          hex_a(0x1E, 0x16, 0x0A, 0.26),
+        error:          hex(0xB0, 0x30, 0x28),
     }
 }
 
@@ -203,6 +206,7 @@ fn slate_colors() -> ColorTokens {
         accent_on:      hex(0xFC, 0xFD, 0xFE),
         shadow:         hex_a(0x1C, 0x2A, 0x3A, 0.18),
         scrim:          hex_a(0x12, 0x1C, 0x28, 0.26),
+        error:          hex(0xB0, 0x30, 0x28),
     }
 }
 
@@ -229,6 +233,7 @@ fn sage_colors() -> ColorTokens {
         accent_on:      hex(0xFA, 0xFB, 0xF6),
         shadow:         hex_a(0x26, 0x30, 0x1C, 0.18),
         scrim:          hex_a(0x18, 0x20, 0x12, 0.26),
+        error:          hex(0xB0, 0x30, 0x28),
     }
 }
 
@@ -255,5 +260,6 @@ fn ink_colors() -> ColorTokens {
         accent_on:      hex(0x1B, 0x18, 0x12),
         shadow:         hex_a(0x00, 0x00, 0x00, 0.50),
         scrim:          hex_a(0x00, 0x00, 0x00, 0.45),
+        error:          hex(0xE0, 0x58, 0x58),
     }
 }

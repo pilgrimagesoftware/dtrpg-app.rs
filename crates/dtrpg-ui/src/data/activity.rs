@@ -30,8 +30,12 @@ pub struct ActivitySnapshot {
     pub in_progress_count: usize,
     /// Number of recently-completed operations that ended with an error.
     pub recent_error_count: usize,
+    /// Number of items in the recent list (excludes expired items).
+    pub recent_count: usize,
     /// Whether the activity panel overlay is open.
     pub panel_open: bool,
     /// Combined item list — in-progress items first, then recent (newest first).
     pub items: Vec<ActivityItem>,
+    /// The id of the currently expanded item row, if any.
+    pub selected_id: Option<u64>,
 }

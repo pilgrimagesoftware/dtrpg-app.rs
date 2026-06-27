@@ -1,6 +1,7 @@
 //! Rust SDK-backed implementation of [`LibraryService`].
 
 use std::collections::HashMap;
+use std::error::Error as StdError;
 
 use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
@@ -371,11 +372,29 @@ fn map_client_error(error: ClientError) -> LibraryServiceError {
     match error {
         ClientError::Sdk(error) => map_sdk_error(error),
         ClientError::Http(error) => {
-            let kind = match error.status().map(|s| s.as_u16()) {
+            let status = error.status().map(|s| s.as_u16());
+            let kind = match status {
                 Some(401 | 403) => LibraryServiceErrorKind::Session,
                 _ => LibraryServiceErrorKind::Network,
             };
-            LibraryServiceError::new(kind, format!("Rust SDK library request failed: {error}"))
+
+            let mut msg = String::from("Rust SDK library request failed");
+            if let Some(url) = error.url() {
+                msg.push_str(&format!(" [{url}]"));
+            }
+            if let Some(code) = status {
+                msg.push_str(&format!(" (HTTP {code})"));
+            }
+            msg.push_str(&format!(": {error}"));
+
+            // Walk the source chain so serde decode errors include the field/line detail.
+            let mut source: Option<&dyn StdError> = StdError::source(&error);
+            while let Some(cause) = source {
+                msg.push_str(&format!(": {cause}"));
+                source = cause.source();
+            }
+
+            LibraryServiceError::new(kind, msg)
         }
     }
 }

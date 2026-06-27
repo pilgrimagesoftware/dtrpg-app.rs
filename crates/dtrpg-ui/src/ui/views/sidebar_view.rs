@@ -25,6 +25,8 @@ pub fn render_sidebar(
     entity: Entity<LibraryController>,
     activity_entity: Entity<ActivityController>,
     activity_in_progress: usize,
+    activity_recent_count: usize,
+    activity_recent_error_count: usize,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
     let surface_alt = colors.surface_alt;
@@ -35,6 +37,7 @@ pub fn render_sidebar(
     let accent = colors.accent;
     let accent_soft = colors.accent_soft;
     let hover = colors.hover;
+    let error = colors.error;
 
     let active_filter = filter.clone();
     let total_size_str = if total_mb >= 1024.0 {
@@ -179,7 +182,14 @@ pub fn render_sidebar(
                         .child(format!("{total_count} titles"))
                         .child(total_size_str),
                 )
-                .child(render_activity_button(activity_entity, activity_in_progress, text_tertiary)),
+                .child(render_activity_button(
+                    activity_entity,
+                    activity_in_progress,
+                    activity_recent_count,
+                    activity_recent_error_count,
+                    text_tertiary,
+                    error,
+                )),
         )
 }
 
@@ -188,20 +198,28 @@ pub fn render_sidebar(
 fn render_activity_button(
     entity: Entity<ActivityController>,
     in_progress: usize,
+    recent_count: usize,
+    recent_error_count: usize,
     text_color: gpui::Hsla,
+    error_color: gpui::Hsla,
 ) -> impl IntoElement + 'static + use<> {
+    let total = in_progress + recent_count;
     let label = if in_progress > 0 {
-        format!("↻ ({in_progress})")
+        format!("↻ ({total})")
+    } else if recent_count > 0 {
+        format!("● ({total})")
     } else {
-        "✓".to_string()
+        "○".to_string()
     };
+
+    let color = if recent_error_count > 0 { error_color } else { text_color };
 
     div()
         .id("activity-button")
         .px(px(18.0))
         .pb(px(11.0))
         .text_xs()
-        .text_color(text_color)
+        .text_color(color)
         .cursor_pointer()
         .child(label)
         .on_click(move |_, _, cx| {

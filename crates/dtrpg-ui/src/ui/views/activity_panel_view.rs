@@ -2,6 +2,8 @@
 
 use gpui::prelude::*;
 use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui_component::scroll::ScrollableElement;
+use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::activity::ActivityController;
 use crate::data::activity::{ActivitySnapshot, ActivityStatus};
@@ -21,6 +23,7 @@ pub fn render_activity_panel(
     let accent = colors.accent;
 
     let close_entity = entity.clone();
+    let selected_id = snap.selected_id;
 
     div()
         .absolute()
@@ -64,34 +67,66 @@ pub fn render_activity_panel(
         )
         // ── Item list ─────────────────────────────────────────────────────
         .child(if snap.items.is_empty() {
-            render_empty(text_tertiary)
+            render_empty(text_primary, text_tertiary)
         } else {
             div()
                 .flex()
                 .flex_col()
                 .max_h(px(300.0))
-                .overflow_y_hidden()
+                .overflow_y_scrollbar()
                 .children(snap.items.iter().map(|item| {
-                    render_item_row(item.label.as_ref(), &item.status, text_secondary, text_tertiary, accent)
+                    render_item_row(
+                        item.id,
+                        item.label.as_ref(),
+                        &item.status,
+                        selected_id,
+                        entity.clone(),
+                        text_secondary,
+                        text_tertiary,
+                        accent,
+                    )
                 }))
                 .into_any_element()
         })
         .into_any_element()
 }
 
-fn render_empty(text_color: gpui::Hsla) -> AnyElement {
+fn render_empty(text_primary: gpui::Hsla, text_tertiary: gpui::Hsla) -> AnyElement {
     div()
-        .px(px(14.0))
-        .py(px(12.0))
-        .text_xs()
-        .text_color(text_color)
-        .child("No recent activity.")
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .py(px(24.0))
+        .gap(px(6.0))
+        .child(
+            div()
+                .text_2xl()
+                .text_color(text_tertiary)
+                .child("○"),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(text_primary)
+                .child("No recent activity."),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(text_tertiary)
+                .child("Activity will appear here as operations run."),
+        )
         .into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_item_row(
+    item_id: u64,
     label: &str,
     status: &ActivityStatus,
+    selected_id: Option<u64>,
+    activity_entity: Entity<ActivityController>,
     text_color: gpui::Hsla,
     text_tertiary: gpui::Hsla,
     accent: gpui::Hsla,
@@ -107,13 +142,26 @@ fn render_item_row(
         None
     };
     let label = label.to_string();
+    let is_expanded = selected_id == Some(item_id);
+
+    // Tooltip shows the full label, plus the error message on a second line for error items.
+    let tooltip_text = match &error_msg {
+        Some(err) => format!("{label}\n{err}"),
+        None => label.clone(),
+    };
 
     div()
+        .id(format!("activity-row-{item_id}"))
         .flex()
         .items_start()
         .gap(px(8.0))
         .px(px(14.0))
         .py(px(6.0))
+        .cursor_pointer()
+        .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+        .on_click(move |_, _, cx| {
+            activity_entity.update(cx, |a, cx| a.select_activity(item_id, cx));
+        })
         .child(
             div()
                 .flex_none()
@@ -126,19 +174,33 @@ fn render_item_row(
                 .flex()
                 .flex_col()
                 .min_w_0()
-                .child(
+                .child(if is_expanded {
+                    div()
+                        .text_xs()
+                        .text_color(text_color)
+                        .child(label)
+                        .into_any_element()
+                } else {
                     div()
                         .text_xs()
                         .text_color(text_color)
                         .truncate()
-                        .child(label),
-                )
+                        .child(label)
+                        .into_any_element()
+                })
                 .children(error_msg.map(|msg| {
-                    div()
-                        .text_xs()
-                        .text_color(text_tertiary)
-                        .truncate()
-                        .child(msg)
+                    if is_expanded {
+                        div()
+                            .text_xs()
+                            .text_color(text_tertiary)
+                            .child(msg)
+                    } else {
+                        div()
+                            .text_xs()
+                            .text_color(text_tertiary)
+                            .truncate()
+                            .child(msg)
+                    }
                 })),
         )
 }

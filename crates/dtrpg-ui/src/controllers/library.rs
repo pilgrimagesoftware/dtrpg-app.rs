@@ -93,8 +93,9 @@ impl LibraryController {
                     weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                 }
                 Err(e) => {
-                    let msg = e.to_string();
-                    weak_activity.update(async_cx, |a, cx| a.error(activity_id, msg, cx)).ok();
+                    let detail = e.panel_detail();
+                    tracing::error!(error = %e, backtrace = %app_backtrace(), "catalog load failed");
+                    weak_activity.update(async_cx, |a, cx| a.error(activity_id, detail, cx)).ok();
                 }
             }
 
@@ -293,6 +294,38 @@ impl LibraryController {
     #[must_use]
     pub fn total_size_mb(&self) -> f64 {
         self.catalog.iter().map(|i| i.size_mb).sum()
+    }
+}
+
+/// Captures a backtrace and returns only the frames from app crates (`dtrpg_*`).
+///
+/// Each retained frame is one symbol line followed by its `at file:line:col` line.
+/// Returns a hint string when `RUST_BACKTRACE` is not set or no app frames are found.
+fn app_backtrace() -> String {
+    let bt = std::backtrace::Backtrace::capture();
+    if bt.status() != std::backtrace::BacktraceStatus::Captured {
+        return "<set RUST_BACKTRACE=1 to capture backtraces>".to_string();
+    }
+    let full = format!("{bt}");
+    let mut out: Vec<&str> = Vec::new();
+    let mut take_location = false;
+    for line in full.lines() {
+        if line.trim_start().starts_with("at ") {
+            if take_location {
+                out.push(line);
+                take_location = false;
+            }
+        } else if line.contains("dtrpg_") {
+            out.push(line);
+            take_location = true;
+        } else {
+            take_location = false;
+        }
+    }
+    if out.is_empty() {
+        "<no app frames found in backtrace>".to_string()
+    } else {
+        out.join("\n")
     }
 }
 

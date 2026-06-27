@@ -49,3 +49,5 @@ metal = "0.33"
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
 md5 = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
