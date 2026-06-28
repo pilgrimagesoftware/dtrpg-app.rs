@@ -109,6 +109,7 @@ pub trait LibraryService: Send + Sync + 'static {
 // ── LoginService ──────────────────────────────────────────────────────────────
 
 /// Tokens returned by a successful login.
+#[derive(Clone)]
 pub struct LoginTokens {
     /// Short-lived JWT bearer token for API requests.
     pub access_token: String,

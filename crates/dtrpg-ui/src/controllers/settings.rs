@@ -20,8 +20,8 @@ pub enum AuthState {
     LoggedOut,
     /// A user is signed in; avatar bytes are fetched asynchronously after login.
     LoggedIn {
-        /// Account email address.
-        email: String,
+        /// Account email address, if known.
+        email: Option<String>,
         /// Cached Gravatar image bytes, or `None` while the fetch is in flight or unavailable.
         avatar_bytes: Option<Arc<Vec<u8>>>,
     },
@@ -159,24 +159,25 @@ impl SettingsController {
 
     // ── Auth state ────────────────────────────────────────────────────────────
 
-    /// Marks the user as signed in with the given email, then spawns a background
-    /// task to fetch the Gravatar avatar.
+    /// Marks the user as signed in.
     ///
-    /// Emits [`SettingsChanged`] immediately (for the initial letter fallback) and
-    /// again once the avatar bytes arrive.
-    pub fn set_logged_in(&mut self, email: String, cx: &mut Context<Self>) {
+    /// When `email` is `Some`, spawns a background task to fetch the Gravatar avatar.
+    /// Emits [`SettingsChanged`] immediately and again once avatar bytes arrive (if applicable).
+    pub fn set_logged_in(&mut self, email: Option<String>, cx: &mut Context<Self>) {
         self.is_authenticated = true;
         self.auth_state = AuthState::LoggedIn { email: email.clone(), avatar_bytes: None };
         cx.emit(SettingsChanged);
 
-        cx.spawn(async move |this, async_cx| {
-            let bytes = async_cx
-                .background_executor()
-                .spawn(async move { fetch_avatar_bytes(email) })
-                .await;
-            this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx)).ok();
-        })
-        .detach();
+        if let Some(addr) = email {
+            cx.spawn(async move |this, async_cx| {
+                let bytes = async_cx
+                    .background_executor()
+                    .spawn(async move { fetch_avatar_bytes(addr) })
+                    .await;
+                this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx)).ok();
+            })
+            .detach();
+        }
     }
 
     /// Stores fetched avatar bytes and re-renders.
@@ -318,8 +319,11 @@ impl SettingsController {
             },
             AuthState::LoggedIn { email, avatar_bytes } => AuthStateSnapshot {
                 is_logged_in: true,
-                email: Some(email.clone()),
-                display_initial: email.trim().chars().next().map(|c| c.to_ascii_uppercase()),
+                display_initial: email
+                    .as_deref()
+                    .and_then(|s| s.trim().chars().next())
+                    .map(|c| c.to_ascii_uppercase()),
+                email: email.clone(),
                 avatar_bytes: avatar_bytes.clone(),
             },
         };

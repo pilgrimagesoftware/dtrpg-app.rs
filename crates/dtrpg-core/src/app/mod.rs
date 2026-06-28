@@ -10,8 +10,8 @@ pub fn run() {
         .with_assets(gpui_component_assets::Assets)
         .with_quit_mode(QuitMode::LastWindowClosed)
         .run(|cx| {
-            cx.set_global(ServiceFactory(Box::new(|| {
-                Box::new(crate::services::sdk::RustSdkLibraryService::from_keyring())
+            cx.set_global(ServiceFactory(Box::new(|tokens| {
+                Box::new(crate::services::sdk::RustSdkLibraryService::from_keyring_with_tokens(tokens))
             })));
             cx.set_global(LoginServiceFactory(Box::new(
                 crate::services::login::build_login_service,

@@ -8,10 +8,7 @@
 pub const SERVICE: &str = "com.pilgrimagesoftware.dtrpg";
 
 /// Account key for the DriveThruRPG API key credential.
+///
+/// This is the only credential persisted to the keychain. Access tokens and
+/// refresh tokens are kept in memory and re-acquired at startup.
 pub const API_KEY: &str = "api-key";
-
-/// Account key for the OAuth access token credential.
-pub const ACCESS_TOKEN: &str = "access-token";
-
-/// Account key for the OAuth refresh token credential.
-pub const REFRESH_TOKEN: &str = "refresh-token";

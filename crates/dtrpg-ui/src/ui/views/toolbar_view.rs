@@ -109,10 +109,6 @@ pub fn render_toolbar(
                     sort_direction,
                     grouped,
                     entity.clone(),
-                    bg,
-                    border_strong,
-                    text_primary,
-                    text_tertiary,
                 ))
                 .child(render_layout_switcher(
                     presentation,
@@ -186,10 +182,6 @@ fn render_sort_selector(
     direction: SortDirection,
     grouped: bool,
     entity: Entity<LibraryController>,
-    _bg: gpui::Hsla,
-    _border: gpui::Hsla,
-    _text_primary: gpui::Hsla,
-    _text_tertiary: gpui::Hsla,
 ) -> impl IntoElement + 'static {
     let label = match current {
         SortMethod::Title => "Title",

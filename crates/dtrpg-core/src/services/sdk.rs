@@ -70,13 +70,13 @@ impl RustSdkLibraryService {
         }
     }
 
-    /// Creates the service from credentials stored in the platform keyring.
+    /// Creates the service using in-memory `tokens` obtained at startup or login.
     ///
-    /// Keyring values take precedence; falls back to environment variables so
-    /// development environments that set env vars still work. Falls back to
-    /// [`UnavailableSdkGateway`] when neither source provides the required credentials.
-    pub fn from_keyring() -> Self {
-        match HttpSdkLibraryGateway::from_keyring() {
+    /// Reads only the API key from the platform keyring; tokens are never persisted
+    /// to the keychain. Falls back to [`UnavailableSdkGateway`] when the API key
+    /// cannot be found.
+    pub fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens) -> Self {
+        match HttpSdkLibraryGateway::from_keyring_with_tokens(tokens) {
             Ok(gateway) => Self::new(Box::new(gateway)),
             Err(error) => Self::new(Box::new(UnavailableSdkGateway::new(error))),
         }
@@ -153,7 +153,10 @@ struct HttpSdkLibraryGateway {
 }
 
 impl HttpSdkLibraryGateway {
-    fn from_keyring() -> Result<Self, LibraryServiceError> {
+    /// Reads only the API key from the keyring and uses the provided in-memory tokens.
+    fn from_keyring_with_tokens(
+        tokens: dtrpg_ui::services::LoginTokens,
+    ) -> Result<Self, LibraryServiceError> {
         let application_key = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
             .load()
             .ok()
@@ -165,30 +168,12 @@ impl HttpSdkLibraryGateway {
                 "No API key found in keyring or environment. Sign in to continue.",
             ))?;
 
-        let access_token = KeyringCredentialStore::new(keys::SERVICE, keys::ACCESS_TOKEN)
-            .load()
-            .ok()
-            .flatten()
-            .map(|c| c.secret)
-            .or_else(|| std::env::var(ACCESS_TOKEN_ENV).ok())
-            .ok_or_else(|| LibraryServiceError::new(
-                LibraryServiceErrorKind::Session,
-                "No access token found. Full authentication is pending a future update.",
-            ))?;
-
-        let refresh_token = KeyringCredentialStore::new(keys::SERVICE, keys::REFRESH_TOKEN)
-            .load()
-            .ok()
-            .flatten()
-            .map(|c| c.secret)
-            .unwrap_or_else(|| std::env::var(REFRESH_TOKEN_ENV).unwrap_or_default());
-
-        let refresh_token_ttl = std::env::var(REFRESH_TOKEN_TTL_ENV)
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(u64::MAX);
-
-        Self::build(application_key, access_token, refresh_token, refresh_token_ttl)
+        Self::build(
+            application_key,
+            tokens.access_token,
+            tokens.refresh_token,
+            tokens.refresh_token_ttl,
+        )
     }
 
     #[allow(dead_code)]

@@ -86,7 +86,8 @@ impl LoginController {
             this.update(async_cx, |ctrl, cx| {
                 match result {
                     Ok(tokens) => {
-                        // Persist API key (applicationKey).
+                        // Persist only the API key; tokens are kept in memory and
+                        // re-acquired on the next startup.
                         let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
                         if let Err(e) = store.store(&Credential {
                             service: keys::SERVICE.into(),
@@ -98,30 +99,8 @@ impl LoginController {
                             return;
                         }
 
-                        // Persist access token.
-                        let store = KeyringCredentialStore::new(keys::SERVICE, keys::ACCESS_TOKEN);
-                        if let Err(e) = store.store(&Credential {
-                            service: keys::SERVICE.into(),
-                            account: keys::ACCESS_TOKEN.into(),
-                            secret: tokens.access_token,
-                        }) {
-                            ctrl.state = LoginState::Error(format!("Could not save access token: {e}"));
-                            cx.emit(LoginStateChanged::Changed);
-                            return;
-                        }
-
-                        // Persist refresh token (best-effort; not required for immediate use).
-                        let store = KeyringCredentialStore::new(keys::SERVICE, keys::REFRESH_TOKEN);
-                        if let Err(e) = store.store(&Credential {
-                            service: keys::SERVICE.into(),
-                            account: keys::REFRESH_TOKEN.into(),
-                            secret: tokens.refresh_token,
-                        }) {
-                            warn!("could not save refresh token: {e}");
-                        }
-
                         ctrl.state = LoginState::Idle;
-                        cx.emit(LoginStateChanged::Succeeded);
+                        cx.emit(LoginStateChanged::Succeeded(tokens));
                     }
                     Err(e) => {
                         ctrl.state = LoginState::Error(e.to_string());
@@ -132,15 +111,13 @@ impl LoginController {
         }).detach();
     }
 
-    /// Deletes all stored credentials from the keyring and emits `LoggedOut`.
+    /// Deletes the stored API key from the keyring and emits `LoggedOut`.
     ///
-    /// Missing entries are logged as warnings, not treated as errors.
+    /// Tokens are not in the keyring and need no explicit deletion.
     pub fn logout(&mut self, cx: &mut Context<Self>) {
-        for account in [keys::API_KEY, keys::ACCESS_TOKEN, keys::REFRESH_TOKEN] {
-            let store = KeyringCredentialStore::new(keys::SERVICE, account);
-            if let Err(e) = store.delete() {
-                warn!("credential delete ({account}): {e}");
-            }
+        let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
+        if let Err(e) = store.delete() {
+            warn!("credential delete (api-key): {e}");
         }
         self.api_key_draft.clear();
         self.state = LoginState::Idle;

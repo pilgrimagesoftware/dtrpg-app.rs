@@ -42,10 +42,17 @@ pub struct LibraryRootView {
 
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
+    ///
+    /// The library window is only opened after successful authentication, so the avatar
+    /// button always reflects the logged-in state.
     pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
-        let settings = cx.new(|_| SettingsController::new());
+        let settings = cx.new(|cx| {
+            let mut ctrl = SettingsController::new();
+            ctrl.set_logged_in(None, cx);
+            ctrl
+        });
         let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
         let auth_initial = {
             #[cfg(debug_assertions)]
@@ -82,25 +89,18 @@ impl LibraryRootView {
         })
         .detach();
 
-        // Handle logout: delete credentials, open login window, close library window.
+        // Handle logout: delete the API key, open login window, close library window.
+        // Tokens are in-memory only and need no explicit deletion.
         cx.subscribe(&settings, |_this, _ctrl, _event: &LogoutRequested, cx| {
-            for account in [keys::API_KEY, keys::ACCESS_TOKEN, keys::REFRESH_TOKEN] {
-                let store = KeyringCredentialStore::new(keys::SERVICE, account);
-                if let Err(e) = store.delete() {
-                    tracing::warn!("credential delete ({account}): {e}");
-                }
+            let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
+            if let Err(e) = store.delete() {
+                tracing::warn!("credential delete (api-key): {e}");
             }
             let entity_id = cx.entity_id();
             open_login_window(None, cx);
             cx.with_window(entity_id, |window, _cx| window.remove_window());
         })
         .detach();
-
-        // Stub: simulate a signed-in user so the avatar button renders during development.
-        #[cfg(debug_assertions)]
-        settings.update(cx, |ctrl, cx| {
-            ctrl.set_logged_in("test@example.com".into(), cx);
-        });
 
         Self { controller, settings, activity, auth_state, catalog_view, settings_focus }
     }
