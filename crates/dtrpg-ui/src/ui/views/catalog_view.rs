@@ -5,28 +5,286 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    div, px, uniform_list, AnyElement, Context, Entity, IntoElement, ParentElement,
+    div, px, uniform_list, AnyElement, App, Context, Entity, IntoElement, ParentElement,
     Render, Styled, UniformListScrollHandle, Window,
 };
+use gpui_component::Sizable;
+use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
+
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::enums::*;
 use crate::data::enums::CatalogPresentation;
+use crate::data::events::LibraryChanged;
 use crate::data::library::LibraryItem;
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::render_generative_cover;
 use crate::util::publisher::group_by_publisher;
 use crate::util::reveal::reveal_in_file_manager;
+use crate::util::sort::{SortDirection, SortMethod};
+
+// ── Shared column definitions ─────────────────────────────────────────────────
+
+/// Returns the column definitions used for the list view.
+///
+/// Used by both the `DataTable` (ungrouped) and the grouped-list header/rows
+/// to ensure column widths are always in sync between headers and cells.
+fn list_columns() -> Vec<Column> {
+    vec![
+        Column::new("title", "Title")
+            .width(300.)
+            .min_width(150.)
+            .resizable(true),
+        Column::new("publisher", "Publisher").width(130.).resizable(true),
+        Column::new("system", "System").width(110.).resizable(true),
+        Column::new("pages", "Pages").width(60.).resizable(true),
+        Column::new("size", "Size").width(60.).resizable(true),
+        Column::new("added", "Added").width(80.).resizable(true),
+        Column::new("status", "").width(24.).resizable(false).selectable(false),
+        Column::new("reveal", "").width(28.).resizable(false).selectable(false),
+    ]
+}
+
+/// Returns a 2–3 character badge abbreviation for an item kind string.
+fn kind_badge(kind: &str) -> &'static str {
+    if kind.contains("Core") {
+        "CR"
+    } else if kind.contains("Supplement") {
+        "SUP"
+    } else if kind.contains("Adventure") {
+        "ADV"
+    } else if kind.contains("Map") {
+        "MAP"
+    } else if kind.contains("Token") {
+        "TOK"
+    } else if kind.contains("Bundle") || kind.contains("PDF") {
+        "PDF"
+    } else {
+        "OTH"
+    }
+}
+
+// ── CatalogListDelegate ───────────────────────────────────────────────────────
+
+/// `TableDelegate` for the ungrouped list view. Backed by `LibraryController`.
+struct CatalogListDelegate {
+    controller: Entity<LibraryController>,
+    storage_root: PathBuf,
+    columns: Vec<Column>,
+}
+
+impl TableDelegate for CatalogListDelegate {
+    fn columns_count(&self, _cx: &App) -> usize {
+        self.columns.len()
+    }
+
+    fn rows_count(&self, cx: &App) -> usize {
+        self.controller.read(cx).visible_items_count()
+    }
+
+    fn column(&self, col_ix: usize, cx: &App) -> Column {
+        let snap = self.controller.read(cx).snapshot();
+        let active_col = match snap.sort {
+            SortMethod::Title => Some(0usize),
+            SortMethod::Publisher => Some(1),
+            SortMethod::PageCount => Some(3),
+            SortMethod::DateAdded => Some(5),
+            SortMethod::Custom { col_key: "publisher" } => Some(1),
+            SortMethod::Custom { col_key: "system" } => Some(2),
+            SortMethod::Custom { col_key: "pages" } => Some(3),
+            SortMethod::Custom { col_key: "size" } => Some(4),
+            SortMethod::Custom { col_key: "added" } => Some(5),
+            SortMethod::Custom { .. } => None,
+        };
+        let col = self.columns[col_ix].clone();
+        if active_col == Some(col_ix) {
+            let sort = match snap.sort_direction {
+                SortDirection::Ascending => ColumnSort::Ascending,
+                SortDirection::Descending => ColumnSort::Descending,
+            };
+            col.sort(sort)
+        } else if col_ix < 6 {
+            col.sort(ColumnSort::Default)
+        } else {
+            col
+        }
+    }
+
+    fn perform_sort(
+        &mut self,
+        col_ix: usize,
+        sort: ColumnSort,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) {
+        if col_ix >= 6 {
+            return;
+        }
+        let method = match col_ix {
+            0 => SortMethod::Title,
+            1 => SortMethod::Custom { col_key: "publisher" },
+            2 => SortMethod::Custom { col_key: "system" },
+            3 => SortMethod::Custom { col_key: "pages" },
+            4 => SortMethod::Custom { col_key: "size" },
+            5 => SortMethod::Custom { col_key: "added" },
+            _ => return,
+        };
+        let (method, direction) = match sort {
+            ColumnSort::Ascending => (method, SortDirection::Ascending),
+            ColumnSort::Descending => (method, SortDirection::Descending),
+            ColumnSort::Default => (SortMethod::Title, SortDirection::Ascending),
+        };
+        self.controller.update(cx, |ctrl, cx| {
+            ctrl.set_sort(method, cx);
+            ctrl.set_sort_direction(direction, cx);
+        });
+    }
+
+    fn render_td(
+        &mut self,
+        row_ix: usize,
+        col_ix: usize,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let items = self.controller.read(cx).visible_items_slice(row_ix..row_ix + 1);
+        let Some(item) = items.into_iter().next() else {
+            return div().into_any_element();
+        };
+        let colors = cx.global::<LibriTheme>().colors.clone();
+
+        match col_ix {
+            0 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .min_w_0()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(colors.text_primary)
+                        .truncate()
+                        .child(item.title.to_string()),
+                )
+                .child(
+                    div()
+                        .flex_none()
+                        .text_xs()
+                        .text_color(colors.text_tertiary)
+                        .px(px(4.0))
+                        .py(px(1.0))
+                        .rounded(px(3.0))
+                        .bg(colors.hover)
+                        .child(kind_badge(&item.kind)),
+                )
+                .into_any_element(),
+
+            1 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .truncate()
+                .child(item.publisher.to_string())
+                .into_any_element(),
+
+            2 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .truncate()
+                .child(item.line.to_string())
+                .into_any_element(),
+
+            3 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .child(item.pages.to_string())
+                .into_any_element(),
+
+            4 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .child(format!("{:.0} MB", item.size_mb))
+                .into_any_element(),
+
+            5 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .child(item.year.to_string())
+                .into_any_element(),
+
+            6 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(render_status(item.status, &colors))
+                .into_any_element(),
+
+            7 => {
+                if item.status == ItemStatus::Downloaded {
+                    let item_reveal_path = self.storage_root.join("items").join(&*item.id);
+                    let reveal_elem_id: Arc<str> =
+                        Arc::from(format!("reveal-row-{}", &*item.id));
+                    div()
+                        .id(reveal_elem_id)
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .on_click(move |_, _, _| {
+                            if !item_reveal_path.exists() {
+                                tracing::warn!(
+                                    path = %item_reveal_path.display(),
+                                    "reveal: file not found — item may need re-download"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&item_reveal_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        })
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(colors.text_tertiary)
+                                .child("↗"),
+                        )
+                        .into_any_element()
+                } else {
+                    div().h_full().into_any_element()
+                }
+            }
+
+            _ => div().into_any_element(),
+        }
+    }
+}
 
 // ── CatalogView ───────────────────────────────────────────────────────────────
 
 /// GPUI view for the catalog area. Holds scroll state and delegates to
-/// `uniform_list` for list and thumbs layouts, keeping frame layout cost
-/// O(visible rows) rather than O(total items).
+/// `DataTable` for list layout and `uniform_list` for thumbs/grid layouts.
 pub struct CatalogView {
     controller: Entity<LibraryController>,
     settings: Entity<SettingsController>,
     scroll_handle: UniformListScrollHandle,
+    catalog_list_table: Entity<TableState<CatalogListDelegate>>,
     /// Cached items-per-row for the grid layout; updated each render from
     /// the window viewport width. Initialized to 4 as a safe default.
     items_per_row: usize,
@@ -35,13 +293,61 @@ pub struct CatalogView {
 impl CatalogView {
     /// Creates a new `CatalogView` connected to the given controller and settings.
     pub fn new(
+        window: &mut Window,
+        cx: &mut Context<Self>,
         controller: Entity<LibraryController>,
         settings: Entity<SettingsController>,
     ) -> Self {
+        let storage_root = settings.read(cx).snapshot().storage_root_path;
+        let delegate = CatalogListDelegate {
+            controller: controller.clone(),
+            storage_root,
+            columns: list_columns(),
+        };
+        let catalog_list_table = cx.new(|cx| {
+            TableState::new(delegate, window, cx)
+                .row_selectable(true)
+                .col_selectable(false)
+                .col_movable(false)
+                .col_resizable(true)
+                .sortable(true)
+        });
+
+        cx.subscribe(
+            &controller,
+            {
+                let table = catalog_list_table.clone();
+                move |_this, _ctrl, _event: &LibraryChanged, cx| {
+                    table.update(cx, |state, cx| state.refresh(cx));
+                }
+            },
+        )
+        .detach();
+
+        cx.subscribe(
+            &catalog_list_table,
+            |this, _table, event: &TableEvent, cx| {
+                if let TableEvent::SelectRow(row_ix) = event {
+                    let row_ix = *row_ix;
+                    let items = this
+                        .controller
+                        .read(cx)
+                        .visible_items_slice(row_ix..row_ix + 1);
+                    if let Some(item) = items.first() {
+                        let id = Arc::clone(&item.id);
+                        this.controller
+                            .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
+                    }
+                }
+            },
+        )
+        .detach();
+
         Self {
             controller,
             settings,
             scroll_handle: UniformListScrollHandle::default(),
+            catalog_list_table,
             items_per_row: 4,
         }
     }
@@ -87,43 +393,44 @@ impl Render for CatalogView {
         }
 
         match (snap.presentation, snap.grouped) {
-            // ── List, ungrouped — virtualized ──────────────────────────────
+            // ── List, ungrouped — DataTable (handles header/row alignment) ──
             (CatalogPresentation::List, false) => {
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
+                use gpui_component::Size;
                 root.px(pad_side)
-                    .child(render_list_header(&colors))
                     .child(
-                        uniform_list("catalog-list", item_count, move |range, _window, cx| {
-                            let items = ctrl.read(cx).visible_items_slice(range);
-                            items.iter().map(|item| {
-                                render_list_row(item, &c, &d, ctrl.clone(), s.clone())
-                                    .into_any_element()
-                            }).collect()
-                        })
-                        .track_scroll(&scroll_handle)
-                        .flex_1()
-                        .min_h_0(),
+                        DataTable::new(&self.catalog_list_table)
+                            .with_size(Size::Size(density.row_text_height))
+                            .bordered(false)
+                            .scrollbar_visible(true, false),
                     )
                     .into_any_element()
             }
 
-            // ── List, grouped — non-virtualized (group headers break uniform height) ──
+            // ── List, grouped — non-virtualized; raw flex rows with shared widths ──
             (CatalogPresentation::List, true) => {
                 let items = self.controller.read(cx).visible_items();
                 let groups = group_by_publisher(items);
+                let cols = list_columns();
                 root.px(pad_side)
                     .children(groups.into_iter().map(|g| {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
                         let s = storage_root.clone();
+                        let header_cols = cols.clone();
+                        let row_cols = cols.clone();
                         div()
                             .child(render_group_header(&g.publisher, g.items.len(), &c))
-                            .child(render_list_header(&c))
+                            .child(render_grouped_list_header(&c, &header_cols))
                             .children(g.items.into_iter().map(move |item| {
-                                render_list_row(&item, &c, &d, e.clone(), s.clone())
+                                render_grouped_list_row(
+                                    &item,
+                                    &c,
+                                    &d,
+                                    e.clone(),
+                                    s.clone(),
+                                    &row_cols,
+                                )
                             }))
                     }))
                     .into_any_element()
@@ -137,10 +444,13 @@ impl Render for CatalogView {
                     .child(
                         uniform_list("catalog-thumbs", item_count, move |range, _window, cx| {
                             let items = ctrl.read(cx).visible_items_slice(range);
-                            items.iter().map(|item| {
-                                render_thumb_row(item, &c, &d, ctrl.clone())
-                                    .into_any_element()
-                            }).collect()
+                            items
+                                .iter()
+                                .map(|item| {
+                                    render_thumb_row(item, &c, &d, ctrl.clone())
+                                        .into_any_element()
+                                })
+                                .collect()
                         })
                         .track_scroll(&scroll_handle)
                         .flex_1()
@@ -175,28 +485,40 @@ impl Render for CatalogView {
                 let s = storage_root.clone();
                 root.px(pad_side)
                     .child(
-                        uniform_list("catalog-grid", row_count, move |row_range, _window, cx| {
-                            let range_start = row_range.start;
-                            let item_start = range_start * items_per_row;
-                            let item_end = (row_range.end * items_per_row).min(item_count);
-                            let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
-                            row_range.map(|row| {
-                                let offset = (row - range_start) * items_per_row;
-                                let row_end = (offset + items_per_row).min(items.len());
-                                let row_items = &items[offset..row_end];
-                                div()
-                                    .flex()
-                                    .gap(d.card_gap_x)
-                                    .mb(d.card_gap_y)
-                                    .children(row_items.iter().map(|item| {
-                                        render_grid_card(
-                                            item, &c, d.card_min_width,
-                                            ctrl.clone(), s.clone(),
-                                        )
-                                    }))
-                                    .into_any_element()
-                            }).collect()
-                        })
+                        uniform_list(
+                            "catalog-grid",
+                            row_count,
+                            move |row_range, _window, cx| {
+                                let range_start = row_range.start;
+                                let item_start = range_start * items_per_row;
+                                let item_end =
+                                    (row_range.end * items_per_row).min(item_count);
+                                let items =
+                                    ctrl.read(cx).visible_items_slice(item_start..item_end);
+                                row_range
+                                    .map(|row| {
+                                        let offset = (row - range_start) * items_per_row;
+                                        let row_end =
+                                            (offset + items_per_row).min(items.len());
+                                        let row_items = &items[offset..row_end];
+                                        div()
+                                            .flex()
+                                            .gap(d.card_gap_x)
+                                            .mb(d.card_gap_y)
+                                            .children(row_items.iter().map(|item| {
+                                                render_grid_card(
+                                                    item,
+                                                    &c,
+                                                    d.card_min_width,
+                                                    ctrl.clone(),
+                                                    s.clone(),
+                                                )
+                                            }))
+                                            .into_any_element()
+                                    })
+                                    .collect()
+                            },
+                        )
                         .track_scroll(&scroll_handle)
                         .flex_1()
                         .min_h_0(),
@@ -305,12 +627,17 @@ fn platform_reveal_label() -> &'static str {
     return "Show in Files";
 }
 
-// ── List layout ───────────────────────────────────────────────────────────────
+// ── Grouped list layout ───────────────────────────────────────────────────────
 
-fn render_list_header(colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
+/// Header row for the grouped list. Column widths come from `cols` so they
+/// always match the data rows rendered by `render_grouped_list_row`.
+fn render_grouped_list_header(
+    colors: &ColorTokens,
+    cols: &[Column],
+) -> impl IntoElement + 'static + use<> {
     let border = colors.border;
     let text_tertiary = colors.text_tertiary;
-    div()
+    let mut row = div()
         .flex()
         .items_center()
         .h(px(28.0))
@@ -318,22 +645,23 @@ fn render_list_header(colors: &ColorTokens) -> impl IntoElement + 'static + use<
         .border_color(border)
         .text_xs()
         .text_color(text_tertiary)
-        .child(div().flex_1().child("Title / Kind"))
-        .child(div().w(px(130.0)).child("Publisher"))
-        .child(div().w(px(110.0)).child("System"))
-        .child(div().w(px(60.0)).child("Pages"))
-        .child(div().w(px(60.0)).child("Size"))
-        .child(div().w(px(80.0)).child("Added"))
-        .child(div().w(px(24.0)).child(""))
-        .child(div().w(px(28.0)).child(""))
+        .child(div().flex_1().child(cols[0].name.to_string()));
+    for col in &cols[1..] {
+        let name = col.name.to_string();
+        let width = col.width;
+        row = row.child(div().w(width).child(name));
+    }
+    row
 }
 
-fn render_list_row(
+/// A single data row for the grouped list. Column widths come from `cols`.
+fn render_grouped_list_row(
     item: &LibraryItem,
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
     storage_root_path: PathBuf,
+    cols: &[Column],
 ) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -348,17 +676,21 @@ fn render_list_row(
     let colors = colors.clone();
     let reveal_item_id = Arc::clone(&item.id);
 
+    // Fixed-width columns 1–7 use widths from the shared column definitions.
+    let [_, pub_w, sys_w, pgs_w, sz_w, yr_w, st_w, rv_w] =
+        std::array::from_fn::<_, 8, _>(|i| cols.get(i).map_or(px(0.), |c| c.width));
+
     let reveal_col: AnyElement = if status == ItemStatus::Downloaded {
         let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
         let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-row-{}", &*reveal_item_id));
         div()
             .id(reveal_elem_id)
-            .w(px(28.0))
+            .w(rv_w)
             .flex()
             .items_center()
             .justify_center()
             .cursor_pointer()
-            .on_click(move |_, _, _cx| {
+            .on_click(move |_, _, _| {
                 if !item_reveal_path.exists() {
                     tracing::warn!(
                         path = %item_reveal_path.display(),
@@ -373,7 +705,7 @@ fn render_list_row(
             .child(div().text_xs().text_color(colors.text_tertiary).child("↗"))
             .into_any_element()
     } else {
-        div().w(px(28.0)).into_any_element()
+        div().w(rv_w).into_any_element()
     };
 
     div()
@@ -403,15 +735,19 @@ fn render_list_row(
                 )
                 .child(
                     div()
+                        .flex_none()
                         .text_xs()
                         .text_color(colors.text_tertiary)
-                        .whitespace_nowrap()
-                        .child(kind),
+                        .px(px(4.0))
+                        .py(px(1.0))
+                        .rounded(px(3.0))
+                        .bg(colors.hover)
+                        .child(kind_badge(&kind)),
                 ),
         )
         .child(
             div()
-                .w(px(130.0))
+                .w(pub_w)
                 .text_sm()
                 .text_color(colors.text_secondary)
                 .truncate()
@@ -419,7 +755,7 @@ fn render_list_row(
         )
         .child(
             div()
-                .w(px(110.0))
+                .w(sys_w)
                 .text_sm()
                 .text_color(colors.text_secondary)
                 .truncate()
@@ -427,26 +763,33 @@ fn render_list_row(
         )
         .child(
             div()
-                .w(px(60.0))
+                .w(pgs_w)
                 .text_sm()
                 .text_color(colors.text_secondary)
                 .child(pages.to_string()),
         )
         .child(
             div()
-                .w(px(60.0))
+                .w(sz_w)
                 .text_sm()
                 .text_color(colors.text_secondary)
                 .child(format!("{size_mb:.0} MB")),
         )
         .child(
             div()
-                .w(px(80.0))
+                .w(yr_w)
                 .text_sm()
                 .text_color(colors.text_secondary)
                 .child(year.to_string()),
         )
-        .child(render_status(status, &colors))
+        .child(
+            div()
+                .w(st_w)
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(render_status(status, &colors)),
+        )
         .child(reveal_col)
 }
 
@@ -587,7 +930,7 @@ fn render_grid_card(
             .id(reveal_elem_id)
             .mt(px(2.0))
             .cursor_pointer()
-            .on_click(move |_, _, _cx| {
+            .on_click(move |_, _, _| {
                 if !item_reveal_path.exists() {
                     tracing::warn!(
                         path = %item_reveal_path.display(),

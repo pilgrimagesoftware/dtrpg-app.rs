@@ -42,11 +42,11 @@ pub struct LibraryRootView {
 
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
-    pub fn new(_window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
+    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let settings = cx.new(|_| SettingsController::new());
-        let catalog_view = cx.new(|_| CatalogView::new(controller.clone(), settings.clone()));
+        let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
         let auth_initial = {
             #[cfg(debug_assertions)]
             {
@@ -115,9 +115,9 @@ impl Render for LibraryRootView {
 
         let snap = self.controller.read(cx).snapshot();
         let (filter, counts, publishers, total_count, total_mb, matched_count,
-             search_query, sort, grouped, presentation, selected_item) = (
+             search_query, sort, sort_direction, grouped, presentation, selected_item) = (
             snap.filter, snap.counts, snap.publishers, snap.total_count, snap.total_mb,
-            snap.matched_count, snap.search_query, snap.sort, snap.grouped,
+            snap.matched_count, snap.search_query, snap.sort, snap.sort_direction, snap.grouped,
             snap.presentation, snap.selected_item,
         );
 
@@ -149,12 +149,14 @@ impl Render for LibraryRootView {
             matched_count,
             &search_query,
             sort,
+            sort_direction,
             grouped,
             presentation,
             lib_entity.clone(),
             settings_entity.clone(),
             &settings_snap.auth,
             colors,
+            cx,
         );
         let banner = render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
         let panel = render_detail_panel(selected_item.as_ref(), settings_snap.storage_root_path.clone(), lib_entity, colors);

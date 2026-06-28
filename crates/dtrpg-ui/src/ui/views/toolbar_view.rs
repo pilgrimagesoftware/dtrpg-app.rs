@@ -1,8 +1,10 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout switcher.
 
+use std::sync::Arc;
+
 use gpui::prelude::*;
-use gpui::{AnyElement, div, px, Entity, IntoElement, ParentElement, Styled};
-use gpui_component::button::{Button, ButtonVariants};
+use gpui::{AnyElement, App, div, img, px, Entity, Image, ImageFormat, ImageSource, IntoElement, ObjectFit, ParentElement, Styled};
+use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
 
@@ -32,12 +34,14 @@ pub fn render_toolbar(
     matched_count: usize,
     search_query: &str,
     sort: SortMethod,
+    sort_direction: SortDirection,
     grouped: bool,
     presentation: CatalogPresentation,
     entity: Entity<LibraryController>,
     settings: Entity<SettingsController>,
     auth: &AuthStateSnapshot,
     colors: &ColorTokens,
+    cx: &App,
 ) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
@@ -102,6 +106,7 @@ pub fn render_toolbar(
                 ))
                 .child(render_sort_selector(
                     sort,
+                    sort_direction,
                     entity.clone(),
                     bg,
                     border_strong,
@@ -127,7 +132,7 @@ pub fn render_toolbar(
                     accent_soft,
                 ))
                 .child(render_settings_button(settings.clone(), text_primary, border_strong))
-                .child(render_avatar_button(auth, settings, colors)),
+                .child(render_avatar_button(auth, settings, colors, cx)),
         )
 }
 
@@ -186,6 +191,7 @@ fn render_search(
 
 fn render_sort_selector(
     current: SortMethod,
+    direction: SortDirection,
     entity: Entity<LibraryController>,
     _bg: gpui::Hsla,
     _border: gpui::Hsla,
@@ -197,7 +203,10 @@ fn render_sort_selector(
         SortMethod::Publisher => "Publisher",
         SortMethod::DateAdded => "Date Added",
         SortMethod::PageCount => "Pages",
+        SortMethod::Custom { .. } => "Custom",
     };
+
+    let is_custom = matches!(current, SortMethod::Custom { .. });
 
     Button::new("sort-selector")
         .label(label)
@@ -208,34 +217,59 @@ fn render_sort_selector(
             let e2 = entity.clone();
             let e3 = entity.clone();
             let e4 = entity.clone();
-            menu.item(
-                PopupMenuItem::new("Title")
-                    .checked(current == SortMethod::Title)
-                    .on_click(move |_, _, cx| {
-                        e.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
-                    }),
-            )
-            .item(
-                PopupMenuItem::new("Publisher")
-                    .checked(current == SortMethod::Publisher)
-                    .on_click(move |_, _, cx| {
-                        e2.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
-                    }),
-            )
-            .item(
-                PopupMenuItem::new("Date Added")
-                    .checked(current == SortMethod::DateAdded)
-                    .on_click(move |_, _, cx| {
-                        e3.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
-                    }),
-            )
-            .item(
-                PopupMenuItem::new("Pages")
-                    .checked(current == SortMethod::PageCount)
-                    .on_click(move |_, _, cx| {
-                        e4.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
-                    }),
-            )
+            let e5 = entity.clone();
+            let e6 = entity.clone();
+            let mut m = menu
+                .item(
+                    PopupMenuItem::new("Title")
+                        .checked(current == SortMethod::Title)
+                        .on_click(move |_, _, cx| {
+                            e.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
+                        }),
+                )
+                .item(
+                    PopupMenuItem::new("Publisher")
+                        .checked(current == SortMethod::Publisher)
+                        .on_click(move |_, _, cx| {
+                            e2.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
+                        }),
+                )
+                .item(
+                    PopupMenuItem::new("Date Added")
+                        .checked(current == SortMethod::DateAdded)
+                        .on_click(move |_, _, cx| {
+                            e3.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
+                        }),
+                )
+                .item(
+                    PopupMenuItem::new("Pages")
+                        .checked(current == SortMethod::PageCount)
+                        .on_click(move |_, _, cx| {
+                            e4.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
+                        }),
+                );
+            if is_custom {
+                m = m.item(PopupMenuItem::new("Custom").checked(true).disabled(true));
+            }
+            m.separator()
+                .item(
+                    PopupMenuItem::new("Ascending")
+                        .checked(direction == SortDirection::Ascending)
+                        .on_click(move |_, _, cx| {
+                            e5.update(cx, |ctrl, cx| {
+                                ctrl.set_sort_direction(SortDirection::Ascending, cx);
+                            });
+                        }),
+                )
+                .item(
+                    PopupMenuItem::new("Descending")
+                        .checked(direction == SortDirection::Descending)
+                        .on_click(move |_, _, cx| {
+                            e6.update(cx, |ctrl, cx| {
+                                ctrl.set_sort_direction(SortDirection::Descending, cx);
+                            });
+                        }),
+                )
         })
 }
 
@@ -354,10 +388,19 @@ fn render_settings_button(
 
 // ── Avatar button ─────────────────────────────────────────────────────────────
 
+fn detect_image_format(bytes: &[u8]) -> ImageFormat {
+    if bytes.starts_with(b"\x89PNG") {
+        ImageFormat::Png
+    } else {
+        ImageFormat::Jpeg
+    }
+}
+
 fn render_avatar_button(
     auth: &AuthStateSnapshot,
     settings: Entity<SettingsController>,
     colors: &ColorTokens,
+    cx: &App,
 ) -> AnyElement {
     if !auth.is_logged_in {
         return div()
@@ -381,9 +424,41 @@ fn render_avatar_button(
         .map(|c| c.to_string())
         .unwrap_or_else(|| "?".to_string());
 
+    let accent = colors.accent;
+    let avatar_variant = ButtonCustomVariant::new(cx)
+        .color(accent)
+        .foreground(gpui::white())
+        .hover(gpui::Hsla { l: (accent.l * 0.85).min(1.0), ..accent })
+        .active(gpui::Hsla { l: (accent.l * 0.75).min(1.0), ..accent });
+
+    let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
+        let format = detect_image_format(bytes);
+        let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
+        img(ImageSource::Image(image))
+            .w(px(30.0))
+            .h(px(30.0))
+            .rounded_full()
+            .object_fit(ObjectFit::Cover)
+            .into_any_element()
+    } else {
+        div()
+            .flex()
+            .items_center()
+            .justify_center()
+            .size_full()
+            .text_xs()
+            .text_color(gpui::white())
+            .child(initial_text)
+            .into_any_element()
+    };
+
     Button::new("avatar-btn")
-        .label(initial_text)
+        .custom(avatar_variant)
         .tooltip("Account")
+        .rounded_full()
+        .w(px(30.0))
+        .h(px(30.0))
+        .child(inner)
         .dropdown_menu(move |menu, _, _| {
             let s = settings.clone();
             menu.item(

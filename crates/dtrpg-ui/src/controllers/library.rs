@@ -28,6 +28,7 @@ pub struct LibrarySnapshot {
     pub matched_count: usize,
     pub search_query: String,
     pub sort: SortMethod,
+    pub sort_direction: SortDirection,
     pub grouped: bool,
     pub presentation: CatalogPresentation,
     pub selected_item: Option<LibraryItem>,
@@ -50,6 +51,8 @@ pub struct LibraryController {
     pub search_query: String,
     /// Current sort method.
     pub sort: SortMethod,
+    /// Current sort direction.
+    pub sort_direction: SortDirection,
     /// Whether the catalog is grouped by publisher.
     pub grouped: bool,
     /// Active catalog presentation mode.
@@ -138,6 +141,7 @@ impl LibraryController {
             filter: SidebarFilter::default(),
             search_query: String::new(),
             sort: SortMethod::default(),
+            sort_direction: SortDirection::default(),
             grouped: false,
             presentation: CatalogPresentation::default(),
             selection: Selection::default(),
@@ -188,6 +192,7 @@ impl LibraryController {
             matched_count,
             search_query: self.search_query.clone(),
             sort: self.sort,
+            sort_direction: self.sort_direction,
             grouped: self.grouped,
             presentation: self.presentation,
             selected_item,
@@ -209,7 +214,7 @@ impl LibraryController {
             })
             .cloned()
             .collect();
-        sort_items(&mut items, self.sort);
+        sort_items(&mut items, self.sort, self.sort_direction);
         items
     }
 
@@ -258,6 +263,12 @@ impl LibraryController {
     /// Sets the sort method.
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
         self.sort = sort;
+        cx.emit(LibraryChanged);
+    }
+
+    /// Sets the sort direction.
+    pub fn set_sort_direction(&mut self, direction: SortDirection, cx: &mut Context<Self>) {
+        self.sort_direction = direction;
         cx.emit(LibraryChanged);
     }
 
