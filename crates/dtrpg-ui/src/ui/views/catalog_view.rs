@@ -71,6 +71,9 @@ struct CatalogListDelegate {
     controller: Entity<LibraryController>,
     storage_root: PathBuf,
     columns: Vec<Column>,
+    /// User-adjusted column widths captured from `TableEvent::ColumnWidthsChanged`.
+    /// `None` means use the static default from `list_columns()`.
+    user_widths: Vec<Option<gpui::Pixels>>,
 }
 
 impl TableDelegate for CatalogListDelegate {
@@ -96,7 +99,10 @@ impl TableDelegate for CatalogListDelegate {
             SortMethod::Custom { col_key: "added" } => Some(5),
             SortMethod::Custom { .. } => None,
         };
-        let col = self.columns[col_ix].clone();
+        let mut col = self.columns[col_ix].clone();
+        if let Some(Some(w)) = self.user_widths.get(col_ix) {
+            col = col.width(w.as_f32());
+        }
         if active_col == Some(col_ix) {
             let sort = match snap.sort_direction {
                 SortDirection::Ascending => ColumnSort::Ascending,
@@ -299,10 +305,13 @@ impl CatalogView {
         settings: Entity<SettingsController>,
     ) -> Self {
         let storage_root = settings.read(cx).snapshot().storage_root_path;
+        let cols = list_columns();
+        let col_count = cols.len();
         let delegate = CatalogListDelegate {
             controller: controller.clone(),
             storage_root,
-            columns: list_columns(),
+            columns: cols,
+            user_widths: vec![None; col_count],
         };
         let catalog_list_table = cx.new(|cx| {
             TableState::new(delegate, window, cx)
@@ -326,18 +335,32 @@ impl CatalogView {
 
         cx.subscribe(
             &catalog_list_table,
-            |this, _table, event: &TableEvent, cx| {
-                if let TableEvent::SelectRow(row_ix) = event {
-                    let row_ix = *row_ix;
-                    let items = this
-                        .controller
-                        .read(cx)
-                        .visible_items_slice(row_ix..row_ix + 1);
-                    if let Some(item) = items.first() {
-                        let id = Arc::clone(&item.id);
-                        this.controller
-                            .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
+            |this, table, event: &TableEvent, cx| {
+                match event {
+                    TableEvent::SelectRow(row_ix) => {
+                        let row_ix = *row_ix;
+                        let items = this
+                            .controller
+                            .read(cx)
+                            .visible_items_slice(row_ix..row_ix + 1);
+                        if let Some(item) = items.first() {
+                            let id = Arc::clone(&item.id);
+                            this.controller
+                                .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
+                        }
                     }
+                    TableEvent::ColumnWidthsChanged(widths) => {
+                        let widths = widths.clone();
+                        table.update(cx, |state, _cx| {
+                            let delegate = state.delegate_mut();
+                            if widths.len() == delegate.user_widths.len() {
+                                for (slot, &w) in delegate.user_widths.iter_mut().zip(widths.iter()) {
+                                    *slot = Some(w);
+                                }
+                            }
+                        });
+                    }
+                    _ => {}
                 }
             },
         )
