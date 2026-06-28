@@ -12,7 +12,7 @@ pub struct PublisherEntry {
     pub count: usize,
 }
 
-/// Returns publisher entries sorted by count descending, then name ascending.
+/// Returns publisher entries sorted by name ascending (case-insensitive).
 #[must_use]
 pub fn publisher_entries(items: &[LibraryItem]) -> Vec<PublisherEntry> {
     let mut map: std::collections::HashMap<Arc<str>, usize> =
@@ -24,7 +24,7 @@ pub fn publisher_entries(items: &[LibraryItem]) -> Vec<PublisherEntry> {
         .into_iter()
         .map(|(name, count)| PublisherEntry { name, count })
         .collect();
-    entries.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+    entries.sort_by_key(|e| e.name.to_lowercase());
     entries
 }
 
@@ -69,5 +69,56 @@ pub fn format_total_size(items: &[LibraryItem]) -> String {
         format!("{:.1} GB", total_mb / 1024.0)
     } else {
         format!("{:.0} MB", total_mb)
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::library::LibraryItem;
+
+    fn item(publisher: &str) -> LibraryItem {
+        LibraryItem::new("id", "Title", publisher, "", "", "PDF", 0, 0.0, 2020, 0,
+            crate::data::enums::ItemStatus::Cloud, "#000000", "")
+    }
+
+    #[test]
+    fn single_publisher_returns_one_entry() {
+        let items = vec![item("Paizo"), item("Paizo")];
+        let entries = publisher_entries(&items);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name.as_ref(), "Paizo");
+    }
+
+    #[test]
+    fn multiple_publishers_sorted_alphabetically() {
+        let items = vec![
+            item("Wizards of the Coast"),
+            item("Paizo"),
+            item("Kobold Press"),
+        ];
+        let entries = publisher_entries(&items);
+        let names: Vec<&str> = entries.iter().map(|e| e.name.as_ref()).collect();
+        assert_eq!(names, ["Kobold Press", "Paizo", "Wizards of the Coast"]);
+    }
+
+    #[test]
+    fn sort_is_case_insensitive() {
+        let items = vec![item("B Publisher"), item("a publisher")];
+        let entries = publisher_entries(&items);
+        assert_eq!(entries[0].name.as_ref(), "a publisher");
+        assert_eq!(entries[1].name.as_ref(), "B Publisher");
+    }
+
+    #[test]
+    fn alphabetical_order_is_independent_of_count() {
+        let mut items = Vec::new();
+        for _ in 0..50 { items.push(item("Zyborg Games")); }
+        items.push(item("Aaeon Press"));
+        let entries = publisher_entries(&items);
+        assert_eq!(entries[0].name.as_ref(), "Aaeon Press");
+        assert_eq!(entries[1].name.as_ref(), "Zyborg Games");
     }
 }

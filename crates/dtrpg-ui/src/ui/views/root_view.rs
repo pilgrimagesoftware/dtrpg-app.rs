@@ -11,6 +11,7 @@ use crate::{
     },
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
+        auth_state::AuthState,
         events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged},
         theme::LibriTheme,
     },
@@ -18,7 +19,7 @@ use crate::{
 };
 use crate::ui::views::{
     activity_panel_view::render_activity_panel,
-    catalog_view::render_catalog,
+    catalog_view::CatalogView,
     detail_panel_view::render_detail_panel,
     notification_banner_view::render_notification_banner,
     settings_view::render_settings_panel,
@@ -33,6 +34,7 @@ pub struct LibraryRootView {
     settings: Entity<SettingsController>,
     activity: Entity<ActivityController>,
     auth_state: Entity<AuthStateController>,
+    catalog_view: Entity<CatalogView>,
     /// Focus handle for the settings overlay; grabbed when the panel opens so
     /// Escape key events route to the backdrop instead of the catalog.
     settings_focus: FocusHandle,
@@ -44,7 +46,20 @@ impl LibraryRootView {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let settings = cx.new(|_| SettingsController::new());
-        let auth_state = cx.new(|_| AuthStateController::new());
+        let catalog_view = cx.new(|_| CatalogView::new(controller.clone(), settings.clone()));
+        let auth_initial = {
+            #[cfg(debug_assertions)]
+            {
+                match std::env::var("DTRPG_AUTH_STATE_OVERRIDE").as_deref().unwrap_or("") {
+                    "unauthenticated" => AuthState::Unauthenticated,
+                    "expired" => AuthState::SessionExpired,
+                    _ => AuthState::Authenticated,
+                }
+            }
+            #[cfg(not(debug_assertions))]
+            { AuthState::Authenticated }
+        };
+        let auth_state = cx.new(|_| AuthStateController::new(auth_initial));
         let settings_focus = cx.focus_handle();
 
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
@@ -87,7 +102,7 @@ impl LibraryRootView {
             ctrl.set_logged_in("test@example.com".into(), cx);
         });
 
-        Self { controller, settings, activity, auth_state, settings_focus }
+        Self { controller, settings, activity, auth_state, catalog_view, settings_focus }
     }
 }
 
@@ -100,10 +115,10 @@ impl Render for LibraryRootView {
 
         let snap = self.controller.read(cx).snapshot();
         let (filter, counts, publishers, total_count, total_mb, matched_count,
-             search_query, sort, grouped, presentation, selected_item, items) = (
+             search_query, sort, grouped, presentation, selected_item) = (
             snap.filter, snap.counts, snap.publishers, snap.total_count, snap.total_mb,
             snap.matched_count, snap.search_query, snap.sort, snap.grouped,
-            snap.presentation, snap.selected_item, snap.items,
+            snap.presentation, snap.selected_item,
         );
 
         let settings_snap = self.settings.read(cx).snapshot();
@@ -115,7 +130,6 @@ impl Render for LibraryRootView {
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
-        let density = &theme.density_constants;
 
         let sidebar = render_sidebar(
             &filter,
@@ -143,7 +157,6 @@ impl Render for LibraryRootView {
             colors,
         );
         let banner = render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
-        let catalog = render_catalog(items, presentation, grouped, lib_entity.clone(), colors, density, settings_snap.storage_root_path.clone());
         let panel = render_detail_panel(selected_item.as_ref(), settings_snap.storage_root_path.clone(), lib_entity, colors);
 
         let surface = colors.surface;
@@ -161,7 +174,7 @@ impl Render for LibraryRootView {
                 .bg(surface)
                 .child(toolbar)
                 .child(banner)
-                .child(catalog);
+                .child(self.catalog_view.clone());
 
             if settings_snap.is_open {
                 // Grab keyboard focus so Escape routes to the backdrop, not the catalog.

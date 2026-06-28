@@ -4,118 +4,222 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
-use crate::data::library::LibraryItem;
-use crate::data::enums::*;
-use crate::ui::library::{
-    cover::render_generative_cover,
+use gpui::{
+    div, px, uniform_list, AnyElement, Context, Entity, IntoElement, ParentElement,
+    Render, Styled, UniformListScrollHandle, Window,
 };
-use crate::data::enums::{CatalogPresentation};
-use crate::util::publisher::{group_by_publisher};
-use crate::util::reveal::reveal_in_file_manager;
 use crate::controllers::library::LibraryController;
-use crate::data::theme::{ColorTokens, DensityConstants};
+use crate::controllers::settings::SettingsController;
+use crate::data::enums::*;
+use crate::data::enums::CatalogPresentation;
+use crate::data::library::LibraryItem;
+use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
+use crate::ui::library::cover::render_generative_cover;
+use crate::util::publisher::group_by_publisher;
+use crate::util::reveal::reveal_in_file_manager;
 
-// ── Public entry point ────────────────────────────────────────────────────────
+// ── CatalogView ───────────────────────────────────────────────────────────────
 
-/// Renders the catalog area in the active presentation mode.
-pub fn render_catalog(
-    items: Vec<LibraryItem>,
-    presentation: CatalogPresentation,
-    grouped: bool,
-    entity: Entity<LibraryController>,
-    colors: &ColorTokens,
-    density: &DensityConstants,
-    storage_root_path: PathBuf,
-) -> AnyElement {
-    let pad_top = density.catalog_pad_top;
-    let pad_side = density.catalog_pad_side;
-    let pad_bottom = density.catalog_pad_bottom;
+/// GPUI view for the catalog area. Holds scroll state and delegates to
+/// `uniform_list` for list and thumbs layouts, keeping frame layout cost
+/// O(visible rows) rather than O(total items).
+pub struct CatalogView {
+    controller: Entity<LibraryController>,
+    settings: Entity<SettingsController>,
+    scroll_handle: UniformListScrollHandle,
+    /// Cached items-per-row for the grid layout; updated each render from
+    /// the window viewport width. Initialized to 4 as a safe default.
+    items_per_row: usize,
+}
 
-    let root = div()
-        .flex_1()
-        .min_h_0()
-        .overflow_y_hidden()
-        .pt(pad_top)
-        .pb(pad_bottom);
-
-    if items.is_empty() {
-        return root
-            .child(render_empty_state(colors.text_tertiary))
-            .into_any_element();
+impl CatalogView {
+    /// Creates a new `CatalogView` connected to the given controller and settings.
+    pub fn new(
+        controller: Entity<LibraryController>,
+        settings: Entity<SettingsController>,
+    ) -> Self {
+        Self {
+            controller,
+            settings,
+            scroll_handle: UniformListScrollHandle::default(),
+            items_per_row: 4,
+        }
     }
+}
 
-    let colors = colors.clone();
-    let density = density.clone();
+impl Render for CatalogView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let snap = self.controller.read(cx).snapshot();
+        let item_count = self.controller.read(cx).visible_items_count();
+        let theme = cx.global::<LibriTheme>().clone();
+        let colors = theme.colors;
+        let density = theme.density_constants;
+        let storage_root = self.settings.read(cx).snapshot().storage_root_path;
 
-    match (presentation, grouped) {
-        (CatalogPresentation::List, false) => root
-            .px(pad_side)
-            .child(render_list_header(&colors))
-            .children(items.iter().map(|item| {
-                render_list_row(item, &colors, &density, entity.clone(), storage_root_path.clone())
-            }))
-            .into_any_element(),
+        let pad_top = density.catalog_pad_top;
+        let pad_side = density.catalog_pad_side;
+        let pad_bottom = density.catalog_pad_bottom;
 
-        (CatalogPresentation::List, true) => {
-            let groups = group_by_publisher(items);
-            root.px(pad_side)
-                .children(groups.into_iter().map(|g| {
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let e = entity.clone();
-                    let s = storage_root_path.clone();
-                    div()
-                        .child(render_group_header(&g.publisher, g.items.len(), &c))
-                        .child(render_list_header(&c))
-                        .children(g.items.into_iter().map(move |item| {
-                            render_list_row(&item, &c, &d, e.clone(), s.clone())
-                        }))
-                }))
-                .into_any_element()
+        // Update items_per_row estimate for grid layout using the viewport width.
+        // Subtract a rough sidebar width (220px) and both side pads.
+        let viewport_w = window.viewport_size().width.as_f32();
+        let usable_w = (viewport_w - 220.0 - pad_side.as_f32() * 2.0).max(0.0);
+        let card_pitch = density.card_min_width + density.card_gap_x.as_f32();
+        self.items_per_row = ((usable_w / card_pitch) as usize).max(1);
+
+        let items_per_row = self.items_per_row;
+        let scroll_handle = self.scroll_handle.clone();
+        let ctrl = self.controller.clone();
+
+        let root = div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .overflow_y_hidden()
+            .pt(pad_top)
+            .pb(pad_bottom);
+
+        if item_count == 0 {
+            return root
+                .child(render_empty_state(colors.text_tertiary))
+                .into_any_element();
         }
 
-        (CatalogPresentation::Thumbs, false) => root
-            .px(pad_side)
-            .children(items.iter().map(|item| {
-                render_thumb_row(item, &colors, &density, entity.clone())
-            }))
-            .into_any_element(),
+        match (snap.presentation, snap.grouped) {
+            // ── List, ungrouped — virtualized ──────────────────────────────
+            (CatalogPresentation::List, false) => {
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                root.px(pad_side)
+                    .child(render_list_header(&colors))
+                    .child(
+                        uniform_list("catalog-list", item_count, move |range, _window, cx| {
+                            let items = ctrl.read(cx).visible_items_slice(range);
+                            items.iter().map(|item| {
+                                render_list_row(item, &c, &d, ctrl.clone(), s.clone())
+                                    .into_any_element()
+                            }).collect()
+                        })
+                        .track_scroll(&scroll_handle)
+                        .flex_1()
+                        .min_h_0(),
+                    )
+                    .into_any_element()
+            }
 
-        (CatalogPresentation::Thumbs, true) => {
-            let groups = group_by_publisher(items);
-            root.px(pad_side)
-                .children(groups.into_iter().map(|g| {
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let e = entity.clone();
-                    div()
-                        .child(render_group_header(&g.publisher, g.items.len(), &c))
-                        .children(g.items.into_iter().map(move |item| {
-                            render_thumb_row(&item, &c, &d, e.clone())
-                        }))
-                }))
-                .into_any_element()
-        }
+            // ── List, grouped — non-virtualized (group headers break uniform height) ──
+            (CatalogPresentation::List, true) => {
+                let items = self.controller.read(cx).visible_items();
+                let groups = group_by_publisher(items);
+                root.px(pad_side)
+                    .children(groups.into_iter().map(|g| {
+                        let c = colors.clone();
+                        let d = density.clone();
+                        let e = self.controller.clone();
+                        let s = storage_root.clone();
+                        div()
+                            .child(render_group_header(&g.publisher, g.items.len(), &c))
+                            .child(render_list_header(&c))
+                            .children(g.items.into_iter().map(move |item| {
+                                render_list_row(&item, &c, &d, e.clone(), s.clone())
+                            }))
+                    }))
+                    .into_any_element()
+            }
 
-        (CatalogPresentation::Grid, false) => root
-            .px(pad_side)
-            .child(render_grid(items, colors, density, entity, storage_root_path))
-            .into_any_element(),
+            // ── Thumbs, ungrouped — virtualized ───────────────────────────
+            (CatalogPresentation::Thumbs, false) => {
+                let c = colors.clone();
+                let d = density.clone();
+                root.px(pad_side)
+                    .child(
+                        uniform_list("catalog-thumbs", item_count, move |range, _window, cx| {
+                            let items = ctrl.read(cx).visible_items_slice(range);
+                            items.iter().map(|item| {
+                                render_thumb_row(item, &c, &d, ctrl.clone())
+                                    .into_any_element()
+                            }).collect()
+                        })
+                        .track_scroll(&scroll_handle)
+                        .flex_1()
+                        .min_h_0(),
+                    )
+                    .into_any_element()
+            }
 
-        (CatalogPresentation::Grid, true) => {
-            let groups = group_by_publisher(items);
-            root.px(pad_side)
-                .children(groups.into_iter().map(|g| {
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let e = entity.clone();
-                    let s = storage_root_path.clone();
-                    div()
-                        .child(render_group_header(&g.publisher, g.items.len(), &c))
-                        .child(render_grid(g.items, c, d, e, s))
-                }))
-                .into_any_element()
+            // ── Thumbs, grouped — non-virtualized ─────────────────────────
+            (CatalogPresentation::Thumbs, true) => {
+                let items = self.controller.read(cx).visible_items();
+                let groups = group_by_publisher(items);
+                root.px(pad_side)
+                    .children(groups.into_iter().map(|g| {
+                        let c = colors.clone();
+                        let d = density.clone();
+                        let e = self.controller.clone();
+                        div()
+                            .child(render_group_header(&g.publisher, g.items.len(), &c))
+                            .children(g.items.into_iter().map(move |item| {
+                                render_thumb_row(&item, &c, &d, e.clone())
+                            }))
+                    }))
+                    .into_any_element()
+            }
+
+            // ── Grid, ungrouped — row-virtualized ─────────────────────────
+            (CatalogPresentation::Grid, false) => {
+                let row_count = item_count.div_ceil(items_per_row);
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                root.px(pad_side)
+                    .child(
+                        uniform_list("catalog-grid", row_count, move |row_range, _window, cx| {
+                            let range_start = row_range.start;
+                            let item_start = range_start * items_per_row;
+                            let item_end = (row_range.end * items_per_row).min(item_count);
+                            let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                            row_range.map(|row| {
+                                let offset = (row - range_start) * items_per_row;
+                                let row_end = (offset + items_per_row).min(items.len());
+                                let row_items = &items[offset..row_end];
+                                div()
+                                    .flex()
+                                    .gap(d.card_gap_x)
+                                    .mb(d.card_gap_y)
+                                    .children(row_items.iter().map(|item| {
+                                        render_grid_card(
+                                            item, &c, d.card_min_width,
+                                            ctrl.clone(), s.clone(),
+                                        )
+                                    }))
+                                    .into_any_element()
+                            }).collect()
+                        })
+                        .track_scroll(&scroll_handle)
+                        .flex_1()
+                        .min_h_0(),
+                    )
+                    .into_any_element()
+            }
+
+            // ── Grid, grouped — non-virtualized ───────────────────────────
+            (CatalogPresentation::Grid, true) => {
+                let items = self.controller.read(cx).visible_items();
+                let groups = group_by_publisher(items);
+                root.px(pad_side)
+                    .children(groups.into_iter().map(|g| {
+                        let c = colors.clone();
+                        let d = density.clone();
+                        let e = self.controller.clone();
+                        let s = storage_root.clone();
+                        div()
+                            .child(render_group_header(&g.publisher, g.items.len(), &c))
+                            .child(render_grid(g.items, c, d, e, s))
+                    }))
+                    .into_any_element()
+            }
         }
     }
 }

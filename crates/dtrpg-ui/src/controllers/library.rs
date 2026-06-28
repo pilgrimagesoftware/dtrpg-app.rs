@@ -213,6 +213,23 @@ impl LibraryController {
         items
     }
 
+    /// Returns the number of items in the filtered, sorted result set.
+    ///
+    /// Cheaper than cloning the full `Vec` when only the count is needed.
+    #[must_use]
+    pub fn visible_items_count(&self) -> usize {
+        self.visible_items().len()
+    }
+
+    /// Returns the items in `range` from the filtered, sorted result set.
+    ///
+    /// Used by `uniform_list` render closures to fetch only the visible slice.
+    #[must_use]
+    pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
+        let items = self.visible_items();
+        items.get(range).map(|s| s.to_vec()).unwrap_or_default()
+    }
+
     // ── Sidebar filter mutations ──────────────────────────────────────────────
 
     /// Sets the active sidebar filter.

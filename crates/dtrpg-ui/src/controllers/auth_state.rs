@@ -14,16 +14,14 @@ pub struct AuthStateController {
 }
 
 impl AuthStateController {
-    /// Creates a new controller.
+    /// Creates a new controller with the given `initial_state`.
     ///
-    /// In debug builds the `DTRPG_AUTH_STATE_OVERRIDE` environment variable may be
-    /// set to `"authenticated"`, `"expired"`, or `"unauthenticated"` to override the
-    /// default initial state. In release builds the initial state is always
-    /// `Unauthenticated`.
-    pub fn new() -> Self {
-        let state = initial_state();
-        let notices = notices_for(state);
-        Self { state, notices }
+    /// Callers are responsible for providing the correct starting state. In debug
+    /// builds, callers may consult `DTRPG_AUTH_STATE_OVERRIDE` before constructing
+    /// to support testing unauthenticated or expired states without real credentials.
+    pub fn new(initial_state: AuthState) -> Self {
+        let notices = notices_for(initial_state);
+        Self { state: initial_state, notices }
     }
 
     /// Returns the current authentication state.
@@ -60,28 +58,7 @@ impl AuthStateController {
     }
 }
 
-impl Default for AuthStateController {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn initial_state() -> AuthState {
-    #[cfg(debug_assertions)]
-    {
-        match std::env::var("DTRPG_AUTH_STATE_OVERRIDE")
-            .as_deref()
-            .unwrap_or("")
-        {
-            "authenticated" => return AuthState::Authenticated,
-            "expired" => return AuthState::SessionExpired,
-            _ => {}
-        }
-    }
-    AuthState::Unauthenticated
-}
 
 fn notices_for(state: AuthState) -> Vec<Notice> {
     match state {
@@ -105,34 +82,24 @@ fn notices_for(state: AuthState) -> Vec<Notice> {
 mod tests {
     use super::*;
 
-    fn make() -> AuthStateController {
-        AuthStateController::new()
-    }
-
     #[test]
-    fn new_defaults_to_unauthenticated() {
-        let ctrl = make();
+    fn unauthenticated_initial_state_produces_one_notice() {
+        let ctrl = AuthStateController::new(AuthState::Unauthenticated);
         assert_eq!(ctrl.state(), AuthState::Unauthenticated);
-    }
-
-    #[test]
-    fn unauthenticated_produces_one_notice() {
-        let ctrl = make();
         assert_eq!(ctrl.active_notices().len(), 1);
         assert_eq!(ctrl.active_notices()[0].kind, NoticeKind::NotSignedIn);
     }
 
     #[test]
-    fn authenticated_state_has_no_notices() {
-        let mut ctrl = make();
-        ctrl.state = AuthState::Authenticated;
-        ctrl.notices = notices_for(AuthState::Authenticated);
+    fn authenticated_initial_state_has_no_notices() {
+        let ctrl = AuthStateController::new(AuthState::Authenticated);
+        assert_eq!(ctrl.state(), AuthState::Authenticated);
         assert!(ctrl.active_notices().is_empty());
     }
 
     #[test]
     fn dismiss_notice_removes_only_target() {
-        let mut ctrl = make();
+        let mut ctrl = AuthStateController::new(AuthState::Unauthenticated);
         assert_eq!(ctrl.active_notices().len(), 1);
         for n in ctrl.notices.iter_mut() {
             if n.kind == NoticeKind::NotSignedIn {
