@@ -1,9 +1,11 @@
-//! TODO: update this description
+//! Catalog enumerations: item status and presentation modes.
+
+use serde::{Deserialize, Serialize};
 
 // ── Enumerations ─────────────────────────────────────────────────────────────
 
 /// Download state of a catalog item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ItemStatus {
     Downloaded,
     Cloud,

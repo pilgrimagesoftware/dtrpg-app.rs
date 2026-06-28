@@ -23,7 +23,8 @@ unwrap_used = "deny"
 
 [workspace.dependencies]
 dtrpg-sdk = { path = "../../dtrpg-sdk/rust" }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
 toml = "0.8"
 dirs = "5"
 rfd = "0.15"

@@ -1,8 +1,11 @@
 //! Library UI state and interaction controller.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
 use gpui::{Context, Entity};
 use crate::controllers::activity::ActivityController;
+use crate::data::catalog_cache::{load_catalog_cache, save_catalog_cache};
+use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::enums::*;
 use crate::data::theme::*;
@@ -14,6 +17,7 @@ use crate::util::publisher::*;
 use crate::util::matching::*;
 use crate::data::events::*;
 use crate::services::LibraryService;
+use crate::ui::library::cover::CoverCache;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 // ── LibraryController ─────────────────────────────────────────────────────────
@@ -63,6 +67,12 @@ pub struct LibraryController {
     pub section_counts: SectionCounts,
     /// Publisher list derived from the full catalog (count desc, name asc).
     pub publishers: Vec<PublisherEntry>,
+    /// Queue of `(item_id, cover_url)` pairs pending thumbnail fetches.
+    thumbnail_queue: VecDeque<(Arc<str>, Arc<str>)>,
+    /// Whether a thumbnail fetch is currently in flight.
+    thumbnail_loading: bool,
+    /// Activity id for the aggregated thumbnail loading entry.
+    thumbnail_activity_id: Option<u64>,
 }
 
 impl LibraryController {
@@ -78,11 +88,24 @@ impl LibraryController {
         let vm = LibraryViewModel::new(service);
         let service_arc = vm.service_arc();
         let weak_activity = activity.downgrade();
+        let storage_root = StorageConfig::load().root_path();
+        let save_root = storage_root.clone();
 
         // Load catalog off the main thread so the UI remains responsive during the
         // potentially multi-page HTTP fetch. Pages are delivered incrementally via an
         // mpsc channel so each page triggers a UI update before the next page arrives.
         cx.spawn(async move |this, async_cx| {
+            // ── Pre-populate from disk cache ──────────────────────────────────
+            let cache_root = storage_root.clone();
+            let cached = async_cx
+                .background_executor()
+                .spawn(async move { load_catalog_cache(&cache_root) })
+                .await;
+            if let Some(items) = cached {
+                this.update(async_cx, |ctrl, cx| ctrl.append_catalog_page(items, cx)).ok();
+            }
+
+            // ── Fetch live catalog from API ───────────────────────────────────
             let activity_id = weak_activity
                 .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", cx))
                 .unwrap_or(0);
@@ -96,10 +119,12 @@ impl LibraryController {
                 .spawn(async move { service_arc.list_items_paged(&mut |page| { tx.send(page).ok(); }) });
 
             // Receive pages one at a time, updating the controller after each.
-            // Each recv() blocks the background thread it runs on, not the async task.
+            // On the first API page, clear any pre-populated cache data so the
+            // live results replace it cleanly.
             let mut rx = Some(rx);
+            let mut first_page = true;
             loop {
-                let receiver = rx.take().expect("receiver is always present in loop");
+                let Some(receiver) = rx.take() else { break; };
                 let (msg, returned_rx) = async_cx
                     .background_executor()
                     .spawn(async move {
@@ -110,7 +135,14 @@ impl LibraryController {
 
                 match msg {
                     Ok(items) => {
-                        this.update(async_cx, |ctrl, cx| ctrl.append_catalog_page(items, cx)).ok();
+                        let is_first = first_page;
+                        first_page = false;
+                        this.update(async_cx, |ctrl, cx| {
+                            if is_first {
+                                ctrl.catalog.clear();
+                            }
+                            ctrl.append_catalog_page(items, cx);
+                        }).ok();
                         rx = Some(returned_rx);
                     }
                     Err(_) => break, // sender dropped — all pages have been sent
@@ -118,11 +150,22 @@ impl LibraryController {
             }
 
             // Wait for the fetch task to complete and surface any error.
-            // On success: dismiss the loading indicator.
+            // On success: save the catalog to disk and dismiss the loading indicator.
             // On error: show the error in the activity panel but leave any
             //   items that were already appended to the catalog visible.
             match fetch.await {
                 Ok(()) => {
+                    let items_to_save = this
+                        .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
+                        .unwrap_or_default();
+                    async_cx
+                        .background_executor()
+                        .spawn(async move {
+                            if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
+                                tracing::warn!(error = %e, "failed to save catalog cache");
+                            }
+                        })
+                        .await;
                     weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                 }
                 Err(e) => {
@@ -147,6 +190,9 @@ impl LibraryController {
             selection: Selection::default(),
             section_counts: SectionCounts::default(),
             publishers: Vec::new(),
+            thumbnail_queue: VecDeque::new(),
+            thumbnail_loading: false,
+            thumbnail_activity_id: None,
         }
     }
 
@@ -155,6 +201,7 @@ impl LibraryController {
     /// Called once per API page as results arrive. Recomputes sidebar state and
     /// notifies the view after each append so the catalog populates progressively.
     fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
+        self.enqueue_thumbnails(&items, cx);
         self.catalog.extend(items);
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
@@ -174,6 +221,128 @@ impl LibraryController {
         self.publishers = publisher_entries(&self.catalog);
         self.selection = Selection::default();
         cx.emit(LibraryChanged);
+    }
+
+    // ── Thumbnail loading ──────────────────────────────────────────────────────
+
+    /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
+    /// cached or in flight.  Must be called before items are added to `catalog`
+    /// so the in-flight marker is set before any render pass can check it.
+    fn enqueue_thumbnails(&mut self, items: &[LibraryItem], cx: &mut Context<Self>) {
+        let to_enqueue: Vec<(Arc<str>, Arc<str>)> = {
+            let cache = cx.global::<CoverCache>();
+            items
+                .iter()
+                .filter_map(|item| {
+                    let url = item.cover_url.as_ref()?;
+                    let id = Arc::clone(&item.id);
+                    if cache.get(&id).is_none() && !cache.is_in_flight(&id) {
+                        Some((id, Arc::clone(url)))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+        for (id, url) in &to_enqueue {
+            cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(id));
+            self.thumbnail_queue.push_back((Arc::clone(id), Arc::clone(url)));
+        }
+        self.drain_thumbnail_queue(cx);
+    }
+
+    /// Starts a thumbnail fetch for the next queued URL if none is in flight.
+    fn drain_thumbnail_queue(&mut self, cx: &mut Context<Self>) {
+        if self.thumbnail_loading || self.thumbnail_queue.is_empty() {
+            return;
+        }
+        let Some((item_id, url)) = self.thumbnail_queue.pop_front() else { return; };
+
+        self.thumbnail_loading = true;
+
+        let activity_id = if let Some(id) = self.thumbnail_activity_id {
+            self.activity
+                .update(cx, |a, cx| a.update_label(id, "Loading thumbnails\u{2026}", cx));
+            id
+        } else {
+            let id = self
+                .activity
+                .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", cx));
+            self.thumbnail_activity_id = Some(id);
+            id
+        };
+
+        let weak_activity = self.activity.downgrade();
+        let url_str = url.to_string();
+
+        cx.spawn(async move |this, async_cx| {
+            let result: Result<Vec<u8>, String> = async {
+                let resp = reqwest::get(&url_str).await.map_err(|e| e.to_string())?;
+                let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+                Ok(bytes.to_vec())
+            }
+            .await;
+
+            match result {
+                Ok(bytes) => {
+                    this.update(async_cx, |ctrl, cx| {
+                        cx.global_mut::<CoverCache>().insert(Arc::clone(&item_id), bytes);
+                        if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
+                            item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
+                        }
+                        ctrl.thumbnail_loading = false;
+                        cx.emit(LibraryChanged);
+                        ctrl.drain_thumbnail_queue(cx);
+                    })
+                    .ok();
+                }
+                Err(e) => {
+                    tracing::warn!(url = %url_str, error = %e, "thumbnail fetch failed");
+                    this.update(async_cx, |ctrl, cx| {
+                        cx.global_mut::<CoverCache>().in_flight.remove(&item_id);
+                        if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
+                            item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
+                        }
+                        ctrl.thumbnail_loading = false;
+                        ctrl.drain_thumbnail_queue(cx);
+                    })
+                    .ok();
+                }
+            }
+
+            let remaining = this
+                .update(async_cx, |ctrl, _cx| ctrl.thumbnail_queue.len())
+                .unwrap_or(0);
+            if remaining == 0 {
+                weak_activity
+                    .update(async_cx, |a, cx| a.complete(activity_id, cx))
+                    .ok();
+                this.update(async_cx, |ctrl, _cx| ctrl.thumbnail_activity_id = None).ok();
+            } else {
+                let label = format!("Loading thumbnails\u{2026} ({remaining} remaining)");
+                weak_activity
+                    .update(async_cx, |a, cx| a.update_label(activity_id, label, cx))
+                    .ok();
+            }
+        })
+        .detach();
+    }
+
+    /// Enqueues a single cover URL at the front of the thumbnail queue and starts
+    /// the drain loop.  Used by the per-item "Load Thumbnail" context menu action.
+    pub fn load_thumbnail(&mut self, cover_url: Arc<str>, cx: &mut Context<Self>) {
+        let item_id = self
+            .catalog
+            .iter()
+            .find(|i| i.cover_url.as_deref() == Some(&*cover_url))
+            .map(|i| Arc::clone(&i.id));
+
+        if let Some(id) = item_id {
+            self.thumbnail_queue.retain(|(i, _)| i != &id);
+            cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(&id));
+            self.thumbnail_queue.push_front((id, cover_url));
+            self.drain_thumbnail_queue(cx);
+        }
     }
 
     // ── Snapshot ──────────────────────────────────────────────────────────────

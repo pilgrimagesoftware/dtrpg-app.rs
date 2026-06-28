@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod auth_state;
+pub mod catalog_cache;
 pub mod notification;
 pub mod avatar;
 pub mod enums;

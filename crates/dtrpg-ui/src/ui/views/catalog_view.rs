@@ -12,12 +12,15 @@ use gpui_component::scroll::ScrollableElement;
 use gpui_component::Sizable;
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
 
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::menu::{DropdownMenu, PopupMenuItem};
+
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::enums::*;
 use crate::data::enums::CatalogPresentation;
 use crate::data::events::LibraryChanged;
-use crate::data::library::LibraryItem;
+use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::render_generative_cover;
 use crate::util::publisher::group_by_publisher;
@@ -43,6 +46,7 @@ fn list_columns() -> Vec<Column> {
         Column::new("added", "Added").width(80.).resizable(true),
         Column::new("status", "").width(24.).resizable(false).selectable(false),
         Column::new("reveal", "").width(28.).resizable(false).selectable(false),
+        Column::new("ctx", "").width(28.).resizable(false).selectable(false),
     ]
 }
 
@@ -276,6 +280,17 @@ impl TableDelegate for CatalogListDelegate {
                 } else {
                     div().h_full().into_any_element()
                 }
+            }
+
+            8 => {
+                let ctrl = self.controller.clone();
+                div()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(render_thumbnail_menu(&item, ctrl))
+                    .into_any_element()
             }
 
             _ => div().into_any_element(),
@@ -640,6 +655,38 @@ fn render_status(status: ItemStatus, colors: &ColorTokens) -> AnyElement {
     }
 }
 
+// ── Thumbnail context menu ─────────────────────────────────────────────────────
+
+/// Renders a small "⋯" button that opens a dropdown with a "Load Thumbnail"
+/// action.  The action is disabled when no `cover_url` is present or when the
+/// cooldown guard is active.
+fn render_thumbnail_menu(
+    item: &LibraryItem,
+    entity: Entity<LibraryController>,
+) -> impl IntoElement + 'static + use<> {
+    let can_load = item.cover_url.is_some() && thumbnail_cooldown_elapsed(item);
+    let cover_url = item.cover_url.clone();
+    let btn_id: Arc<str> = Arc::from(format!("ctx-thumb-{}", &*item.id));
+
+    Button::new(btn_id)
+        .ghost()
+        .small()
+        .label("\u{22ef}")
+        .dropdown_menu(move |menu, _, _| {
+            let eu = entity.clone();
+            let url = cover_url.clone();
+            menu.item(
+                PopupMenuItem::new("Load Thumbnail")
+                    .disabled(!can_load)
+                    .on_click(move |_, _, cx| {
+                        if let Some(ref u) = url {
+                            eu.update(cx, |ctrl, cx| ctrl.load_thumbnail(Arc::clone(u), cx));
+                        }
+                    }),
+            )
+        })
+}
+
 // ── Reveal action ─────────────────────────────────────────────────────────────
 
 fn platform_reveal_label() -> &'static str {
@@ -699,10 +746,13 @@ fn render_grouped_list_row(
     let h = density.row_text_height;
     let colors = colors.clone();
     let reveal_item_id = Arc::clone(&item.id);
+    let ctx_cover_url = item.cover_url.clone();
+    let ctx_can_load = item.cover_url.is_some() && thumbnail_cooldown_elapsed(item);
+    let ctx_btn_id: Arc<str> = Arc::from(format!("ctx-list-{}", &*item.id));
 
-    // Fixed-width columns 1–7 use widths from the shared column definitions.
-    let [_, pub_w, sys_w, pgs_w, sz_w, yr_w, st_w, rv_w] =
-        std::array::from_fn::<_, 8, _>(|i| cols.get(i).map_or(px(0.), |c| c.width));
+    // Fixed-width columns 1–8 use widths from the shared column definitions.
+    let [_, pub_w, sys_w, pgs_w, sz_w, yr_w, st_w, rv_w, ctx_w] =
+        std::array::from_fn::<_, 9, _>(|i| cols.get(i).map_or(px(0.), |c| c.width));
 
     let reveal_col: AnyElement = if status == ItemStatus::Downloaded {
         let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
@@ -732,6 +782,7 @@ fn render_grouped_list_row(
         div().w(rv_w).into_any_element()
     };
 
+    let entity_click = entity.clone();
     div()
         .id(Arc::clone(&id))
         .flex()
@@ -741,7 +792,7 @@ fn render_grouped_list_row(
         .border_color(colors.border)
         .cursor_pointer()
         .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
+            entity_click.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
         })
         .child(
             div()
@@ -815,6 +866,35 @@ fn render_grouped_list_row(
                 .child(render_status(status, &colors)),
         )
         .child(reveal_col)
+        .child(
+            div()
+                .w(ctx_w)
+                .flex()
+                .items_center()
+                .justify_center()
+                .child({
+                    let eu = entity.clone();
+                    Button::new(ctx_btn_id)
+                        .ghost()
+                        .small()
+                        .label("\u{22ef}")
+                        .dropdown_menu(move |menu, _, _| {
+                            let eu2 = eu.clone();
+                            let url = ctx_cover_url.clone();
+                            menu.item(
+                                PopupMenuItem::new("Load Thumbnail")
+                                    .disabled(!ctx_can_load)
+                                    .on_click(move |_, _, cx| {
+                                        if let Some(ref u) = url {
+                                            eu2.update(cx, |ctrl, cx| {
+                                                ctrl.load_thumbnail(Arc::clone(u), cx);
+                                            });
+                                        }
+                                    }),
+                            )
+                        })
+                }),
+        )
 }
 
 // ── Thumbs layout ─────────────────────────────────────────────────────────────
@@ -838,6 +918,7 @@ fn render_thumb_row(
     let thumb_h = thumb_w * 10.0 / 7.0;
     let row_h = density.row_text_height + px(6.0);
     let colors = colors.clone();
+    let ctx_menu = render_thumbnail_menu(item, entity.clone());
 
     let cover = render_generative_cover(item, thumb_w, thumb_h);
 
@@ -905,6 +986,7 @@ fn render_thumb_row(
                 ),
         )
         .child(render_status(status, &colors))
+        .child(ctx_menu)
 }
 
 // ── Grid layout ───────────────────────────────────────────────────────────────
@@ -946,6 +1028,7 @@ fn render_grid_card(
 
     let cover = render_generative_cover(item, card_w, cover_h);
     let colors = colors.clone();
+    let ctx_menu = render_thumbnail_menu(item, entity.clone());
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
         let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
@@ -1019,6 +1102,7 @@ fn render_grid_card(
                         )
                         .child(render_status(status, &colors)),
                 )
-                .child(reveal_row),
+                .child(reveal_row)
+                .child(ctx_menu),
         )
 }

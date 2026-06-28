@@ -1,13 +1,14 @@
 //! Data model, filtering, sorting, and stub catalog for the Libri library view.
 
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 use crate::data::enums::ItemStatus;
 use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
 
 // ── LibraryItem ───────────────────────────────────────────────────────────────
 
 /// A single item in the RPG catalog.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryItem {
     /// Stable unique identifier (e.g. `"b1"`).
     pub id: Arc<str>,
@@ -31,9 +32,14 @@ pub struct LibraryItem {
     pub color: Arc<str>,
     pub desc: Arc<str>,
     /// Optional URL for a real cover thumbnail.
+    #[serde(default)]
     pub cover_url: Option<Arc<str>>,
     /// Unix timestamp (seconds since epoch) when the item was added to the library.
+    #[serde(default)]
     pub date_added: Option<i64>,
+    /// Last time a thumbnail fetch was attempted for this item; not persisted to cache.
+    #[serde(skip)]
+    pub thumbnail_last_attempted: Option<std::time::SystemTime>,
 }
 
 impl LibraryItem {
@@ -71,6 +77,7 @@ impl LibraryItem {
             desc: desc.into(),
             cover_url: None,
             date_added,
+            thumbnail_last_attempted: None,
         }
     }
 }
@@ -104,6 +111,20 @@ pub fn section_counts(catalog: &[LibraryItem]) -> SectionCounts {
             .filter(|i| i.status == ItemStatus::Cloud)
             .count(),
     }
+}
+
+// ── Thumbnail cooldown ────────────────────────────────────────────────────────
+
+const THUMBNAIL_COOLDOWN_SECS: u64 = 300;
+
+/// Returns `true` if no thumbnail fetch has been attempted, or the last attempt
+/// was more than 5 minutes ago.
+#[must_use]
+pub fn thumbnail_cooldown_elapsed(item: &LibraryItem) -> bool {
+    let Some(last) = item.thumbnail_last_attempted else { return true; };
+    std::time::SystemTime::now()
+        .duration_since(last)
+        .is_ok_and(|d| d.as_secs() >= THUMBNAIL_COOLDOWN_SECS)
 }
 
 // ── Footer totals ─────────────────────────────────────────────────────────────

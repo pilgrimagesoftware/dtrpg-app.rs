@@ -50,6 +50,17 @@ impl ActivityController {
         id
     }
 
+    /// Updates the display label of an in-progress item.
+    ///
+    /// No-op if `id` is not found in the in-progress list.
+    pub fn update_label(&mut self, id: u64, label: impl Into<String>, cx: &mut Context<Self>) {
+        if let Some(item) = self.in_progress.iter_mut().find(|i| i.id == id) {
+            let s: String = label.into();
+            item.label = Arc::from(s.as_str());
+            cx.emit(ActivityChanged);
+        }
+    }
+
     /// Resolves an in-progress item as successfully completed and schedules its 15-second expiry.
     ///
     /// No-op if `id` is not found in the in-progress list.

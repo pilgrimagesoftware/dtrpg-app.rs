@@ -367,6 +367,7 @@ fn map_order_product(
         desc: desc.as_str().into(),
         cover_url: None,
         date_added: None,
+        thumbnail_last_attempted: None,
     }
 }
 
