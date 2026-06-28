@@ -381,6 +381,7 @@ fn map_order_product(
         color: DEFAULT_COLOR.into(),
         desc: desc.as_str().into(),
         cover_url: None,
+        date_added: None,
     }
 }
 

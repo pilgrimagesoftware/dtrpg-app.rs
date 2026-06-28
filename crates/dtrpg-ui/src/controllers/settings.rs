@@ -31,6 +31,8 @@ pub enum AuthState {
 pub struct AuthStateSnapshot {
     /// `true` when a user is signed in.
     pub is_logged_in: bool,
+    /// Account email address when signed in.
+    pub email: Option<String>,
     /// First character of the email, uppercased — used as the avatar fallback initial.
     pub display_initial: Option<char>,
     /// Cached avatar image bytes from Gravatar, or `None`.
@@ -310,11 +312,13 @@ impl SettingsController {
         let auth = match &self.auth_state {
             AuthState::LoggedOut => AuthStateSnapshot {
                 is_logged_in: false,
+                email: None,
                 display_initial: None,
                 avatar_bytes: None,
             },
             AuthState::LoggedIn { email, avatar_bytes } => AuthStateSnapshot {
                 is_logged_in: true,
+                email: Some(email.clone()),
                 display_initial: email.trim().chars().next().map(|c| c.to_ascii_uppercase()),
                 avatar_bytes: avatar_bytes.clone(),
             },

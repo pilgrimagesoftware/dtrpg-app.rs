@@ -270,6 +270,7 @@ mod tests {
             color: color.into(),
             desc: "A test item.".into(),
             cover_url: None,
+            date_added: None,
         }
     }
 

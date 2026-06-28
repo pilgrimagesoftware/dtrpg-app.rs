@@ -81,7 +81,7 @@ mod tests {
 
     fn item(publisher: &str) -> LibraryItem {
         LibraryItem::new("id", "Title", publisher, "", "", "PDF", 0, 0.0, 2020, 0,
-            crate::data::enums::ItemStatus::Cloud, "#000000", "")
+            crate::data::enums::ItemStatus::Cloud, "#000000", "", None)
     }
 
     #[test]

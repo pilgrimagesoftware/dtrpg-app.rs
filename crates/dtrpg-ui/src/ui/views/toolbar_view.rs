@@ -17,13 +17,13 @@ use crate::data::{
 use crate::util::filter::*;
 use crate::util::sort::*;
 
-fn section_title_for(filter: &SidebarFilter) -> &str {
+fn section_title_for(filter: &SidebarFilter) -> String {
     match filter {
-        SidebarFilter::AllTitles => "All Titles",
-        SidebarFilter::RecentlyAdded => "Recently Added",
-        SidebarFilter::OnDevice => "On This Device",
-        SidebarFilter::InCloud => "In the Cloud",
-        SidebarFilter::Publisher(_) => "Publisher",
+        SidebarFilter::AllTitles => "All Titles".to_string(),
+        SidebarFilter::RecentlyAdded => "Recently Added".to_string(),
+        SidebarFilter::OnDevice => "On This Device".to_string(),
+        SidebarFilter::InCloud => "In the Cloud".to_string(),
+        SidebarFilter::Publisher(name) => format!("Publisher: {name}"),
     }
 }
 
@@ -52,7 +52,7 @@ pub fn render_toolbar(
     let accent = colors.accent;
     let accent_soft = colors.accent_soft;
 
-    let title = section_title_for(filter).to_string();
+    let title = section_title_for(filter);
     let search_query = search_query.to_string();
 
     div()
@@ -107,20 +107,12 @@ pub fn render_toolbar(
                 .child(render_sort_selector(
                     sort,
                     sort_direction,
-                    entity.clone(),
-                    bg,
-                    border_strong,
-                    text_primary,
-                    text_tertiary,
-                ))
-                .child(render_group_toggle(
                     grouped,
                     entity.clone(),
                     bg,
                     border_strong,
                     text_primary,
-                    accent,
-                    accent_soft,
+                    text_tertiary,
                 ))
                 .child(render_layout_switcher(
                     presentation,
@@ -192,6 +184,7 @@ fn render_search(
 fn render_sort_selector(
     current: SortMethod,
     direction: SortDirection,
+    grouped: bool,
     entity: Entity<LibraryController>,
     _bg: gpui::Hsla,
     _border: gpui::Hsla,
@@ -211,6 +204,7 @@ fn render_sort_selector(
     Button::new("sort-selector")
         .label(label)
         .ghost()
+        .dropdown_caret(true)
         .tooltip("Sort order")
         .dropdown_menu(move |menu, _, _| {
             let e = entity.clone();
@@ -219,6 +213,7 @@ fn render_sort_selector(
             let e4 = entity.clone();
             let e5 = entity.clone();
             let e6 = entity.clone();
+            let e7 = entity.clone();
             let mut m = menu
                 .item(
                     PopupMenuItem::new("Title")
@@ -270,39 +265,15 @@ fn render_sort_selector(
                             });
                         }),
                 )
+                .separator()
+                .item(
+                    PopupMenuItem::new("Group by Publisher")
+                        .checked(grouped)
+                        .on_click(move |_, _, cx| {
+                            e7.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
+                        }),
+                )
         })
-}
-
-// ── Group toggle ──────────────────────────────────────────────────────────────
-
-fn render_group_toggle(
-    grouped: bool,
-    entity: Entity<LibraryController>,
-    bg: gpui::Hsla,
-    border: gpui::Hsla,
-    text_primary: gpui::Hsla,
-    accent: gpui::Hsla,
-    accent_soft: gpui::Hsla,
-) -> impl IntoElement + 'static {
-    let btn_bg = if grouped { accent_soft } else { bg };
-    let text_color = if grouped { accent } else { text_primary };
-
-    div()
-        .id("group-toggle")
-        .h(px(30.0))
-        .px(px(11.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(border)
-        .bg(btn_bg)
-        .flex()
-        .items_center()
-        .cursor_pointer()
-        .tooltip(|window, cx| Tooltip::new("Group by publisher").build(window, cx))
-        .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
-        })
-        .child(div().text_sm().text_color(text_color).child("Group"))
 }
 
 // ── Layout switcher ───────────────────────────────────────────────────────────
@@ -452,6 +423,8 @@ fn render_avatar_button(
             .into_any_element()
     };
 
+    let menu_email = auth.email.clone().unwrap_or_default();
+
     Button::new("avatar-btn")
         .custom(avatar_variant)
         .tooltip("Account")
@@ -461,11 +434,37 @@ fn render_avatar_button(
         .child(inner)
         .dropdown_menu(move |menu, _, _| {
             let s = settings.clone();
-            menu.item(
-                PopupMenuItem::new("Log Out").on_click(move |_, _, cx| {
-                    s.update(cx, |ctrl, cx| ctrl.logout(cx));
-                }),
-            )
+            menu.item(PopupMenuItem::label(menu_email.clone()))
+                .item(PopupMenuItem::separator())
+                .item(
+                    PopupMenuItem::new("Log Out").on_click(move |_, _, cx| {
+                        s.update(cx, |ctrl, cx| ctrl.logout(cx));
+                    }),
+                )
         })
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::filter::SidebarFilter;
+
+    #[test]
+    fn publisher_filter_shows_name() {
+        let title = section_title_for(&SidebarFilter::Publisher("Kobold Press".into()));
+        assert_eq!(title, "Publisher: Kobold Press");
+    }
+
+    #[test]
+    fn all_titles_filter_label() {
+        let title = section_title_for(&SidebarFilter::AllTitles);
+        assert_eq!(title, "All Titles");
+    }
+
+    #[test]
+    fn recently_added_filter_label() {
+        let title = section_title_for(&SidebarFilter::RecentlyAdded);
+        assert_eq!(title, "Recently Added");
+    }
 }

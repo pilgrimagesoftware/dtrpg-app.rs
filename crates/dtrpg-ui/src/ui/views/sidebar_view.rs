@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, ParentElement, Styled};
+use gpui_component::scroll::ScrollableElement;
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
@@ -91,7 +92,7 @@ pub fn render_sidebar(
             div()
                 .flex_1()
                 .min_h_0()
-                .overflow_y_hidden()
+                .overflow_y_scrollbar()
                 .py(px(6.0))
                 // Library smart section
                 .child(
@@ -218,7 +219,7 @@ fn render_activity_button(
         .id("activity-button")
         .px(px(18.0))
         .pb(px(11.0))
-        .text_xs()
+        .text_sm()
         .text_color(color)
         .cursor_pointer()
         .child(label)

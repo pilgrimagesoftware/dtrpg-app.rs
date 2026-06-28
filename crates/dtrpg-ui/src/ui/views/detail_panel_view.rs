@@ -4,13 +4,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement,
-           StatefulInteractiveElement, Styled};
+           SharedString, StatefulInteractiveElement, Styled};
+use gpui_component::tooltip::Tooltip;
 use crate::data::library::LibraryItem;
 
 use crate::ui::library::cover::render_generative_cover;
 use crate::data::enums::ItemStatus;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
+use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
@@ -31,7 +33,7 @@ pub fn render_detail_panel(
     let text_tertiary = colors.text_tertiary;
     let accent = colors.accent;
     let accent_on = colors.accent_on;
-    let hover = colors.hover;
+    let scrim = colors.scrim;
 
     let item = item.clone();
     let entity_close = entity.clone();
@@ -61,13 +63,13 @@ pub fn render_detail_panel(
                 .id("detail-close")
                 .size(px(24.0))
                 .rounded_full()
-                .bg(hover)
+                .bg(scrim)
                 .flex()
                 .items_center()
                 .justify_center()
                 .cursor_pointer()
                 .text_sm()
-                .text_color(text_secondary)
+                .text_color(accent_on)
                 .on_click(move |_, _, cx| {
                     entity_close.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
                 })
@@ -262,6 +264,29 @@ fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens) -> impl IntoE
                 .border_color(border)
                 .child(div().text_xs().text_color(text_tertiary).child(label))
                 .child(div().text_xs().text_color(text_secondary).child(value)),
+        );
+    }
+
+    if let Some(ts) = item.date_added {
+        let relative = format_relative(ts);
+        let absolute = format_absolute(ts);
+        let id = SharedString::from(format!("detail-added-{}", item.id));
+        table = table.child(
+            div()
+                .flex()
+                .justify_between()
+                .py(px(8.0))
+                .border_b_1()
+                .border_color(border)
+                .child(div().text_xs().text_color(text_tertiary).child("Added"))
+                .child(
+                    div()
+                        .id(id)
+                        .text_xs()
+                        .text_color(text_secondary)
+                        .child(relative)
+                        .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx)),
+                ),
         );
     }
 

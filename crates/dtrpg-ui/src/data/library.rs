@@ -32,6 +32,8 @@ pub struct LibraryItem {
     pub desc: Arc<str>,
     /// Optional URL for a real cover thumbnail.
     pub cover_url: Option<Arc<str>>,
+    /// Unix timestamp (seconds since epoch) when the item was added to the library.
+    pub date_added: Option<i64>,
 }
 
 impl LibraryItem {
@@ -50,6 +52,7 @@ impl LibraryItem {
         status: ItemStatus,
         color: &str,
         desc: &str,
+        date_added: Option<i64>,
     ) -> Self {
         Self {
             id: id.into(),
@@ -67,6 +70,7 @@ impl LibraryItem {
             color: color.into(),
             desc: desc.into(),
             cover_url: None,
+            date_added,
         }
     }
 }

@@ -8,6 +8,7 @@ use gpui::{
     div, px, uniform_list, AnyElement, App, Context, Entity, IntoElement, ParentElement,
     Render, Styled, UniformListScrollHandle, Window,
 };
+use gpui_component::scroll::ScrollableElement;
 use gpui_component::Sizable;
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
 
@@ -405,7 +406,7 @@ impl Render for CatalogView {
             .min_h_0()
             .flex()
             .flex_col()
-            .overflow_y_hidden()
+            .overflow_y_scrollbar()
             .pt(pad_top)
             .pb(pad_bottom);
 
