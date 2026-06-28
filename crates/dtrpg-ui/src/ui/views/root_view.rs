@@ -49,7 +49,7 @@ impl LibraryRootView {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let settings = cx.new(|cx| {
-            let mut ctrl = SettingsController::new();
+            let mut ctrl = SettingsController::new(cx);
             ctrl.set_logged_in(None, cx);
             ctrl
         });
@@ -186,6 +186,7 @@ impl Render for LibraryRootView {
                     &settings_snap.file_openers,
                     settings_snap.is_authenticated,
                     settings_snap.storage_root_path,
+                    settings_snap.storage_path_exists,
                     settings_entity,
                     &self.settings_focus,
                     colors,

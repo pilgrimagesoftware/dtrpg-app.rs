@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use gpui::{div, px, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::storage::validate_writable;
@@ -10,11 +11,12 @@ use crate::data::theme::ColorTokens;
 
 /// Renders the Storage settings section.
 ///
-/// Displays the current `storage_root_path`, a "Change…" button that opens the OS
-/// folder picker, and a "Show in Finder/Explorer/Files" button that reveals the
-/// storage root in the file manager.
+/// Displays the current `storage_root_path`, inline icon buttons for "Change…" and
+/// "Show in Finder/Explorer/Files", and an optional warning row when `storage_path_exists`
+/// is `false`.
 pub fn render_storage_section(
     storage_root_path: PathBuf,
+    storage_path_exists: bool,
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
@@ -23,12 +25,16 @@ pub fn render_storage_section(
     let text_tertiary = colors.text_tertiary;
     let border = colors.border;
     let surface_alt = colors.surface_alt;
+    let warning_bg = colors.warning_bg;
+    let warning_text = colors.warning_text;
 
     let path_display = storage_root_path.to_string_lossy().into_owned();
     let entity_change = entity.clone();
     let entity_reveal = entity;
 
-    div()
+    let reveal_label = platform_reveal_label();
+
+    let mut section = div()
         .flex()
         .flex_col()
         .gap(px(24.0))
@@ -41,7 +47,7 @@ pub fn render_storage_section(
                 .text_color(text_primary)
                 .child("Catalog Storage Location"),
         )
-        // ── Path display ──────────────────────────────────────────────────
+        // ── Path row with inline action buttons ───────────────────────────
         .child(
             div()
                 .flex()
@@ -49,62 +55,118 @@ pub fn render_storage_section(
                 .gap(px(6.0))
                 .child(
                     div()
-                        .h(px(34.0))
-                        .px(px(12.0))
-                        .rounded(px(8.0))
-                        .border_1()
-                        .border_color(border)
-                        .bg(surface_alt)
                         .flex()
                         .items_center()
+                        .gap(px(8.0))
+                        // Path display field
                         .child(
                             div()
-                                .text_sm()
-                                .text_color(text_secondary)
-                                .truncate()
-                                .child(path_display),
+                                .flex_1()
+                                .min_w_0()
+                                .h(px(34.0))
+                                .px(px(12.0))
+                                .rounded(px(8.0))
+                                .border_1()
+                                .border_color(border)
+                                .bg(surface_alt)
+                                .flex()
+                                .items_center()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_secondary)
+                                        .truncate()
+                                        .child(path_display),
+                                ),
+                        )
+                        // "Change…" icon button
+                        .child(
+                            div()
+                                .id("change-storage")
+                                .flex_none()
+                                .size(px(32.0))
+                                .rounded(px(8.0))
+                                .border_1()
+                                .border_color(border)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .tooltip(|window, cx| Tooltip::new("Change\u{2026}").build(window, cx))
+                                .on_click(move |_event, _window, cx| {
+                                    let picked = rfd::FileDialog::new().pick_folder();
+                                    if let Some(path) = picked {
+                                        match validate_writable(&path) {
+                                            Ok(()) => {
+                                                entity_change.update(cx, |ctrl, cx| {
+                                                    if let Err(e) = ctrl.apply_storage_path(path, cx) {
+                                                        tracing::warn!("storage path rejected: {e}");
+                                                    }
+                                                });
+                                            }
+                                            Err(e) => tracing::warn!("storage path not writable: {e}"),
+                                        }
+                                    }
+                                })
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_primary)
+                                        .child("📂"),
+                                ),
+                        )
+                        // "Show in Finder/Explorer/Files" icon button
+                        .child(
+                            div()
+                                .id("reveal-storage")
+                                .flex_none()
+                                .size(px(32.0))
+                                .rounded(px(8.0))
+                                .border_1()
+                                .border_color(border)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .tooltip(move |window, cx| Tooltip::new(reveal_label).build(window, cx))
+                                .on_click(move |_event, _window, cx| {
+                                    entity_reveal.read(cx).reveal_storage_location();
+                                })
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_primary)
+                                        .child("↗"),
+                                ),
                         ),
                 ),
-        )
+        );
+
+    // ── Missing-path warning ──────────────────────────────────────────────
+    if !storage_path_exists {
+        section = section.child(
+            div()
+                .rounded(px(6.0))
+                .px(px(10.0))
+                .py(px(6.0))
+                .bg(warning_bg)
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .child(div().text_sm().text_color(warning_text).child("⚠"))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(warning_text)
+                        .child("Storage folder does not exist. Downloads may fail."),
+                ),
+        );
+    }
+
+    section
         // ── Divider ───────────────────────────────────────────────────────
         .child(div().h(px(1.0)).bg(border))
-        // ── Actions ───────────────────────────────────────────────────────
-        .child(
-            div()
-                .flex()
-                .gap(px(12.0))
-                .child(render_action_button(
-                    "change-storage",
-                    "Change\u{2026}",
-                    text_primary,
-                    border,
-                    move |_event, _window, cx| {
-                        let picked = rfd::FileDialog::new().pick_folder();
-                        if let Some(path) = picked {
-                            match validate_writable(&path) {
-                                Ok(()) => {
-                                    entity_change.update(cx, |ctrl, cx| {
-                                        if let Err(e) = ctrl.apply_storage_path(path, cx) {
-                                            tracing::warn!("storage path rejected: {e}");
-                                        }
-                                    });
-                                }
-                                Err(e) => tracing::warn!("storage path not writable: {e}"),
-                            }
-                        }
-                    },
-                ))
-                .child(render_action_button(
-                    "reveal-storage",
-                    platform_reveal_label(),
-                    text_primary,
-                    border,
-                    move |_event, _window, cx| {
-                        entity_reveal.read(cx).reveal_storage_location();
-                    },
-                )),
-        )
-        // ── Warning ───────────────────────────────────────────────────────
+        // ── Note ─────────────────────────────────────────────────────────
         .child(
             div()
                 .text_xs()
@@ -122,26 +184,4 @@ fn platform_reveal_label() -> &'static str {
     return "Show in Explorer";
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     return "Show in Files";
-}
-
-fn render_action_button(
-    id: &'static str,
-    label: &'static str,
-    text: gpui::Hsla,
-    border: gpui::Hsla,
-    on_click: impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
-) -> impl IntoElement + 'static {
-    div()
-        .id(id)
-        .h(px(34.0))
-        .px(px(16.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(border)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor_pointer()
-        .on_click(on_click)
-        .child(div().text_sm().text_color(text).child(label))
 }

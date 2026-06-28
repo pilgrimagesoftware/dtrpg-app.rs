@@ -93,6 +93,8 @@ pub struct SettingsSnapshot {
     pub storage_root_path: PathBuf,
     /// `true` when the configured storage root is unreachable (e.g. unmounted volume).
     pub storage_unavailable: bool,
+    /// `true` when the configured storage root exists on disk.
+    pub storage_path_exists: bool,
     /// Current auth state for the toolbar avatar button.
     pub auth: AuthStateSnapshot,
 }
@@ -107,14 +109,15 @@ pub struct SettingsController {
     auth_state: AuthState,
     storage: StorageConfig,
     storage_unavailable: bool,
+    storage_path_exists: bool,
 }
 
 impl SettingsController {
     /// Creates a controller, restoring the last-active tab and file-opener list from disk.
     ///
     /// Checks the platform keyring to determine initial auth state, and verifies the
-    /// configured storage root is accessible.
-    pub fn new() -> Self {
+    /// configured storage root is accessible. Spawns a background check for path existence.
+    pub fn new(cx: &mut Context<Self>) -> Self {
         let (file_openers, tab_name) = FileOpenerConfig::load_with_tab();
         let active_tab = tab_name
             .as_deref()
@@ -133,21 +136,19 @@ impl SettingsController {
                 "configured storage root is not accessible"
             );
         }
-        Self {
+        let initial_path = storage.root_path();
+        let mut ctrl = Self {
             is_open: false,
             active_tab,
             file_openers,
             is_authenticated,
             auth_state: AuthState::LoggedOut,
+            storage_path_exists: true,
             storage,
             storage_unavailable,
-        }
-    }
-}
-
-impl Default for SettingsController {
-    fn default() -> Self {
-        Self::new()
+        };
+        ctrl.check_storage_path_exists(initial_path, cx);
+        ctrl
     }
 }
 
@@ -223,10 +224,29 @@ impl SettingsController {
         cx: &mut Context<Self>,
     ) -> Result<(), StorageError> {
         validate_writable(&path)?;
-        self.storage.set_root_path(path);
+        self.storage.set_root_path(path.clone());
         self.storage_unavailable = false;
+        self.check_storage_path_exists(path, cx);
         cx.emit(SettingsChanged);
         Ok(())
+    }
+
+    /// Spawns a background task to check whether `path` exists on disk.
+    ///
+    /// Writes the result back to `storage_path_exists` and notifies the UI.
+    fn check_storage_path_exists(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, async_cx| {
+            let exists = async_cx
+                .background_executor()
+                .spawn(async move { path.exists() })
+                .await;
+            this.update(async_cx, |ctrl, cx| {
+                ctrl.storage_path_exists = exists;
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
     }
 
     /// Opens the OS file manager at the configured storage root, creating the
@@ -335,6 +355,7 @@ impl SettingsController {
             is_authenticated: self.is_authenticated,
             storage_root_path: self.storage.root_path(),
             storage_unavailable: self.storage_unavailable,
+            storage_path_exists: self.storage_path_exists,
             auth,
         }
     }

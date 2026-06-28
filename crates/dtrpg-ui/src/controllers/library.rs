@@ -88,7 +88,8 @@ impl LibraryController {
         let vm = LibraryViewModel::new(service);
         let service_arc = vm.service_arc();
         let weak_activity = activity.downgrade();
-        let storage_root = StorageConfig::load().root_path();
+        let storage_cfg = StorageConfig::load();
+        let storage_root = storage_cfg.metadata_path();
         let save_root = storage_root.clone();
 
         // Load catalog off the main thread so the UI remains responsive during the

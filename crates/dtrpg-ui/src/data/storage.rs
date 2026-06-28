@@ -85,7 +85,16 @@ impl StorageConfig {
         self.root_path().try_exists().unwrap_or(false)
     }
 
-    /// Derives a stable per-item subdirectory under the root.
+    /// Returns the directory where catalog metadata (e.g. the catalog cache) is stored.
+    ///
+    /// Maps to `{root}/metadata/`.
+    pub fn metadata_path(&self) -> PathBuf {
+        self.root_path().join("metadata")
+    }
+
+    /// Derives a stable per-item subdirectory under the downloads directory.
+    ///
+    /// Maps to `{root}/items/{item_id}/`.
     pub fn path_for_item(&self, item_id: &str) -> PathBuf {
         self.root_path().join("items").join(item_id)
     }
@@ -151,6 +160,12 @@ mod tests {
         let custom = PathBuf::from("/tmp/custom-storage");
         let cfg = StorageConfig { override_path: Some(custom.clone()) };
         assert_eq!(cfg.root_path(), custom);
+    }
+
+    #[test]
+    fn metadata_path_is_under_root() {
+        let cfg = StorageConfig { override_path: Some(PathBuf::from("/tmp/dtrpg")) };
+        assert_eq!(cfg.metadata_path(), Path::new("/tmp/dtrpg/metadata"));
     }
 
     #[test]
