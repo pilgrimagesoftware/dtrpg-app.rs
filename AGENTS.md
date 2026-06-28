@@ -27,6 +27,13 @@ When adding features, prefer new focused modules over expanding existing files i
 - Preserve the separation between UI rendering, interaction state, and service adapters.
 - Keep code structured so stubs can be replaced by SDK adapters without rewriting views.
 
+## gpui-component Usage
+
+Always prefer components from the `gpui-component` crate over rolling custom implementations:
+
+- **Tabular data**: Use `DataTable` (virtualized, delegate-based, handles header/row alignment) or `Table`/`TableHeader`/`TableRow`/`TableHead`/`TableCell` (simple, stateless). Never build custom flex-row column layouts for table-like views — they cannot reliably align headers with rows when virtualization is involved.
+- Check the `gpui-component` crate for any other UI primitive before implementing from scratch.
+
 ## Credential Storage
 
 All DriveThruRPG account credentials (API key, access token, refresh token) MUST be stored
