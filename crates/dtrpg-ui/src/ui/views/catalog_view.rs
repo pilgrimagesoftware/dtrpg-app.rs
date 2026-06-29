@@ -27,6 +27,12 @@ use crate::util::publisher::group_by_publisher;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::sort::{SortDirection, SortMethod};
 
+#[derive(Clone, Copy)]
+enum EmptyReason {
+    LibraryEmpty,
+    NoMatches,
+}
+
 // ── Shared column definitions ─────────────────────────────────────────────────
 
 /// Returns the column definitions used for the list view.
@@ -404,6 +410,15 @@ impl Render for CatalogView {
         let pad_top = density.catalog_pad_top;
         let pad_side = density.catalog_pad_side;
         let pad_bottom = density.catalog_pad_bottom;
+        let empty_reason = if item_count == 0 {
+            Some(if snap.total_count == 0 {
+                EmptyReason::LibraryEmpty
+            } else {
+                EmptyReason::NoMatches
+            })
+        } else {
+            None
+        };
 
         // Update items_per_row estimate for grid layout using the viewport width.
         // Subtract a rough sidebar width (220px) and both side pads.
@@ -425,9 +440,18 @@ impl Render for CatalogView {
             .pt(pad_top)
             .pb(pad_bottom);
 
-        if item_count == 0 {
+        if let Some(reason) = empty_reason {
+            let empty_state = match reason {
+                EmptyReason::LibraryEmpty => {
+                    render_library_empty_state(colors.text_tertiary).into_any_element()
+                }
+                EmptyReason::NoMatches => {
+                    render_no_matches_state(&snap.search_query, colors.text_tertiary)
+                        .into_any_element()
+                }
+            };
             return root
-                .child(render_empty_state(colors.text_tertiary))
+                .child(empty_state)
                 .into_any_element();
         }
 
@@ -587,7 +611,13 @@ impl Render for CatalogView {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-fn render_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'static {
+fn render_no_matches_state(search_query: &str, text_color: gpui::Hsla) -> impl IntoElement + 'static {
+    let hint = if search_query.is_empty() {
+        "Try selecting a different section."
+    } else {
+        "Try clearing your search."
+    };
+
     div()
         .flex()
         .flex_col()
@@ -601,6 +631,29 @@ fn render_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'static {
                 .text_sm()
                 .text_color(text_color)
                 .child("No titles match."),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(text_color)
+                .child(hint),
+        )
+}
+
+fn render_library_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'static {
+    div()
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .h_full()
+        .gap(px(12.0))
+        .child(div().text_2xl().text_color(text_color).child("⊘"))
+        .child(
+            div()
+                .text_sm()
+                .text_color(text_color)
+                .child("Your library is empty."),
         )
 }
 
