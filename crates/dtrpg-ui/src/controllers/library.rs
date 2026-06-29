@@ -108,7 +108,7 @@ impl LibraryController {
 
             // ── Fetch live catalog from API ───────────────────────────────────
             let activity_id = weak_activity
-                .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", cx))
+                .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", None, cx))
                 .unwrap_or(0);
 
             let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
@@ -268,7 +268,7 @@ impl LibraryController {
         } else {
             let id = self
                 .activity
-                .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", cx));
+                .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", None, cx));
             self.thumbnail_activity_id = Some(id);
             id
         };

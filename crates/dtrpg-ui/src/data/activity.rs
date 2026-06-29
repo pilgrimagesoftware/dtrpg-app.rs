@@ -1,6 +1,7 @@
 //! Activity data model for tracking background operations.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 /// The lifecycle state of a single background operation.
 #[derive(Debug, Clone)]
@@ -14,14 +15,36 @@ pub enum ActivityStatus {
 }
 
 /// A single tracked background operation.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ActivityItem {
-    /// Unique monotonically-increasing identifier assigned by [`super::super::controllers::activity::ActivityController`].
+    /// Unique monotonically-increasing identifier assigned by [`ActivityController`].
     pub id: u64,
     /// Human-readable label shown in the activity panel.
     pub label: Arc<str>,
     /// Current lifecycle state.
     pub status: ActivityStatus,
+    /// Monotonic timestamp captured when the item was started.
+    pub started_at: Instant,
+    /// Total duration in seconds, frozen when the item leaves InProgress; None while running.
+    pub elapsed_secs: Option<u64>,
+    /// Reported progress in [0.0, 1.0]; None means indeterminate.
+    pub progress: Option<f32>,
+    /// Optional callback invoked when the user cancels this item.
+    pub cancel_fn: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
+}
+
+impl std::fmt::Debug for ActivityItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ActivityItem")
+            .field("id", &self.id)
+            .field("label", &self.label)
+            .field("status", &self.status)
+            .field("started_at", &self.started_at)
+            .field("elapsed_secs", &self.elapsed_secs)
+            .field("progress", &self.progress)
+            .field("has_cancel_fn", &self.cancel_fn.is_some())
+            .finish()
+    }
 }
 
 /// Snapshot of all activity state needed by the root view for one render pass.

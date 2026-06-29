@@ -1,6 +1,7 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{AppContext, div, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled};
+use gpui::{AppContext, div, Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render, Styled};
+use crate::ui::actions::{Minimize, ShowSettings, ToggleFullscreen, Zoom};
 
 use crate::{
     controllers::{
@@ -209,12 +210,20 @@ impl Render for LibraryRootView {
             sidebar_col = sidebar_col.child(overlay);
         }
 
+        let settings_for_action = self.settings.clone();
+
         div()
             .size_full()
             .bg(surface)
             .text_color(text_primary)
             .flex()
             .relative()
+            .on_action(move |_: &ShowSettings, _, cx| {
+                settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
+            })
+            .on_action(|_: &Minimize, window, _| window.minimize_window())
+            .on_action(|_: &Zoom, window, _| window.zoom_window())
+            .on_action(|_: &ToggleFullscreen, window, _| window.toggle_fullscreen())
             .child(sidebar_col)
             .child(main_content)
             .child(panel)

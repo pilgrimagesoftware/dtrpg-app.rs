@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpui::Context;
 
@@ -37,14 +37,26 @@ impl ActivityController {
 
     /// Registers a new in-progress operation with the given label.
     ///
+    /// `cancel_fn` is an optional callback the UI invokes when the user clicks the cancel button.
+    /// Pass `None` for operations that do not support cancellation.
+    ///
     /// Returns the assigned activity id, which the caller must pass to [`complete`] or [`error`].
-    pub fn start(&mut self, label: &str, cx: &mut Context<Self>) -> u64 {
+    pub fn start(
+        &mut self,
+        label: &str,
+        cancel_fn: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
+        cx: &mut Context<Self>,
+    ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         self.in_progress.push(ActivityItem {
             id,
             label: Arc::from(label),
             status: ActivityStatus::InProgress,
+            started_at: Instant::now(),
+            elapsed_secs: None,
+            progress: None,
+            cancel_fn,
         });
         cx.emit(ActivityChanged);
         id
@@ -67,6 +79,7 @@ impl ActivityController {
     pub fn complete(&mut self, id: u64, cx: &mut Context<Self>) {
         if let Some(pos) = self.in_progress.iter().position(|i| i.id == id) {
             let mut item = self.in_progress.remove(pos);
+            item.elapsed_secs = Some(item.started_at.elapsed().as_secs());
             item.status = ActivityStatus::Complete;
             self.push_recent(item);
             cx.emit(ActivityChanged);
@@ -84,6 +97,7 @@ impl ActivityController {
     pub fn error(&mut self, id: u64, message: String, cx: &mut Context<Self>) {
         if let Some(pos) = self.in_progress.iter().position(|i| i.id == id) {
             let mut item = self.in_progress.remove(pos);
+            item.elapsed_secs = Some(item.started_at.elapsed().as_secs());
             item.status = ActivityStatus::Error(message);
             self.push_recent(item);
             cx.emit(ActivityChanged);
@@ -120,6 +134,28 @@ impl ActivityController {
             Some(id)
         };
         cx.emit(ActivityChanged);
+    }
+
+    /// Updates the progress value for an in-progress item, clamped to [0.0, 1.0].
+    ///
+    /// No-op if `id` is not found in the in-progress list.
+    pub fn update_progress(&mut self, id: u64, progress: f32, cx: &mut Context<Self>) {
+        if let Some(item) = self.in_progress.iter_mut().find(|i| i.id == id) {
+            item.progress = Some(progress.clamp(0.0, 1.0));
+            cx.emit(ActivityChanged);
+        }
+    }
+
+    /// Calls the stored cancel function (if any) and transitions the item to Error("Cancelled").
+    ///
+    /// No-op if `id` is not found in the in-progress list.
+    pub fn cancel_activity(&mut self, id: u64, cx: &mut Context<Self>) {
+        if let Some(item) = self.in_progress.iter().find(|i| i.id == id)
+            && let Some(cancel_fn) = item.cancel_fn.clone()
+        {
+            cancel_fn();
+        }
+        self.error(id, "Cancelled".to_string(), cx);
     }
 
     /// Toggles the activity panel overlay open or closed.

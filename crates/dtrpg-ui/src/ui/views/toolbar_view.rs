@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, App, div, img, px, Entity, Image, ImageFormat, ImageSource, IntoElement, ObjectFit, ParentElement, Styled};
+use gpui::{AnyElement, App, div, img, px, Entity, Image, ImageFormat, ImageSource, IntoElement, MouseButton, ObjectFit, ParentElement, Styled};
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
@@ -88,8 +88,15 @@ pub fn render_toolbar(
                         .child(matched_count.to_string()),
                 ),
         )
-        // ── Spacer ────────────────────────────────────────────────────────
-        .child(div().flex_1())
+        // ── Spacer / drag region ──────────────────────────────────────────
+        .child(
+            div()
+                .id("toolbar-drag-region")
+                .flex_1()
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_move();
+                }),
+        )
         // ── Controls ──────────────────────────────────────────────────────
         .child(
             div()
