@@ -6,14 +6,21 @@ use gpui::prelude::FluentBuilder;
 use gpui::{AnyElement, div, img, px, Entity, Image, ImageFormat, ImageSource, InteractiveElement,
     IntoElement, ObjectFit, ParentElement, StatefulInteractiveElement, Styled, StyledImage};
 use gpui_component::input::{Input, InputState};
+use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
 
+#[cfg(target_os = "macos")]
+const MONOSPACE_FONT: &str = "Menlo";
+#[cfg(target_os = "windows")]
+const MONOSPACE_FONT: &str = "Consolas";
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+const MONOSPACE_FONT: &str = "Liberation Mono";
+
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
 pub fn render_account_section(
-    is_authenticated: bool,
     auth: &AuthStateSnapshot,
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
@@ -22,7 +29,7 @@ pub fn render_account_section(
     sign_in_in_progress: bool,
     sign_in_error: Option<String>,
 ) -> AnyElement {
-    if is_authenticated {
+    if auth.is_logged_in {
         render_authenticated(auth, entity, colors).into_any_element()
     } else {
         render_unauthenticated(entity, colors, api_key_input, email_input, sign_in_in_progress, sign_in_error).into_any_element()
@@ -41,6 +48,8 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
     let avatar = render_avatar_circle(auth, colors);
     let email_text = auth.email.clone().unwrap_or_else(|| "DriveThruRPG Account".to_string());
 
+    let entity_reset = entity.clone();
+
     div()
         .flex()
         .flex_col()
@@ -51,26 +60,73 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
             div()
                 .flex()
                 .items_center()
-                .gap(px(16.0))
-                .child(avatar)
+                .justify_between()
                 .child(
                     div()
                         .flex()
-                        .flex_col()
-                        .gap(px(4.0))
-                        .child(
-                            div()
-                                .text_sm()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .text_color(text_primary)
-                                .child("Account"),
-                        )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(text_secondary)
-                                .child(email_text),
-                        ),
+                        .items_center()
+                        .gap(px(16.0))
+                        .flex_1()
+                        .min_w_0()
+                        .child(avatar)
+                        .child({
+                            let mut col = div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(4.0))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                                        .text_color(text_primary)
+                                        .child("Account"),
+                                )
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_secondary)
+                                        .child(email_text),
+                                );
+                            if let Some(hint) = &auth.api_key_hint {
+                                col = col.child(
+                                    div()
+                                        .flex()
+                                        .items_baseline()
+                                        .gap(px(6.0))
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(colors.text_tertiary)
+                                                .child("API Key"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .font_family(MONOSPACE_FONT)
+                                                .text_color(colors.text_tertiary)
+                                                .child(hint.clone()),
+                                        ),
+                                );
+                            }
+                            col
+                        }),
+                )
+                .child(
+                    div()
+                        .id("reset-api-key-btn")
+                        .size(px(32.0))
+                        .rounded(px(8.0))
+                        .border_1()
+                        .border_color(border)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .tooltip(|window, cx| Tooltip::new("Reset API Key").build(window, cx))
+                        .on_click(move |_, _, cx| {
+                            entity_reset.update(cx, |ctrl, cx| ctrl.request_logout(cx));
+                        })
+                        .child(div().text_sm().text_color(text_primary).child("↺")),
                 ),
         )
         // ── Divider ───────────────────────────────────────────────────────

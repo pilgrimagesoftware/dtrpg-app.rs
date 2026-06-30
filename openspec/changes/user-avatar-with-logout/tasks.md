@@ -42,4 +42,4 @@
 - [ ] 4.4 Click the avatar; confirm the logout popover appears with a "Log Out" item
 - [ ] 4.5 Click "Log Out"; confirm the avatar reverts to the generic person icon and the popover closes
 - [ ] 4.6 Confirm clicking the generic (logged-out) avatar does not open a popover
-- [ ] 4.7 Remove or gate the stub `set_logged_in` call behind a `#[cfg(debug_assertions)]` block so it doesn't ship in release builds
+- [x] 4.7 Remove or gate the stub `set_logged_in` call behind a `#[cfg(debug_assertions)]` block so it doesn't ship in release builds

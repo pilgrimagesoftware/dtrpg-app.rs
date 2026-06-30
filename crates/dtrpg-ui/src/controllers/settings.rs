@@ -41,6 +41,8 @@ pub struct AuthStateSnapshot {
     pub display_initial: Option<char>,
     /// Cached avatar image bytes from Gravatar, or `None`.
     pub avatar_bytes: Option<Arc<Vec<u8>>>,
+    /// Masked API key hint (first 4 + bullets + last 1), set at sign-in time.
+    pub api_key_hint: Option<String>,
 }
 
 // ── SettingsController ────────────────────────────────────────────────────────
@@ -100,6 +102,8 @@ pub struct SettingsController {
     storage_path_draft: String,
     /// Input state for the storage path text field; set by the root view after creation.
     storage_path_input: Option<Entity<InputState>>,
+    /// Masked API key hint computed at sign-in time (first 4 + bullets + last 1).
+    api_key_hint: Option<String>,
 }
 
 impl SettingsController {
@@ -146,6 +150,7 @@ impl SettingsController {
             email_input: None,
             storage_path_draft,
             storage_path_input: None,
+            api_key_hint: None,
         };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
@@ -187,9 +192,10 @@ impl SettingsController {
     ///
     /// When `email` is `Some`, spawns a background task to fetch the Gravatar avatar.
     /// Emits [`SettingsChanged`] immediately and again once avatar bytes arrive (if applicable).
-    pub fn set_logged_in(&mut self, email: Option<String>, cx: &mut Context<Self>) {
+    pub fn set_logged_in(&mut self, email: Option<String>, api_key: Option<&str>, cx: &mut Context<Self>) {
         self.is_authenticated = true;
         self.auth_state = AuthState::LoggedIn { email: email.clone(), avatar_bytes: None };
+        self.api_key_hint = api_key.map(mask_api_key);
         cx.emit(SettingsChanged);
 
         if let Some(addr) = email {
@@ -221,6 +227,7 @@ impl SettingsController {
     pub fn logout(&mut self, cx: &mut Context<Self>) {
         self.is_authenticated = false;
         self.auth_state = AuthState::LoggedOut;
+        self.api_key_hint = None;
         cx.emit(SettingsChanged);
         cx.emit(LogoutRequested);
     }
@@ -326,6 +333,7 @@ impl SettingsController {
         cx.emit(StartupAuthBegun);
 
         cx.spawn(async move |this, async_cx| {
+            let api_key_hint = api_key.clone();
             let result = async_cx
                 .background_executor()
                 .spawn(async move { svc.authenticate(&api_key) })
@@ -333,7 +341,7 @@ impl SettingsController {
 
             this.update(async_cx, |ctrl, cx| match result {
                 Ok(tokens) => {
-                    ctrl.set_logged_in(email, cx);
+                    ctrl.set_logged_in(email, Some(api_key_hint.as_str()), cx);
                     cx.emit(SignInSucceeded(tokens));
                 }
                 Err(e) => {
@@ -382,7 +390,7 @@ impl SettingsController {
                         }
                         ProfileConfig::save(email.as_deref());
                         ctrl.api_key_draft.clear();
-                        ctrl.set_logged_in(email, cx);
+                        ctrl.set_logged_in(email, Some(api_key.as_str()), cx);
                         cx.emit(SignInSucceeded(tokens));
                     }
                     Err(e) => {
@@ -452,6 +460,7 @@ impl SettingsController {
                 email: None,
                 display_initial: None,
                 avatar_bytes: None,
+                api_key_hint: None,
             },
             AuthState::LoggedIn { email, avatar_bytes } => AuthStateSnapshot {
                 is_logged_in: true,
@@ -461,6 +470,7 @@ impl SettingsController {
                     .map(|c| c.to_ascii_uppercase()),
                 email: email.clone(),
                 avatar_bytes: avatar_bytes.clone(),
+                api_key_hint: self.api_key_hint.clone(),
             },
         };
 
@@ -486,3 +496,37 @@ impl SettingsController {
 
 impl EventEmitter<SettingsChanged> for SettingsController {}
 impl EventEmitter<LogoutRequested> for SettingsController {}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Returns a masked representation of an API key: first 4 chars + bullets + last 1 char.
+/// For keys 5 characters or shorter, returns only bullets.
+fn mask_api_key(key: &str) -> String {
+    if key.len() > 5 {
+        format!("{}••••••••{}", &key[..4], &key[key.len() - 1..])
+    } else {
+        "••••••••".to_string()
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mask_api_key_long_key() {
+        assert_eq!(mask_api_key("abcdefghij1"), "abcd••••••••1");
+    }
+
+    #[test]
+    fn mask_api_key_short_key() {
+        assert_eq!(mask_api_key("abc"), "••••••••");
+    }
+
+    #[test]
+    fn mask_api_key_exactly_five() {
+        assert_eq!(mask_api_key("abcde"), "••••••••");
+    }
+}

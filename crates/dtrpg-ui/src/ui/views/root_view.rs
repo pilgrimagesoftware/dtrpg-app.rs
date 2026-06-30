@@ -297,7 +297,6 @@ impl Render for LibraryRootView {
                 }
                 let overlay = render_settings_panel(
                     &settings_snap.file_openers,
-                    settings_snap.is_authenticated,
                     settings_snap.auth,
                     settings_snap.storage_root_path,
                     settings_snap.storage_path_exists,

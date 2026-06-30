@@ -26,7 +26,6 @@ use crate::ui::views::{
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(
     file_openers: &[FileOpenerEntry],
-    is_authenticated: bool,
     auth: AuthStateSnapshot,
     storage_root_path: PathBuf,
     storage_path_exists: bool,
@@ -72,7 +71,6 @@ pub fn render_settings_panel(
             SettingPage::new("Account").group(
                 SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
                     render_account_section(
-                        is_authenticated,
                         &account_auth,
                         account_entity.clone(),
                         &account_colors,
