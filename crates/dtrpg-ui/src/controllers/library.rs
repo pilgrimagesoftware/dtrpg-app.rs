@@ -143,11 +143,11 @@ impl LibraryController {
                 .background_executor()
                 .spawn(async move { service_arc.list_items_paged(&mut |page| { tx.send(page).ok(); }) });
 
-            // Receive pages one at a time, updating the controller after each.
-            // On the first API page, clear any pre-populated cache data so the
-            // live results replace it cleanly.
+            // Accumulate all live SDK pages into a local buffer so the cached catalog
+            // remains visible in the UI throughout the fetch. The swap happens once,
+            // after the channel closes, so there is no intermediate partially-loaded state.
             let mut rx = Some(rx);
-            let mut first_page = true;
+            let mut live_items: Vec<LibraryItem> = Vec::new();
             loop {
                 let Some(receiver) = rx.take() else { break; };
                 let (msg, returned_rx) = async_cx
@@ -160,14 +160,7 @@ impl LibraryController {
 
                 match msg {
                     Ok(items) => {
-                        let is_first = first_page;
-                        first_page = false;
-                        this.update(async_cx, |ctrl, cx| {
-                            if is_first {
-                                ctrl.catalog.clear();
-                            }
-                            ctrl.append_catalog_page(items, cx);
-                        }).ok();
+                        live_items.extend(items);
                         rx = Some(returned_rx);
                     }
                     Err(_) => break, // sender dropped — all pages have been sent
@@ -175,11 +168,12 @@ impl LibraryController {
             }
 
             // Wait for the fetch task to complete and surface any error.
-            // On success: save the catalog to disk and dismiss the loading indicator.
-            // On error: show the error in the activity panel but leave any
-            //   items that were already appended to the catalog visible.
+            // On success: swap the catalog atomically with the full live dataset,
+            //   then save to disk and dismiss the loading indicator.
+            // On error: leave the cached catalog unchanged in memory.
             match fetch.await {
                 Ok(()) => {
+                    this.update(async_cx, |ctrl, cx| ctrl.set_catalog(live_items, cx)).ok();
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
                         .unwrap_or_default();
@@ -203,10 +197,21 @@ impl LibraryController {
         .detach();
     }
 
+    /// Atomically replaces the catalog with a complete dataset and recomputes derived state.
+    ///
+    /// Used after all live SDK pages have been collected so the UI transitions from
+    /// cached data to the full live set in one render pass.
+    fn set_catalog(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
+        self.enqueue_thumbnails(&items, cx);
+        self.catalog = items;
+        self.section_counts = section_counts(&self.catalog);
+        self.publishers = publisher_entries(&self.catalog);
+        cx.emit(LibraryChanged);
+    }
+
     /// Appends a page of items received incrementally from the background load task.
     ///
-    /// Called once per API page as results arrive. Recomputes sidebar state and
-    /// notifies the view after each append so the catalog populates progressively.
+    /// Used only for the initial disk-cache pre-population, not for live SDK pages.
     fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog.extend(items);
