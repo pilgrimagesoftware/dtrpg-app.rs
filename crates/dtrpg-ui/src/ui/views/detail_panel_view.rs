@@ -134,8 +134,9 @@ pub fn render_detail_panel(
                         .flex()
                         .flex_col()
                         .gap(px(8.0))
-                        .child(
+                        .child(if is_downloaded {
                             div()
+                                .id("detail-read")
                                 .h(px(36.0))
                                 .px(px(16.0))
                                 .rounded(px(8.0))
@@ -150,8 +151,27 @@ pub fn render_detail_panel(
                                         .font_weight(gpui::FontWeight::MEDIUM)
                                         .text_color(accent_on)
                                         .child("Read"),
-                                ),
-                        )
+                                )
+                        } else {
+                            div()
+                                .id("detail-read")
+                                .h(px(36.0))
+                                .px(px(16.0))
+                                .rounded(px(8.0))
+                                .bg(accent)
+                                .opacity(0.4)
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .tooltip(|window, cx| Tooltip::new("Download this item first").build(window, cx))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(gpui::FontWeight::MEDIUM)
+                                        .text_color(accent_on)
+                                        .child("Read"),
+                                )
+                        })
                         .child(
                             div()
                                 .id("detail-download")
