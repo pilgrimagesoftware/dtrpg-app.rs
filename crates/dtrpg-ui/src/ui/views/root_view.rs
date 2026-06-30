@@ -1,7 +1,8 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{AppContext, div, Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render, Styled};
-use crate::ui::actions::{Minimize, ShowSettings, ToggleFullscreen, Zoom};
+use gpui::{AppContext, div, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
+use gpui_component::input::{InputEvent, InputState};
+use crate::ui::actions::ShowSettings;
 
 use crate::{
     controllers::{
@@ -36,9 +37,14 @@ pub struct LibraryRootView {
     activity: Entity<ActivityController>,
     auth_state: Entity<AuthStateController>,
     catalog_view: Entity<CatalogView>,
+    /// Default focus handle for the root div, ensuring menu-triggered actions
+    /// always have a dispatch path even before any child element grabs focus.
+    root_focus: FocusHandle,
     /// Focus handle for the settings overlay; grabbed when the panel opens so
     /// Escape key events route to the backdrop instead of the catalog.
     settings_focus: FocusHandle,
+    /// Editable search input wired to the library controller's search query.
+    search_input: Entity<InputState>,
 }
 
 impl LibraryRootView {
@@ -68,7 +74,24 @@ impl LibraryRootView {
             { AuthState::Authenticated }
         };
         let auth_state = cx.new(|_| AuthStateController::new(auth_initial));
+        let root_focus = cx.focus_handle();
+        root_focus.focus(window, cx);
         let settings_focus = cx.focus_handle();
+
+        let search_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("Search\u{2026}")
+        });
+
+        let controller_for_search = controller.clone();
+        cx.subscribe(&search_input, move |_this, input_entity, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                let value = input_entity.read(cx).value().to_string();
+                controller_for_search.update(cx, |ctrl, cx| {
+                    ctrl.set_search_query(value, cx);
+                });
+            }
+        })
+        .detach();
 
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
             cx.notify();
@@ -103,7 +126,13 @@ impl LibraryRootView {
         })
         .detach();
 
-        Self { controller, settings, activity, auth_state, catalog_view, settings_focus }
+        Self { controller, settings, activity, auth_state, catalog_view, root_focus, settings_focus, search_input }
+    }
+}
+
+impl Focusable for LibraryRootView {
+    fn focus_handle(&self, _cx: &gpui::App) -> FocusHandle {
+        self.root_focus.clone()
     }
 }
 
@@ -116,9 +145,9 @@ impl Render for LibraryRootView {
 
         let snap = self.controller.read(cx).snapshot();
         let (filter, counts, publishers, total_count, total_mb, matched_count,
-             search_query, sort, sort_direction, grouped, presentation, selected_item) = (
+             sort, sort_direction, grouped, presentation, selected_item) = (
             snap.filter, snap.counts, snap.publishers, snap.total_count, snap.total_mb,
-            snap.matched_count, snap.search_query, snap.sort, snap.sort_direction, snap.grouped,
+            snap.matched_count, snap.sort, snap.sort_direction, snap.grouped,
             snap.presentation, snap.selected_item,
         );
 
@@ -148,7 +177,7 @@ impl Render for LibraryRootView {
         let toolbar = render_toolbar(
             &filter,
             matched_count,
-            &search_query,
+            self.search_input.clone(),
             sort,
             sort_direction,
             grouped,
@@ -218,12 +247,10 @@ impl Render for LibraryRootView {
             .text_color(text_primary)
             .flex()
             .relative()
+            .track_focus(&self.root_focus)
             .on_action(move |_: &ShowSettings, _, cx| {
                 settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
             })
-            .on_action(|_: &Minimize, window, _| window.minimize_window())
-            .on_action(|_: &Zoom, window, _| window.zoom_window())
-            .on_action(|_: &ToggleFullscreen, window, _| window.toggle_fullscreen())
             .child(sidebar_col)
             .child(main_content)
             .child(panel)

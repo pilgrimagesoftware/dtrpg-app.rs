@@ -82,6 +82,21 @@ pub fn setup(cx: &mut App) {
     cx.on_action::<HideApplication>(|_, cx| cx.hide());
     cx.on_action::<HideOthers>(|_, cx| cx.hide_other_apps());
     cx.on_action::<About>(|_, _cx| {});
+    cx.on_action::<Minimize>(|_, cx| {
+        if let Some(win) = cx.active_window() {
+            win.update(cx, |_, window, _| window.minimize_window()).ok();
+        }
+    });
+    cx.on_action::<Zoom>(|_, cx| {
+        if let Some(win) = cx.active_window() {
+            win.update(cx, |_, window, _| window.zoom_window()).ok();
+        }
+    });
+    cx.on_action::<ToggleFullscreen>(|_, cx| {
+        if let Some(win) = cx.active_window() {
+            win.update(cx, |_, window, _| window.toggle_fullscreen()).ok();
+        }
+    });
 
     // Menu bar
     cx.set_menus([

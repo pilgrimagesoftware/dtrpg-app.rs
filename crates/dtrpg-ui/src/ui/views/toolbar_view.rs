@@ -5,6 +5,7 @@ use std::sync::Arc;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, div, img, px, Entity, Image, ImageFormat, ImageSource, IntoElement, MouseButton, ObjectFit, ParentElement, Styled};
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
 
@@ -32,7 +33,7 @@ fn section_title_for(filter: &SidebarFilter) -> String {
 pub fn render_toolbar(
     filter: &SidebarFilter,
     matched_count: usize,
-    search_query: &str,
+    search_input: Entity<InputState>,
     sort: SortMethod,
     sort_direction: SortDirection,
     grouped: bool,
@@ -53,7 +54,6 @@ pub fn render_toolbar(
     let accent_soft = colors.accent_soft;
 
     let title = section_title_for(filter);
-    let search_query = search_query.to_string();
 
     div()
         .h(px(53.0))
@@ -93,6 +93,7 @@ pub fn render_toolbar(
             div()
                 .id("toolbar-drag-region")
                 .flex_1()
+                .h_full()
                 .on_mouse_down(MouseButton::Left, |_, window, _| {
                     window.start_window_move();
                 }),
@@ -103,14 +104,11 @@ pub fn render_toolbar(
                 .flex()
                 .items_center()
                 .gap(px(10.0))
-                .child(render_search(
-                    search_query,
-                    entity.clone(),
-                    bg,
-                    border_strong,
-                    text_primary,
-                    text_tertiary,
-                ))
+                .child(
+                    Input::new(&search_input)
+                        .w(px(188.0))
+                        .cleanable(true),
+                )
                 .child(render_sort_selector(
                     sort,
                     sort_direction,
@@ -129,57 +127,6 @@ pub fn render_toolbar(
                 .child(render_settings_button(settings.clone(), text_primary, border_strong))
                 .child(render_avatar_button(auth, settings, colors, cx)),
         )
-}
-
-// ── Search ────────────────────────────────────────────────────────────────────
-
-fn render_search(
-    query: String,
-    entity: Entity<LibraryController>,
-    bg: gpui::Hsla,
-    border: gpui::Hsla,
-    text_primary: gpui::Hsla,
-    text_tertiary: gpui::Hsla,
-) -> impl IntoElement + 'static {
-    let has_query = !query.is_empty();
-    let entity_clear = entity.clone();
-
-    div()
-        .flex()
-        .items_center()
-        .gap(px(7.0))
-        .h(px(30.0))
-        .px(px(9.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(border)
-        .bg(bg)
-        .w(px(188.0))
-        .child(div().text_xs().text_color(text_tertiary).child("⌕"))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .text_sm()
-                .text_color(if has_query { text_primary } else { text_tertiary })
-                .truncate()
-                .child(if has_query { query } else { "Search…".into() }),
-        )
-        .when(has_query, |el| {
-            el.child(
-                div()
-                    .id("search-clear")
-                    .text_xs()
-                    .text_color(text_tertiary)
-                    .cursor_pointer()
-                    .on_click(move |_, _, cx| {
-                        entity_clear.update(cx, |ctrl, cx| {
-                            ctrl.clear_search_query(cx);
-                        });
-                    })
-                    .child("✕"),
-            )
-        })
 }
 
 // ── Sort selector ─────────────────────────────────────────────────────────────
