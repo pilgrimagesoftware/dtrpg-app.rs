@@ -40,8 +40,6 @@ pub struct FileOpenerConfig {
 struct AppConfigFile {
     #[serde(default)]
     file_openers: Vec<FileOpenerEntry>,
-    #[serde(default)]
-    active_settings_tab: Option<String>,
 }
 
 // ── FileOpenerConfig impl ─────────────────────────────────────────────────────
@@ -61,29 +59,15 @@ impl FileOpenerConfig {
         Self { entries: parsed.file_openers }
     }
 
-    /// Loads both the file-opener config and the active tab string from disk.
-    pub fn load_with_tab() -> (Self, Option<String>) {
-        let Some(path) = config_path() else {
-            return (Self::default(), None);
-        };
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            return (Self::default(), None);
-        };
-        let parsed: AppConfigFile = toml::from_str(&text).unwrap_or_default();
-        (Self { entries: parsed.file_openers }, parsed.active_settings_tab)
-    }
-
-    /// Saves the config (and optionally an active-tab hint) to disk, creating
-    /// parent directories if needed.  Silently ignores I/O errors.
-    pub fn save(&self, active_tab_name: Option<&str>) {
+    /// Saves the config to disk, creating parent directories if needed.
+    ///
+    /// Silently ignores I/O errors.
+    pub fn save(&self) {
         let Some(path) = config_path() else { return };
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let file = AppConfigFile {
-            file_openers: self.entries.clone(),
-            active_settings_tab: active_tab_name.map(str::to_owned),
-        };
+        let file = AppConfigFile { file_openers: self.entries.clone() };
         if let Ok(text) = toml::to_string(&file) {
             let _ = std::fs::write(path, text);
         }

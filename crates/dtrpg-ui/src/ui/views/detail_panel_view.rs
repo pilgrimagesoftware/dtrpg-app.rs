@@ -43,6 +43,8 @@ pub fn render_detail_panel(
     let is_downloaded = item.status == ItemStatus::Downloaded;
 
     div()
+        .id("detail-panel")
+        .occlude()
         .absolute()
         .right_0()
         .top_0()

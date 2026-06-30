@@ -46,3 +46,23 @@ impl EventEmitter<AuthStateChanged> for AuthStateController {}
 pub struct SignInSucceeded(pub LoginTokens);
 
 impl EventEmitter<SignInSucceeded> for SettingsController {}
+
+// ── StartupAuthBegun ──────────────────────────────────────────────────────────
+
+/// Emitted by `SettingsController` when a background startup re-authentication begins.
+///
+/// The receiver should set `AuthStateController` to the auth-pending state so the
+/// banner shows "Signing in..." instead of "Not signed in".
+pub struct StartupAuthBegun;
+
+impl EventEmitter<StartupAuthBegun> for SettingsController {}
+
+// ── StartupAuthFailed ─────────────────────────────────────────────────────────
+
+/// Emitted by `SettingsController` when background startup re-authentication fails.
+///
+/// The receiver should clear the auth-pending state so the banner transitions to
+/// the normal "Not signed in" notice.
+pub struct StartupAuthFailed;
+
+impl EventEmitter<StartupAuthFailed> for SettingsController {}

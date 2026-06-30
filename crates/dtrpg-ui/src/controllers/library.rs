@@ -16,7 +16,7 @@ use crate::util::sort::*;
 use crate::util::publisher::*;
 use crate::util::matching::*;
 use crate::data::events::*;
-use crate::services::LibraryService;
+use crate::services::{LibraryService, LibraryServiceErrorKind};
 use crate::ui::library::cover::CoverCache;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
@@ -167,7 +167,12 @@ impl LibraryController {
                 });
 
             // If the service reports an estimated total, seed the progress bar.
-            let estimated_total: Option<usize> = total_rx.recv().ok();
+            // Run on background executor so the main thread isn't blocked while
+            // waiting for the first API response.
+            let estimated_total: Option<usize> = async_cx
+                .background_executor()
+                .spawn(async move { total_rx.recv().ok() })
+                .await;
             if let Some(total) = estimated_total {
                 weak_activity
                     .update(async_cx, |a, cx| a.update_progress(activity_id, 0.0, cx))
@@ -231,7 +236,13 @@ impl LibraryController {
                 }
                 Err(e) => {
                     let detail = e.panel_detail();
-                    tracing::error!(error = %e, backtrace = %app_backtrace(), "catalog load failed");
+                    // Session errors are expected when starting before auth completes;
+                    // network and other errors are genuine failures worth surfacing.
+                    if e.kind == LibraryServiceErrorKind::Session {
+                        tracing::debug!(error = %e, "catalog load skipped: no authenticated session");
+                    } else {
+                        tracing::error!(error = %e, backtrace = %app_backtrace(), "catalog load failed");
+                    }
                     weak_activity.update(async_cx, |a, cx| a.error(activity_id, detail, cx)).ok();
                 }
             }

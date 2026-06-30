@@ -10,7 +10,7 @@ use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::{AuthStateSnapshot, SettingsController, SettingsTab};
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::{
     enums::{CatalogPresentation},
     theme::ColorTokens,
@@ -351,7 +351,7 @@ fn render_avatar_button(
                 let s = settings.clone();
                 menu.item(
                     PopupMenuItem::new("Sign In\u{2026}").on_click(move |_, _, cx| {
-                        s.update(cx, |ctrl, cx| ctrl.open_to(SettingsTab::Account, cx));
+                        s.update(cx, |ctrl, cx| ctrl.open(cx));
                     }),
                 )
             })

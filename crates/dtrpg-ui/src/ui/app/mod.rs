@@ -3,7 +3,6 @@ use gpui_component::{init, Root};
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
-use crate::data::auth_state::AuthState;
 use crate::services::{LibraryService, LoginService, LoginTokens};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
@@ -26,17 +25,17 @@ pub struct LoginServiceFactory(pub Box<dyn Fn() -> Box<dyn LoginService> + Send 
 
 impl Global for LoginServiceFactory {}
 
-/// Opens the library window with the given auth state.
+/// Opens the library window in the unauthenticated state.
 ///
-/// Always opens the library window regardless of auth state. When `auth_state` is
-/// `Unauthenticated`, the window opens with a notification banner prompting sign-in.
+/// The window opens immediately. If `startup_api_key` is `Some`, the root view
+/// kicks off a background re-authentication and transitions to authenticated on success.
 ///
 /// # Panics
 ///
 /// Panics if the window cannot be opened or if `ServiceFactory` has not been set.
 #[allow(clippy::expect_used)]
-pub fn open_library_window(tokens: Option<LoginTokens>, auth_state: AuthState, cx: &mut App) {
-    let service = (cx.global::<ServiceFactory>().0)(tokens);
+pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
+    let service = (cx.global::<ServiceFactory>().0)(None);
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
@@ -47,7 +46,7 @@ pub fn open_library_window(tokens: Option<LoginTokens>, auth_state: AuthState, c
             ..Default::default()
         },
         move |window, cx| {
-            let view = cx.new(|cx| LibraryRootView::new(window, cx, service, auth_state));
+            let view = cx.new(|cx| LibraryRootView::new(window, cx, service, startup_api_key));
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
     )
@@ -132,7 +131,7 @@ pub fn setup(cx: &mut App) {
         ]),
     ]);
 
-    let api_key = match KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY).load() {
+    let startup_api_key = match KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY).load() {
         Ok(Some(cred)) => Some(cred.secret),
         Ok(None) => None,
         Err(e) => {
@@ -141,22 +140,6 @@ pub fn setup(cx: &mut App) {
         }
     };
 
-    // Always open the library window. If re-auth succeeds, the window opens authenticated.
-    // If re-auth fails or no key exists, the window opens with a notification banner.
-    let (tokens, auth_state) = match api_key {
-        Some(key) => {
-            let login_service = (cx.global::<LoginServiceFactory>().0)();
-            match login_service.authenticate(&key) {
-                Ok(tokens) => (Some(tokens), AuthState::Authenticated),
-                Err(e) => {
-                    warn!("silent re-authentication failed: {e}");
-                    (None, AuthState::Unauthenticated)
-                }
-            }
-        }
-        None => (None, AuthState::Unauthenticated),
-    };
-
-    open_library_window(tokens, auth_state, cx);
+    open_library_window(startup_api_key, cx);
     cx.activate(true);
 }

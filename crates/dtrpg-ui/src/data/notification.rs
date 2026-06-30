@@ -1,7 +1,5 @@
 //! Auth-related notification types displayed in the `NotificationBanner`.
 
-use crate::controllers::settings::SettingsTab;
-
 /// Identifies the kind of auth notice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeKind {
@@ -23,8 +21,8 @@ pub struct Notice {
 }
 
 /// The action triggered by the primary button on a notice row.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum NoticeAction {
-    /// Open the settings panel to the given tab.
-    OpenSettings(SettingsTab),
+    /// Open the settings panel.
+    OpenSettings,
 }

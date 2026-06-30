@@ -1,10 +1,10 @@
-//! Notification banner view: renders auth-related notices below the toolbar.
+//! Notification banner view: renders persistent auth-related notices below the toolbar.
 
 use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled};
 
 use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::settings::SettingsController;
-use crate::data::notification::{Notice, NoticeAction, NoticeKind};
+use crate::data::notification::{Notice, NoticeKind};
 use crate::data::theme::ColorTokens;
 
 /// Renders the notification banner column.
@@ -40,9 +40,6 @@ pub fn render_notification_banner(
             let auth_entity_action = auth_entity.clone();
             let auth_entity_dismiss = auth_entity.clone();
             let settings_entity = settings_entity.clone();
-            let tab = match &notice.action {
-                NoticeAction::OpenSettings(tab) => *tab,
-            };
 
             div()
                 .flex()
@@ -50,14 +47,12 @@ pub fn render_notification_banner(
                 .gap(px(12.0))
                 .px(px(16.0))
                 .py(px(8.0))
-                // Warning icon
                 .child(
                     div()
                         .text_sm()
                         .text_color(warning_text)
                         .child("⚠"),
                 )
-                // Message
                 .child(
                     div()
                         .flex_1()
@@ -65,7 +60,6 @@ pub fn render_notification_banner(
                         .text_color(warning_text)
                         .child(message),
                 )
-                // Action button
                 .child(
                     div()
                         .id(format!("notice-action-{kind:?}"))
@@ -80,7 +74,6 @@ pub fn render_notification_banner(
                         .child(action_label)
                         .on_click(move |_, _, cx| {
                             settings_entity.update(cx, |ctrl, cx| {
-                                ctrl.set_tab(tab, cx);
                                 ctrl.open(cx);
                             });
                             auth_entity_action.update(cx, |ctrl, cx| {
@@ -88,7 +81,6 @@ pub fn render_notification_banner(
                             });
                         }),
                 )
-                // Dismiss button
                 .child(
                     div()
                         .id(format!("notice-dismiss-{kind:?}"))
@@ -111,10 +103,7 @@ pub fn render_notification_banner(
 
 fn notice_strings(notice: &Notice) -> (&'static str, &'static str) {
     match notice.kind {
-        NoticeKind::NotSignedIn => (
-            "Not signed in to DriveThruRPG",
-            "Set Up Account",
-        ),
+        NoticeKind::NotSignedIn => ("Not signed in to DriveThruRPG", "Set Up Account"),
         NoticeKind::SessionExpired => (
             "Session expired — sign in again to refresh your library",
             "Sign In Again",

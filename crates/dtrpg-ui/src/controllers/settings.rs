@@ -1,4 +1,4 @@
-//! Settings controller: owns open/closed state, active tab, and file-opener overrides.
+//! Settings controller: owns open/closed state and file-opener overrides.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -8,7 +8,7 @@ use gpui_component::input::InputState;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore, keys};
 use crate::data::avatar::fetch_avatar_bytes;
-use crate::data::events::{LogoutRequested, SettingsChanged, SignInSucceeded};
+use crate::data::events::{LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed};
 use crate::data::profile::ProfileConfig;
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
@@ -31,6 +31,7 @@ pub enum AuthState {
 }
 
 /// Snapshot of auth state for a single render pass.
+#[derive(Clone)]
 pub struct AuthStateSnapshot {
     /// `true` when a user is signed in.
     pub is_logged_in: bool,
@@ -42,53 +43,11 @@ pub struct AuthStateSnapshot {
     pub avatar_bytes: Option<Arc<Vec<u8>>>,
 }
 
-// ── SettingsTab ───────────────────────────────────────────────────────────────
-
-/// The three tabs available in the settings panel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SettingsTab {
-    #[default]
-    Account,
-    Storage,
-    FileOpeners,
-}
-
-impl SettingsTab {
-    /// Human-readable label used in the tab strip.
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Account => "Account",
-            Self::Storage => "Storage",
-            Self::FileOpeners => "File Openers",
-        }
-    }
-
-    /// Parses a persisted tab name back to a `SettingsTab`.
-    fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "Account" => Some(Self::Account),
-            "Storage" => Some(Self::Storage),
-            "FileOpeners" => Some(Self::FileOpeners),
-            _ => None,
-        }
-    }
-
-    /// The string written to disk when persisting the active tab.
-    fn to_name(self) -> &'static str {
-        match self {
-            Self::Account => "Account",
-            Self::Storage => "Storage",
-            Self::FileOpeners => "FileOpeners",
-        }
-    }
-}
-
 // ── SettingsController ────────────────────────────────────────────────────────
 
 /// Snapshot of settings state needed by the views for a single render pass.
 pub struct SettingsSnapshot {
     pub is_open: bool,
-    pub active_tab: SettingsTab,
     pub file_openers: Vec<FileOpenerEntry>,
     /// `true` when an API key is present in the keyring.
     pub is_authenticated: bool,
@@ -118,11 +77,10 @@ pub struct SettingsSnapshot {
     pub storage_path_input: Option<Entity<InputState>>,
 }
 
-/// Owns all mutable settings state: panel visibility, active tab, file-opener overrides,
+/// Owns all mutable settings state: panel visibility, file-opener overrides,
 /// catalog storage configuration, and sign-in form state.
 pub struct SettingsController {
     is_open: bool,
-    active_tab: SettingsTab,
     file_openers: FileOpenerConfig,
     is_authenticated: bool,
     auth_state: AuthState,
@@ -145,16 +103,12 @@ pub struct SettingsController {
 }
 
 impl SettingsController {
-    /// Creates a controller, restoring the last-active tab and file-opener list from disk.
+    /// Creates a controller, loading the file-opener list from disk.
     ///
     /// Checks the platform keyring to determine initial auth state, and verifies the
     /// configured storage root is accessible. Spawns a background check for path existence.
     pub fn new(login_service: Box<dyn LoginService>, cx: &mut Context<Self>) -> Self {
-        let (file_openers, tab_name) = FileOpenerConfig::load_with_tab();
-        let active_tab = tab_name
-            .as_deref()
-            .and_then(SettingsTab::from_name)
-            .unwrap_or_default();
+        let file_openers = FileOpenerConfig::load();
         let is_authenticated = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
             .load()
             .ok()
@@ -177,7 +131,6 @@ impl SettingsController {
 
         let mut ctrl = Self {
             is_open: false,
-            active_tab,
             file_openers,
             is_authenticated,
             auth_state: AuthState::LoggedOut,
@@ -358,6 +311,41 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
+    /// Authenticates silently at startup using a stored API key.
+    ///
+    /// Emits [`StartupAuthBegun`] immediately, then runs authentication on a background
+    /// thread. On success, emits [`SignInSucceeded`] so the root view can replace the
+    /// library service. On failure, emits [`StartupAuthFailed`] and logs a warning.
+    pub fn startup_auth(&mut self, api_key: String, cx: &mut Context<Self>) {
+        let email = {
+            let trimmed = self.email_draft.trim();
+            if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+        };
+        let svc = self.login_service.clone();
+
+        cx.emit(StartupAuthBegun);
+
+        cx.spawn(async move |this, async_cx| {
+            let result = async_cx
+                .background_executor()
+                .spawn(async move { svc.authenticate(&api_key) })
+                .await;
+
+            this.update(async_cx, |ctrl, cx| match result {
+                Ok(tokens) => {
+                    ctrl.set_logged_in(email, cx);
+                    cx.emit(SignInSucceeded(tokens));
+                }
+                Err(e) => {
+                    tracing::warn!("startup re-authentication failed: {e}");
+                    cx.emit(StartupAuthFailed);
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
     /// Attempts to sign in with the current `api_key_draft`.
     ///
     /// Runs authentication on a background thread. On success, stores the API key to
@@ -410,13 +398,6 @@ impl SettingsController {
 
     // ── Panel visibility ──────────────────────────────────────────────────────
 
-    /// Opens the settings panel to the given tab.
-    pub fn open_to(&mut self, tab: SettingsTab, cx: &mut Context<Self>) {
-        self.is_open = true;
-        self.active_tab = tab;
-        cx.emit(SettingsChanged);
-    }
-
     /// Opens the settings panel.
     pub fn open(&mut self, cx: &mut Context<Self>) {
         if !self.is_open {
@@ -439,20 +420,6 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
-    // ── Tab navigation ────────────────────────────────────────────────────────
-
-    /// Returns the currently active settings tab.
-    pub fn active_tab(&self) -> SettingsTab {
-        self.active_tab
-    }
-
-    /// Sets the active tab and persists it to disk.
-    pub fn set_tab(&mut self, tab: SettingsTab, cx: &mut Context<Self>) {
-        self.active_tab = tab;
-        self.file_openers.save(Some(tab.to_name()));
-        cx.emit(SettingsChanged);
-    }
-
     // ── File-opener overrides ─────────────────────────────────────────────────
 
     /// Returns a shared reference to the file-opener config.
@@ -463,7 +430,7 @@ impl SettingsController {
     /// Adds or replaces a file-opener entry and persists the change.
     pub fn add_file_opener(&mut self, entry: FileOpenerEntry, cx: &mut Context<Self>) -> AddOutcome {
         let outcome = self.file_openers.add(entry);
-        self.file_openers.save(Some(self.active_tab.to_name()));
+        self.file_openers.save();
         cx.emit(SettingsChanged);
         outcome
     }
@@ -471,7 +438,7 @@ impl SettingsController {
     /// Removes the file-opener entry for `extension` and persists the change.
     pub fn remove_file_opener(&mut self, extension: &str, cx: &mut Context<Self>) {
         self.file_openers.remove(extension);
-        self.file_openers.save(Some(self.active_tab.to_name()));
+        self.file_openers.save();
         cx.emit(SettingsChanged);
     }
 
@@ -499,7 +466,6 @@ impl SettingsController {
 
         SettingsSnapshot {
             is_open: self.is_open,
-            active_tab: self.active_tab,
             file_openers: self.file_openers.entries().to_vec(),
             is_authenticated: self.is_authenticated,
             storage_root_path: self.storage.root_path(),

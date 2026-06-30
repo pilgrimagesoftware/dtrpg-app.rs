@@ -1,12 +1,13 @@
-//! Settings panel overlay: tab strip + active section content.
+//! Settings panel overlay: sidebar navigation + per-page content via gpui-component Settings.
 
 use std::path::PathBuf;
 
 use gpui::prelude::*;
 use gpui::{div, px, AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled};
 use gpui_component::input::InputState;
+use gpui_component::setting::{SettingGroup, SettingItem, SettingPage, Settings};
 
-use crate::controllers::settings::{AuthStateSnapshot, SettingsController, SettingsTab};
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::{
@@ -20,11 +21,10 @@ use crate::ui::views::{
 /// Renders the settings panel overlay when settings are open.
 ///
 /// The returned element is positioned absolute and fills its containing block,
-/// which must have `position: relative` set.  The sidebar is outside that
+/// which must have `position: relative` set. The sidebar is outside that
 /// container so it remains visible.
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(
-    active_tab: SettingsTab,
     file_openers: &[FileOpenerEntry],
     is_authenticated: bool,
     auth: AuthStateSnapshot,
@@ -45,8 +45,69 @@ pub fn render_settings_panel(
     let backdrop = gpui::hsla(0.0, 0.0, 0.0, 0.35);
 
     let entity_close = entity.clone();
-    let entity_tab = entity.clone();
     let entity_escape = entity.clone();
+
+    // ── Capture data for each page's render closure ───────────────────────────
+
+    let account_entity = entity.clone();
+    let account_auth = auth.clone();
+    let account_colors = colors.clone();
+    let account_api_key_input = api_key_input.clone();
+    let account_email_input = email_input.clone();
+
+    let storage_entity = entity.clone();
+    let storage_path = storage_root_path.clone();
+    let storage_colors = colors.clone();
+    let storage_path_input = storage_path_input.clone();
+
+    let file_openers_vec = file_openers.to_vec();
+    let file_openers_entity = entity.clone();
+    let file_openers_colors = colors.clone();
+
+    // ── Build the Settings component ──────────────────────────────────────────
+
+    let settings = Settings::new("settings-panel")
+        .sidebar_width(px(160.0))
+        .page(
+            SettingPage::new("Account").group(
+                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+                    render_account_section(
+                        is_authenticated,
+                        &account_auth,
+                        account_entity.clone(),
+                        &account_colors,
+                        account_api_key_input.clone(),
+                        account_email_input.clone(),
+                        sign_in_in_progress,
+                        sign_in_error.clone(),
+                    )
+                })),
+            ),
+        )
+        .page(
+            SettingPage::new("Storage").group(
+                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+                    render_storage_section(
+                        storage_path.clone(),
+                        storage_path_exists,
+                        storage_entity.clone(),
+                        &storage_colors,
+                        storage_path_input.clone(),
+                    )
+                })),
+            ),
+        )
+        .page(
+            SettingPage::new("File Openers").group(
+                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+                    render_file_openers_section(
+                        &file_openers_vec,
+                        file_openers_entity.clone(),
+                        &file_openers_colors,
+                    )
+                })),
+            ),
+        );
 
     div()
         .id("settings-backdrop")
@@ -63,11 +124,10 @@ pub fn render_settings_panel(
         .flex()
         .items_center()
         .justify_center()
-        // ── Modal card ────────────────────────────────────────────────────
         .child(
             div()
-                .w(px(560.0))
-                .h(px(440.0))
+                .w(px(720.0))
+                .h(px(480.0))
                 .bg(surface)
                 .border_1()
                 .border_color(border)
@@ -109,106 +169,11 @@ pub fn render_settings_panel(
                                 .on_click(move |_, _, cx| {
                                     entity_close.update(cx, |ctrl, cx| ctrl.close(cx));
                                 })
-                                .child("✕"),
+                                .child("x"),
                         ),
                 )
-                // ── Tab strip ─────────────────────────────────────────────
-                .child(render_tab_strip(active_tab, entity_tab, colors))
-                // ── Section content ───────────────────────────────────────
-                .child(
-                    div()
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_hidden()
-                        .child(render_active_section(active_tab, file_openers, is_authenticated, auth, storage_root_path, storage_path_exists, entity, colors, api_key_input, email_input, sign_in_in_progress, sign_in_error, storage_path_input)),
-                ),
+                // ── Settings component (sidebar + active page) ────────────
+                .child(div().flex_1().min_h_0().child(settings)),
         )
         .into_any_element()
-}
-
-// ── Tab strip ─────────────────────────────────────────────────────────────────
-
-fn render_tab_strip(
-    active_tab: SettingsTab,
-    entity: Entity<SettingsController>,
-    colors: &ColorTokens,
-) -> impl IntoElement + 'static + use<> {
-    let border = colors.border;
-    let accent = colors.accent;
-    let text_tertiary = colors.text_tertiary;
-    let accent_soft = colors.accent_soft;
-
-    let tabs = [SettingsTab::Account, SettingsTab::Storage, SettingsTab::FileOpeners];
-
-    let mut strip = div()
-        .h(px(40.0))
-        .flex_none()
-        .flex()
-        .items_center()
-        .border_b_1()
-        .border_color(border)
-        .px(px(4.0));
-
-    for tab in tabs {
-        let is_active = tab == active_tab;
-        let e = entity.clone();
-        let text_color = if is_active { accent } else { text_tertiary };
-        let bg = if is_active { accent_soft } else { gpui::hsla(0.0, 0.0, 0.0, 0.0) };
-
-        strip = strip.child(
-            div()
-                .id(tab.label())
-                .h(px(32.0))
-                .px(px(14.0))
-                .mx(px(2.0))
-                .rounded(px(6.0))
-                .bg(bg)
-                .flex()
-                .items_center()
-                .cursor_pointer()
-                .on_click(move |_, _, cx| {
-                    e.update(cx, |ctrl, cx| ctrl.set_tab(tab, cx));
-                })
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(if is_active {
-                            gpui::FontWeight::SEMIBOLD
-                        } else {
-                            gpui::FontWeight::NORMAL
-                        })
-                        .text_color(text_color)
-                        .child(tab.label()),
-                ),
-        );
-    }
-
-    strip
-}
-
-// ── Active section ────────────────────────────────────────────────────────────
-
-#[allow(clippy::too_many_arguments)]
-fn render_active_section(
-    active_tab: SettingsTab,
-    file_openers: &[FileOpenerEntry],
-    is_authenticated: bool,
-    auth: AuthStateSnapshot,
-    storage_root_path: PathBuf,
-    storage_path_exists: bool,
-    entity: Entity<SettingsController>,
-    colors: &ColorTokens,
-    api_key_input: Option<Entity<InputState>>,
-    email_input: Option<Entity<InputState>>,
-    sign_in_in_progress: bool,
-    sign_in_error: Option<String>,
-    storage_path_input: Option<Entity<InputState>>,
-) -> AnyElement {
-    match active_tab {
-        SettingsTab::Account => render_account_section(is_authenticated, &auth, entity, colors, api_key_input, email_input, sign_in_in_progress, sign_in_error).into_any_element(),
-        SettingsTab::Storage => render_storage_section(storage_root_path, storage_path_exists, entity, colors, storage_path_input).into_any_element(),
-        SettingsTab::FileOpeners => {
-            render_file_openers_section(file_openers, entity, colors).into_any_element()
-        }
-    }
 }

@@ -2,7 +2,7 @@
 
 use gpui::{AppContext, div, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
 use gpui_component::input::{InputEvent, InputState};
-use crate::data::profile::ProfileConfig;
+use gpui_component::{notification::Notification, WindowExt as _};
 use crate::ui::actions::ShowSettings;
 use crate::ui::app::{LoginServiceFactory, ServiceFactory};
 
@@ -16,7 +16,7 @@ use crate::{
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
         auth_state::AuthState,
-        events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded},
+        events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed},
         theme::LibriTheme,
     },
     services::LibraryService,
@@ -30,6 +30,9 @@ use crate::ui::views::{
     sidebar_view::render_sidebar,
     toolbar_view::render_toolbar,
 };
+/// Type-tag used to identify the startup-auth toast notification.
+struct AuthPendingNotif;
+
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
     controller: Entity<LibraryController>,
@@ -50,20 +53,13 @@ pub struct LibraryRootView {
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
     ///
-    /// `auth_state` reflects the outcome of startup re-authentication. The window
-    /// always opens; the banner reflects whether the user is signed in.
-    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>, auth_state: AuthState) -> Self {
+    /// If `startup_api_key` is `Some`, a background re-authentication is started immediately.
+    /// The window always opens in the unauthenticated state and transitions once auth completes.
+    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>, startup_api_key: Option<String>) -> Self {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let login_service = cx.global::<LoginServiceFactory>().0();
-        let profile_email = ProfileConfig::load().email().map(str::to_owned);
-        let settings = cx.new(|cx| {
-            let mut ctrl = SettingsController::new(login_service, cx);
-            if auth_state == AuthState::Authenticated {
-                ctrl.set_logged_in(profile_email, cx);
-            }
-            ctrl
-        });
+        let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
         let api_key_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("Paste API key here\u{2026}")
@@ -114,7 +110,7 @@ impl LibraryRootView {
         settings.update(cx, |ctrl, _cx| ctrl.set_storage_path_input(storage_path_input));
 
         let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
-        let auth_state = cx.new(|_| AuthStateController::new(auth_state));
+        let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
         let root_focus = cx.focus_handle();
         root_focus.focus(window, cx);
         let settings_focus = cx.focus_handle();
@@ -166,16 +162,44 @@ impl LibraryRootView {
         })
         .detach();
 
-        // Handle sign-in: replace the library service and mark as authenticated.
+        // Handle sign-in: replace the library service, mark authenticated, dismiss any auth toast.
         let auth_state_for_signin = auth_state.clone();
         let controller_for_signin = controller.clone();
-        cx.subscribe(&settings, move |_this, _ctrl, event: &SignInSucceeded, cx| {
+        cx.subscribe_in(&settings, window, move |_this, _settings, event: &SignInSucceeded, window, cx| {
             let tokens = event.0.clone();
             let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens));
             controller_for_signin.update(cx, |ctrl, cx| ctrl.replace_service(service, cx));
             auth_state_for_signin.update(cx, |ctrl, cx| ctrl.set_state(AuthState::Authenticated, cx));
+            window.remove_notification::<AuthPendingNotif>(cx);
         })
         .detach();
+
+        // Handle startup auth beginning: suppress the "Not signed in" banner and show a toast.
+        let auth_state_for_begun = auth_state.clone();
+        cx.subscribe_in(&settings, window, move |_this, _settings, _event: &StartupAuthBegun, window, cx| {
+            auth_state_for_begun.update(cx, |ctrl, cx| ctrl.set_auth_pending(true, cx));
+            window.push_notification(
+                Notification::new()
+                    .message("Signing in to DriveThruRPG...")
+                    .autohide(false)
+                    .id::<AuthPendingNotif>(),
+                cx,
+            );
+        })
+        .detach();
+
+        // Handle startup auth failure: clear pending state and dismiss the toast.
+        let auth_state_for_failed = auth_state.clone();
+        cx.subscribe_in(&settings, window, move |_this, _settings, _event: &StartupAuthFailed, window, cx| {
+            auth_state_for_failed.update(cx, |ctrl, cx| ctrl.set_auth_pending(false, cx));
+            window.remove_notification::<AuthPendingNotif>(cx);
+        })
+        .detach();
+
+        // Start background auth after all subscriptions are wired.
+        if let Some(key) = startup_api_key {
+            settings.update(cx, |ctrl, cx| ctrl.startup_auth(key, cx));
+        }
 
         Self { controller, settings, activity, auth_state, catalog_view, root_focus, settings_focus, search_input }
     }
@@ -272,7 +296,6 @@ impl Render for LibraryRootView {
                     window.focus(&self.settings_focus, cx);
                 }
                 let overlay = render_settings_panel(
-                    settings_snap.active_tab,
                     &settings_snap.file_openers,
                     settings_snap.is_authenticated,
                     settings_snap.auth,
