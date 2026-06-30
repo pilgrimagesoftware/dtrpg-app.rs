@@ -13,4 +13,6 @@ pub enum SidebarFilter {
     OnDevice,
     InCloud,
     Publisher(Arc<str>),
+    /// Filter to items belonging to a named DTRPG product list.
+    Collection(Arc<str>),
 }

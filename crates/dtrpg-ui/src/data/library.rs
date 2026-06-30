@@ -82,6 +82,19 @@ impl LibraryItem {
     }
 }
 
+// ── LibraryCollection ─────────────────────────────────────────────────────────
+
+/// A DTRPG product list (user-curated collection of products).
+#[derive(Debug, Clone)]
+pub struct LibraryCollection {
+    /// Numeric product list identifier.
+    pub id: u64,
+    /// Display name of the collection.
+    pub name: Arc<str>,
+    /// Number of items in the collection according to the API.
+    pub item_count: usize,
+}
+
 // ── Smart section counts ──────────────────────────────────────────────────────
 
 /// Counts for each smart sidebar section given the full catalog.

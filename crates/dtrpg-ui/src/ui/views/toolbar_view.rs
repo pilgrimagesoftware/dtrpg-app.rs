@@ -25,6 +25,7 @@ fn section_title_for(filter: &SidebarFilter) -> String {
         SidebarFilter::OnDevice => "On This Device".to_string(),
         SidebarFilter::InCloud => "In the Cloud".to_string(),
         SidebarFilter::Publisher(name) => format!("Publisher: {name}"),
+        SidebarFilter::Collection(name) => format!("Collection: {name}"),
     }
 }
 

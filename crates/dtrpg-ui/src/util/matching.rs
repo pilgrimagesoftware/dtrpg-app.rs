@@ -16,6 +16,9 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter) -> bool {
         SidebarFilter::OnDevice => item.status == ItemStatus::Downloaded,
         SidebarFilter::InCloud => item.status == ItemStatus::Cloud,
         SidebarFilter::Publisher(name) => item.publisher.as_ref() == name.as_ref(),
+        // Collection filtering requires membership data not available here;
+        // handled inline in LibraryController::visible_items().
+        SidebarFilter::Collection(_) => false,
     }
 }
 

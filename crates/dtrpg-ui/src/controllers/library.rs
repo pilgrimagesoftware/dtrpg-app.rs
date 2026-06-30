@@ -1,6 +1,6 @@
 //! Library UI state and interaction controller.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use gpui::{Context, Entity};
 use crate::controllers::activity::ActivityController;
@@ -27,6 +27,10 @@ pub struct LibrarySnapshot {
     pub filter: SidebarFilter,
     pub counts: SectionCounts,
     pub publishers: Vec<PublisherEntry>,
+    pub collections: Vec<CollectionEntry>,
+    pub collection_membership: HashMap<Arc<str>, HashSet<u64>>,
+    pub publishers_collapsed: bool,
+    pub collections_collapsed: bool,
     pub total_count: usize,
     pub total_mb: f64,
     pub matched_count: usize,
@@ -67,6 +71,14 @@ pub struct LibraryController {
     pub section_counts: SectionCounts,
     /// Publisher list derived from the full catalog (count desc, name asc).
     pub publishers: Vec<PublisherEntry>,
+    /// Collection list loaded from the API product-list endpoint.
+    pub collections: Vec<CollectionEntry>,
+    /// Maps collection name to the set of numeric product IDs it contains.
+    pub collection_membership: HashMap<Arc<str>, HashSet<u64>>,
+    /// Whether the Publishers section in the sidebar is collapsed.
+    pub publishers_collapsed: bool,
+    /// Whether the Collections section in the sidebar is collapsed.
+    pub collections_collapsed: bool,
     /// Queue of `(item_id, cover_url)` pairs pending thumbnail fetches.
     thumbnail_queue: VecDeque<(Arc<str>, Arc<str>)>,
     /// Whether a thumbnail fetch is currently in flight.
@@ -100,6 +112,10 @@ impl LibraryController {
             selection: Selection::default(),
             section_counts: SectionCounts::default(),
             publishers: Vec::new(),
+            collections: Vec::new(),
+            collection_membership: HashMap::new(),
+            publishers_collapsed: false,
+            collections_collapsed: false,
             thumbnail_queue: VecDeque::new(),
             thumbnail_loading: false,
             thumbnail_activity_id: None,
@@ -173,7 +189,10 @@ impl LibraryController {
             // On error: leave the cached catalog unchanged in memory.
             match fetch.await {
                 Ok(()) => {
-                    this.update(async_cx, |ctrl, cx| ctrl.set_catalog(live_items, cx)).ok();
+                    this.update(async_cx, |ctrl, cx| {
+                        ctrl.set_catalog(live_items, cx);
+                        ctrl.load_collections(cx);
+                    }).ok();
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
                         .unwrap_or_default();
@@ -220,6 +239,45 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
+    /// Spawns a background task to fetch product lists from the API and apply them.
+    fn load_collections(&mut self, cx: &mut Context<Self>) {
+        let service_arc = self.vm.service_arc();
+        cx.spawn(async move |this, async_cx| {
+            let result = async_cx
+                .background_executor()
+                .spawn(async move { service_arc.list_collections() })
+                .await;
+            match result {
+                Ok((lib_collections, membership)) => {
+                    let entries: Vec<CollectionEntry> = lib_collections
+                        .into_iter()
+                        .map(|c| CollectionEntry { name: c.name, count: c.item_count })
+                        .collect();
+                    this.update(async_cx, |ctrl, cx| {
+                        ctrl.apply_collections(entries, membership, cx);
+                    })
+                    .ok();
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "collections load failed");
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Stores the fetched collections and emits a change event.
+    fn apply_collections(
+        &mut self,
+        collections: Vec<CollectionEntry>,
+        membership: HashMap<Arc<str>, HashSet<u64>>,
+        cx: &mut Context<Self>,
+    ) {
+        self.collections = collections;
+        self.collection_membership = membership;
+        cx.emit(LibraryChanged);
+    }
+
     /// Returns the current pane state from the service layer.
     pub fn pane_state(&self) -> &LibraryPaneState {
         self.vm.pane_state()
@@ -234,6 +292,8 @@ impl LibraryController {
         self.catalog.clear();
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        self.collections.clear();
+        self.collection_membership.clear();
         self.selection = Selection::default();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
@@ -383,6 +443,10 @@ impl LibraryController {
             filter: self.filter.clone(),
             counts: self.section_counts,
             publishers: self.publishers.clone(),
+            collections: self.collections.clone(),
+            collection_membership: self.collection_membership.clone(),
+            publishers_collapsed: self.publishers_collapsed,
+            collections_collapsed: self.collections_collapsed,
             total_count: self.section_counts.all,
             total_mb: self.total_size_mb(),
             matched_count,
@@ -405,8 +469,14 @@ impl LibraryController {
             .catalog
             .iter()
             .filter(|i| {
-                item_matches_filter(i, &self.filter)
-                    && item_matches_query(i, &self.search_query)
+                let passes_filter = if let SidebarFilter::Collection(name) = &self.filter {
+                    self.collection_membership
+                        .get(name)
+                        .is_some_and(|ids| ids.contains(&i.numeric_id))
+                } else {
+                    item_matches_filter(i, &self.filter)
+                };
+                passes_filter && item_matches_query(i, &self.search_query)
             })
             .cloned()
             .collect();
@@ -429,6 +499,20 @@ impl LibraryController {
     pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
         let items = self.visible_items();
         items.get(range).map(|s| s.to_vec()).unwrap_or_default()
+    }
+
+    // ── Sidebar collapse toggles ──────────────────────────────────────────────
+
+    /// Toggles whether the Publishers section in the sidebar is collapsed.
+    pub fn toggle_publishers_collapsed(&mut self, cx: &mut Context<Self>) {
+        self.publishers_collapsed = !self.publishers_collapsed;
+        cx.emit(LibraryChanged);
+    }
+
+    /// Toggles whether the Collections section in the sidebar is collapsed.
+    pub fn toggle_collections_collapsed(&mut self, cx: &mut Context<Self>) {
+        self.collections_collapsed = !self.collections_collapsed;
+        cx.emit(LibraryChanged);
     }
 
     // ── Sidebar filter mutations ──────────────────────────────────────────────

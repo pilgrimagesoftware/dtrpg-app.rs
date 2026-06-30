@@ -1,4 +1,4 @@
-//! Sidebar view: wordmark, smart nav, publisher nav, storage footer.
+//! Sidebar view: wordmark, smart nav, publisher nav, collections nav, storage footer.
 
 use std::sync::Arc;
 
@@ -13,7 +13,7 @@ use crate::data::{
     theme::ColorTokens,
 };
 use crate::util::filter::SidebarFilter;
-use crate::util::publisher::PublisherEntry;
+use crate::util::publisher::{CollectionEntry, PublisherEntry};
 
 /// Renders the full sidebar column.
 #[allow(clippy::too_many_arguments)]
@@ -21,6 +21,9 @@ pub fn render_sidebar(
     filter: &SidebarFilter,
     counts: SectionCounts,
     publishers: &[PublisherEntry],
+    publishers_collapsed: bool,
+    collections: &[CollectionEntry],
+    collections_collapsed: bool,
     total_count: usize,
     total_mb: f64,
     entity: Entity<LibraryController>,
@@ -132,23 +135,31 @@ pub fn render_sidebar(
                             accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                         )),
                 )
-                // Publishers section
-                .child(
-                    div()
+                // Publishers section (collapsible)
+                .child({
+                    let e = entity.clone();
+                    let pub_label = if publishers_collapsed { "PUBLISHERS ▶" } else { "PUBLISHERS ▼" };
+                    let mut section = div()
                         .border_t_1()
                         .border_color(border)
                         .mt(px(2.0))
                         .pt(px(8.0))
                         .child(
                             div()
+                                .id("publishers-section-header")
                                 .px(px(20.0))
                                 .pb(px(7.0))
                                 .text_xs()
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
                                 .text_color(text_tertiary)
-                                .child("PUBLISHERS"),
-                        )
-                        .children(publishers.iter().map(|entry| {
+                                .cursor_pointer()
+                                .on_click(move |_, _, cx| {
+                                    e.update(cx, |ctrl, cx| ctrl.toggle_publishers_collapsed(cx));
+                                })
+                                .child(pub_label),
+                        );
+                    if !publishers_collapsed {
+                        section = section.children(publishers.iter().map(|entry| {
                             let is_active = active_filter
                                 == SidebarFilter::Publisher(Arc::clone(&entry.name));
                             let filter = SidebarFilter::Publisher(Arc::clone(&entry.name));
@@ -160,8 +171,50 @@ pub fn render_sidebar(
                                 entity.clone(),
                                 accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
                             )
-                        })),
-                ),
+                        }));
+                    }
+                    section
+                })
+                // Collections section (collapsible)
+                .child({
+                    let e = entity.clone();
+                    let col_label = if collections_collapsed { "COLLECTIONS ▶" } else { "COLLECTIONS ▼" };
+                    let mut section = div()
+                        .border_t_1()
+                        .border_color(border)
+                        .mt(px(2.0))
+                        .pt(px(8.0))
+                        .child(
+                            div()
+                                .id("collections-section-header")
+                                .px(px(20.0))
+                                .pb(px(7.0))
+                                .text_xs()
+                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .text_color(text_tertiary)
+                                .cursor_pointer()
+                                .on_click(move |_, _, cx| {
+                                    e.update(cx, |ctrl, cx| ctrl.toggle_collections_collapsed(cx));
+                                })
+                                .child(col_label),
+                        );
+                    if !collections_collapsed {
+                        section = section.children(collections.iter().map(|entry| {
+                            let is_active = active_filter
+                                == SidebarFilter::Collection(Arc::clone(&entry.name));
+                            let filter = SidebarFilter::Collection(Arc::clone(&entry.name));
+                            render_nav_row(
+                                entry.name.as_ref(),
+                                Some(entry.count),
+                                is_active,
+                                filter,
+                                entity.clone(),
+                                accent, accent_soft, hover, text_primary, text_secondary, text_tertiary,
+                            )
+                        }));
+                    }
+                    section
+                }),
         )
         // ── Footer ────────────────────────────────────────────────────────
         .child(

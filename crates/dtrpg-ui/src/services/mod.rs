@@ -1,6 +1,8 @@
 //! Service trait and error types for library data access.
 
-use crate::data::library::LibraryItem;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use crate::data::library::{LibraryCollection, LibraryItem};
 
 /// The type of service failure returned by library operations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -104,6 +106,21 @@ pub trait LibraryService: Send + Sync + 'static {
     /// Returns [`LibraryServiceError`] with kind [`LibraryServiceErrorKind::NotFound`]
     /// if the id does not match any item, or a network/session error if the request fails.
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError>;
+
+    /// Returns the user's DTRPG product lists along with the set of product IDs in each.
+    ///
+    /// The returned tuple is `(collections, membership)` where `membership` maps each
+    /// collection name to its set of product numeric IDs (for catalog intersection).
+    ///
+    /// The default implementation returns empty collections so existing stub and test
+    /// implementations compile without changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LibraryServiceError`] if the request fails.
+    fn list_collections(&self) -> Result<(Vec<LibraryCollection>, HashMap<Arc<str>, HashSet<u64>>), LibraryServiceError> {
+        Ok((Vec::new(), HashMap::new()))
+    }
 }
 
 // ── LoginService ──────────────────────────────────────────────────────────────

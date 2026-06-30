@@ -195,9 +195,12 @@ impl Render for LibraryRootView {
         let auth_entity = self.auth_state.clone();
 
         let snap = self.controller.read(cx).snapshot();
-        let (filter, counts, publishers, total_count, total_mb, matched_count,
-             sort, sort_direction, grouped, presentation, selected_item) = (
-            snap.filter, snap.counts, snap.publishers, snap.total_count, snap.total_mb,
+        let (filter, counts, publishers, collections, publishers_collapsed, collections_collapsed,
+             total_count, total_mb, matched_count, sort, sort_direction, grouped,
+             presentation, selected_item) = (
+            snap.filter, snap.counts, snap.publishers, snap.collections,
+            snap.publishers_collapsed, snap.collections_collapsed,
+            snap.total_count, snap.total_mb,
             snap.matched_count, snap.sort, snap.sort_direction, snap.grouped,
             snap.presentation, snap.selected_item,
         );
@@ -216,6 +219,9 @@ impl Render for LibraryRootView {
             &filter,
             counts,
             &publishers,
+            publishers_collapsed,
+            &collections,
+            collections_collapsed,
             total_count,
             total_mb,
             lib_entity.clone(),

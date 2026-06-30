@@ -28,6 +28,15 @@ pub fn publisher_entries(items: &[LibraryItem]) -> Vec<PublisherEntry> {
     entries
 }
 
+// ── Collection aggregation ────────────────────────────────────────────────────
+
+/// A collection entry with the count of catalog items in the collection.
+#[derive(Debug, Clone)]
+pub struct CollectionEntry {
+    pub name: Arc<str>,
+    pub count: usize,
+}
+
 // ── Grouped view ──────────────────────────────────────────────────────────────
 
 /// A publisher group containing its items (already filtered and sorted).
