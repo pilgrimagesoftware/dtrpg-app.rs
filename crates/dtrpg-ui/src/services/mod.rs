@@ -4,6 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use crate::data::library::{LibraryCollection, LibraryItem};
 
+/// Maps item IDs to their collection membership sets.
+pub type CollectionMembership = HashMap<Arc<str>, HashSet<u64>>;
+
 /// The type of service failure returned by library operations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LibraryServiceErrorKind {
@@ -118,7 +121,7 @@ pub trait LibraryService: Send + Sync + 'static {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] if the request fails.
-    fn list_collections(&self) -> Result<(Vec<LibraryCollection>, HashMap<Arc<str>, HashSet<u64>>), LibraryServiceError> {
+    fn list_collections(&self) -> Result<(Vec<LibraryCollection>, CollectionMembership), LibraryServiceError> {
         Ok((Vec::new(), HashMap::new()))
     }
 }

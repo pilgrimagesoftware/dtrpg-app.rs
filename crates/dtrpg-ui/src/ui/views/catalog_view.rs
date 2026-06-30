@@ -13,7 +13,7 @@ use gpui_component::Sizable;
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
 
 use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
@@ -155,6 +155,54 @@ impl TableDelegate for CatalogListDelegate {
             ctrl.set_sort(method, cx);
             ctrl.set_sort_direction(direction, cx);
         });
+    }
+
+    fn context_menu(
+        &mut self,
+        row_ix: usize,
+        menu: PopupMenu,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> PopupMenu {
+        let items = self.controller.read(cx).visible_items_slice(row_ix..row_ix + 1);
+        let Some(item) = items.into_iter().next() else {
+            return menu;
+        };
+        let id = Arc::clone(&item.id);
+        let status = item.status;
+        let entity = self.controller.clone();
+        match status {
+            ItemStatus::Downloaded => {
+                let item_path = self.storage_root.join("items").join(&*id);
+                let entity_remove = entity.clone();
+                let remove_id = Arc::clone(&id);
+                menu.item(
+                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                            if !item_path.exists() {
+                                tracing::warn!(
+                                    path = %item_path.display(),
+                                    "reveal: file not found"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&item_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        }),
+                    )
+                    .item(
+                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        }),
+                    )
+            }
+            ItemStatus::Cloud => {
+                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
+                    entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
+                }))
+            }
+        }
     }
 
     fn render_td(
@@ -503,6 +551,7 @@ impl Render for CatalogView {
             (CatalogPresentation::Thumbs, false) => {
                 let c = colors.clone();
                 let d = density.clone();
+                let s = storage_root.clone();
                 root.px(pad_side)
                     .child(
                         uniform_list("catalog-thumbs", item_count, move |range, _window, cx| {
@@ -510,7 +559,7 @@ impl Render for CatalogView {
                             items
                                 .iter()
                                 .map(|item| {
-                                    render_thumb_row(item, &c, &d, ctrl.clone())
+                                    render_thumb_row(item, &c, &d, ctrl.clone(), s.clone())
                                         .into_any_element()
                                 })
                                 .collect()
@@ -531,10 +580,11 @@ impl Render for CatalogView {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
+                        let s = storage_root.clone();
                         div()
                             .child(render_group_header(&g.publisher, g.items.len(), &c))
                             .children(g.items.into_iter().map(move |item| {
-                                render_thumb_row(&item, &c, &d, e.clone())
+                                render_thumb_row(&item, &c, &d, e.clone(), s.clone())
                             }))
                     }))
                     .into_any_element()
@@ -835,6 +885,9 @@ fn render_grouped_list_row(
         div().w(rv_w).into_any_element()
     };
 
+    let ctx_id = Arc::clone(&id);
+    let ctx_entity = entity.clone();
+    let ctx_path = storage_root_path.join("items").join(&*id);
     let entity_click = entity.clone();
     div()
         .id(Arc::clone(&id))
@@ -948,6 +1001,40 @@ fn render_grouped_list_row(
                         })
                 }),
         )
+        .context_menu(move |menu, _, _| match status {
+            ItemStatus::Downloaded => {
+                let reveal_path = ctx_path.clone();
+                let remove_id = Arc::clone(&ctx_id);
+                let entity_remove = ctx_entity.clone();
+                menu.item(
+                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                            if !reveal_path.exists() {
+                                tracing::warn!(
+                                    path = %reveal_path.display(),
+                                    "reveal: file not found"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        }),
+                    )
+                    .item(
+                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        }),
+                    )
+            }
+            ItemStatus::Cloud => {
+                let dl_id = Arc::clone(&ctx_id);
+                let entity_dl = ctx_entity.clone();
+                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
+                    entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                }))
+            }
+        })
 }
 
 // ── Thumbs layout ─────────────────────────────────────────────────────────────
@@ -957,6 +1044,7 @@ fn render_thumb_row(
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
+    storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -972,6 +1060,9 @@ fn render_thumb_row(
     let row_h = density.thumb_row_height;
     let colors = colors.clone();
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
+    let ctx_id = Arc::clone(&id);
+    let ctx_entity = entity.clone();
+    let ctx_path = storage_root_path.join("items").join(&*id);
 
     let cover = render_generative_cover(item, thumb_w, thumb_h, false);
 
@@ -1040,6 +1131,40 @@ fn render_thumb_row(
         )
         .child(render_status(status, &colors))
         .child(ctx_menu)
+        .context_menu(move |menu, _, _| match status {
+            ItemStatus::Downloaded => {
+                let reveal_path = ctx_path.clone();
+                let remove_id = Arc::clone(&ctx_id);
+                let entity_remove = ctx_entity.clone();
+                menu.item(
+                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                            if !reveal_path.exists() {
+                                tracing::warn!(
+                                    path = %reveal_path.display(),
+                                    "reveal: file not found"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        }),
+                    )
+                    .item(
+                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        }),
+                    )
+            }
+            ItemStatus::Cloud => {
+                let dl_id = Arc::clone(&ctx_id);
+                let entity_dl = ctx_entity.clone();
+                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
+                    entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                }))
+            }
+        })
 }
 
 // ── Grid layout ───────────────────────────────────────────────────────────────
@@ -1082,6 +1207,9 @@ fn render_grid_card(
     let cover = render_generative_cover(item, card_w, cover_h, true);
     let colors = colors.clone();
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
+    let ctx_id = Arc::clone(&id);
+    let ctx_entity = entity.clone();
+    let ctx_path = storage_root_path.join("items").join(&*id);
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
         let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
@@ -1158,4 +1286,38 @@ fn render_grid_card(
                 .child(reveal_row)
                 .child(ctx_menu),
         )
+        .context_menu(move |menu, _, _| match status {
+            ItemStatus::Downloaded => {
+                let reveal_path = ctx_path.clone();
+                let remove_id = Arc::clone(&ctx_id);
+                let entity_remove = ctx_entity.clone();
+                menu.item(
+                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                            if !reveal_path.exists() {
+                                tracing::warn!(
+                                    path = %reveal_path.display(),
+                                    "reveal: file not found"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        }),
+                    )
+                    .item(
+                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        }),
+                    )
+            }
+            ItemStatus::Cloud => {
+                let dl_id = Arc::clone(&ctx_id);
+                let entity_dl = ctx_entity.clone();
+                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
+                    entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                }))
+            }
+        })
 }
