@@ -58,6 +58,8 @@ pub enum Density {
 pub struct DensityConstants {
     /// Height of a text-list row.
     pub row_text_height: Pixels,
+    /// Height of a thumbs-list row.
+    pub thumb_row_height: Pixels,
     /// Width of a thumbnail in a thumbs-list row (plain f32 for arithmetic).
     pub thumb_width: f32,
     /// Minimum width of a grid card (plain f32 for arithmetic).
@@ -76,7 +78,8 @@ impl DensityConstants {
     fn comfortable() -> Self {
         Self {
             row_text_height: px(44.0),
-            thumb_width: 46.0,
+            thumb_row_height: px(90.0),
+            thumb_width: 60.0,
             card_min_width: 158.0,
             card_gap_x: px(22.0),
             card_gap_y: px(26.0),
@@ -89,7 +92,8 @@ impl DensityConstants {
     fn compact() -> Self {
         Self {
             row_text_height: px(33.0),
-            thumb_width: 40.0,
+            thumb_row_height: px(76.0),
+            thumb_width: 50.0,
             card_min_width: 132.0,
             card_gap_x: px(16.0),
             card_gap_y: px(18.0),

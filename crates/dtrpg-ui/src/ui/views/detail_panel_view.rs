@@ -83,7 +83,7 @@ pub fn render_detail_panel(
                 .w(px(cover_w))
                 .h(px(cover_h))
                 .flex_none()
-                .child(render_generative_cover(&item, cover_w, cover_h))
+                .child(render_generative_cover(&item, cover_w, cover_h, true))
         })
         // Scrollable body
         .child(

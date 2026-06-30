@@ -189,7 +189,7 @@ fn render_motif(motif: Motif, fg: Hsla) -> impl IntoElement {
 }
 
 /// Renders a generative cover tile at the given pixel dimensions.
-pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32) -> impl IntoElement + 'static + use<> {
+pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32, render_text: bool) -> impl IntoElement + 'static + use<> {
     let style = cover_style(item);
     let bg = style.background;
     let fg = style.foreground;
@@ -197,52 +197,63 @@ pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32) -> i
     let fg45 = style.foreground_45;
     let motif = style.motif;
 
-    let publisher = item.publisher.to_string();
-    let title = item.title.to_string();
-    let line = item.line.to_string();
-
-    div()
+    let mut cover = div()
         .w(px(width))
         .h(px(height))
         .bg(bg)
         .flex()
         .flex_col()
-        .justify_between()
-        .overflow_hidden()
-        .child(
-            div()
-                .px_2()
-                .pt_2()
-                .text_color(fg70)
-                .text_xs()
-                .truncate()
-                .child(publisher),
-        )
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .items_center()
-                .gap_1()
-                .px_1()
-                .child(render_motif(motif, fg45))
-                .child(
-                    div()
-                        .text_color(fg)
-                        .text_xs()
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .child(title),
-                ),
-        )
-        .child(
-            div()
-                .px_2()
-                .pb_2()
-                .text_color(fg45)
-                .text_xs()
-                .truncate()
-                .child(line),
-        )
+        .overflow_hidden();
+
+    if render_text {
+        let publisher = item.publisher.to_string();
+        let title = item.title.to_string();
+        let line = item.line.to_string();
+
+        cover = cover
+            .justify_between()
+            .child(
+                div()
+                    .px_2()
+                    .pt_2()
+                    .text_color(fg70)
+                    .text_xs()
+                    .truncate()
+                    .child(publisher),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap_1()
+                    .px_1()
+                    .child(render_motif(motif, fg45))
+                    .child(
+                        div()
+                            .text_color(fg)
+                            .text_xs()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child(title),
+                    ),
+            )
+            .child(
+                div()
+                    .px_2()
+                    .pb_2()
+                    .text_color(fg45)
+                    .text_xs()
+                    .truncate()
+                    .child(line),
+            );
+    } else {
+        cover = cover
+            .items_center()
+            .justify_center()
+            .child(render_motif(motif, fg45));
+    }
+
+    cover
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

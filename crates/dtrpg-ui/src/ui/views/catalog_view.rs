@@ -969,11 +969,11 @@ fn render_thumb_row(
     let status = item.status;
     let thumb_w = density.thumb_width;
     let thumb_h = thumb_w * 10.0 / 7.0;
-    let row_h = density.row_text_height + px(6.0);
+    let row_h = density.thumb_row_height;
     let colors = colors.clone();
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
 
-    let cover = render_generative_cover(item, thumb_w, thumb_h);
+    let cover = render_generative_cover(item, thumb_w, thumb_h, false);
 
     div()
         .id(Arc::clone(&id))
@@ -1079,7 +1079,7 @@ fn render_grid_card(
     let cover_h = card_w * 10.0 / 7.0;
     let reveal_item_id = Arc::clone(&item.id);
 
-    let cover = render_generative_cover(item, card_w, cover_h);
+    let cover = render_generative_cover(item, card_w, cover_h, true);
     let colors = colors.clone();
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
 
