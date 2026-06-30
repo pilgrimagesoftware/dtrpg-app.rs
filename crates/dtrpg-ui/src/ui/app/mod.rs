@@ -3,41 +3,39 @@ use gpui_component::{init, Root};
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
+use crate::data::auth_state::AuthState;
 use crate::services::{LibraryService, LoginService, LoginTokens};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
-use crate::ui::windows::login::open_login_window;
 use crate::util::init::init_globals;
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
 ///
-/// The closure receives the in-memory [`LoginTokens`] obtained at startup or after login
-/// so they never need to be written to the keychain.
+/// `None` tokens mean the user is not authenticated; the factory should return a
+/// service that reflects the unauthenticated state without crashing.
 ///
-/// Set this global before calling [`setup`] so both the startup routing and the
-/// post-login library window opener can create fresh service instances.
-pub struct ServiceFactory(pub Box<dyn Fn(LoginTokens) -> Box<dyn LibraryService> + Send + Sync + 'static>);
+/// Set this global before calling [`setup`].
+pub struct ServiceFactory(pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService> + Send + Sync + 'static>);
 
 impl Global for ServiceFactory {}
 
 /// Holds the factory closure used to create a [`LoginService`] on demand.
 ///
-/// Set this global before calling [`setup`] so the login window can obtain a service
-/// instance to exchange the user's API key for session tokens.
+/// Used by [`SettingsController`] to authenticate the user from the Account tab.
 pub struct LoginServiceFactory(pub Box<dyn Fn() -> Box<dyn LoginService> + Send + Sync + 'static>);
 
 impl Global for LoginServiceFactory {}
 
-/// Opens a new library window backed by a freshly created service from [`ServiceFactory`].
+/// Opens the library window with the given auth state.
 ///
-/// `tokens` are passed directly to the service factory so they never touch the keychain.
-/// The avatar button reflects the logged-in state immediately.
+/// Always opens the library window regardless of auth state. When `auth_state` is
+/// `Unauthenticated`, the window opens with a notification banner prompting sign-in.
 ///
 /// # Panics
 ///
 /// Panics if the window cannot be opened or if `ServiceFactory` has not been set.
 #[allow(clippy::expect_used)]
-pub fn open_library_window(tokens: LoginTokens, cx: &mut App) {
+pub fn open_library_window(tokens: Option<LoginTokens>, auth_state: AuthState, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(tokens);
     cx.open_window(
         WindowOptions {
@@ -49,7 +47,7 @@ pub fn open_library_window(tokens: LoginTokens, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
-            let view = cx.new(|cx| LibraryRootView::new(window, cx, service));
+            let view = cx.new(|cx| LibraryRootView::new(window, cx, service, auth_state));
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
     )
@@ -143,26 +141,22 @@ pub fn setup(cx: &mut App) {
         }
     };
 
-    match api_key {
+    // Always open the library window. If re-auth succeeds, the window opens authenticated.
+    // If re-auth fails or no key exists, the window opens with a notification banner.
+    let (tokens, auth_state) = match api_key {
         Some(key) => {
-            // Always re-authenticate on startup so the access token is guaranteed fresh.
-            // Tokens are kept in memory only — never written to the keychain.
-            // TODO: refresh the access token when it nears expiry rather than only on startup.
             let login_service = (cx.global::<LoginServiceFactory>().0)();
             match login_service.authenticate(&key) {
-                Ok(tokens) => {
-                    open_library_window(tokens, cx);
-                }
+                Ok(tokens) => (Some(tokens), AuthState::Authenticated),
                 Err(e) => {
                     warn!("silent re-authentication failed: {e}");
-                    open_login_window(Some(key), cx);
+                    (None, AuthState::Unauthenticated)
                 }
             }
         }
-        None => {
-            open_login_window(None, cx);
-        }
-    }
+        None => (None, AuthState::Unauthenticated),
+    };
 
+    open_library_window(tokens, auth_state, cx);
     cx.activate(true);
 }

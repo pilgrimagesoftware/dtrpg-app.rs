@@ -11,7 +11,10 @@ pub fn run() {
         .with_quit_mode(QuitMode::LastWindowClosed)
         .run(|cx| {
             cx.set_global(ServiceFactory(Box::new(|tokens| {
-                Box::new(crate::services::sdk::RustSdkLibraryService::from_keyring_with_tokens(tokens))
+                match tokens {
+                    Some(t) => Box::new(crate::services::sdk::RustSdkLibraryService::from_keyring_with_tokens(t)),
+                    None => Box::new(crate::services::sdk::RustSdkLibraryService::unauthenticated()),
+                }
             })));
             cx.set_global(LoginServiceFactory(Box::new(
                 crate::services::login::build_login_service,

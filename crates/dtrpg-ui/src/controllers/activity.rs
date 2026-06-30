@@ -35,6 +35,16 @@ impl ActivityController {
         }
     }
 
+    /// Clears all activity items (in-progress and recent) and closes the panel.
+    ///
+    /// Used when replacing the library service so stale error messages don't persist.
+    pub fn clear(&mut self, cx: &mut Context<Self>) {
+        self.in_progress.clear();
+        self.recent.clear();
+        self.selected_id = None;
+        cx.emit(ActivityChanged);
+    }
+
     /// Registers a new in-progress operation with the given label.
     ///
     /// `cancel_fn` is an optional callback the UI invokes when the user clicks the cancel button.

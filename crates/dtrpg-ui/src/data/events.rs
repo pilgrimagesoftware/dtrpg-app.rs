@@ -4,6 +4,7 @@ use gpui::EventEmitter;
 use crate::controllers::activity::ActivityController;
 use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::library::LibraryController;
+use crate::controllers::settings::SettingsController;
 use crate::services::LoginTokens;
 
 // ── LibraryChanged ────────────────────────────────────────────────────────────
@@ -37,15 +38,11 @@ pub struct AuthStateChanged;
 
 impl EventEmitter<AuthStateChanged> for AuthStateController {}
 
-// ── LoginStateChanged ─────────────────────────────────────────────────────────
+// ── SignInSucceeded ───────────────────────────────────────────────────────────
 
-/// Emitted by `LoginController` when auth state transitions.
-pub enum LoginStateChanged {
-    /// The draft API key or in-progress/error state changed; views should re-render.
-    Changed,
-    /// Login succeeded; tokens are passed so the receiver can open the library window
-    /// without reading them from the keychain.
-    Succeeded(LoginTokens),
-    /// Logout completed; the caller should open the login window.
-    LoggedOut,
-}
+/// Emitted by `SettingsController` when the user successfully signs in from the Account tab.
+///
+/// The receiver should update `AuthStateController` and replace the `LibraryService`.
+pub struct SignInSucceeded(pub LoginTokens);
+
+impl EventEmitter<SignInSucceeded> for SettingsController {}

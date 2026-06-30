@@ -86,15 +86,39 @@ impl LibraryController {
     /// Does not panic; service errors are reflected in [`pane_state`].
     pub fn new(service: Box<dyn LibraryService>, activity: Entity<ActivityController>, cx: &mut Context<Self>) -> Self {
         let vm = LibraryViewModel::new(service);
-        let service_arc = vm.service_arc();
-        let weak_activity = activity.downgrade();
+
+        let mut ctrl = Self {
+            vm,
+            activity,
+            catalog: Vec::new(),
+            filter: SidebarFilter::default(),
+            search_query: String::new(),
+            sort: SortMethod::default(),
+            sort_direction: SortDirection::default(),
+            grouped: false,
+            presentation: CatalogPresentation::default(),
+            selection: Selection::default(),
+            section_counts: SectionCounts::default(),
+            publishers: Vec::new(),
+            thumbnail_queue: VecDeque::new(),
+            thumbnail_loading: false,
+            thumbnail_activity_id: None,
+        };
+        ctrl.start_load(cx);
+        ctrl
+    }
+
+    /// Spawns a background task to load the catalog from cache then the live API.
+    ///
+    /// Pages are delivered incrementally via an mpsc channel so each page triggers
+    /// a UI update before the next page arrives.
+    fn start_load(&mut self, cx: &mut Context<Self>) {
+        let service_arc = self.vm.service_arc();
+        let weak_activity = self.activity.downgrade();
         let storage_cfg = StorageConfig::load();
         let storage_root = storage_cfg.metadata_path();
         let save_root = storage_root.clone();
 
-        // Load catalog off the main thread so the UI remains responsive during the
-        // potentially multi-page HTTP fetch. Pages are delivered incrementally via an
-        // mpsc channel so each page triggers a UI update before the next page arrives.
         cx.spawn(async move |this, async_cx| {
             // ── Pre-populate from disk cache ──────────────────────────────────
             let cache_root = storage_root.clone();
@@ -177,24 +201,6 @@ impl LibraryController {
             }
         })
         .detach();
-
-        Self {
-            vm,
-            activity,
-            catalog: Vec::new(),
-            filter: SidebarFilter::default(),
-            search_query: String::new(),
-            sort: SortMethod::default(),
-            sort_direction: SortDirection::default(),
-            grouped: false,
-            presentation: CatalogPresentation::default(),
-            selection: Selection::default(),
-            section_counts: SectionCounts::default(),
-            publishers: Vec::new(),
-            thumbnail_queue: VecDeque::new(),
-            thumbnail_loading: false,
-            thumbnail_activity_id: None,
-        }
     }
 
     /// Appends a page of items received incrementally from the background load task.
@@ -212,6 +218,21 @@ impl LibraryController {
     /// Returns the current pane state from the service layer.
     pub fn pane_state(&self) -> &LibraryPaneState {
         self.vm.pane_state()
+    }
+
+    /// Replaces the backing service and triggers a fresh catalog load.
+    ///
+    /// Clears the activity panel so stale error messages from the previous
+    /// (unauthenticated) service do not persist after sign-in.
+    pub fn replace_service(&mut self, service: Box<dyn LibraryService>, cx: &mut Context<Self>) {
+        self.vm.replace_service(service);
+        self.catalog.clear();
+        self.section_counts = section_counts(&self.catalog);
+        self.publishers = publisher_entries(&self.catalog);
+        self.selection = Selection::default();
+        self.activity.update(cx, |a, cx| a.clear(cx));
+        cx.emit(LibraryChanged);
+        self.start_load(cx);
     }
 
     /// Reloads catalog from the service and resets selection.

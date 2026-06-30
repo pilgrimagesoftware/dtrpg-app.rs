@@ -55,6 +55,15 @@ impl LibraryViewModel {
         Arc::clone(&self.service)
     }
 
+    /// Replaces the backing service and resets pane state for a fresh load.
+    pub fn replace_service(&mut self, service: Box<dyn LibraryService>) {
+        self.service = Arc::from(service);
+        self.items.clear();
+        self.selected = None;
+        self.pane = LibraryPaneState::Loading;
+        self.last_error = None;
+    }
+
     /// Returns the current high-level pane state.
     pub fn pane_state(&self) -> &LibraryPaneState {
         &self.pane

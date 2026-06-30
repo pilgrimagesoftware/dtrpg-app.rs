@@ -10,7 +10,7 @@ use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController, SettingsTab};
 use crate::data::{
     enums::{CatalogPresentation},
     theme::ColorTokens,
@@ -320,19 +320,40 @@ fn render_avatar_button(
     cx: &App,
 ) -> AnyElement {
     if !auth.is_logged_in {
-        return div()
-            .id("avatar-btn")
-            .h(px(30.0))
-            .w(px(30.0))
-            .rounded_full()
-            .bg(colors.surface_alt)
-            .border_1()
-            .border_color(colors.border_strong)
+        let surface_alt = colors.surface_alt;
+        let border_strong = colors.border_strong;
+        let text_tertiary = colors.text_tertiary;
+        let unauthenticated_variant = ButtonCustomVariant::new(cx)
+            .color(surface_alt)
+            .foreground(text_tertiary)
+            .hover(gpui::Hsla { l: (surface_alt.l * 0.9).min(1.0), ..surface_alt })
+            .active(gpui::Hsla { l: (surface_alt.l * 0.8).min(1.0), ..surface_alt });
+        let inner = div()
             .flex()
             .items_center()
             .justify_center()
-            .tooltip(|window, cx| Tooltip::new("Not signed in").build(window, cx))
-            .child(div().text_xs().text_color(colors.text_tertiary).child("👤"))
+            .size_full()
+            .text_xs()
+            .text_color(text_tertiary)
+            .child("👤")
+            .into_any_element();
+        return Button::new("avatar-btn")
+            .custom(unauthenticated_variant)
+            .tooltip("Not signed in")
+            .rounded_full()
+            .w(px(30.0))
+            .h(px(30.0))
+            .border_1()
+            .border_color(border_strong)
+            .child(inner)
+            .dropdown_menu(move |menu, _, _| {
+                let s = settings.clone();
+                menu.item(
+                    PopupMenuItem::new("Sign In\u{2026}").on_click(move |_, _, cx| {
+                        s.update(cx, |ctrl, cx| ctrl.open_to(SettingsTab::Account, cx));
+                    }),
+                )
+            })
             .into_any_element();
     }
 

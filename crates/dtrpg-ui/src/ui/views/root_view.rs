@@ -3,6 +3,7 @@
 use gpui::{AppContext, div, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
 use gpui_component::input::{InputEvent, InputState};
 use crate::ui::actions::ShowSettings;
+use crate::ui::app::{LoginServiceFactory, ServiceFactory};
 
 use crate::{
     controllers::{
@@ -14,7 +15,7 @@ use crate::{
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
         auth_state::AuthState,
-        events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged},
+        events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded},
         theme::LibriTheme,
     },
     services::LibraryService,
@@ -28,8 +29,6 @@ use crate::ui::views::{
     sidebar_view::render_sidebar,
     toolbar_view::render_toolbar,
 };
-use crate::ui::windows::login::open_login_window;
-
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
     controller: Entity<LibraryController>,
@@ -50,30 +49,34 @@ pub struct LibraryRootView {
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
     ///
-    /// The library window is only opened after successful authentication, so the avatar
-    /// button always reflects the logged-in state.
-    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>) -> Self {
+    /// `auth_state` reflects the outcome of startup re-authentication. The window
+    /// always opens; the banner reflects whether the user is signed in.
+    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>, auth_state: AuthState) -> Self {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
+        let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| {
-            let mut ctrl = SettingsController::new(cx);
-            ctrl.set_logged_in(None, cx);
+            let mut ctrl = SettingsController::new(login_service, cx);
+            if auth_state == AuthState::Authenticated {
+                ctrl.set_logged_in(None, cx);
+            }
             ctrl
         });
-        let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
-        let auth_initial = {
-            #[cfg(debug_assertions)]
-            {
-                match std::env::var("DTRPG_AUTH_STATE_OVERRIDE").as_deref().unwrap_or("") {
-                    "unauthenticated" => AuthState::Unauthenticated,
-                    "expired" => AuthState::SessionExpired,
-                    _ => AuthState::Authenticated,
-                }
+
+        let api_key_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("Paste API key here\u{2026}")
+        });
+        let settings_for_input = settings.clone();
+        cx.subscribe(&api_key_input, move |_this, input_entity, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                let value = input_entity.read(cx).value().to_string();
+                settings_for_input.update(cx, |ctrl, cx| ctrl.set_api_key_draft(value, cx));
             }
-            #[cfg(not(debug_assertions))]
-            { AuthState::Authenticated }
-        };
-        let auth_state = cx.new(|_| AuthStateController::new(auth_initial));
+        })
+        .detach();
+        settings.update(cx, |ctrl, _cx| ctrl.set_api_key_input(api_key_input));
+        let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
+        let auth_state = cx.new(|_| AuthStateController::new(auth_state));
         let root_focus = cx.focus_handle();
         root_focus.focus(window, cx);
         let settings_focus = cx.focus_handle();
@@ -113,16 +116,26 @@ impl LibraryRootView {
         })
         .detach();
 
-        // Handle logout: delete the API key, open login window, close library window.
+        // Handle logout: delete the API key and transition to unauthenticated.
         // Tokens are in-memory only and need no explicit deletion.
-        cx.subscribe(&settings, |_this, _ctrl, _event: &LogoutRequested, cx| {
+        let auth_state_for_logout = auth_state.clone();
+        cx.subscribe(&settings, move |_this, _ctrl, _event: &LogoutRequested, cx| {
             let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
             if let Err(e) = store.delete() {
                 tracing::warn!("credential delete (api-key): {e}");
             }
-            let entity_id = cx.entity_id();
-            open_login_window(None, cx);
-            cx.with_window(entity_id, |window, _cx| window.remove_window());
+            auth_state_for_logout.update(cx, |ctrl, cx| ctrl.set_state(AuthState::Unauthenticated, cx));
+        })
+        .detach();
+
+        // Handle sign-in: replace the library service and mark as authenticated.
+        let auth_state_for_signin = auth_state.clone();
+        let controller_for_signin = controller.clone();
+        cx.subscribe(&settings, move |_this, _ctrl, event: &SignInSucceeded, cx| {
+            let tokens = event.0.clone();
+            let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens));
+            controller_for_signin.update(cx, |ctrl, cx| ctrl.replace_service(service, cx));
+            auth_state_for_signin.update(cx, |ctrl, cx| ctrl.set_state(AuthState::Authenticated, cx));
         })
         .detach();
 
@@ -209,8 +222,11 @@ impl Render for LibraryRootView {
                 .child(self.catalog_view.clone());
 
             if settings_snap.is_open {
-                // Grab keyboard focus so Escape routes to the backdrop, not the catalog.
-                window.focus(&self.settings_focus, cx);
+                // Focus the backdrop on first open so Escape works immediately.
+                // Don't steal focus if a child (e.g. the API key input) already has it.
+                if !self.settings_focus.contains_focused(window, cx) {
+                    window.focus(&self.settings_focus, cx);
+                }
                 let overlay = render_settings_panel(
                     settings_snap.active_tab,
                     &settings_snap.file_openers,
@@ -220,6 +236,9 @@ impl Render for LibraryRootView {
                     settings_entity,
                     &self.settings_focus,
                     colors,
+                    settings_snap.api_key_input,
+                    settings_snap.sign_in_in_progress,
+                    settings_snap.sign_in_error,
                 );
                 content = content.child(overlay);
             }

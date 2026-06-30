@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use gpui::prelude::*;
 use gpui::{div, px, AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled};
+use gpui_component::input::InputState;
 
 use crate::controllers::settings::{SettingsController, SettingsTab};
 use crate::data::file_openers::FileOpenerEntry;
@@ -31,6 +32,9 @@ pub fn render_settings_panel(
     entity: Entity<SettingsController>,
     focus_handle: &FocusHandle,
     colors: &ColorTokens,
+    api_key_input: Option<Entity<InputState>>,
+    sign_in_in_progress: bool,
+    sign_in_error: Option<String>,
 ) -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
@@ -113,7 +117,7 @@ pub fn render_settings_panel(
                         .flex_1()
                         .min_h_0()
                         .overflow_y_hidden()
-                        .child(render_active_section(active_tab, file_openers, is_authenticated, storage_root_path, storage_path_exists, entity, colors)),
+                        .child(render_active_section(active_tab, file_openers, is_authenticated, storage_root_path, storage_path_exists, entity, colors, api_key_input, sign_in_in_progress, sign_in_error)),
                 ),
         )
         .into_any_element()
@@ -190,9 +194,12 @@ fn render_active_section(
     storage_path_exists: bool,
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
+    api_key_input: Option<Entity<InputState>>,
+    sign_in_in_progress: bool,
+    sign_in_error: Option<String>,
 ) -> AnyElement {
     match active_tab {
-        SettingsTab::Account => render_account_section(is_authenticated, entity, colors).into_any_element(),
+        SettingsTab::Account => render_account_section(is_authenticated, entity, colors, api_key_input, sign_in_in_progress, sign_in_error).into_any_element(),
         SettingsTab::Storage => render_storage_section(storage_root_path, storage_path_exists, entity, colors).into_any_element(),
         SettingsTab::FileOpeners => {
             render_file_openers_section(file_openers, entity, colors).into_any_element()

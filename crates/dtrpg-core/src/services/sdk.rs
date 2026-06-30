@@ -70,6 +70,14 @@ impl RustSdkLibraryService {
         }
     }
 
+    /// Creates an unauthenticated service that returns a "not signed in" error on all calls.
+    pub fn unauthenticated() -> Self {
+        Self::new(Box::new(UnavailableSdkGateway::new(LibraryServiceError::new(
+            LibraryServiceErrorKind::Session,
+            "Not signed in. Open Settings > Account to sign in.",
+        ))))
+    }
+
     /// Creates the service using in-memory `tokens` obtained at startup or login.
     ///
     /// Reads only the API key from the platform keyring; tokens are never persisted
