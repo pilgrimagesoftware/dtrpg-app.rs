@@ -7,7 +7,8 @@ use std::sync::Arc;
 use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
     LibraryItemsParams, OrderProductItem, OrderProductItemResponse, OrderProductListResponse,
-    PageParams, ProductListCollectionResponse, ProductListItemsResponse, PublisherItem, SdkError,
+    PageParams, PaginationLinks, ProductListCollectionResponse, ProductListItemsResponse,
+    PublisherItem, SdkError,
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -109,22 +110,25 @@ impl RustSdkLibraryService {
 impl LibraryService for RustSdkLibraryService {
     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError> {
         let mut all_items: Vec<LibraryItem> = Vec::new();
-        self.list_items_paged(&mut |page_items| all_items.extend(page_items))?;
+        self.list_items_paged(&mut |page_items| all_items.extend(page_items), None)?;
         Ok(all_items)
     }
 
     fn list_items_paged(
         &self,
         on_page: &mut dyn FnMut(Vec<LibraryItem>),
+        mut on_total: Option<&mut dyn FnMut(usize)>,
     ) -> Result<(), LibraryServiceError> {
         let mut all_included: Vec<PublisherItem> = Vec::new();
         let mut page: u32 = 1;
         let mut global_index: u32 = 0;
+        let mut total_reported = false;
+        let page_size: u32 = 100;
 
         loop {
             let params = LibraryItemsParams {
                 page: Some(page),
-                page_size: Some(100),
+                page_size: Some(page_size),
                 get_checksum: Some(false),
                 get_filters: Some(true),
                 library: Some(true),
@@ -133,6 +137,15 @@ impl LibraryService for RustSdkLibraryService {
             };
 
             let response = self.gateway.list_order_products(params)?;
+
+            // Derive estimated total from `links.last` on the first page response.
+            if !total_reported {
+                if let (Some(cb), Some(last_page)) = (on_total.as_deref_mut(), last_page_from_links(&response.links)) {
+                    let estimated = (last_page as usize).saturating_mul(page_size as usize);
+                    cb(estimated);
+                }
+                total_reported = true;
+            }
 
             if let Some(included) = response.included {
                 for publisher in included {
@@ -345,6 +358,18 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
     fn list_product_list_items(&self, _product_list_id: u64) -> Result<ProductListItemsResponse, LibraryServiceError> {
         Err(self.error.clone())
     }
+}
+
+/// Extracts the last page number from a [`PaginationLinks`] `last` URL.
+///
+/// Parses the `page` query parameter from the URL using a simple string split.
+/// Returns `None` if `links.last` is absent or contains no valid `page` value.
+fn last_page_from_links(links: &PaginationLinks) -> Option<u32> {
+    let last_url = links.last.as_deref()?;
+    // Find "page=" in the query string and parse the digits that follow.
+    let page_part = last_url.split("page=").nth(1)?;
+    let digits: String = page_part.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse::<u32>().ok().filter(|&n| n > 0)
 }
 
 fn publisher_lookup(included: &[PublisherItem]) -> HashMap<u64, String> {
@@ -694,6 +719,36 @@ mod tests {
             prev: None,
             next,
         }
+    }
+
+    #[test]
+    fn last_page_from_links_parses_page_number() {
+        let links = PaginationLinks {
+            self_: "self".to_string(),
+            first: None,
+            last: Some("https://api.example.com/orders?page=42&pageSize=100".to_string()),
+            prev: None,
+            next: None,
+        };
+        assert_eq!(last_page_from_links(&links), Some(42));
+    }
+
+    #[test]
+    fn last_page_from_links_returns_none_when_absent() {
+        let links = pagination_links(None);
+        assert_eq!(last_page_from_links(&links), None);
+    }
+
+    #[test]
+    fn last_page_from_links_returns_none_when_no_page_param() {
+        let links = PaginationLinks {
+            self_: "self".to_string(),
+            first: None,
+            last: Some("https://api.example.com/orders?pageSize=100".to_string()),
+            prev: None,
+            next: None,
+        };
+        assert_eq!(last_page_from_links(&links), None);
     }
 
     #[test]

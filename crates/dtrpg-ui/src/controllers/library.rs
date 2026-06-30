@@ -151,13 +151,29 @@ impl LibraryController {
                 .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", None, cx))
                 .unwrap_or(0);
 
+            // Two channels: one for page batches, one for the estimated total.
             let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
+            let (total_tx, total_rx) = std::sync::mpsc::channel::<usize>();
 
             // Run the paginated fetch on the background executor. Each page is sent
             // through the channel as it arrives; the result indicates overall success/failure.
             let fetch = async_cx
                 .background_executor()
-                .spawn(async move { service_arc.list_items_paged(&mut |page| { tx.send(page).ok(); }) });
+                .spawn(async move {
+                    service_arc.list_items_paged(
+                        &mut |page| { tx.send(page).ok(); },
+                        Some(&mut |total| { total_tx.send(total).ok(); }),
+                    )
+                });
+
+            // If the service reports an estimated total, seed the progress bar.
+            let estimated_total: Option<usize> = total_rx.recv().ok();
+            if let Some(total) = estimated_total {
+                weak_activity
+                    .update(async_cx, |a, cx| a.update_progress(activity_id, 0.0, cx))
+                    .ok();
+                tracing::debug!(estimated_total = total, "catalog load: estimated item count");
+            }
 
             // Accumulate all live SDK pages into a local buffer so the cached catalog
             // remains visible in the UI throughout the fetch. The swap happens once,
@@ -177,6 +193,13 @@ impl LibraryController {
                 match msg {
                     Ok(items) => {
                         live_items.extend(items);
+                        // Update progress after each page if we have an estimate.
+                        if let Some(total) = estimated_total.filter(|&t| t > 0) {
+                            let progress = (live_items.len() as f32 / total as f32).min(1.0);
+                            weak_activity
+                                .update(async_cx, |a, cx| a.update_progress(activity_id, progress, cx))
+                                .ok();
+                        }
                         rx = Some(returned_rx);
                     }
                     Err(_) => break, // sender dropped — all pages have been sent

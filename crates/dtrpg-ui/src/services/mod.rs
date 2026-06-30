@@ -88,6 +88,10 @@ pub trait LibraryService: Send + Sync + 'static {
     /// override this to call `on_page` incrementally so callers can update the UI
     /// without waiting for all pages.
     ///
+    /// `on_total` is called at most once, before the first `on_page` delivery, with an
+    /// estimated total item count. Implementations that cannot determine the total pass
+    /// `None` or simply never call `on_total`. The default implementation never calls it.
+    ///
     /// # Errors
     ///
     /// Returns a [`LibraryServiceError`] if any page request fails. Items delivered
@@ -97,7 +101,9 @@ pub trait LibraryService: Send + Sync + 'static {
     fn list_items_paged(
         &self,
         on_page: &mut dyn FnMut(Vec<LibraryItem>),
+        on_total: Option<&mut dyn FnMut(usize)>,
     ) -> Result<(), LibraryServiceError> {
+        let _ = on_total;
         on_page(self.list_items()?);
         Ok(())
     }
