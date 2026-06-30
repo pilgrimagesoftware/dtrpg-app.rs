@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod profile;
 pub mod auth_state;
 pub mod catalog_cache;
 pub mod notification;

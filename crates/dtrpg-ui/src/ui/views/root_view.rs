@@ -2,6 +2,7 @@
 
 use gpui::{AppContext, div, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
 use gpui_component::input::{InputEvent, InputState};
+use crate::data::profile::ProfileConfig;
 use crate::ui::actions::ShowSettings;
 use crate::ui::app::{LoginServiceFactory, ServiceFactory};
 
@@ -55,10 +56,11 @@ impl LibraryRootView {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let login_service = cx.global::<LoginServiceFactory>().0();
+        let profile_email = ProfileConfig::load().email().map(str::to_owned);
         let settings = cx.new(|cx| {
             let mut ctrl = SettingsController::new(login_service, cx);
             if auth_state == AuthState::Authenticated {
-                ctrl.set_logged_in(None, cx);
+                ctrl.set_logged_in(profile_email, cx);
             }
             ctrl
         });
@@ -75,6 +77,24 @@ impl LibraryRootView {
         })
         .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_api_key_input(api_key_input));
+
+        let email_initial = settings.read(cx).email_draft().to_owned();
+        let email_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx).placeholder("Email (optional, for avatar)");
+            if !email_initial.is_empty() {
+                state = state.default_value(&email_initial);
+            }
+            state
+        });
+        let settings_for_email = settings.clone();
+        cx.subscribe(&email_input, move |_this, input_entity, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                let value = input_entity.read(cx).value().to_string();
+                settings_for_email.update(cx, |ctrl, cx| ctrl.set_email_draft(value, cx));
+            }
+        })
+        .detach();
+        settings.update(cx, |ctrl, _cx| ctrl.set_email_input(email_input));
 
         let storage_path_placeholder = {
             use crate::data::storage::StorageConfig;
@@ -256,6 +276,7 @@ impl Render for LibraryRootView {
                     &self.settings_focus,
                     colors,
                     settings_snap.api_key_input,
+                    settings_snap.email_input,
                     settings_snap.sign_in_in_progress,
                     settings_snap.sign_in_error,
                     settings_snap.storage_path_input,

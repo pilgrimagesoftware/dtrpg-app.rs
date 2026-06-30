@@ -9,6 +9,7 @@ use gpui_component::input::InputState;
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore, keys};
 use crate::data::avatar::fetch_avatar_bytes;
 use crate::data::events::{LogoutRequested, SettingsChanged, SignInSucceeded};
+use crate::data::profile::ProfileConfig;
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 use crate::services::LoginService;
@@ -101,12 +102,16 @@ pub struct SettingsSnapshot {
     pub auth: AuthStateSnapshot,
     /// Current value of the API key draft field in the Account tab.
     pub api_key_draft: String,
+    /// Current value of the email draft field in the Account tab (optional, for avatar).
+    pub email_draft: String,
     /// `true` while a sign-in request is in flight.
     pub sign_in_in_progress: bool,
     /// Error message from the last failed sign-in attempt, if any.
     pub sign_in_error: Option<String>,
     /// Shared input state for the API key text field in the Account tab.
     pub api_key_input: Option<Entity<InputState>>,
+    /// Shared input state for the email text field in the Account tab.
+    pub email_input: Option<Entity<InputState>>,
     /// Current draft value of the storage path text field.
     pub storage_path_draft: String,
     /// Shared input state for the storage path text field in the Storage tab.
@@ -126,10 +131,13 @@ pub struct SettingsController {
     storage_path_exists: bool,
     login_service: Arc<dyn LoginService>,
     api_key_draft: String,
+    email_draft: String,
     sign_in_in_progress: bool,
     sign_in_error: Option<String>,
     /// Input state for the API key text field; set by the root view after creation.
     api_key_input: Option<Entity<InputState>>,
+    /// Input state for the email text field; set by the root view after creation.
+    email_input: Option<Entity<InputState>>,
     /// Draft value of the storage path text field.
     storage_path_draft: String,
     /// Input state for the storage path text field; set by the root view after creation.
@@ -162,6 +170,11 @@ impl SettingsController {
         }
         let initial_path = storage.root_path();
         let storage_path_draft = initial_path.to_string_lossy().into_owned();
+        let email_draft = ProfileConfig::load()
+            .email()
+            .unwrap_or_default()
+            .to_owned();
+
         let mut ctrl = Self {
             is_open: false,
             active_tab,
@@ -173,9 +186,11 @@ impl SettingsController {
             storage_unavailable,
             login_service: Arc::from(login_service),
             api_key_draft: String::new(),
+            email_draft,
             sign_in_in_progress: false,
             sign_in_error: None,
             api_key_input: None,
+            email_input: None,
             storage_path_draft,
             storage_path_input: None,
         };
@@ -188,6 +203,11 @@ impl SettingsController {
     /// Must be called once after construction, before the settings panel is first rendered.
     pub fn set_api_key_input(&mut self, input: Entity<InputState>) {
         self.api_key_input = Some(input);
+    }
+
+    /// Attaches the email input state entity created by the root view.
+    pub fn set_email_input(&mut self, input: Entity<InputState>) {
+        self.email_input = Some(input);
     }
 
     /// Attaches the storage path input state entity created by the root view.
@@ -327,6 +347,17 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
+    /// Returns the current email draft value.
+    pub fn email_draft(&self) -> &str {
+        &self.email_draft
+    }
+
+    /// Updates the email draft field.
+    pub fn set_email_draft(&mut self, value: String, cx: &mut Context<Self>) {
+        self.email_draft = value;
+        cx.emit(SettingsChanged);
+    }
+
     /// Attempts to sign in with the current `api_key_draft`.
     ///
     /// Runs authentication on a background thread. On success, stores the API key to
@@ -341,6 +372,10 @@ impl SettingsController {
         cx.emit(SettingsChanged);
 
         let key = self.api_key_draft.clone();
+        let email = {
+            let trimmed = self.email_draft.trim();
+            if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+        };
         let svc = self.login_service.clone();
 
         cx.spawn(async move |this, async_cx| {
@@ -357,8 +392,9 @@ impl SettingsController {
                         if let Err(e) = store.store(&Credential { service: keys::SERVICE.into(), account: keys::API_KEY.into(), secret: api_key.clone() }) {
                             tracing::warn!("failed to save API key to keyring: {e}");
                         }
+                        ProfileConfig::save(email.as_deref());
                         ctrl.api_key_draft.clear();
-                        ctrl.set_logged_in(None, cx);
+                        ctrl.set_logged_in(email, cx);
                         cx.emit(SignInSucceeded(tokens));
                     }
                     Err(e) => {
@@ -471,9 +507,11 @@ impl SettingsController {
             storage_path_exists: self.storage_path_exists,
             auth,
             api_key_draft: self.api_key_draft.clone(),
+            email_draft: self.email_draft.clone(),
             sign_in_in_progress: self.sign_in_in_progress,
             sign_in_error: self.sign_in_error.clone(),
             api_key_input: self.api_key_input.clone(),
+            email_input: self.email_input.clone(),
             storage_path_draft: self.storage_path_draft.clone(),
             storage_path_input: self.storage_path_input.clone(),
         }

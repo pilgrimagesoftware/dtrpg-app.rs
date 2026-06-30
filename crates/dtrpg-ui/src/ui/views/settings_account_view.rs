@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use gpui::prelude::FluentBuilder;
 use gpui::{AnyElement, div, img, px, Entity, Image, ImageFormat, ImageSource, InteractiveElement,
     IntoElement, ObjectFit, ParentElement, StatefulInteractiveElement, Styled, StyledImage};
 use gpui_component::input::{Input, InputState};
@@ -10,19 +11,21 @@ use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
 
 /// Renders the Account settings section.
+#[allow(clippy::too_many_arguments)]
 pub fn render_account_section(
     is_authenticated: bool,
     auth: &AuthStateSnapshot,
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
     api_key_input: Option<Entity<InputState>>,
+    email_input: Option<Entity<InputState>>,
     sign_in_in_progress: bool,
     sign_in_error: Option<String>,
 ) -> AnyElement {
     if is_authenticated {
         render_authenticated(auth, entity, colors).into_any_element()
     } else {
-        render_unauthenticated(entity, colors, api_key_input, sign_in_in_progress, sign_in_error).into_any_element()
+        render_unauthenticated(entity, colors, api_key_input, email_input, sign_in_in_progress, sign_in_error).into_any_element()
     }
 }
 
@@ -128,6 +131,7 @@ fn render_unauthenticated(
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
     api_key_input: Option<Entity<InputState>>,
+    email_input: Option<Entity<InputState>>,
     sign_in_in_progress: bool,
     sign_in_error: Option<String>,
 ) -> impl IntoElement + 'static {
@@ -191,7 +195,10 @@ fn render_unauthenticated(
                 Input::new(&input_state)
                     .appearance(true)
                     .into_element(),
-            );
+            )
+            .when_some(email_input, |el, email_state| {
+                el.child(Input::new(&email_state).appearance(true).into_element())
+            });
 
         if let Some(err) = sign_in_error {
             form_section = form_section.child(
