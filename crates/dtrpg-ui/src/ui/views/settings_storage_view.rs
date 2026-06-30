@@ -2,7 +2,8 @@
 
 use std::path::PathBuf;
 
-use gpui::{div, px, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui::{div, px, AnyElement, Element, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::settings::SettingsController;
@@ -19,10 +20,10 @@ pub fn render_storage_section(
     storage_path_exists: bool,
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
+    storage_path_input: Option<Entity<InputState>>,
 ) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
-    let text_tertiary = colors.text_tertiary;
     let border = colors.border;
     let surface_alt = colors.surface_alt;
     let warning_bg = colors.warning_bg;
@@ -30,7 +31,7 @@ pub fn render_storage_section(
 
     let path_display = storage_root_path.to_string_lossy().into_owned();
     let entity_change = entity.clone();
-    let entity_reveal = entity;
+    let entity_reveal = entity.clone();
 
     let reveal_label = platform_reveal_label();
 
@@ -58,27 +59,36 @@ pub fn render_storage_section(
                         .flex()
                         .items_center()
                         .gap(px(8.0))
-                        // Path display field
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .h(px(34.0))
-                                .px(px(12.0))
-                                .rounded(px(8.0))
-                                .border_1()
-                                .border_color(border)
-                                .bg(surface_alt)
-                                .flex()
-                                .items_center()
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(text_secondary)
-                                        .truncate()
-                                        .child(path_display),
-                                ),
-                        )
+                        // Path input field
+                        .child({
+                            let path_el: AnyElement = if let Some(input_state) = storage_path_input {
+                                Input::new(&input_state)
+                                    .appearance(true)
+                                    .into_element()
+                                    .into_any()
+                            } else {
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .h(px(34.0))
+                                    .px(px(12.0))
+                                    .rounded(px(8.0))
+                                    .border_1()
+                                    .border_color(border)
+                                    .bg(surface_alt)
+                                    .flex()
+                                    .items_center()
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(text_secondary)
+                                            .truncate()
+                                            .child(path_display),
+                                    )
+                                    .into_any()
+                            };
+                            path_el
+                        })
                         // "Change…" icon button
                         .child(
                             div()
@@ -170,8 +180,8 @@ pub fn render_storage_section(
         .child(
             div()
                 .text_xs()
-                .text_color(text_tertiary)
-                .child("Changing the storage location will not move existing downloaded files."),
+                .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0))
+                .child("\u{26A0} Changing the storage location will not move existing downloaded files."),
         )
 }
 

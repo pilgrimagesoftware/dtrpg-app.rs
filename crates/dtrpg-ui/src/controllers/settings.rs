@@ -107,6 +107,10 @@ pub struct SettingsSnapshot {
     pub sign_in_error: Option<String>,
     /// Shared input state for the API key text field in the Account tab.
     pub api_key_input: Option<Entity<InputState>>,
+    /// Current draft value of the storage path text field.
+    pub storage_path_draft: String,
+    /// Shared input state for the storage path text field in the Storage tab.
+    pub storage_path_input: Option<Entity<InputState>>,
 }
 
 /// Owns all mutable settings state: panel visibility, active tab, file-opener overrides,
@@ -126,6 +130,10 @@ pub struct SettingsController {
     sign_in_error: Option<String>,
     /// Input state for the API key text field; set by the root view after creation.
     api_key_input: Option<Entity<InputState>>,
+    /// Draft value of the storage path text field.
+    storage_path_draft: String,
+    /// Input state for the storage path text field; set by the root view after creation.
+    storage_path_input: Option<Entity<InputState>>,
 }
 
 impl SettingsController {
@@ -153,6 +161,7 @@ impl SettingsController {
             );
         }
         let initial_path = storage.root_path();
+        let storage_path_draft = initial_path.to_string_lossy().into_owned();
         let mut ctrl = Self {
             is_open: false,
             active_tab,
@@ -167,6 +176,8 @@ impl SettingsController {
             sign_in_in_progress: false,
             sign_in_error: None,
             api_key_input: None,
+            storage_path_draft,
+            storage_path_input: None,
         };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
@@ -177,6 +188,17 @@ impl SettingsController {
     /// Must be called once after construction, before the settings panel is first rendered.
     pub fn set_api_key_input(&mut self, input: Entity<InputState>) {
         self.api_key_input = Some(input);
+    }
+
+    /// Attaches the storage path input state entity created by the root view.
+    pub fn set_storage_path_input(&mut self, input: Entity<InputState>) {
+        self.storage_path_input = Some(input);
+    }
+
+    /// Updates the storage path draft field.
+    pub fn set_storage_path_draft(&mut self, value: String, cx: &mut Context<Self>) {
+        self.storage_path_draft = value;
+        cx.emit(SettingsChanged);
     }
 }
 
@@ -452,6 +474,8 @@ impl SettingsController {
             sign_in_in_progress: self.sign_in_in_progress,
             sign_in_error: self.sign_in_error.clone(),
             api_key_input: self.api_key_input.clone(),
+            storage_path_draft: self.storage_path_draft.clone(),
+            storage_path_input: self.storage_path_input.clone(),
         }
     }
 }

@@ -75,6 +75,24 @@ impl LibraryRootView {
         })
         .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_api_key_input(api_key_input));
+
+        let storage_path_placeholder = {
+            use crate::data::storage::StorageConfig;
+            StorageConfig::load().root_path().to_string_lossy().into_owned()
+        };
+        let storage_path_input = cx.new(|cx| {
+            InputState::new(window, cx).default_value(&storage_path_placeholder)
+        });
+        let settings_for_storage = settings.clone();
+        cx.subscribe(&storage_path_input, move |_this, input_entity, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                let value = input_entity.read(cx).value().to_string();
+                settings_for_storage.update(cx, |ctrl, cx| ctrl.set_storage_path_draft(value, cx));
+            }
+        })
+        .detach();
+        settings.update(cx, |ctrl, _cx| ctrl.set_storage_path_input(storage_path_input));
+
         let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
         let auth_state = cx.new(|_| AuthStateController::new(auth_state));
         let root_focus = cx.focus_handle();
@@ -231,6 +249,7 @@ impl Render for LibraryRootView {
                     settings_snap.active_tab,
                     &settings_snap.file_openers,
                     settings_snap.is_authenticated,
+                    settings_snap.auth,
                     settings_snap.storage_root_path,
                     settings_snap.storage_path_exists,
                     settings_entity,
@@ -239,6 +258,7 @@ impl Render for LibraryRootView {
                     settings_snap.api_key_input,
                     settings_snap.sign_in_in_progress,
                     settings_snap.sign_in_error,
+                    settings_snap.storage_path_input,
                 );
                 content = content.child(overlay);
             }

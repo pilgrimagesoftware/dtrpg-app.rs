@@ -6,7 +6,7 @@ use gpui::prelude::*;
 use gpui::{div, px, AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled};
 use gpui_component::input::InputState;
 
-use crate::controllers::settings::{SettingsController, SettingsTab};
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController, SettingsTab};
 use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::{
@@ -27,6 +27,7 @@ pub fn render_settings_panel(
     active_tab: SettingsTab,
     file_openers: &[FileOpenerEntry],
     is_authenticated: bool,
+    auth: AuthStateSnapshot,
     storage_root_path: PathBuf,
     storage_path_exists: bool,
     entity: Entity<SettingsController>,
@@ -35,6 +36,7 @@ pub fn render_settings_panel(
     api_key_input: Option<Entity<InputState>>,
     sign_in_in_progress: bool,
     sign_in_error: Option<String>,
+    storage_path_input: Option<Entity<InputState>>,
 ) -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
@@ -117,7 +119,7 @@ pub fn render_settings_panel(
                         .flex_1()
                         .min_h_0()
                         .overflow_y_hidden()
-                        .child(render_active_section(active_tab, file_openers, is_authenticated, storage_root_path, storage_path_exists, entity, colors, api_key_input, sign_in_in_progress, sign_in_error)),
+                        .child(render_active_section(active_tab, file_openers, is_authenticated, auth, storage_root_path, storage_path_exists, entity, colors, api_key_input, sign_in_in_progress, sign_in_error, storage_path_input)),
                 ),
         )
         .into_any_element()
@@ -190,6 +192,7 @@ fn render_active_section(
     active_tab: SettingsTab,
     file_openers: &[FileOpenerEntry],
     is_authenticated: bool,
+    auth: AuthStateSnapshot,
     storage_root_path: PathBuf,
     storage_path_exists: bool,
     entity: Entity<SettingsController>,
@@ -197,10 +200,11 @@ fn render_active_section(
     api_key_input: Option<Entity<InputState>>,
     sign_in_in_progress: bool,
     sign_in_error: Option<String>,
+    storage_path_input: Option<Entity<InputState>>,
 ) -> AnyElement {
     match active_tab {
-        SettingsTab::Account => render_account_section(is_authenticated, entity, colors, api_key_input, sign_in_in_progress, sign_in_error).into_any_element(),
-        SettingsTab::Storage => render_storage_section(storage_root_path, storage_path_exists, entity, colors).into_any_element(),
+        SettingsTab::Account => render_account_section(is_authenticated, &auth, entity, colors, api_key_input, sign_in_in_progress, sign_in_error).into_any_element(),
+        SettingsTab::Storage => render_storage_section(storage_root_path, storage_path_exists, entity, colors, storage_path_input).into_any_element(),
         SettingsTab::FileOpeners => {
             render_file_openers_section(file_openers, entity, colors).into_any_element()
         }
