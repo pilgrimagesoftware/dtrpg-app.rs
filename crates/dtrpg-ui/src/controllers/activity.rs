@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use gpui::Context;
 
 use crate::data::activity::{ActivityItem, ActivitySnapshot, ActivityStatus};
-use crate::data::events::ActivityChanged;
+use crate::data::events::{ActivityChanged, DownloadComplete, DownloadError};
 
 const RECENT_CAP: usize = 25;
 const EXPIRY_SECS: u64 = 15;
@@ -91,8 +91,10 @@ impl ActivityController {
             let mut item = self.in_progress.remove(pos);
             item.elapsed_secs = Some(item.started_at.elapsed().as_secs());
             item.status = ActivityStatus::Complete;
+            let title = item.label.clone();
             self.push_recent(item);
             cx.emit(ActivityChanged);
+            cx.emit(DownloadComplete { title });
             cx.spawn(async move |this, async_cx| {
                 async_cx.background_executor().timer(Duration::from_secs(EXPIRY_SECS)).await;
                 this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
@@ -108,9 +110,11 @@ impl ActivityController {
         if let Some(pos) = self.in_progress.iter().position(|i| i.id == id) {
             let mut item = self.in_progress.remove(pos);
             item.elapsed_secs = Some(item.started_at.elapsed().as_secs());
-            item.status = ActivityStatus::Error(message);
+            let title = item.label.clone();
+            item.status = ActivityStatus::Error(message.clone());
             self.push_recent(item);
             cx.emit(ActivityChanged);
+            cx.emit(DownloadError { title, message });
             cx.spawn(async move |this, async_cx| {
                 async_cx.background_executor().timer(Duration::from_secs(ERROR_EXPIRY_SECS)).await;
                 this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();

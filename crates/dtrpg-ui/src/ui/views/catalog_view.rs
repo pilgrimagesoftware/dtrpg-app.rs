@@ -8,8 +8,11 @@ use gpui::{
     div, px, uniform_list, AnyElement, App, Context, Entity, IntoElement, ParentElement,
     Render, Styled, UniformListScrollHandle, Window,
 };
+use gpui_component::badge::Badge;
+use gpui_component::pagination::Pagination;
 use gpui_component::scroll::ScrollableElement;
-use gpui_component::Sizable;
+use gpui_component::spinner::Spinner;
+use gpui_component::{Sizable, Size};
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
 
 use gpui_component::button::{Button, ButtonVariants};
@@ -479,6 +482,8 @@ impl Render for CatalogView {
         let scroll_handle = self.scroll_handle.clone();
         let ctrl = self.controller.clone();
 
+        let outer = div().flex_1().min_h_0().flex().flex_col();
+
         let root = div()
             .flex_1()
             .min_h_0()
@@ -487,6 +492,12 @@ impl Render for CatalogView {
             .overflow_y_scrollbar()
             .pt(pad_top)
             .pb(pad_bottom);
+
+        if snap.catalog_loading && item_count == 0 {
+            return outer
+                .child(root.justify_center().items_center().child(Spinner::new().with_size(Size::Large)))
+                .into_any_element();
+        }
 
         if let Some(reason) = empty_reason {
             let empty_state = match reason {
@@ -498,12 +509,16 @@ impl Render for CatalogView {
                         .into_any_element()
                 }
             };
-            return root
-                .child(empty_state)
-                .into_any_element();
+            return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        match (snap.presentation, snap.grouped) {
+        let current_page = snap.current_page;
+        let total_pages = snap.total_pages;
+        let page_size = snap.page_size;
+        let ctrl_for_page = self.controller.clone();
+        let ctrl_for_size = self.controller.clone();
+
+        let content: AnyElement = match (snap.presentation, snap.grouped) {
             // ── List, ungrouped — DataTable (handles header/row alignment) ──
             (CatalogPresentation::List, false) => {
                 use gpui_component::Size;
@@ -655,7 +670,51 @@ impl Render for CatalogView {
                     }))
                     .into_any_element()
             }
+        };
+
+        let mut result = outer.child(content);
+
+        if total_pages > 1 {
+            let size_picker = Button::new("page-size-btn")
+                .ghost()
+                .label(format!("{page_size} / page"))
+                .dropdown_caret(true)
+                .dropdown_menu(move |menu, _, _| {
+                    let c = ctrl_for_size.clone();
+                    [10usize, 25, 50, 100, 200].into_iter().fold(menu, |m, n| {
+                        let c2 = c.clone();
+                        m.item(
+                            PopupMenuItem::new(format!("{n}"))
+                                .checked(n == page_size)
+                                .on_click(move |_, _, cx| {
+                                    c2.update(cx, |ctrl, cx| ctrl.set_page_size(n, cx));
+                                }),
+                        )
+                    })
+                });
+
+            result = result.child(
+                div()
+                    .flex_none()
+                    .px(pad_side)
+                    .py(px(8.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .gap(px(16.0))
+                    .child(size_picker)
+                    .child(
+                        Pagination::new("catalog-pagination")
+                            .current_page(current_page)
+                            .total_pages(total_pages)
+                            .on_click(move |page, _, cx| {
+                                ctrl_for_page.update(cx, |ctrl, cx| ctrl.set_page(*page, cx));
+                            }),
+                    ),
+            );
         }
+
+        result.into_any_element()
     }
 }
 
@@ -1066,6 +1125,21 @@ fn render_thumb_row(
 
     let cover = render_generative_cover(item, thumb_w, thumb_h, false);
 
+    let cover_cell: AnyElement = {
+        let inner = div()
+            .w(px(thumb_w))
+            .h(px(thumb_h))
+            .rounded(px(3.0))
+            .overflow_hidden()
+            .flex_none()
+            .child(cover);
+        if status == ItemStatus::Downloaded {
+            Badge::new().dot().color(gpui::green()).child(inner).into_any_element()
+        } else {
+            inner.into_any_element()
+        }
+    };
+
     div()
         .id(Arc::clone(&id))
         .flex()
@@ -1078,15 +1152,7 @@ fn render_thumb_row(
         .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
         })
-        .child(
-            div()
-                .w(px(thumb_w))
-                .h(px(thumb_h))
-                .rounded(px(3.0))
-                .overflow_hidden()
-                .flex_none()
-                .child(cover),
-        )
+        .child(cover_cell)
         .child(
             div()
                 .flex_1()
@@ -1241,6 +1307,15 @@ fn render_grid_card(
         div().into_any_element()
     };
 
+    let cover_cell: AnyElement = {
+        let inner = div().w(px(card_w)).h(px(cover_h)).child(cover);
+        if status == ItemStatus::Downloaded {
+            Badge::new().dot().color(gpui::green()).child(inner).into_any_element()
+        } else {
+            inner.into_any_element()
+        }
+    };
+
     div()
         .id(Arc::clone(&id))
         .w(px(card_w))
@@ -1252,7 +1327,7 @@ fn render_grid_card(
         .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
         })
-        .child(div().w(px(card_w)).h(px(cover_h)).child(cover))
+        .child(cover_cell)
         .child(
             div()
                 .px(px(4.0))

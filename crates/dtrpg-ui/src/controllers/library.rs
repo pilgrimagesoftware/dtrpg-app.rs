@@ -29,8 +29,6 @@ pub struct LibrarySnapshot {
     pub publishers: Vec<PublisherEntry>,
     pub collections: Vec<CollectionEntry>,
     pub collection_membership: HashMap<Arc<str>, HashSet<u64>>,
-    pub publishers_collapsed: bool,
-    pub collections_collapsed: bool,
     pub total_count: usize,
     pub total_mb: f64,
     pub matched_count: usize,
@@ -41,6 +39,10 @@ pub struct LibrarySnapshot {
     pub presentation: CatalogPresentation,
     pub selected_item: Option<LibraryItem>,
     pub items: Vec<LibraryItem>,
+    pub catalog_loading: bool,
+    pub current_page: usize,
+    pub page_size: usize,
+    pub total_pages: usize,
 }
 
 /// Owns all mutable state for the library view.
@@ -75,16 +77,18 @@ pub struct LibraryController {
     pub collections: Vec<CollectionEntry>,
     /// Maps collection name to the set of numeric product IDs it contains.
     pub collection_membership: HashMap<Arc<str>, HashSet<u64>>,
-    /// Whether the Publishers section in the sidebar is collapsed.
-    pub publishers_collapsed: bool,
-    /// Whether the Collections section in the sidebar is collapsed.
-    pub collections_collapsed: bool,
     /// Queue of `(item_id, cover_url)` pairs pending thumbnail fetches.
     thumbnail_queue: VecDeque<(Arc<str>, Arc<str>)>,
     /// Whether a thumbnail fetch is currently in flight.
     thumbnail_loading: bool,
     /// Activity id for the aggregated thumbnail loading entry.
     thumbnail_activity_id: Option<u64>,
+    /// True from startup until the first `set_catalog` call completes.
+    catalog_loading: bool,
+    /// 1-based current page index.
+    pub current_page: usize,
+    /// Number of items per page. One of: 10, 25, 50, 100, 200.
+    pub page_size: usize,
 }
 
 impl LibraryController {
@@ -114,11 +118,12 @@ impl LibraryController {
             publishers: Vec::new(),
             collections: Vec::new(),
             collection_membership: HashMap::new(),
-            publishers_collapsed: false,
-            collections_collapsed: false,
             thumbnail_queue: VecDeque::new(),
             thumbnail_loading: false,
             thumbnail_activity_id: None,
+            catalog_loading: true,
+            current_page: 1,
+            page_size: crate::data::ui_prefs::UiPrefs::load().page_size().unwrap_or(25),
         };
         ctrl.start_load(cx);
         ctrl
@@ -257,6 +262,7 @@ impl LibraryController {
     fn set_catalog(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog = items;
+        self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
         cx.emit(LibraryChanged);
@@ -470,8 +476,11 @@ impl LibraryController {
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
-        let items = self.visible_items();
-        let matched_count = items.len();
+        let all_items = self.visible_items();
+        let matched_count = all_items.len();
+        let total_pages = matched_count.div_ceil(self.page_size).max(1);
+        let page_start = (self.current_page - 1) * self.page_size;
+        let items: Vec<LibraryItem> = all_items.into_iter().skip(page_start).take(self.page_size).collect();
         let selected_item = self.selected_item().cloned();
         LibrarySnapshot {
             filter: self.filter.clone(),
@@ -479,8 +488,6 @@ impl LibraryController {
             publishers: self.publishers.clone(),
             collections: self.collections.clone(),
             collection_membership: self.collection_membership.clone(),
-            publishers_collapsed: self.publishers_collapsed,
-            collections_collapsed: self.collections_collapsed,
             total_count: self.section_counts.all,
             total_mb: self.total_size_mb(),
             matched_count,
@@ -491,7 +498,50 @@ impl LibraryController {
             presentation: self.presentation,
             selected_item,
             items,
+            catalog_loading: self.catalog_loading,
+            current_page: self.current_page,
+            page_size: self.page_size,
+            total_pages,
         }
+    }
+
+    /// Returns true while the initial catalog fetch is still in flight and no items have arrived.
+    pub fn is_loading(&self) -> bool {
+        self.catalog_loading && self.catalog.is_empty()
+    }
+
+    // ── Pagination ────────────────────────────────────────────────────────────
+
+    /// Total number of pages for the current filtered result set.
+    ///
+    /// Always returns at least 1.
+    pub fn total_pages(&self) -> usize {
+        let count = self.visible_items().len();
+        count.div_ceil(self.page_size).max(1)
+    }
+
+    /// Navigates to the given 1-based page, clamped to the valid range.
+    ///
+    /// Emits [`LibraryChanged`].
+    pub fn set_page(&mut self, page: usize, cx: &mut Context<Self>) {
+        let total = self.total_pages();
+        self.current_page = page.clamp(1, total);
+        cx.emit(LibraryChanged);
+    }
+
+    /// Sets the number of items shown per page.
+    ///
+    /// Accepted values: `[10, 25, 50, 100, 200]`. Ignored for other values.
+    /// Resets `current_page` to 1 and emits [`LibraryChanged`].
+    pub fn set_page_size(&mut self, size: usize, cx: &mut Context<Self>) {
+        const VALID: [usize; 5] = [10, 25, 50, 100, 200];
+        if !VALID.contains(&size) {
+            return;
+        }
+        self.page_size = size;
+        self.current_page = 1;
+        crate::data::ui_prefs::UiPrefs::load().save_page_size(size);
+        cx.emit(LibraryChanged);
     }
 
     // ── Filtered result set ───────────────────────────────────────────────────
@@ -522,31 +572,32 @@ impl LibraryController {
     ///
     /// Cheaper than cloning the full `Vec` when only the count is needed.
     #[must_use]
+    /// Returns the number of items on the current page.
     pub fn visible_items_count(&self) -> usize {
-        self.visible_items().len()
+        let all = self.visible_items();
+        let page_start = (self.current_page - 1) * self.page_size;
+        all.len().saturating_sub(page_start).min(self.page_size)
     }
 
-    /// Returns the items in `range` from the filtered, sorted result set.
+    /// Returns a slice within the current page window.
     ///
-    /// Used by `uniform_list` render closures to fetch only the visible slice.
+    /// `range` is 0-based relative to the start of the current page.
+    /// Used by `uniform_list` render closures.
     #[must_use]
     pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
+        let page_start = (self.current_page - 1) * self.page_size;
         let items = self.visible_items();
-        items.get(range).map(|s| s.to_vec()).unwrap_or_default()
+        let abs_start = page_start + range.start;
+        let abs_end = page_start + range.end;
+        items.get(abs_start..abs_end).map(|s| s.to_vec()).unwrap_or_default()
     }
 
-    // ── Sidebar collapse toggles ──────────────────────────────────────────────
-
-    /// Toggles whether the Publishers section in the sidebar is collapsed.
-    pub fn toggle_publishers_collapsed(&mut self, cx: &mut Context<Self>) {
-        self.publishers_collapsed = !self.publishers_collapsed;
-        cx.emit(LibraryChanged);
-    }
-
-    /// Toggles whether the Collections section in the sidebar is collapsed.
-    pub fn toggle_collections_collapsed(&mut self, cx: &mut Context<Self>) {
-        self.collections_collapsed = !self.collections_collapsed;
-        cx.emit(LibraryChanged);
+    /// Returns all items on the current page.
+    #[must_use]
+    pub fn visible_page_items(&self) -> Vec<LibraryItem> {
+        let page_start = (self.current_page - 1) * self.page_size;
+        let items = self.visible_items();
+        items.into_iter().skip(page_start).take(self.page_size).collect()
     }
 
     // ── Sidebar filter mutations ──────────────────────────────────────────────
@@ -554,6 +605,7 @@ impl LibraryController {
     /// Sets the active sidebar filter.
     pub fn set_filter(&mut self, filter: SidebarFilter, cx: &mut Context<Self>) {
         self.filter = filter;
+        self.current_page = 1;
         self.selection = Selection::None;
         cx.emit(LibraryChanged);
     }
@@ -563,6 +615,7 @@ impl LibraryController {
     /// Updates the text search query.
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
         self.search_query = query;
+        self.current_page = 1;
         cx.emit(LibraryChanged);
     }
 

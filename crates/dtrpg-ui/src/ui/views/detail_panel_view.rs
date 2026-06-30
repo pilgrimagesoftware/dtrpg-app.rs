@@ -3,15 +3,18 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement,
-           SharedString, StatefulInteractiveElement, Styled};
+use gpui::prelude::FluentBuilder as _;
+use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled};
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::tooltip::Tooltip;
-use crate::data::library::LibraryItem;
+use gpui_component::Disableable;
 
-use crate::ui::library::cover::render_generative_cover;
-use crate::data::enums::ItemStatus;
 use crate::controllers::library::LibraryController;
+use crate::data::enums::ItemStatus;
+use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
+use crate::ui::library::cover::render_generative_cover;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
 
@@ -31,9 +34,8 @@ pub fn render_detail_panel(
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let text_tertiary = colors.text_tertiary;
-    let accent = colors.accent;
-    let accent_on = colors.accent_on;
     let scrim = colors.scrim;
+    let accent_on = colors.accent_on;
 
     let item = item.clone();
     let entity_close = entity.clone();
@@ -136,105 +138,52 @@ pub fn render_detail_panel(
                         .flex()
                         .flex_col()
                         .gap(px(8.0))
-                        .child(if is_downloaded {
-                            div()
-                                .id("detail-read")
-                                .h(px(36.0))
-                                .px(px(16.0))
-                                .rounded(px(8.0))
-                                .bg(accent)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(gpui::FontWeight::MEDIUM)
-                                        .text_color(accent_on)
-                                        .child("Read"),
-                                )
-                        } else {
-                            div()
-                                .id("detail-read")
-                                .h(px(36.0))
-                                .px(px(16.0))
-                                .rounded(px(8.0))
-                                .bg(accent)
-                                .opacity(0.4)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .tooltip(|window, cx| Tooltip::new("Download this item first").build(window, cx))
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(gpui::FontWeight::MEDIUM)
-                                        .text_color(accent_on)
-                                        .child("Read"),
-                                )
-                        })
                         .child(
-                            div()
-                                .id("detail-download")
-                                .h(px(36.0))
-                                .px(px(16.0))
-                                .rounded(px(8.0))
-                                .border_1()
-                                .border_color(border)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
+                            Button::new("detail-read")
+                                .primary()
+                                .label("Read")
+                                .w_full()
+                                .disabled(!is_downloaded)
+                                .when(!is_downloaded, |b| {
+                                    b.tooltip("Download this item first")
+                                }),
+                        )
+                        .child(
+                            Button::new("detail-download")
+                                .ghost()
+                                .outline()
+                                .label(if is_downloaded { "Downloaded" } else { "Download" })
+                                .w_full()
                                 .on_click(move |_, _, cx| {
                                     let id = Arc::clone(&item_id);
                                     entity_download.update(cx, |ctrl, cx| {
                                         ctrl.toggle_download(&id, cx);
                                     });
-                                })
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(text_primary)
-                                        .child(if is_downloaded { "Downloaded" } else { "Download" }),
-                                ),
+                                }),
                         )
-                        .child(if is_downloaded {
+                        .when(is_downloaded, |col| {
                             let item_path = storage_root_path
                                 .join("items")
                                 .join(reveal_item_id.as_ref());
-                            div()
-                                .id("detail-reveal")
-                                .h(px(36.0))
-                                .px(px(16.0))
-                                .rounded(px(8.0))
-                                .border_1()
-                                .border_color(border)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .on_click(move |_, _, _cx| {
-                                    if !item_path.exists() {
-                                        tracing::warn!(
-                                            path = %item_path.display(),
-                                            "reveal: file not found — item may need re-download"
-                                        );
-                                        return;
-                                    }
-                                    if let Err(e) = reveal_in_file_manager(&item_path) {
-                                        tracing::warn!("reveal_in_file_manager failed: {e}");
-                                    }
-                                })
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(text_primary)
-                                        .child(platform_reveal_label()),
-                                )
-                                .into_any_element()
-                        } else {
-                            div().into_any_element()
+                            col.child(
+                                Button::new("detail-reveal")
+                                    .ghost()
+                                    .outline()
+                                    .label(platform_reveal_label())
+                                    .w_full()
+                                    .on_click(move |_, _, _cx| {
+                                        if !item_path.exists() {
+                                            tracing::warn!(
+                                                path = %item_path.display(),
+                                                "reveal: file not found — item may need re-download"
+                                            );
+                                            return;
+                                        }
+                                        if let Err(e) = reveal_in_file_manager(&item_path) {
+                                            tracing::warn!("reveal_in_file_manager failed: {e}");
+                                        }
+                                    }),
+                            )
                         }),
                 )
                 // Metadata table
@@ -252,65 +201,33 @@ fn platform_reveal_label() -> &'static str {
     return "Show in Files";
 }
 
-fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
-    let rows: Vec<(&'static str, String)> = vec![
-        ("System",    item.line.to_string()),
-        ("Category",  item.kind.to_string()),
-        ("Format",    item.format.to_string()),
-        ("Pages",     item.pages.to_string()),
-        ("File size", format!("{:.0} MB", item.size_mb)),
-        ("Released",  item.year.to_string()),
-        ("Status", match item.status {
-            ItemStatus::Downloaded => "On this device".into(),
-            ItemStatus::Cloud => "In the cloud".into(),
-        }),
-    ];
+fn render_metadata_table(item: &LibraryItem, _colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
+    let status_str: String = match item.status {
+        ItemStatus::Downloaded => "On this device".into(),
+        ItemStatus::Cloud => "In the cloud".into(),
+    };
 
-    let border = colors.border;
-    let text_tertiary = colors.text_tertiary;
-    let text_secondary = colors.text_secondary;
-
-    let mut table = div()
-        .flex()
-        .flex_col()
-        .border_t_1()
-        .border_color(border);
-
-    for (label, value) in rows {
-        table = table.child(
-            div()
-                .flex()
-                .justify_between()
-                .py(px(8.0))
-                .border_b_1()
-                .border_color(border)
-                .child(div().text_xs().text_color(text_tertiary).child(label))
-                .child(div().text_xs().text_color(text_secondary).child(value)),
-        );
-    }
+    let mut list = DescriptionList::new()
+        .columns(1)
+        .child(DescriptionItem::new("System").value(item.line.to_string()))
+        .child(DescriptionItem::new("Category").value(item.kind.to_string()))
+        .child(DescriptionItem::new("Format").value(item.format.to_string()))
+        .child(DescriptionItem::new("Pages").value(item.pages.to_string()))
+        .child(DescriptionItem::new("File size").value(format!("{:.0} MB", item.size_mb)))
+        .child(DescriptionItem::new("Released").value(item.year.to_string()))
+        .child(DescriptionItem::new("Status").value(status_str));
 
     if let Some(ts) = item.date_added {
         let relative = format_relative(ts);
         let absolute = format_absolute(ts);
         let id = SharedString::from(format!("detail-added-{}", item.id));
-        table = table.child(
-            div()
-                .flex()
-                .justify_between()
-                .py(px(8.0))
-                .border_b_1()
-                .border_color(border)
-                .child(div().text_xs().text_color(text_tertiary).child("Added"))
-                .child(
-                    div()
-                        .id(id)
-                        .text_xs()
-                        .text_color(text_secondary)
-                        .child(relative)
-                        .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx)),
-                ),
-        );
+        let value = div()
+            .id(id)
+            .child(relative)
+            .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
+            .into_any_element();
+        list = list.child(DescriptionItem::new("Added").value(value));
     }
 
-    table
+    list
 }

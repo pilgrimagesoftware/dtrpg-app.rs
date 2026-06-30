@@ -12,3 +12,4 @@ pub mod theme;
 pub mod library;
 pub mod constants;
 pub mod selection;
+pub mod ui_prefs;

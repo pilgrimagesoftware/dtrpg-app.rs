@@ -1,8 +1,10 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{AppContext, div, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
+use gpui::{AppContext, div, px, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
 use gpui_component::input::{InputEvent, InputState};
-use gpui_component::{notification::Notification, WindowExt as _};
+use gpui_component::notification::{Notification, NotificationType};
+use gpui_component::resizable::{h_resizable, resizable_panel, ResizableState};
+use gpui_component::WindowExt as _;
 use crate::ui::actions::ShowSettings;
 use crate::ui::app::{LoginServiceFactory, ServiceFactory};
 
@@ -16,8 +18,9 @@ use crate::{
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
         auth_state::AuthState,
-        events::{ActivityChanged, AuthStateChanged, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed},
+        events::{ActivityChanged, AuthStateChanged, DownloadComplete, DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed},
         theme::LibriTheme,
+        ui_prefs::UiPrefs,
     },
     services::LibraryService,
 };
@@ -40,6 +43,12 @@ pub struct LibraryRootView {
     activity: Entity<ActivityController>,
     auth_state: Entity<AuthStateController>,
     catalog_view: Entity<CatalogView>,
+    /// Resizable state for the three-column main layout (sidebar / catalog / detail).
+    resize_state: Entity<ResizableState>,
+    /// Restored or default sidebar panel initial width.
+    sidebar_width: f32,
+    /// Restored or default detail panel initial width.
+    detail_width: f32,
     /// Default focus handle for the root div, ensuring menu-triggered actions
     /// always have a dispatch path even before any child element grabs focus.
     root_focus: FocusHandle,
@@ -140,6 +149,27 @@ impl LibraryRootView {
         })
         .detach();
 
+        cx.subscribe_in(&activity, window, |_this, _ctrl, event: &DownloadComplete, window, cx| {
+            let msg = format!("Downloaded: {}", event.title);
+            window.push_notification(
+                Notification::success(msg),
+                cx,
+            );
+        })
+        .detach();
+
+        cx.subscribe_in(&activity, window, |_this, _ctrl, event: &DownloadError, window, cx| {
+            let msg = format!("{}: {}", event.title, event.message);
+            window.push_notification(
+                Notification::new()
+                    .message(msg)
+                    .with_type(NotificationType::Error)
+                    .autohide(false),
+                cx,
+            );
+        })
+        .detach();
+
         cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
             cx.notify();
         })
@@ -201,7 +231,22 @@ impl LibraryRootView {
             settings.update(cx, |ctrl, cx| ctrl.startup_auth(key, cx));
         }
 
-        Self { controller, settings, activity, auth_state, catalog_view, root_focus, settings_focus, search_input }
+        let ui_prefs = UiPrefs::load();
+        let sidebar_width = ui_prefs.sidebar_width().unwrap_or(250.0);
+        let detail_width = ui_prefs.detail_width().unwrap_or(320.0);
+        let resize_state = cx.new(|_| ResizableState::default());
+
+        cx.subscribe(&resize_state, move |_this, state, _event, cx| {
+            let sizes = state.read(cx).sizes().clone();
+            if sizes.len() >= 3 {
+                let sidebar = sizes[0].as_f32();
+                let detail = sizes[2].as_f32();
+                UiPrefs::load().save_panel_widths(sidebar, detail);
+            }
+        })
+        .detach();
+
+        Self { controller, settings, activity, auth_state, catalog_view, resize_state, sidebar_width, detail_width, root_focus, settings_focus, search_input }
     }
 }
 
@@ -219,11 +264,11 @@ impl Render for LibraryRootView {
         let auth_entity = self.auth_state.clone();
 
         let snap = self.controller.read(cx).snapshot();
-        let (filter, counts, publishers, collections, publishers_collapsed, collections_collapsed,
+        let (filter, counts, publishers, collections, collection_membership,
              total_count, total_mb, matched_count, sort, sort_direction, grouped,
              presentation, selected_item) = (
             snap.filter, snap.counts, snap.publishers, snap.collections,
-            snap.publishers_collapsed, snap.collections_collapsed,
+            snap.collection_membership,
             snap.total_count, snap.total_mb,
             snap.matched_count, snap.sort, snap.sort_direction, snap.grouped,
             snap.presentation, snap.selected_item,
@@ -240,12 +285,11 @@ impl Render for LibraryRootView {
         let colors = &theme.colors;
 
         let sidebar = render_sidebar(
-            &filter,
+            filter.clone(),
             counts,
-            &publishers,
-            publishers_collapsed,
-            &collections,
-            collections_collapsed,
+            publishers,
+            collections,
+            collection_membership,
             total_count,
             total_mb,
             lib_entity.clone(),
@@ -253,7 +297,6 @@ impl Render for LibraryRootView {
             activity_snap.in_progress_count,
             activity_snap.recent_count,
             activity_snap.recent_error_count,
-            colors,
         );
         let toolbar = render_toolbar(
             &filter,
@@ -318,7 +361,7 @@ impl Render for LibraryRootView {
         // Wrap the sidebar in a relative container so the activity panel overlay
         // (which is absolute-positioned) is anchored within the sidebar column.
         let mut sidebar_col = div()
-            .flex_none()
+            .size_full()
             .relative()
             .child(sidebar);
 
@@ -328,19 +371,39 @@ impl Render for LibraryRootView {
         }
 
         let settings_for_action = self.settings.clone();
+        let sidebar_initial = self.sidebar_width;
+        let detail_initial = self.detail_width;
+        let has_detail = selected_item.is_some();
 
         div()
             .size_full()
             .bg(surface)
             .text_color(text_primary)
-            .flex()
             .relative()
             .track_focus(&self.root_focus)
             .on_action(move |_: &ShowSettings, _, cx| {
                 settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
             })
-            .child(sidebar_col)
-            .child(main_content)
-            .child(panel)
+            .child(
+                h_resizable("main-layout")
+                    .with_state(&self.resize_state)
+                    .child(
+                        resizable_panel()
+                            .size(px(sidebar_initial))
+                            .size_range(px(180.)..px(361.))
+                            .child(sidebar_col),
+                    )
+                    .child(
+                        resizable_panel()
+                            .child(main_content),
+                    )
+                    .child(
+                        resizable_panel()
+                            .size(px(detail_initial))
+                            .size_range(px(240.)..px(481.))
+                            .visible(has_detail)
+                            .child(panel),
+                    ),
+            )
     }
 }

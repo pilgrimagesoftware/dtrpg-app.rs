@@ -3,10 +3,13 @@
 use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder;
-use gpui::{AnyElement, div, img, px, Entity, Image, ImageFormat, ImageSource, InteractiveElement,
-    IntoElement, ObjectFit, ParentElement, StatefulInteractiveElement, Styled, StyledImage};
+use gpui::{AnyElement, div, px, Entity, Image, ImageFormat, ImageSource, InteractiveElement,
+    IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui_component::avatar::Avatar;
+use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
+use gpui_component::Sizable;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
@@ -42,8 +45,6 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
-    let accent = colors.accent;
-    let accent_on = colors.accent_on;
 
     let avatar = render_avatar_circle(auth, colors);
     let email_text = auth.email.clone().unwrap_or_else(|| "DriveThruRPG Account".to_string());
@@ -137,48 +138,25 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                 .flex()
                 .flex_col()
                 .gap(px(12.0))
-                .child(render_logout_button(entity, accent, accent_on)),
+                .child(render_logout_button(entity)),
         )
 }
 
 /// Renders a 56×56 avatar circle: Gravatar image if available, initial letter otherwise.
-fn render_avatar_circle(auth: &AuthStateSnapshot, colors: &ColorTokens) -> AnyElement {
-    let size = px(56.0);
+fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyElement {
+    let avatar = Avatar::new().with_size(gpui_component::Size::Size(px(56.))).rounded_full();
 
     if let Some(bytes) = &auth.avatar_bytes {
         let format = if bytes.starts_with(b"\x89PNG") { ImageFormat::Png } else { ImageFormat::Jpeg };
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        return div()
-            .size(size)
-            .rounded_full()
-            .overflow_hidden()
-            .child(
-                img(ImageSource::Image(image))
-                    .size(size)
-                    .object_fit(ObjectFit::Cover),
-            )
-            .into_any_element();
+        return avatar.src(ImageSource::Image(image)).into_any_element();
     }
 
-    let initial = auth.display_initial
-        .map(|c| c.to_string())
+    let name = auth.email.clone()
+        .or_else(|| auth.display_initial.map(|c| c.to_string()))
         .unwrap_or_else(|| "?".to_string());
 
-    div()
-        .size(size)
-        .rounded_full()
-        .bg(colors.accent_soft)
-        .flex()
-        .items_center()
-        .justify_center()
-        .child(
-            div()
-                .text_xl()
-                .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_color(colors.accent)
-                .child(initial),
-        )
-        .into_any_element()
+    avatar.name(name).into_any_element()
 }
 
 // ── Unauthenticated state ─────────────────────────────────────────────────────
@@ -296,29 +274,11 @@ fn render_unauthenticated(
     form
 }
 
-fn render_logout_button(
-    entity: Entity<SettingsController>,
-    accent: gpui::Hsla,
-    accent_on: gpui::Hsla,
-) -> impl IntoElement + 'static {
-    div()
-        .id("logout-btn")
-        .h(px(34.0))
-        .px(px(16.0))
-        .rounded(px(8.0))
-        .bg(accent)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor_pointer()
-        .on_click(move |_event, _window, cx| {
+fn render_logout_button(entity: Entity<SettingsController>) -> impl IntoElement + 'static {
+    Button::new("logout-btn")
+        .danger()
+        .label("Log Out")
+        .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.request_logout(cx));
         })
-        .child(
-            div()
-                .text_sm()
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .text_color(accent_on)
-                .child("Log Out"),
-        )
 }

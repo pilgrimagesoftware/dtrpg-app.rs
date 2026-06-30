@@ -4,10 +4,11 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{AnyElement, App, div, img, px, Entity, Image, ImageFormat, ImageSource, IntoElement, MouseButton, ObjectFit, ParentElement, Styled};
+use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
-use gpui_component::tooltip::Tooltip;
+use gpui_component::tab::{Tab, TabBar};
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -47,12 +48,8 @@ pub fn render_toolbar(
 ) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
-    let border_strong = colors.border_strong;
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
-    let bg = colors.surface_alt;
-    let accent = colors.accent;
-    let accent_soft = colors.accent_soft;
 
     let title = section_title_for(filter);
 
@@ -116,16 +113,8 @@ pub fn render_toolbar(
                     grouped,
                     entity.clone(),
                 ))
-                .child(render_layout_switcher(
-                    presentation,
-                    entity,
-                    bg,
-                    border_strong,
-                    text_primary,
-                    accent,
-                    accent_soft,
-                ))
-                .child(render_settings_button(settings.clone(), text_primary, border_strong))
+                .child(render_layout_switcher(presentation, entity))
+                .child(render_settings_button(settings.clone()))
                 .child(render_avatar_button(auth, settings, colors, cx)),
         )
 }
@@ -228,80 +217,38 @@ fn render_sort_selector(
 fn render_layout_switcher(
     current: CatalogPresentation,
     entity: Entity<LibraryController>,
-    bg: gpui::Hsla,
-    border: gpui::Hsla,
-    text_primary: gpui::Hsla,
-    accent: gpui::Hsla,
-    accent_soft: gpui::Hsla,
 ) -> impl IntoElement + 'static {
-    let modes = [
-        (CatalogPresentation::List, "layout-list", "List view"),
-        (CatalogPresentation::Thumbs, "layout-thumbs", "Thumbnail view"),
-        (CatalogPresentation::Grid, "layout-grid", "Grid view"),
-    ];
-    let labels = ["List", "Thumbs", "Grid"];
-
-    let mut row = div()
-        .flex()
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(border)
-        .bg(bg)
-        .overflow_hidden();
-
-    for ((mode, id_str, tooltip_text), label) in modes.into_iter().zip(labels) {
-        let is_active = current == mode;
-        let btn_bg = if is_active {
-            accent_soft
-        } else {
-            gpui::hsla(0.0, 0.0, 0.0, 0.0)
-        };
-        let text = if is_active { accent } else { text_primary };
-        let e = entity.clone();
-
-        row = row.child(
-            div()
-                .id(id_str)
-                .h(px(28.0))
-                .px(px(10.0))
-                .bg(btn_bg)
-                .flex()
-                .items_center()
-                .cursor_pointer()
-                .tooltip(move |window, cx| Tooltip::new(tooltip_text).build(window, cx))
-                .on_click(move |_, _, cx| {
-                    e.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
-                })
-                .child(div().text_sm().text_color(text).child(label)),
-        );
-    }
-
-    row
+    let selected = match current {
+        CatalogPresentation::List => 0usize,
+        CatalogPresentation::Thumbs => 1,
+        CatalogPresentation::Grid => 2,
+    };
+    TabBar::new("layout-switcher")
+        .segmented()
+        .selected_index(selected)
+        .child(Tab::new().label("List"))
+        .child(Tab::new().label("Thumbs"))
+        .child(Tab::new().label("Grid"))
+        .on_click(move |ix, _, cx| {
+            let mode = match ix {
+                0 => CatalogPresentation::List,
+                1 => CatalogPresentation::Thumbs,
+                _ => CatalogPresentation::Grid,
+            };
+            entity.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
+        })
 }
 
 // ── Settings gear button ──────────────────────────────────────────────────────
 
-fn render_settings_button(
-    settings: Entity<SettingsController>,
-    text_primary: gpui::Hsla,
-    border: gpui::Hsla,
-) -> impl IntoElement + 'static {
-    div()
-        .id("settings-gear")
-        .h(px(30.0))
-        .w(px(30.0))
-        .rounded(px(8.0))
-        .border_1()
-        .border_color(border)
-        .flex()
-        .items_center()
-        .justify_center()
-        .cursor_pointer()
-        .tooltip(|window, cx| Tooltip::new("Settings").build(window, cx))
+fn render_settings_button(settings: Entity<SettingsController>) -> impl IntoElement + 'static {
+    Button::new("settings-gear")
+        .ghost()
+        .icon(IconName::Settings)
+        .tooltip("Settings")
         .on_click(move |_, _, cx| {
             settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
         })
-        .child(div().text_sm().text_color(text_primary).child("⚙"))
 }
 
 // ── Avatar button ─────────────────────────────────────────────────────────────

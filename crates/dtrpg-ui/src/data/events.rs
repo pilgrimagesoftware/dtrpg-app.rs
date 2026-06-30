@@ -21,6 +21,28 @@ pub struct ActivityChanged;
 
 impl EventEmitter<ActivityChanged> for ActivityController {}
 
+// ── DownloadComplete ──────────────────────────────────────────────────────────
+
+/// Emitted when a download activity item transitions to `Complete`.
+pub struct DownloadComplete {
+    /// Display label of the completed item.
+    pub title: std::sync::Arc<str>,
+}
+
+impl EventEmitter<DownloadComplete> for ActivityController {}
+
+// ── DownloadError ─────────────────────────────────────────────────────────────
+
+/// Emitted when a download activity item transitions to `Error`.
+pub struct DownloadError {
+    /// Display label of the failed item.
+    pub title: std::sync::Arc<str>,
+    /// Error message.
+    pub message: String,
+}
+
+impl EventEmitter<DownloadError> for ActivityController {}
+
 // ── SettingsChanged ───────────────────────────────────────────────────────────
 
 /// Emitted when any settings state changes that should trigger a re-render.

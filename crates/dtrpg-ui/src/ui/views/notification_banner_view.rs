@@ -1,6 +1,8 @@
 //! Notification banner view: renders persistent auth-related notices below the toolbar.
 
-use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui_component::alert::Alert;
+use gpui_component::button::{Button, ButtonVariants};
 
 use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::settings::SettingsController;
@@ -21,18 +23,14 @@ pub fn render_notification_banner(
         return div().into_any_element();
     }
 
-    let warning_bg = colors.warning_bg;
-    let warning_text = colors.warning_text;
-    let border_strong = colors.border_strong;
-    let text_secondary = colors.text_secondary;
+    let border = colors.border;
 
     div()
         .flex_none()
         .flex()
         .flex_col()
-        .bg(warning_bg)
         .border_b_1()
-        .border_color(border_strong)
+        .border_color(border)
         .children(notices.into_iter().map(|notice| {
             let (message, action_label) = notice_strings(&notice);
             let kind = notice.kind;
@@ -44,55 +42,25 @@ pub fn render_notification_banner(
             div()
                 .flex()
                 .items_center()
-                .gap(px(12.0))
-                .px(px(16.0))
-                .py(px(8.0))
+                .gap(px(8.0))
                 .child(
-                    div()
-                        .text_sm()
-                        .text_color(warning_text)
-                        .child("⚠"),
-                )
-                .child(
-                    div()
+                    Alert::warning(format!("notice-alert-{kind:?}"), message)
+                        .banner()
                         .flex_1()
-                        .text_sm()
-                        .text_color(warning_text)
-                        .child(message),
-                )
-                .child(
-                    div()
-                        .id(format!("notice-action-{kind:?}"))
-                        .px(px(10.0))
-                        .py(px(4.0))
-                        .rounded(px(5.0))
-                        .text_xs()
-                        .text_color(warning_text)
-                        .border_1()
-                        .border_color(warning_text)
-                        .cursor_pointer()
-                        .child(action_label)
-                        .on_click(move |_, _, cx| {
-                            settings_entity.update(cx, |ctrl, cx| {
-                                ctrl.open(cx);
-                            });
-                            auth_entity_action.update(cx, |ctrl, cx| {
+                        .on_close(move |_, _, cx| {
+                            auth_entity_dismiss.update(cx, |ctrl, cx| {
                                 ctrl.dismiss_notice(kind, cx);
                             });
                         }),
                 )
                 .child(
-                    div()
-                        .id(format!("notice-dismiss-{kind:?}"))
-                        .px(px(6.0))
-                        .py(px(4.0))
-                        .rounded(px(5.0))
-                        .text_xs()
-                        .text_color(text_secondary)
-                        .cursor_pointer()
-                        .child("×")
+                    Button::new(format!("notice-action-{kind:?}"))
+                        .ghost()
+                        .label(action_label)
+                        .mr(px(8.0))
                         .on_click(move |_, _, cx| {
-                            auth_entity_dismiss.update(cx, |ctrl, cx| {
+                            settings_entity.update(cx, |ctrl, cx| ctrl.open(cx));
+                            auth_entity_action.update(cx, |ctrl, cx| {
                                 ctrl.dismiss_notice(kind, cx);
                             });
                         }),
