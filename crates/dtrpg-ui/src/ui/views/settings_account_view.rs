@@ -3,13 +3,15 @@
 use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder;
-use gpui::{AnyElement, div, px, Entity, Image, ImageFormat, ImageSource, InteractiveElement,
-    IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui::{
+    AnyElement, Entity, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
+    ParentElement, StatefulInteractiveElement, Styled, div, px,
+};
+use gpui_component::Sizable;
 use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
-use gpui_component::Sizable;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
@@ -35,19 +37,34 @@ pub fn render_account_section(
     if auth.is_logged_in {
         render_authenticated(auth, entity, colors).into_any_element()
     } else {
-        render_unauthenticated(entity, colors, api_key_input, email_input, sign_in_in_progress, sign_in_error).into_any_element()
+        render_unauthenticated(
+            entity,
+            colors,
+            api_key_input,
+            email_input,
+            sign_in_in_progress,
+            sign_in_error,
+        )
+        .into_any_element()
     }
 }
 
 // ── Authenticated state ───────────────────────────────────────────────────────
 
-fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsController>, colors: &ColorTokens) -> impl IntoElement + 'static {
+fn render_authenticated(
+    auth: &AuthStateSnapshot,
+    entity: Entity<SettingsController>,
+    colors: &ColorTokens,
+) -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
 
     let avatar = render_avatar_circle(auth, colors);
-    let email_text = auth.email.clone().unwrap_or_else(|| "DriveThruRPG Account".to_string());
+    let email_text = auth
+        .email
+        .clone()
+        .unwrap_or_else(|| "DriveThruRPG Account".to_string());
 
     let entity_reset = entity.clone();
 
@@ -83,10 +100,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                         .child("Account"),
                                 )
                                 .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(text_secondary)
-                                        .child(email_text),
+                                    div().text_sm().text_color(text_secondary).child(email_text),
                                 );
                             if let Some(hint) = &auth.api_key_hint {
                                 col = col.child(
@@ -144,15 +158,23 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
 
 /// Renders a 56×56 avatar circle: Gravatar image if available, initial letter otherwise.
 fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyElement {
-    let avatar = Avatar::new().with_size(gpui_component::Size::Size(px(56.))).rounded_full();
+    let avatar = Avatar::new()
+        .with_size(gpui_component::Size::Size(px(56.)))
+        .rounded_full();
 
     if let Some(bytes) = &auth.avatar_bytes {
-        let format = if bytes.starts_with(b"\x89PNG") { ImageFormat::Png } else { ImageFormat::Jpeg };
+        let format = if bytes.starts_with(b"\x89PNG") {
+            ImageFormat::Png
+        } else {
+            ImageFormat::Jpeg
+        };
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
         return avatar.src(ImageSource::Image(image)).into_any_element();
     }
 
-    let name = auth.email.clone()
+    let name = auth
+        .email
+        .clone()
         .or_else(|| auth.display_initial.map(|c| c.to_string()))
         .unwrap_or_else(|| "?".to_string());
 
@@ -204,43 +226,38 @@ fn render_unauthenticated(
         )
         .child(div().h(px(1.0)).bg(border))
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(12.0))
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(text_tertiary)
-                        .child("Sign in with your DriveThruRPG API key to access your library."),
-                ),
+            div().flex().flex_col().gap(px(12.0)).child(
+                div()
+                    .text_xs()
+                    .text_color(text_tertiary)
+                    .child("Sign in with your DriveThruRPG API key to access your library."),
+            ),
         );
 
     if let Some(input_state) = api_key_input {
         let entity_for_btn = entity.clone();
-        let btn_bg = if sign_in_in_progress { disabled_bg } else { accent };
-        let btn_label = if sign_in_in_progress { "Signing In..." } else { "Sign In" };
+        let btn_bg = if sign_in_in_progress {
+            disabled_bg
+        } else {
+            accent
+        };
+        let btn_label = if sign_in_in_progress {
+            "Signing In..."
+        } else {
+            "Sign In"
+        };
 
         let mut form_section = div()
             .flex()
             .flex_col()
             .gap(px(10.0))
-            .child(
-                Input::new(&input_state)
-                    .appearance(true)
-                    .into_element(),
-            )
+            .child(Input::new(&input_state).appearance(true).into_element())
             .when_some(email_input, |el, email_state| {
                 el.child(Input::new(&email_state).appearance(true).into_element())
             });
 
         if let Some(err) = sign_in_error {
-            form_section = form_section.child(
-                div()
-                    .text_xs()
-                    .text_color(error_color)
-                    .child(err),
-            );
+            form_section = form_section.child(div().text_xs().text_color(error_color).child(err));
         }
 
         form_section = form_section.child(

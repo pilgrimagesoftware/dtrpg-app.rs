@@ -1,11 +1,11 @@
 //! Controller events emitted when state changes.
 
-use gpui::EventEmitter;
 use crate::controllers::activity::ActivityController;
 use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::services::LoginTokens;
+use gpui::EventEmitter;
 
 // ── LibraryChanged ────────────────────────────────────────────────────────────
 

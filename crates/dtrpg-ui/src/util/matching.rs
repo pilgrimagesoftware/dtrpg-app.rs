@@ -1,9 +1,9 @@
 //! Data model, filtering, sorting, and stub catalog for the Libri library view.
 
-use crate::util::filter::{SidebarFilter};
+use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
-use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
+use crate::util::filter::SidebarFilter;
 
 // ── Matching functions ─────────────────────────────────────────────────────────────────
 

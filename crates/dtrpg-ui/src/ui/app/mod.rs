@@ -1,5 +1,5 @@
 use gpui::*;
-use gpui_component::{init, Root};
+use gpui_component::{Root, init};
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
@@ -14,7 +14,9 @@ use crate::util::init::init_globals;
 /// service that reflects the unauthenticated state without crashing.
 ///
 /// Set this global before calling [`setup`].
-pub struct ServiceFactory(pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService> + Send + Sync + 'static>);
+pub struct ServiceFactory(
+    pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService> + Send + Sync + 'static>,
+);
 
 impl Global for ServiceFactory {}
 
@@ -91,7 +93,8 @@ pub fn setup(cx: &mut App) {
     });
     cx.on_action::<ToggleFullscreen>(|_, cx| {
         if let Some(win) = cx.active_window() {
-            win.update(cx, |_, window, _| window.toggle_fullscreen()).ok();
+            win.update(cx, |_, window, _| window.toggle_fullscreen())
+                .ok();
         }
     });
 
@@ -119,16 +122,12 @@ pub fn setup(cx: &mut App) {
             MenuItem::os_action("Paste", Paste, OsAction::Paste),
             MenuItem::os_action("Select All", SelectAll, OsAction::SelectAll),
         ]),
-        Menu::new("View").items([
-            MenuItem::action("Enter Full Screen", ToggleFullscreen),
-        ]),
+        Menu::new("View").items([MenuItem::action("Enter Full Screen", ToggleFullscreen)]),
         Menu::new("Window").items([
             MenuItem::action("Minimize", Minimize),
             MenuItem::action("Zoom", Zoom),
         ]),
-        Menu::new("Help").items([
-            MenuItem::action("About Libri", About),
-        ]),
+        Menu::new("Help").items([MenuItem::action("About Libri", About)]),
     ]);
 
     let startup_api_key = match KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY).load() {

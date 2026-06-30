@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use gpui::prelude::*;
-use gpui::{div, px, AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled};
+use gpui::{AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::input::InputState;
 use gpui_component::setting::{SettingGroup, SettingItem, SettingPage, Settings};
 
@@ -68,8 +68,8 @@ pub fn render_settings_panel(
     let settings = Settings::new("settings-panel")
         .sidebar_width(px(160.0))
         .page(
-            SettingPage::new("Account").group(
-                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+            SettingPage::new("Account").group(SettingGroup::new().item(SettingItem::render(
+                move |_, _window, _cx| {
                     render_account_section(
                         &account_auth,
                         account_entity.clone(),
@@ -79,12 +79,12 @@ pub fn render_settings_panel(
                         sign_in_in_progress,
                         sign_in_error.clone(),
                     )
-                })),
-            ),
+                },
+            ))),
         )
         .page(
-            SettingPage::new("Storage").group(
-                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+            SettingPage::new("Storage").group(SettingGroup::new().item(SettingItem::render(
+                move |_, _window, _cx| {
                     render_storage_section(
                         storage_path.clone(),
                         storage_path_exists,
@@ -92,19 +92,19 @@ pub fn render_settings_panel(
                         &storage_colors,
                         storage_path_input.clone(),
                     )
-                })),
-            ),
+                },
+            ))),
         )
         .page(
-            SettingPage::new("File Openers").group(
-                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+            SettingPage::new("File Openers").group(SettingGroup::new().item(SettingItem::render(
+                move |_, _window, _cx| {
                     render_file_openers_section(
                         &file_openers_vec,
                         file_openers_entity.clone(),
                         &file_openers_colors,
                     )
-                })),
-            ),
+                },
+            ))),
         );
 
     div()

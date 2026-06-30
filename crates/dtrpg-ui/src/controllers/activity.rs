@@ -96,7 +96,10 @@ impl ActivityController {
             cx.emit(ActivityChanged);
             cx.emit(DownloadComplete { title });
             cx.spawn(async move |this, async_cx| {
-                async_cx.background_executor().timer(Duration::from_secs(EXPIRY_SECS)).await;
+                async_cx
+                    .background_executor()
+                    .timer(Duration::from_secs(EXPIRY_SECS))
+                    .await;
                 this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
             })
             .detach();
@@ -116,7 +119,10 @@ impl ActivityController {
             cx.emit(ActivityChanged);
             cx.emit(DownloadError { title, message });
             cx.spawn(async move |this, async_cx| {
-                async_cx.background_executor().timer(Duration::from_secs(ERROR_EXPIRY_SECS)).await;
+                async_cx
+                    .background_executor()
+                    .timer(Duration::from_secs(ERROR_EXPIRY_SECS))
+                    .await;
                 this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
             })
             .detach();

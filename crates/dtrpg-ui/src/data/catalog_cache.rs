@@ -73,8 +73,20 @@ mod tests {
 
     fn make_item(id: &str) -> LibraryItem {
         LibraryItem::new(
-            id, "Test Title", "Test Publisher", "", "Core", "PDF",
-            100, 10.0, 2024, 1, ItemStatus::Cloud, "#1C2A44", "Desc.", None,
+            id,
+            "Test Title",
+            "Test Publisher",
+            "",
+            "Core",
+            "PDF",
+            100,
+            10.0,
+            2024,
+            1,
+            ItemStatus::Cloud,
+            "#1C2A44",
+            "Desc.",
+            None,
         )
     }
 

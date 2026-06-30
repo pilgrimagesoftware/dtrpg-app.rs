@@ -1,8 +1,8 @@
 //! TODO
 
-use gpui::App;
 use crate::data::theme::LibriTheme;
 use crate::ui::library::cover::CoverCache;
+use gpui::App;
 
 // ── GPUI global initializer ───────────────────────────────────────────────────
 

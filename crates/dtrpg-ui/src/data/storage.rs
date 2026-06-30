@@ -41,8 +41,7 @@ pub fn validate_writable(path: &Path) -> Result<(), StorageError> {
         Err(_) => return Err(StorageError::VolumeUnavailable(path.to_path_buf())),
     }
     let probe = path.join(".dtrpg_write_probe");
-    std::fs::write(&probe, b"probe")
-        .map_err(|_| StorageError::NotWritable(path.to_path_buf()))?;
+    std::fs::write(&probe, b"probe").map_err(|_| StorageError::NotWritable(path.to_path_buf()))?;
     let _ = std::fs::remove_file(&probe);
     Ok(())
 }
@@ -149,7 +148,9 @@ mod tests {
 
     #[test]
     fn default_path_is_non_empty() {
-        let cfg = StorageConfig { override_path: None };
+        let cfg = StorageConfig {
+            override_path: None,
+        };
         let path = cfg.root_path();
         assert!(path.components().count() > 0);
         assert!(path.ends_with("dtrpg"));
@@ -158,19 +159,25 @@ mod tests {
     #[test]
     fn override_path_is_returned_when_set() {
         let custom = PathBuf::from("/tmp/custom-storage");
-        let cfg = StorageConfig { override_path: Some(custom.clone()) };
+        let cfg = StorageConfig {
+            override_path: Some(custom.clone()),
+        };
         assert_eq!(cfg.root_path(), custom);
     }
 
     #[test]
     fn metadata_path_is_under_root() {
-        let cfg = StorageConfig { override_path: Some(PathBuf::from("/tmp/dtrpg")) };
+        let cfg = StorageConfig {
+            override_path: Some(PathBuf::from("/tmp/dtrpg")),
+        };
         assert_eq!(cfg.metadata_path(), Path::new("/tmp/dtrpg/metadata"));
     }
 
     #[test]
     fn path_for_item_is_under_root() {
-        let cfg = StorageConfig { override_path: Some(PathBuf::from("/tmp/dtrpg")) };
+        let cfg = StorageConfig {
+            override_path: Some(PathBuf::from("/tmp/dtrpg")),
+        };
         let item_path = cfg.path_for_item("b42");
         assert_eq!(item_path, Path::new("/tmp/dtrpg/items/b42"));
     }

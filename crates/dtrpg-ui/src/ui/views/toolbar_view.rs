@@ -3,7 +3,10 @@
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, App, div, img, px, Entity, Image, ImageFormat, ImageSource, IntoElement, MouseButton, ObjectFit, ParentElement, Styled};
+use gpui::{
+    AnyElement, App, Entity, Image, ImageFormat, ImageSource, IntoElement, MouseButton, ObjectFit,
+    ParentElement, Styled, div, img, px,
+};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_component::input::{Input, InputState};
@@ -12,10 +15,7 @@ use gpui_component::tab::{Tab, TabBar};
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
-use crate::data::{
-    enums::{CatalogPresentation},
-    theme::ColorTokens,
-};
+use crate::data::{enums::CatalogPresentation, theme::ColorTokens};
 use crate::util::filter::*;
 use crate::util::sort::*;
 
@@ -102,11 +102,7 @@ pub fn render_toolbar(
                 .flex()
                 .items_center()
                 .gap(px(10.0))
-                .child(
-                    Input::new(&search_input)
-                        .w(px(188.0))
-                        .cleanable(true),
-                )
+                .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
                 .child(render_sort_selector(
                     sort,
                     sort_direction,
@@ -274,8 +270,14 @@ fn render_avatar_button(
         let unauthenticated_variant = ButtonCustomVariant::new(cx)
             .color(surface_alt)
             .foreground(text_tertiary)
-            .hover(gpui::Hsla { l: (surface_alt.l * 0.9).min(1.0), ..surface_alt })
-            .active(gpui::Hsla { l: (surface_alt.l * 0.8).min(1.0), ..surface_alt });
+            .hover(gpui::Hsla {
+                l: (surface_alt.l * 0.9).min(1.0),
+                ..surface_alt
+            })
+            .active(gpui::Hsla {
+                l: (surface_alt.l * 0.8).min(1.0),
+                ..surface_alt
+            });
         let inner = div()
             .flex()
             .items_center()
@@ -314,8 +316,14 @@ fn render_avatar_button(
     let avatar_variant = ButtonCustomVariant::new(cx)
         .color(accent)
         .foreground(gpui::white())
-        .hover(gpui::Hsla { l: (accent.l * 0.85).min(1.0), ..accent })
-        .active(gpui::Hsla { l: (accent.l * 0.75).min(1.0), ..accent });
+        .hover(gpui::Hsla {
+            l: (accent.l * 0.85).min(1.0),
+            ..accent
+        })
+        .active(gpui::Hsla {
+            l: (accent.l * 0.75).min(1.0),
+            ..accent
+        });
 
     let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
         let format = detect_image_format(bytes);
@@ -351,11 +359,9 @@ fn render_avatar_button(
             let s = settings.clone();
             menu.item(PopupMenuItem::label(menu_email.clone()))
                 .item(PopupMenuItem::separator())
-                .item(
-                    PopupMenuItem::new("Log Out").on_click(move |_, _, cx| {
-                        s.update(cx, |ctrl, cx| ctrl.logout(cx));
-                    }),
-                )
+                .item(PopupMenuItem::new("Log Out").on_click(move |_, _, cx| {
+                    s.update(cx, |ctrl, cx| ctrl.logout(cx));
+                }))
         })
         .into_any_element()
 }

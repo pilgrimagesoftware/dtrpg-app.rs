@@ -1,6 +1,6 @@
 //! Libri theme system: four color themes and two density variants.
 
-use gpui::{px, Hsla, Pixels}; // Pixels kept for GPUI layout fields
+use gpui::{Hsla, Pixels, px}; // Pixels kept for GPUI layout fields
 
 // ── Color tokens ──────────────────────────────────────────────────────────────
 
@@ -142,7 +142,12 @@ impl LibriTheme {
             Density::Comfortable => DensityConstants::comfortable(),
             Density::Compact => DensityConstants::compact(),
         };
-        Self { key, colors, density, density_constants }
+        Self {
+            key,
+            colors,
+            density,
+            density_constants,
+        }
     }
 
     /// Returns the default theme (parchment, comfortable).
@@ -173,23 +178,23 @@ fn hex_a(r: u8, g: u8, b: u8, a: f32) -> Hsla {
 
 fn parchment_colors() -> ColorTokens {
     ColorTokens {
-        desktop_bg:     hex(0xC5, 0xB9, 0x9D),
-        surface:        hex(0xFC, 0xF9, 0xF3),
-        surface_alt:    hex(0xF2, 0xEC, 0xDF),
-        hover:          hex(0xED, 0xE6, 0xD6),
-        text_primary:   hex(0x26, 0x21, 0x1A),
+        desktop_bg: hex(0xC5, 0xB9, 0x9D),
+        surface: hex(0xFC, 0xF9, 0xF3),
+        surface_alt: hex(0xF2, 0xEC, 0xDF),
+        hover: hex(0xED, 0xE6, 0xD6),
+        text_primary: hex(0x26, 0x21, 0x1A),
         text_secondary: hex(0x5B, 0x53, 0x46),
-        text_tertiary:  hex(0x8C, 0x82, 0x70),
-        border:         hex(0xE7, 0xDF, 0xCD),
-        border_strong:  hex(0xDB, 0xD1, 0xBB),
-        accent:         hex(0x8C, 0x4A, 0x22),
-        accent_soft:    hex_a(0x8C, 0x4A, 0x22, 0.13),
-        accent_on:      hex(0xFC, 0xF9, 0xF3),
-        shadow:         hex_a(0x3A, 0x2E, 0x1A, 0.18),
-        scrim:          hex_a(0x1E, 0x16, 0x0A, 0.26),
-        error:          hex(0xB0, 0x30, 0x28),
-        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
-        warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0),
+        text_tertiary: hex(0x8C, 0x82, 0x70),
+        border: hex(0xE7, 0xDF, 0xCD),
+        border_strong: hex(0xDB, 0xD1, 0xBB),
+        accent: hex(0x8C, 0x4A, 0x22),
+        accent_soft: hex_a(0x8C, 0x4A, 0x22, 0.13),
+        accent_on: hex(0xFC, 0xF9, 0xF3),
+        shadow: hex_a(0x3A, 0x2E, 0x1A, 0.18),
+        scrim: hex_a(0x1E, 0x16, 0x0A, 0.26),
+        error: hex(0xB0, 0x30, 0x28),
+        warning_bg: gpui::hsla(0.11, 0.9, 0.5, 0.12),
+        warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0),
     }
 }
 
@@ -202,23 +207,23 @@ fn parchment_colors() -> ColorTokens {
 
 fn slate_colors() -> ColorTokens {
     ColorTokens {
-        desktop_bg:     hex(0xAD, 0xB7, 0xBF),
-        surface:        hex(0xFC, 0xFD, 0xFE),
-        surface_alt:    hex(0xEE, 0xF1, 0xF4),
-        hover:          hex(0xE7, 0xEC, 0xF0),
-        text_primary:   hex(0x1B, 0x25, 0x30),
+        desktop_bg: hex(0xAD, 0xB7, 0xBF),
+        surface: hex(0xFC, 0xFD, 0xFE),
+        surface_alt: hex(0xEE, 0xF1, 0xF4),
+        hover: hex(0xE7, 0xEC, 0xF0),
+        text_primary: hex(0x1B, 0x25, 0x30),
         text_secondary: hex(0x4C, 0x59, 0x65),
-        text_tertiary:  hex(0x7E, 0x8B, 0x98),
-        border:         hex(0xE4, 0xE9, 0xED),
-        border_strong:  hex(0xD5, 0xDC, 0xE2),
-        accent:         hex(0x7A, 0x42, 0x20),
-        accent_soft:    hex_a(0x7A, 0x42, 0x20, 0.13),
-        accent_on:      hex(0xFC, 0xFD, 0xFE),
-        shadow:         hex_a(0x1C, 0x2A, 0x3A, 0.18),
-        scrim:          hex_a(0x12, 0x1C, 0x28, 0.26),
-        error:          hex(0xB0, 0x30, 0x28),
-        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
-        warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0),
+        text_tertiary: hex(0x7E, 0x8B, 0x98),
+        border: hex(0xE4, 0xE9, 0xED),
+        border_strong: hex(0xD5, 0xDC, 0xE2),
+        accent: hex(0x7A, 0x42, 0x20),
+        accent_soft: hex_a(0x7A, 0x42, 0x20, 0.13),
+        accent_on: hex(0xFC, 0xFD, 0xFE),
+        shadow: hex_a(0x1C, 0x2A, 0x3A, 0.18),
+        scrim: hex_a(0x12, 0x1C, 0x28, 0.26),
+        error: hex(0xB0, 0x30, 0x28),
+        warning_bg: gpui::hsla(0.11, 0.9, 0.5, 0.12),
+        warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0),
     }
 }
 
@@ -231,23 +236,23 @@ fn slate_colors() -> ColorTokens {
 
 fn sage_colors() -> ColorTokens {
     ColorTokens {
-        desktop_bg:     hex(0xB2, 0xBC, 0xA0),
-        surface:        hex(0xFA, 0xFB, 0xF6),
-        surface_alt:    hex(0xED, 0xF0, 0xE7),
-        hover:          hex(0xE6, 0xEB, 0xDE),
-        text_primary:   hex(0x23, 0x27, 0x1F),
+        desktop_bg: hex(0xB2, 0xBC, 0xA0),
+        surface: hex(0xFA, 0xFB, 0xF6),
+        surface_alt: hex(0xED, 0xF0, 0xE7),
+        hover: hex(0xE6, 0xEB, 0xDE),
+        text_primary: hex(0x23, 0x27, 0x1F),
         text_secondary: hex(0x51, 0x5A, 0x4A),
-        text_tertiary:  hex(0x84, 0x8D, 0x78),
-        border:         hex(0xE2, 0xE7, 0xDA),
-        border_strong:  hex(0xD4, 0xDB, 0xC8),
-        accent:         hex(0x7A, 0x42, 0x20),
-        accent_soft:    hex_a(0x7A, 0x42, 0x20, 0.13),
-        accent_on:      hex(0xFA, 0xFB, 0xF6),
-        shadow:         hex_a(0x26, 0x30, 0x1C, 0.18),
-        scrim:          hex_a(0x18, 0x20, 0x12, 0.26),
-        error:          hex(0xB0, 0x30, 0x28),
-        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
-        warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0),
+        text_tertiary: hex(0x84, 0x8D, 0x78),
+        border: hex(0xE2, 0xE7, 0xDA),
+        border_strong: hex(0xD4, 0xDB, 0xC8),
+        accent: hex(0x7A, 0x42, 0x20),
+        accent_soft: hex_a(0x7A, 0x42, 0x20, 0.13),
+        accent_on: hex(0xFA, 0xFB, 0xF6),
+        shadow: hex_a(0x26, 0x30, 0x1C, 0.18),
+        scrim: hex_a(0x18, 0x20, 0x12, 0.26),
+        error: hex(0xB0, 0x30, 0x28),
+        warning_bg: gpui::hsla(0.11, 0.9, 0.5, 0.12),
+        warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0),
     }
 }
 
@@ -260,22 +265,22 @@ fn sage_colors() -> ColorTokens {
 
 fn ink_colors() -> ColorTokens {
     ColorTokens {
-        desktop_bg:     hex(0x14, 0x11, 0x0A),
-        surface:        hex(0x1B, 0x18, 0x12),
-        surface_alt:    hex(0x21, 0x1D, 0x15),
-        hover:          hex(0x2A, 0x24, 0x1B),
-        text_primary:   hex(0xEC, 0xE4, 0xD3),
+        desktop_bg: hex(0x14, 0x11, 0x0A),
+        surface: hex(0x1B, 0x18, 0x12),
+        surface_alt: hex(0x21, 0x1D, 0x15),
+        hover: hex(0x2A, 0x24, 0x1B),
+        text_primary: hex(0xEC, 0xE4, 0xD3),
         text_secondary: hex(0xB4, 0xAA, 0x94),
-        text_tertiary:  hex(0x87, 0x7D, 0x68),
-        border:         hex(0x2C, 0x27, 0x1E),
-        border_strong:  hex(0x39, 0x2F, 0x23),
-        accent:         hex(0xE0, 0x84, 0x5A),
-        accent_soft:    hex_a(0xE0, 0x84, 0x5A, 0.13),
-        accent_on:      hex(0x1B, 0x18, 0x12),
-        shadow:         hex_a(0x00, 0x00, 0x00, 0.50),
-        scrim:          hex_a(0x00, 0x00, 0x00, 0.45),
-        error:          hex(0xE0, 0x58, 0x58),
-        warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.10),
-        warning_text:   gpui::hsla(0.10, 0.90, 0.65, 1.0),
+        text_tertiary: hex(0x87, 0x7D, 0x68),
+        border: hex(0x2C, 0x27, 0x1E),
+        border_strong: hex(0x39, 0x2F, 0x23),
+        accent: hex(0xE0, 0x84, 0x5A),
+        accent_soft: hex_a(0xE0, 0x84, 0x5A, 0.13),
+        accent_on: hex(0x1B, 0x18, 0x12),
+        shadow: hex_a(0x00, 0x00, 0x00, 0.50),
+        scrim: hex_a(0x00, 0x00, 0x00, 0.45),
+        error: hex(0xE0, 0x58, 0x58),
+        warning_bg: gpui::hsla(0.11, 0.9, 0.5, 0.10),
+        warning_text: gpui::hsla(0.10, 0.90, 0.65, 1.0),
     }
 }

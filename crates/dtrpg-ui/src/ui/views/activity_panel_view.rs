@@ -3,7 +3,7 @@
 use std::time::Instant;
 
 use gpui::prelude::*;
-use gpui::{div, px, relative, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px, relative};
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::tooltip::Tooltip;
 
@@ -107,12 +107,7 @@ fn render_empty(text_primary: gpui::Hsla, text_tertiary: gpui::Hsla) -> AnyEleme
         .justify_center()
         .py(px(24.0))
         .gap(px(6.0))
-        .child(
-            div()
-                .text_2xl()
-                .text_color(text_tertiary)
-                .child("o"),
-        )
+        .child(div().text_2xl().text_color(text_tertiary).child("o"))
         .child(
             div()
                 .text_sm()
@@ -231,10 +226,7 @@ fn render_item_row(
                         })
                         .children(error_msg.map(|msg| {
                             if is_expanded {
-                                div()
-                                    .text_xs()
-                                    .text_color(text_tertiary)
-                                    .child(msg)
+                                div().text_xs().text_color(text_tertiary).child(msg)
                             } else {
                                 div()
                                     .text_xs()
@@ -273,12 +265,6 @@ fn render_item_row(
                 .mt(px(4.0))
                 .bg(border)
                 .rounded(px(1.5))
-                .child(
-                    div()
-                        .h_full()
-                        .w(relative(fill))
-                        .bg(accent)
-                        .rounded(px(1.5)),
-                )
+                .child(div().h_full().w(relative(fill)).bg(accent).rounded(px(1.5)))
         }))
 }

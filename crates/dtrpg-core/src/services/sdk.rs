@@ -61,7 +61,10 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] on network or session failures.
-    fn list_product_list_items(&self, product_list_id: u64) -> Result<ProductListItemsResponse, LibraryServiceError>;
+    fn list_product_list_items(
+        &self,
+        product_list_id: u64,
+    ) -> Result<ProductListItemsResponse, LibraryServiceError>;
 }
 
 /// Library service adapter backed by the Rust SDK.
@@ -88,10 +91,12 @@ impl RustSdkLibraryService {
 
     /// Creates an unauthenticated service that returns a "not signed in" error on all calls.
     pub fn unauthenticated() -> Self {
-        Self::new(Box::new(UnavailableSdkGateway::new(LibraryServiceError::new(
-            LibraryServiceErrorKind::Session,
-            "Not signed in. Open Settings > Account to sign in.",
-        ))))
+        Self::new(Box::new(UnavailableSdkGateway::new(
+            LibraryServiceError::new(
+                LibraryServiceErrorKind::Session,
+                "Not signed in. Open Settings > Account to sign in.",
+            ),
+        )))
     }
 
     /// Creates the service using in-memory `tokens` obtained at startup or login.
@@ -140,7 +145,10 @@ impl LibraryService for RustSdkLibraryService {
 
             // Derive estimated total from `links.last` on the first page response.
             if !total_reported {
-                if let (Some(cb), Some(last_page)) = (on_total.as_deref_mut(), last_page_from_links(&response.links)) {
+                if let (Some(cb), Some(last_page)) = (
+                    on_total.as_deref_mut(),
+                    last_page_from_links(&response.links),
+                ) {
                     let estimated = (last_page as usize).saturating_mul(page_size as usize);
                     cb(estimated);
                 }
@@ -182,7 +190,10 @@ impl LibraryService for RustSdkLibraryService {
         Ok(map_order_product(&response.data, &HashMap::new(), 0))
     }
 
-    fn list_collections(&self) -> Result<(Vec<LibraryCollection>, HashMap<Arc<str>, HashSet<u64>>), LibraryServiceError> {
+    fn list_collections(
+        &self,
+    ) -> Result<(Vec<LibraryCollection>, HashMap<Arc<str>, HashSet<u64>>), LibraryServiceError>
+    {
         let response = self.gateway.list_product_lists()?;
         let mut collections = Vec::new();
         let mut membership: HashMap<Arc<str>, HashSet<u64>> = HashMap::new();
@@ -206,7 +217,11 @@ impl LibraryService for RustSdkLibraryService {
                 .filter_map(|v| v["productId"].as_u64())
                 .collect();
 
-            collections.push(LibraryCollection { id, name: Arc::clone(&name), item_count });
+            collections.push(LibraryCollection {
+                id,
+                name: Arc::clone(&name),
+                item_count,
+            });
             membership.insert(name, product_ids);
         }
 
@@ -230,10 +245,12 @@ impl HttpSdkLibraryGateway {
             .flatten()
             .map(|c| c.secret)
             .or_else(|| std::env::var(APPLICATION_KEY_ENV).ok())
-            .ok_or_else(|| LibraryServiceError::new(
-                LibraryServiceErrorKind::Session,
-                "No API key found in keyring or environment. Sign in to continue.",
-            ))?;
+            .ok_or_else(|| {
+                LibraryServiceError::new(
+                    LibraryServiceErrorKind::Session,
+                    "No API key found in keyring or environment. Sign in to continue.",
+                )
+            })?;
 
         Self::build(
             application_key,
@@ -263,7 +280,12 @@ impl HttpSdkLibraryGateway {
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(u64::MAX);
 
-        Self::build(application_key, access_token, refresh_token, refresh_token_ttl)
+        Self::build(
+            application_key,
+            access_token,
+            refresh_token,
+            refresh_token_ttl,
+        )
     }
 
     fn build(
@@ -318,13 +340,25 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
 
     fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
         self.runtime
-            .block_on(self.client.list_product_lists(PageParams { page: None, page_size: None }))
+            .block_on(self.client.list_product_lists(PageParams {
+                page: None,
+                page_size: None,
+            }))
             .map_err(map_client_error)
     }
 
-    fn list_product_list_items(&self, product_list_id: u64) -> Result<ProductListItemsResponse, LibraryServiceError> {
+    fn list_product_list_items(
+        &self,
+        product_list_id: u64,
+    ) -> Result<ProductListItemsResponse, LibraryServiceError> {
         self.runtime
-            .block_on(self.client.list_product_list_items(product_list_id, PageParams { page: None, page_size: None }))
+            .block_on(self.client.list_product_list_items(
+                product_list_id,
+                PageParams {
+                    page: None,
+                    page_size: None,
+                },
+            ))
             .map_err(map_client_error)
     }
 }
@@ -355,7 +389,10 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
         Err(self.error.clone())
     }
 
-    fn list_product_list_items(&self, _product_list_id: u64) -> Result<ProductListItemsResponse, LibraryServiceError> {
+    fn list_product_list_items(
+        &self,
+        _product_list_id: u64,
+    ) -> Result<ProductListItemsResponse, LibraryServiceError> {
         Err(self.error.clone())
     }
 }
@@ -368,7 +405,10 @@ fn last_page_from_links(links: &PaginationLinks) -> Option<u32> {
     let last_url = links.last.as_deref()?;
     // Find "page=" in the query string and parse the digits that follow.
     let page_part = last_url.split("page=").nth(1)?;
-    let digits: String = page_part.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = page_part
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     digits.parse::<u32>().ok().filter(|&n| n > 0)
 }
 
@@ -406,7 +446,13 @@ fn map_order_product(
         .filters
         .as_ref()
         .and_then(|filters| filters.iter().find(|f| f.parent_filter_id == 0))
-        .map(|f| if f.parent_name.is_empty() { f.name.clone() } else { f.parent_name.clone() })
+        .map(|f| {
+            if f.parent_name.is_empty() {
+                f.name.clone()
+            } else {
+                f.parent_name.clone()
+            }
+        })
         .unwrap_or_else(|| "Library item".to_string());
 
     let mut format_parts: Vec<String> = attributes
@@ -423,12 +469,7 @@ fn map_order_product(
         format_parts.join(" + ")
     };
 
-    let size_mb = attributes
-        .files
-        .iter()
-        .map(|f| f.size as f64)
-        .sum::<f64>()
-        / BYTES_PER_MB;
+    let size_mb = attributes.files.iter().map(|f| f.size as f64).sum::<f64>() / BYTES_PER_MB;
 
     let year = attributes
         .file_last_modified
@@ -473,7 +514,9 @@ fn map_order_product(
 fn map_client_error(error: ClientError) -> LibraryServiceError {
     match error {
         ClientError::Sdk(error) => map_sdk_error(error),
-        ClientError::DecodeFailed { url, status, cause, .. } => {
+        ClientError::DecodeFailed {
+            url, status, cause, ..
+        } => {
             let kind = match status {
                 401 => LibraryServiceErrorKind::NeedsReauth,
                 403 => LibraryServiceErrorKind::Session,
@@ -590,11 +633,28 @@ mod tests {
         }
 
         fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
-            Ok(ProductListCollectionResponse { data: vec![], links: pagination_links(None), meta: PaginationMeta { items_per_page: 100, current_page: 1 } })
+            Ok(ProductListCollectionResponse {
+                data: vec![],
+                links: pagination_links(None),
+                meta: PaginationMeta {
+                    items_per_page: 100,
+                    current_page: 1,
+                },
+            })
         }
 
-        fn list_product_list_items(&self, _product_list_id: u64) -> Result<ProductListItemsResponse, LibraryServiceError> {
-            Ok(ProductListItemsResponse { links: pagination_links(None), meta: PaginationMeta { items_per_page: 100, current_page: 1 }, data: vec![] })
+        fn list_product_list_items(
+            &self,
+            _product_list_id: u64,
+        ) -> Result<ProductListItemsResponse, LibraryServiceError> {
+            Ok(ProductListItemsResponse {
+                links: pagination_links(None),
+                meta: PaginationMeta {
+                    items_per_page: 100,
+                    current_page: 1,
+                },
+                data: vec![],
+            })
         }
     }
 
@@ -614,14 +674,20 @@ mod tests {
             if call == 0 {
                 Ok(OrderProductListResponse {
                     links: pagination_links(Some("page=2".to_string())),
-                    meta: PaginationMeta { items_per_page: 1, current_page: 1 },
+                    meta: PaginationMeta {
+                        items_per_page: 1,
+                        current_page: 1,
+                    },
                     data: vec![order_product_item(42, "Item Page One")],
                     included: None,
                 })
             } else {
                 Ok(OrderProductListResponse {
                     links: pagination_links(None),
-                    meta: PaginationMeta { items_per_page: 1, current_page: 2 },
+                    meta: PaginationMeta {
+                        items_per_page: 1,
+                        current_page: 2,
+                    },
                     data: vec![order_product_item(99, "Item Page Two")],
                     included: None,
                 })
@@ -632,15 +698,35 @@ mod tests {
             &self,
             _id: u64,
         ) -> Result<OrderProductItemResponse, LibraryServiceError> {
-            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
+            Err(LibraryServiceError::new(
+                LibraryServiceErrorKind::NotFound,
+                "not used",
+            ))
         }
 
         fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
-            Ok(ProductListCollectionResponse { data: vec![], links: pagination_links(None), meta: PaginationMeta { items_per_page: 100, current_page: 1 } })
+            Ok(ProductListCollectionResponse {
+                data: vec![],
+                links: pagination_links(None),
+                meta: PaginationMeta {
+                    items_per_page: 100,
+                    current_page: 1,
+                },
+            })
         }
 
-        fn list_product_list_items(&self, _product_list_id: u64) -> Result<ProductListItemsResponse, LibraryServiceError> {
-            Ok(ProductListItemsResponse { links: pagination_links(None), meta: PaginationMeta { items_per_page: 100, current_page: 1 }, data: vec![] })
+        fn list_product_list_items(
+            &self,
+            _product_list_id: u64,
+        ) -> Result<ProductListItemsResponse, LibraryServiceError> {
+            Ok(ProductListItemsResponse {
+                links: pagination_links(None),
+                meta: PaginationMeta {
+                    items_per_page: 100,
+                    current_page: 1,
+                },
+                data: vec![],
+            })
         }
     }
 
@@ -753,7 +839,9 @@ mod tests {
 
     #[test]
     fn sdk_service_fetches_all_pages_via_pagination() {
-        let gateway = TwoPageGateway { call_count: AtomicU32::new(0) };
+        let gateway = TwoPageGateway {
+            call_count: AtomicU32::new(0),
+        };
         let service = RustSdkLibraryService::new(Box::new(gateway));
 
         let items = service.list_items().expect("list items");

@@ -3,13 +3,22 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const MONTH_NAMES: [&str; 12] = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 ];
 
 const MONTH_ABBRS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
 /// Returns the current Unix timestamp in seconds.
@@ -209,9 +218,6 @@ mod tests {
     #[test]
     fn absolute_known_date() {
         // 2024-01-05 15:42:00 UTC = 1704469320
-        assert_eq!(
-            format_absolute(1_704_469_320),
-            "January 5, 2024 at 3:42 PM"
-        );
+        assert_eq!(format_absolute(1_704_469_320), "January 5, 2024 at 3:42 PM");
     }
 }

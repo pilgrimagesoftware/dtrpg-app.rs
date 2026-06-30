@@ -8,9 +8,11 @@ use gpui_component::input::InputState;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore, keys};
 use crate::data::avatar::fetch_avatar_bytes;
-use crate::data::events::{LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed};
-use crate::data::profile::ProfileConfig;
+use crate::data::events::{
+    LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
+};
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use crate::data::profile::ProfileConfig;
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 use crate::services::LoginService;
 
@@ -128,10 +130,7 @@ impl SettingsController {
         }
         let initial_path = storage.root_path();
         let storage_path_draft = initial_path.to_string_lossy().into_owned();
-        let email_draft = ProfileConfig::load()
-            .email()
-            .unwrap_or_default()
-            .to_owned();
+        let email_draft = ProfileConfig::load().email().unwrap_or_default().to_owned();
 
         let mut ctrl = Self {
             is_open: false,
@@ -192,9 +191,17 @@ impl SettingsController {
     ///
     /// When `email` is `Some`, spawns a background task to fetch the Gravatar avatar.
     /// Emits [`SettingsChanged`] immediately and again once avatar bytes arrive (if applicable).
-    pub fn set_logged_in(&mut self, email: Option<String>, api_key: Option<&str>, cx: &mut Context<Self>) {
+    pub fn set_logged_in(
+        &mut self,
+        email: Option<String>,
+        api_key: Option<&str>,
+        cx: &mut Context<Self>,
+    ) {
         self.is_authenticated = true;
-        self.auth_state = AuthState::LoggedIn { email: email.clone(), avatar_bytes: None };
+        self.auth_state = AuthState::LoggedIn {
+            email: email.clone(),
+            avatar_bytes: None,
+        };
         self.api_key_hint = api_key.map(mask_api_key);
         cx.emit(SettingsChanged);
 
@@ -204,7 +211,8 @@ impl SettingsController {
                     .background_executor()
                     .spawn(async move { fetch_avatar_bytes(addr) })
                     .await;
-                this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx)).ok();
+                this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx))
+                    .ok();
             })
             .detach();
         }
@@ -326,7 +334,11 @@ impl SettingsController {
     pub fn startup_auth(&mut self, api_key: String, cx: &mut Context<Self>) {
         let email = {
             let trimmed = self.email_draft.trim();
-            if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_owned())
+            }
         };
         let svc = self.login_service.clone();
 
@@ -370,7 +382,11 @@ impl SettingsController {
         let key = self.api_key_draft.clone();
         let email = {
             let trimmed = self.email_draft.trim();
-            if trimmed.is_empty() { None } else { Some(trimmed.to_owned()) }
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_owned())
+            }
         };
         let svc = self.login_service.clone();
 
@@ -385,7 +401,11 @@ impl SettingsController {
                 match result {
                     Ok((api_key, tokens)) => {
                         let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
-                        if let Err(e) = store.store(&Credential { service: keys::SERVICE.into(), account: keys::API_KEY.into(), secret: api_key.clone() }) {
+                        if let Err(e) = store.store(&Credential {
+                            service: keys::SERVICE.into(),
+                            account: keys::API_KEY.into(),
+                            secret: api_key.clone(),
+                        }) {
                             tracing::warn!("failed to save API key to keyring: {e}");
                         }
                         ProfileConfig::save(email.as_deref());
@@ -436,7 +456,11 @@ impl SettingsController {
     }
 
     /// Adds or replaces a file-opener entry and persists the change.
-    pub fn add_file_opener(&mut self, entry: FileOpenerEntry, cx: &mut Context<Self>) -> AddOutcome {
+    pub fn add_file_opener(
+        &mut self,
+        entry: FileOpenerEntry,
+        cx: &mut Context<Self>,
+    ) -> AddOutcome {
         let outcome = self.file_openers.add(entry);
         self.file_openers.save();
         cx.emit(SettingsChanged);
@@ -462,7 +486,10 @@ impl SettingsController {
                 avatar_bytes: None,
                 api_key_hint: None,
             },
-            AuthState::LoggedIn { email, avatar_bytes } => AuthStateSnapshot {
+            AuthState::LoggedIn {
+                email,
+                avatar_bytes,
+            } => AuthStateSnapshot {
                 is_logged_in: true,
                 display_initial: email
                     .as_deref()

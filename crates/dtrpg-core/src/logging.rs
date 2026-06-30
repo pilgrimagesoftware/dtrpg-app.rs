@@ -11,9 +11,9 @@
 use std::path::PathBuf;
 
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::EnvFilter;
 
 /// Initialises the global tracing subscriber with console and file layers.
 ///
@@ -29,7 +29,10 @@ pub fn init() -> Option<WorkerGuard> {
     if let Err(e) = std::fs::create_dir_all(&log_dir) {
         // Can't create log dir — set up console-only and continue.
         init_console_only();
-        eprintln!("warning: could not create log directory {}: {e}", log_dir.display());
+        eprintln!(
+            "warning: could not create log directory {}: {e}",
+            log_dir.display()
+        );
         return None;
     }
 

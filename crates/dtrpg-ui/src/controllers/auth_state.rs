@@ -21,7 +21,11 @@ impl AuthStateController {
     /// to support testing unauthenticated or expired states without real credentials.
     pub fn new(initial_state: AuthState) -> Self {
         let notices = notices_for(initial_state, false);
-        Self { state: initial_state, notices, is_auth_pending: false }
+        Self {
+            state: initial_state,
+            notices,
+            is_auth_pending: false,
+        }
     }
 
     /// Returns the current authentication state.

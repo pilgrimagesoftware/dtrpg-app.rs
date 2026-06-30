@@ -9,10 +9,10 @@ pub mod ui {
     pub mod views;
     pub mod windows;
 }
-pub mod credentials;
-pub mod models;
-pub mod data;
 pub mod controllers;
+pub mod credentials;
+pub mod data;
+pub mod models;
 pub mod services;
-pub mod view_models;
 pub mod util;
+pub mod view_models;

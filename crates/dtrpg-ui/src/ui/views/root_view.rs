@@ -1,37 +1,38 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use gpui::{AppContext, div, px, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled};
-use gpui_component::input::{InputEvent, InputState};
-use gpui_component::notification::{Notification, NotificationType};
-use gpui_component::resizable::{h_resizable, resizable_panel, ResizableState};
-use gpui_component::WindowExt as _;
 use crate::ui::actions::ShowSettings;
 use crate::ui::app::{LoginServiceFactory, ServiceFactory};
+use gpui::{
+    AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
+    ParentElement, Render, Styled, div, px,
+};
+use gpui_component::WindowExt as _;
+use gpui_component::input::{InputEvent, InputState};
+use gpui_component::notification::{Notification, NotificationType};
+use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 
+use crate::ui::views::{
+    activity_panel_view::render_activity_panel, catalog_view::CatalogView,
+    detail_panel_view::render_detail_panel, notification_banner_view::render_notification_banner,
+    settings_view::render_settings_panel, sidebar_view::render_sidebar,
+    toolbar_view::render_toolbar,
+};
 use crate::{
     controllers::{
-        activity::ActivityController,
-        auth_state::AuthStateController,
-        library::LibraryController,
+        activity::ActivityController, auth_state::AuthStateController, library::LibraryController,
         settings::SettingsController,
     },
     credentials::{CredentialStore, KeyringCredentialStore, keys},
     data::{
         auth_state::AuthState,
-        events::{ActivityChanged, AuthStateChanged, DownloadComplete, DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed},
+        events::{
+            ActivityChanged, AuthStateChanged, DownloadComplete, DownloadError, LibraryChanged,
+            LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
+        },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
     },
     services::LibraryService,
-};
-use crate::ui::views::{
-    activity_panel_view::render_activity_panel,
-    catalog_view::CatalogView,
-    detail_panel_view::render_detail_panel,
-    notification_banner_view::render_notification_banner,
-    settings_view::render_settings_panel,
-    sidebar_view::render_sidebar,
-    toolbar_view::render_toolbar,
 };
 /// Type-tag used to identify the startup-auth toast notification.
 struct AuthPendingNotif;
@@ -64,22 +65,29 @@ impl LibraryRootView {
     ///
     /// If `startup_api_key` is `Some`, a background re-authentication is started immediately.
     /// The window always opens in the unauthenticated state and transitions once auth completes.
-    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>, service: Box<dyn LibraryService>, startup_api_key: Option<String>) -> Self {
+    pub fn new(
+        window: &mut gpui::Window,
+        cx: &mut Context<Self>,
+        service: Box<dyn LibraryService>,
+        startup_api_key: Option<String>,
+    ) -> Self {
         let activity = cx.new(|_| ActivityController::new());
         let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
         let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
-        let api_key_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("Paste API key here\u{2026}")
-        });
+        let api_key_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Paste API key here\u{2026}"));
         let settings_for_input = settings.clone();
-        cx.subscribe(&api_key_input, move |_this, input_entity, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                let value = input_entity.read(cx).value().to_string();
-                settings_for_input.update(cx, |ctrl, cx| ctrl.set_api_key_draft(value, cx));
-            }
-        })
+        cx.subscribe(
+            &api_key_input,
+            move |_this, input_entity, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let value = input_entity.read(cx).value().to_string();
+                    settings_for_input.update(cx, |ctrl, cx| ctrl.set_api_key_draft(value, cx));
+                }
+            },
+        )
         .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_api_key_input(api_key_input));
 
@@ -92,51 +100,64 @@ impl LibraryRootView {
             state
         });
         let settings_for_email = settings.clone();
-        cx.subscribe(&email_input, move |_this, input_entity, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                let value = input_entity.read(cx).value().to_string();
-                settings_for_email.update(cx, |ctrl, cx| ctrl.set_email_draft(value, cx));
-            }
-        })
+        cx.subscribe(
+            &email_input,
+            move |_this, input_entity, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let value = input_entity.read(cx).value().to_string();
+                    settings_for_email.update(cx, |ctrl, cx| ctrl.set_email_draft(value, cx));
+                }
+            },
+        )
         .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_email_input(email_input));
 
         let storage_path_placeholder = {
             use crate::data::storage::StorageConfig;
-            StorageConfig::load().root_path().to_string_lossy().into_owned()
+            StorageConfig::load()
+                .root_path()
+                .to_string_lossy()
+                .into_owned()
         };
-        let storage_path_input = cx.new(|cx| {
-            InputState::new(window, cx).default_value(&storage_path_placeholder)
-        });
+        let storage_path_input =
+            cx.new(|cx| InputState::new(window, cx).default_value(&storage_path_placeholder));
         let settings_for_storage = settings.clone();
-        cx.subscribe(&storage_path_input, move |_this, input_entity, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                let value = input_entity.read(cx).value().to_string();
-                settings_for_storage.update(cx, |ctrl, cx| ctrl.set_storage_path_draft(value, cx));
-            }
-        })
+        cx.subscribe(
+            &storage_path_input,
+            move |_this, input_entity, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let value = input_entity.read(cx).value().to_string();
+                    settings_for_storage
+                        .update(cx, |ctrl, cx| ctrl.set_storage_path_draft(value, cx));
+                }
+            },
+        )
         .detach();
-        settings.update(cx, |ctrl, _cx| ctrl.set_storage_path_input(storage_path_input));
+        settings.update(cx, |ctrl, _cx| {
+            ctrl.set_storage_path_input(storage_path_input)
+        });
 
-        let catalog_view = cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
+        let catalog_view =
+            cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
         let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
         let root_focus = cx.focus_handle();
         root_focus.focus(window, cx);
         let settings_focus = cx.focus_handle();
 
-        let search_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("Search\u{2026}")
-        });
+        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Search\u{2026}"));
 
         let controller_for_search = controller.clone();
-        cx.subscribe(&search_input, move |_this, input_entity, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                let value = input_entity.read(cx).value().to_string();
-                controller_for_search.update(cx, |ctrl, cx| {
-                    ctrl.set_search_query(value, cx);
-                });
-            }
-        })
+        cx.subscribe(
+            &search_input,
+            move |_this, input_entity, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let value = input_entity.read(cx).value().to_string();
+                    controller_for_search.update(cx, |ctrl, cx| {
+                        ctrl.set_search_query(value, cx);
+                    });
+                }
+            },
+        )
         .detach();
 
         cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
@@ -149,25 +170,30 @@ impl LibraryRootView {
         })
         .detach();
 
-        cx.subscribe_in(&activity, window, |_this, _ctrl, event: &DownloadComplete, window, cx| {
-            let msg = format!("Downloaded: {}", event.title);
-            window.push_notification(
-                Notification::success(msg),
-                cx,
-            );
-        })
+        cx.subscribe_in(
+            &activity,
+            window,
+            |_this, _ctrl, event: &DownloadComplete, window, cx| {
+                let msg = format!("Downloaded: {}", event.title);
+                window.push_notification(Notification::success(msg), cx);
+            },
+        )
         .detach();
 
-        cx.subscribe_in(&activity, window, |_this, _ctrl, event: &DownloadError, window, cx| {
-            let msg = format!("{}: {}", event.title, event.message);
-            window.push_notification(
-                Notification::new()
-                    .message(msg)
-                    .with_type(NotificationType::Error)
-                    .autohide(false),
-                cx,
-            );
-        })
+        cx.subscribe_in(
+            &activity,
+            window,
+            |_this, _ctrl, event: &DownloadError, window, cx| {
+                let msg = format!("{}: {}", event.title, event.message);
+                window.push_notification(
+                    Notification::new()
+                        .message(msg)
+                        .with_type(NotificationType::Error)
+                        .autohide(false),
+                    cx,
+                );
+            },
+        )
         .detach();
 
         cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
@@ -175,55 +201,76 @@ impl LibraryRootView {
         })
         .detach();
 
-        cx.subscribe(&auth_state, |_this, _ctrl, _event: &AuthStateChanged, cx| {
-            cx.notify();
-        })
+        cx.subscribe(
+            &auth_state,
+            |_this, _ctrl, _event: &AuthStateChanged, cx| {
+                cx.notify();
+            },
+        )
         .detach();
 
         // Handle logout: delete the API key and transition to unauthenticated.
         // Tokens are in-memory only and need no explicit deletion.
         let auth_state_for_logout = auth_state.clone();
-        cx.subscribe(&settings, move |_this, _ctrl, _event: &LogoutRequested, cx| {
-            let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
-            if let Err(e) = store.delete() {
-                tracing::warn!("credential delete (api-key): {e}");
-            }
-            auth_state_for_logout.update(cx, |ctrl, cx| ctrl.set_state(AuthState::Unauthenticated, cx));
-        })
+        cx.subscribe(
+            &settings,
+            move |_this, _ctrl, _event: &LogoutRequested, cx| {
+                let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
+                if let Err(e) = store.delete() {
+                    tracing::warn!("credential delete (api-key): {e}");
+                }
+                auth_state_for_logout.update(cx, |ctrl, cx| {
+                    ctrl.set_state(AuthState::Unauthenticated, cx)
+                });
+            },
+        )
         .detach();
 
         // Handle sign-in: replace the library service, mark authenticated, dismiss any auth toast.
         let auth_state_for_signin = auth_state.clone();
         let controller_for_signin = controller.clone();
-        cx.subscribe_in(&settings, window, move |_this, _settings, event: &SignInSucceeded, window, cx| {
-            let tokens = event.0.clone();
-            let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens));
-            controller_for_signin.update(cx, |ctrl, cx| ctrl.replace_service(service, cx));
-            auth_state_for_signin.update(cx, |ctrl, cx| ctrl.set_state(AuthState::Authenticated, cx));
-            window.remove_notification::<AuthPendingNotif>(cx);
-        })
+        cx.subscribe_in(
+            &settings,
+            window,
+            move |_this, _settings, event: &SignInSucceeded, window, cx| {
+                let tokens = event.0.clone();
+                let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens));
+                controller_for_signin.update(cx, |ctrl, cx| ctrl.replace_service(service, cx));
+                auth_state_for_signin
+                    .update(cx, |ctrl, cx| ctrl.set_state(AuthState::Authenticated, cx));
+                window.remove_notification::<AuthPendingNotif>(cx);
+            },
+        )
         .detach();
 
         // Handle startup auth beginning: suppress the "Not signed in" banner and show a toast.
         let auth_state_for_begun = auth_state.clone();
-        cx.subscribe_in(&settings, window, move |_this, _settings, _event: &StartupAuthBegun, window, cx| {
-            auth_state_for_begun.update(cx, |ctrl, cx| ctrl.set_auth_pending(true, cx));
-            window.push_notification(
-                Notification::new()
-                    .message("Signing in to DriveThruRPG...")
-                    .autohide(false)
-                    .id::<AuthPendingNotif>(),
-                cx,
-            );
-        })
+        cx.subscribe_in(
+            &settings,
+            window,
+            move |_this, _settings, _event: &StartupAuthBegun, window, cx| {
+                auth_state_for_begun.update(cx, |ctrl, cx| ctrl.set_auth_pending(true, cx));
+                window.push_notification(
+                    Notification::new()
+                        .message("Signing in to DriveThruRPG...")
+                        .autohide(false)
+                        .id::<AuthPendingNotif>(),
+                    cx,
+                );
+            },
+        )
         .detach();
 
         // Handle startup auth failure: clear pending state and dismiss the toast.
         let auth_state_for_failed = auth_state.clone();
-        cx.subscribe_in(&settings, window, move |_this, _settings, _event: &StartupAuthFailed, window, cx| {
-            auth_state_for_failed.update(cx, |ctrl, cx| ctrl.set_auth_pending(false, cx));
-            window.remove_notification::<AuthPendingNotif>(cx);
-        })
+        cx.subscribe_in(
+            &settings,
+            window,
+            move |_this, _settings, _event: &StartupAuthFailed, window, cx| {
+                auth_state_for_failed.update(cx, |ctrl, cx| ctrl.set_auth_pending(false, cx));
+                window.remove_notification::<AuthPendingNotif>(cx);
+            },
+        )
         .detach();
 
         // Start background auth after all subscriptions are wired.
@@ -246,7 +293,19 @@ impl LibraryRootView {
         })
         .detach();
 
-        Self { controller, settings, activity, auth_state, catalog_view, resize_state, sidebar_width, detail_width, root_focus, settings_focus, search_input }
+        Self {
+            controller,
+            settings,
+            activity,
+            auth_state,
+            catalog_view,
+            resize_state,
+            sidebar_width,
+            detail_width,
+            root_focus,
+            settings_focus,
+            search_input,
+        }
     }
 }
 
@@ -264,19 +323,42 @@ impl Render for LibraryRootView {
         let auth_entity = self.auth_state.clone();
 
         let snap = self.controller.read(cx).snapshot();
-        let (filter, counts, publishers, collections, collection_membership,
-             total_count, total_mb, matched_count, sort, sort_direction, grouped,
-             presentation, selected_item) = (
-            snap.filter, snap.counts, snap.publishers, snap.collections,
+        let (
+            filter,
+            counts,
+            publishers,
+            collections,
+            collection_membership,
+            total_count,
+            total_mb,
+            matched_count,
+            sort,
+            sort_direction,
+            grouped,
+            presentation,
+            selected_item,
+        ) = (
+            snap.filter,
+            snap.counts,
+            snap.publishers,
+            snap.collections,
             snap.collection_membership,
-            snap.total_count, snap.total_mb,
-            snap.matched_count, snap.sort, snap.sort_direction, snap.grouped,
-            snap.presentation, snap.selected_item,
+            snap.total_count,
+            snap.total_mb,
+            snap.matched_count,
+            snap.sort,
+            snap.sort_direction,
+            snap.grouped,
+            snap.presentation,
+            snap.selected_item,
         );
 
         let settings_snap = self.settings.read(cx).snapshot();
         let activity_snap = self.activity.read(cx).snapshot();
-        let notices: Vec<_> = self.auth_state.read(cx).active_notices()
+        let notices: Vec<_> = self
+            .auth_state
+            .read(cx)
+            .active_notices()
             .into_iter()
             .cloned()
             .collect();
@@ -312,8 +394,14 @@ impl Render for LibraryRootView {
             colors,
             cx,
         );
-        let banner = render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
-        let panel = render_detail_panel(selected_item.as_ref(), settings_snap.storage_root_path.clone(), lib_entity, colors);
+        let banner =
+            render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
+        let panel = render_detail_panel(
+            selected_item.as_ref(),
+            settings_snap.storage_root_path.clone(),
+            lib_entity,
+            colors,
+        );
 
         let surface = colors.surface;
         let text_primary = colors.text_primary;
@@ -360,10 +448,7 @@ impl Render for LibraryRootView {
 
         // Wrap the sidebar in a relative container so the activity panel overlay
         // (which is absolute-positioned) is anchored within the sidebar column.
-        let mut sidebar_col = div()
-            .size_full()
-            .relative()
-            .child(sidebar);
+        let mut sidebar_col = div().size_full().relative().child(sidebar);
 
         if activity_snap.panel_open {
             let overlay = render_activity_panel(&activity_snap, activity_entity, colors);
@@ -393,10 +478,7 @@ impl Render for LibraryRootView {
                             .size_range(px(180.)..px(361.))
                             .child(sidebar_col),
                     )
-                    .child(
-                        resizable_panel()
-                            .child(main_content),
-                    )
+                    .child(resizable_panel().child(main_content))
                     .child(
                         resizable_panel()
                             .size(px(detail_initial))

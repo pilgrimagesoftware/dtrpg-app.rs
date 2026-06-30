@@ -13,7 +13,9 @@ pub enum SortMethod {
     DateAdded,
     PageCount,
     /// Sort driven by a column header click; carries the column key string.
-    Custom { col_key: &'static str },
+    Custom {
+        col_key: &'static str,
+    },
 }
 
 /// Direction for catalog sorting.
@@ -37,7 +39,9 @@ pub fn sort_items(items: &mut [LibraryItem], method: SortMethod, direction: Sort
         SortMethod::PageCount => {
             items.sort_by(|a, b| a.pages.cmp(&b.pages).then_with(|| a.title.cmp(&b.title)))
         }
-        SortMethod::Custom { col_key: "publisher" } => items.sort_by(|a, b| {
+        SortMethod::Custom {
+            col_key: "publisher",
+        } => items.sort_by(|a, b| {
             a.publisher
                 .cmp(&b.publisher)
                 .then_with(|| a.title.cmp(&b.title))

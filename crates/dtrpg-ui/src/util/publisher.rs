@@ -1,7 +1,7 @@
 //! Data model, filtering, sorting, and stub catalog for the Libri library view.
 
-use std::sync::Arc;
 use crate::data::library::LibraryItem;
+use std::sync::Arc;
 
 // ── Publisher aggregation ─────────────────────────────────────────────────────
 
@@ -15,8 +15,7 @@ pub struct PublisherEntry {
 /// Returns publisher entries sorted by name ascending (case-insensitive).
 #[must_use]
 pub fn publisher_entries(items: &[LibraryItem]) -> Vec<PublisherEntry> {
-    let mut map: std::collections::HashMap<Arc<str>, usize> =
-        std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<Arc<str>, usize> = std::collections::HashMap::new();
     for item in items {
         *map.entry(Arc::clone(&item.publisher)).or_insert(0) += 1;
     }
@@ -89,8 +88,22 @@ mod tests {
     use crate::data::library::LibraryItem;
 
     fn item(publisher: &str) -> LibraryItem {
-        LibraryItem::new("id", "Title", publisher, "", "", "PDF", 0, 0.0, 2020, 0,
-            crate::data::enums::ItemStatus::Cloud, "#000000", "", None)
+        LibraryItem::new(
+            "id",
+            "Title",
+            publisher,
+            "",
+            "",
+            "PDF",
+            0,
+            0.0,
+            2020,
+            0,
+            crate::data::enums::ItemStatus::Cloud,
+            "#000000",
+            "",
+            None,
+        )
     }
 
     #[test]
@@ -124,7 +137,9 @@ mod tests {
     #[test]
     fn alphabetical_order_is_independent_of_count() {
         let mut items = Vec::new();
-        for _ in 0..50 { items.push(item("Zyborg Games")); }
+        for _ in 0..50 {
+            items.push(item("Zyborg Games"));
+        }
         items.push(item("Aaeon Press"));
         let entries = publisher_entries(&items);
         assert_eq!(entries[0].name.as_ref(), "Aaeon Press");

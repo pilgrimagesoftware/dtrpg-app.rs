@@ -1,8 +1,8 @@
 //! Service trait and error types for library data access.
 
+use crate::data::library::{LibraryCollection, LibraryItem};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use crate::data::library::{LibraryCollection, LibraryItem};
 
 /// Maps item IDs to their collection membership sets.
 pub type CollectionMembership = HashMap<Arc<str>, HashSet<u64>>;
@@ -36,22 +36,21 @@ pub struct LibraryServiceError {
 impl LibraryServiceError {
     /// Creates a new service error.
     pub fn new(kind: LibraryServiceErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into() }
+        Self {
+            kind,
+            message: message.into(),
+        }
     }
 
     /// Returns a multi-line string suitable for display in the activity panel,
     /// combining the error message with a kind-specific user hint.
     pub fn panel_detail(&self) -> String {
         let hint = match self.kind {
-            LibraryServiceErrorKind::Network => {
-                "Check your internet connection and try again."
-            }
+            LibraryServiceErrorKind::Network => "Check your internet connection and try again.",
             LibraryServiceErrorKind::Session => {
                 "Your access token may be missing or expired. Try signing out and back in."
             }
-            LibraryServiceErrorKind::NotFound => {
-                "The requested item could not be found."
-            }
+            LibraryServiceErrorKind::NotFound => "The requested item could not be found.",
             LibraryServiceErrorKind::NeedsReauth => {
                 "Your session has expired. Please sign out and sign back in."
             }
@@ -127,7 +126,9 @@ pub trait LibraryService: Send + Sync + 'static {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] if the request fails.
-    fn list_collections(&self) -> Result<(Vec<LibraryCollection>, CollectionMembership), LibraryServiceError> {
+    fn list_collections(
+        &self,
+    ) -> Result<(Vec<LibraryCollection>, CollectionMembership), LibraryServiceError> {
         Ok((Vec::new(), HashMap::new()))
     }
 }

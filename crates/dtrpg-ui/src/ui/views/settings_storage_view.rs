@@ -2,7 +2,10 @@
 
 use std::path::PathBuf;
 
-use gpui::{div, px, AnyElement, Element, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled};
+use gpui::{
+    AnyElement, Element, Entity, InteractiveElement, IntoElement, ParentElement,
+    StatefulInteractiveElement, Styled, div, px,
+};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
 
@@ -50,106 +53,92 @@ pub fn render_storage_section(
         )
         // ── Path row with inline action buttons ───────────────────────────
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(6.0))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(8.0))
-                        // Path input field
-                        .child({
-                            let path_el: AnyElement = if let Some(input_state) = storage_path_input {
-                                Input::new(&input_state)
-                                    .appearance(true)
-                                    .into_element()
-                                    .into_any()
-                            } else {
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .h(px(34.0))
-                                    .px(px(12.0))
-                                    .rounded(px(8.0))
-                                    .border_1()
-                                    .border_color(border)
-                                    .bg(surface_alt)
-                                    .flex()
-                                    .items_center()
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .text_color(text_secondary)
-                                            .truncate()
-                                            .child(path_display),
-                                    )
-                                    .into_any()
-                            };
-                            path_el
-                        })
-                        // "Change…" icon button
-                        .child(
+            div().flex().flex_col().gap(px(6.0)).child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(8.0))
+                    // Path input field
+                    .child({
+                        let path_el: AnyElement = if let Some(input_state) = storage_path_input {
+                            Input::new(&input_state)
+                                .appearance(true)
+                                .into_element()
+                                .into_any()
+                        } else {
                             div()
-                                .id("change-storage")
-                                .flex_none()
-                                .size(px(32.0))
+                                .flex_1()
+                                .min_w_0()
+                                .h(px(34.0))
+                                .px(px(12.0))
                                 .rounded(px(8.0))
                                 .border_1()
                                 .border_color(border)
+                                .bg(surface_alt)
                                 .flex()
                                 .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .tooltip(|window, cx| Tooltip::new("Change\u{2026}").build(window, cx))
-                                .on_click(move |_event, _window, cx| {
-                                    let picked = rfd::FileDialog::new().pick_folder();
-                                    if let Some(path) = picked {
-                                        match validate_writable(&path) {
-                                            Ok(()) => {
-                                                entity_change.update(cx, |ctrl, cx| {
-                                                    if let Err(e) = ctrl.apply_storage_path(path, cx) {
-                                                        tracing::warn!("storage path rejected: {e}");
-                                                    }
-                                                });
-                                            }
-                                            Err(e) => tracing::warn!("storage path not writable: {e}"),
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_secondary)
+                                        .truncate()
+                                        .child(path_display),
+                                )
+                                .into_any()
+                        };
+                        path_el
+                    })
+                    // "Change…" icon button
+                    .child(
+                        div()
+                            .id("change-storage")
+                            .flex_none()
+                            .size(px(32.0))
+                            .rounded(px(8.0))
+                            .border_1()
+                            .border_color(border)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .tooltip(|window, cx| Tooltip::new("Change\u{2026}").build(window, cx))
+                            .on_click(move |_event, _window, cx| {
+                                let picked = rfd::FileDialog::new().pick_folder();
+                                if let Some(path) = picked {
+                                    match validate_writable(&path) {
+                                        Ok(()) => {
+                                            entity_change.update(cx, |ctrl, cx| {
+                                                if let Err(e) = ctrl.apply_storage_path(path, cx) {
+                                                    tracing::warn!("storage path rejected: {e}");
+                                                }
+                                            });
                                         }
+                                        Err(e) => tracing::warn!("storage path not writable: {e}"),
                                     }
-                                })
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(text_primary)
-                                        .child("📂"),
-                                ),
-                        )
-                        // "Show in Finder/Explorer/Files" icon button
-                        .child(
-                            div()
-                                .id("reveal-storage")
-                                .flex_none()
-                                .size(px(32.0))
-                                .rounded(px(8.0))
-                                .border_1()
-                                .border_color(border)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .cursor_pointer()
-                                .tooltip(move |window, cx| Tooltip::new(reveal_label).build(window, cx))
-                                .on_click(move |_event, _window, cx| {
-                                    entity_reveal.read(cx).reveal_storage_location();
-                                })
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(text_primary)
-                                        .child("↗"),
-                                ),
-                        ),
-                ),
+                                }
+                            })
+                            .child(div().text_sm().text_color(text_primary).child("📂")),
+                    )
+                    // "Show in Finder/Explorer/Files" icon button
+                    .child(
+                        div()
+                            .id("reveal-storage")
+                            .flex_none()
+                            .size(px(32.0))
+                            .rounded(px(8.0))
+                            .border_1()
+                            .border_color(border)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .tooltip(move |window, cx| Tooltip::new(reveal_label).build(window, cx))
+                            .on_click(move |_event, _window, cx| {
+                                entity_reveal.read(cx).reveal_storage_location();
+                            })
+                            .child(div().text_sm().text_color(text_primary).child("↗")),
+                    ),
+            ),
         );
 
     // ── Missing-path warning ──────────────────────────────────────────────

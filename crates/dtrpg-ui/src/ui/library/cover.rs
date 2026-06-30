@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use gpui::{div, px, rgb, Hsla, IntoElement, ParentElement, Styled};
+use gpui::{Hsla, IntoElement, ParentElement, Styled, div, px, rgb};
 
 use crate::data::library::LibraryItem;
 
@@ -160,17 +160,9 @@ fn render_motif(motif: Motif, fg: Hsla) -> impl IntoElement {
     let size = px(24.0);
     match motif {
         // ○ circle outline
-        Motif::Circle => div()
-            .text_xl()
-            .text_color(fg)
-            .child("○")
-            .into_any_element(),
+        Motif::Circle => div().text_xl().text_color(fg).child("○").into_any_element(),
         // ◇ diamond outline (Unicode avoids CSS rotate)
-        Motif::Diamond => div()
-            .text_xl()
-            .text_color(fg)
-            .child("◇")
-            .into_any_element(),
+        Motif::Diamond => div().text_xl().text_color(fg).child("◇").into_any_element(),
         // two horizontal rules
         Motif::DoubleRule => div()
             .flex()
@@ -180,16 +172,17 @@ fn render_motif(motif: Motif, fg: Hsla) -> impl IntoElement {
             .child(div().w(size).h(px(1.0)).bg(fg))
             .into_any_element(),
         // △ triangle outline (Unicode avoids CSS rotate)
-        Motif::Triangle => div()
-            .text_xl()
-            .text_color(fg)
-            .child("△")
-            .into_any_element(),
+        Motif::Triangle => div().text_xl().text_color(fg).child("△").into_any_element(),
     }
 }
 
 /// Renders a generative cover tile at the given pixel dimensions.
-pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32, render_text: bool) -> impl IntoElement + 'static + use<> {
+pub fn render_generative_cover(
+    item: &LibraryItem,
+    width: f32,
+    height: f32,
+    render_text: bool,
+) -> impl IntoElement + 'static + use<> {
     let style = cover_style(item);
     let bg = style.background;
     let fg = style.foreground;
@@ -261,7 +254,7 @@ pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32, rend
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data::enums::{ItemStatus};
+    use crate::data::enums::ItemStatus;
     use crate::util::stubs::*;
 
     fn make_item(id: &str, title: &str, color: &str) -> LibraryItem {
@@ -299,7 +292,10 @@ mod tests {
         let item = make_item("b1", "Dark Book", "#1C2A44");
         let style = cover_style(&item);
         // Cream has high lightness
-        assert!(style.foreground.l > 0.8, "expected cream foreground on dark bg");
+        assert!(
+            style.foreground.l > 0.8,
+            "expected cream foreground on dark bg"
+        );
     }
 
     #[test]
@@ -307,7 +303,10 @@ mod tests {
         // #C9A02C is a lighter warm-gold: r=201,g=160,b=44 → (201*299+160*587+44*114)/1000 ≈ 160 > 150
         let item = make_item("b_light", "Light Book", "#C9A02C");
         let style = cover_style(&item);
-        assert!(style.foreground.l < 0.2, "expected dark foreground on light bg");
+        assert!(
+            style.foreground.l < 0.2,
+            "expected dark foreground on light bg"
+        );
     }
 
     #[test]

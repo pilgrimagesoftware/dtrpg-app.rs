@@ -4,11 +4,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
-use gpui::{div, px, AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled};
+use gpui::{
+    AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, div, px,
+};
+use gpui_component::Disableable;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::tooltip::Tooltip;
-use gpui_component::Disableable;
 
 use crate::controllers::library::LibraryController;
 use crate::data::enums::ItemStatus;
@@ -144,15 +147,17 @@ pub fn render_detail_panel(
                                 .label("Read")
                                 .w_full()
                                 .disabled(!is_downloaded)
-                                .when(!is_downloaded, |b| {
-                                    b.tooltip("Download this item first")
-                                }),
+                                .when(!is_downloaded, |b| b.tooltip("Download this item first")),
                         )
                         .child(
                             Button::new("detail-download")
                                 .ghost()
                                 .outline()
-                                .label(if is_downloaded { "Downloaded" } else { "Download" })
+                                .label(if is_downloaded {
+                                    "Downloaded"
+                                } else {
+                                    "Download"
+                                })
                                 .w_full()
                                 .on_click(move |_, _, cx| {
                                     let id = Arc::clone(&item_id);
@@ -201,7 +206,10 @@ fn platform_reveal_label() -> &'static str {
     return "Show in Files";
 }
 
-fn render_metadata_table(item: &LibraryItem, _colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
+fn render_metadata_table(
+    item: &LibraryItem,
+    _colors: &ColorTokens,
+) -> impl IntoElement + 'static + use<> {
     let status_str: String = match item.status {
         ItemStatus::Downloaded => "On this device".into(),
         ItemStatus::Cloud => "In the cloud".into(),

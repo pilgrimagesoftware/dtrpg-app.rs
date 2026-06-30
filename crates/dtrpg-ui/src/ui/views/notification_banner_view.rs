@@ -1,6 +1,6 @@
 //! Notification banner view: renders persistent auth-related notices below the toolbar.
 
-use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
 

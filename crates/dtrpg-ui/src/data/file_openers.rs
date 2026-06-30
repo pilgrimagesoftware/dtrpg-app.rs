@@ -56,7 +56,9 @@ impl FileOpenerConfig {
             return Self::default();
         };
         let parsed: AppConfigFile = toml::from_str(&text).unwrap_or_default();
-        Self { entries: parsed.file_openers }
+        Self {
+            entries: parsed.file_openers,
+        }
     }
 
     /// Saves the config to disk, creating parent directories if needed.
@@ -67,7 +69,9 @@ impl FileOpenerConfig {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let file = AppConfigFile { file_openers: self.entries.clone() };
+        let file = AppConfigFile {
+            file_openers: self.entries.clone(),
+        };
         if let Ok(text) = toml::to_string(&file) {
             let _ = std::fs::write(path, text);
         }
@@ -100,7 +104,11 @@ impl FileOpenerConfig {
             extension: normalize_ext(&entry.extension),
             app_path: entry.app_path,
         };
-        if let Some(existing) = self.entries.iter_mut().find(|e| e.extension == normalized.extension) {
+        if let Some(existing) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.extension == normalized.extension)
+        {
             existing.app_path = normalized.app_path;
             return AddOutcome::Replaced;
         }
@@ -126,7 +134,10 @@ impl FileOpenerConfig {
 
     /// Returns entries whose `app_path` does not exist on disk.
     pub fn validate_all(&self) -> Vec<&FileOpenerEntry> {
-        self.entries.iter().filter(|e| !e.app_path.exists()).collect()
+        self.entries
+            .iter()
+            .filter(|e| !e.app_path.exists())
+            .collect()
     }
 }
 
@@ -143,7 +154,9 @@ fn config_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     let base = std::env::var("APPDATA").ok().map(PathBuf::from)?;
     #[cfg(not(target_os = "windows"))]
-    let base = std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config"))?;
+    let base = std::env::var("HOME")
+        .ok()
+        .map(|h| PathBuf::from(h).join(".config"))?;
     Some(base.join("dtrpg").join("app_config.toml"))
 }
 
@@ -154,7 +167,10 @@ mod tests {
     use super::*;
 
     fn entry(ext: &str, path: &str) -> FileOpenerEntry {
-        FileOpenerEntry { extension: ext.to_owned(), app_path: PathBuf::from(path) }
+        FileOpenerEntry {
+            extension: ext.to_owned(),
+            app_path: PathBuf::from(path),
+        }
     }
 
     fn config_with(entries: Vec<FileOpenerEntry>) -> FileOpenerConfig {
@@ -166,21 +182,36 @@ mod tests {
     #[test]
     fn find_override_exact_match() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override("pdf"), Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(
+            cfg.find_override("pdf"),
+            Some(Path::new("/Applications/Preview.app"))
+        );
     }
 
     #[test]
     fn find_override_case_insensitive() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override("PDF"), Some(Path::new("/Applications/Preview.app")));
-        assert_eq!(cfg.find_override("Pdf"), Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(
+            cfg.find_override("PDF"),
+            Some(Path::new("/Applications/Preview.app"))
+        );
+        assert_eq!(
+            cfg.find_override("Pdf"),
+            Some(Path::new("/Applications/Preview.app"))
+        );
     }
 
     #[test]
     fn find_override_dot_prefixed_input() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override(".pdf"), Some(Path::new("/Applications/Preview.app")));
-        assert_eq!(cfg.find_override(".PDF"), Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(
+            cfg.find_override(".pdf"),
+            Some(Path::new("/Applications/Preview.app"))
+        );
+        assert_eq!(
+            cfg.find_override(".PDF"),
+            Some(Path::new("/Applications/Preview.app"))
+        );
     }
 
     #[test]
@@ -215,7 +246,10 @@ mod tests {
         let result = cfg.add(entry("pdf", "/Applications/Acrobat.app"));
         assert_eq!(result, AddOutcome::Replaced);
         assert_eq!(cfg.entries().len(), 1);
-        assert_eq!(cfg.entries()[0].app_path, PathBuf::from("/Applications/Acrobat.app"));
+        assert_eq!(
+            cfg.entries()[0].app_path,
+            PathBuf::from("/Applications/Acrobat.app")
+        );
     }
 
     // ── validate_all ──────────────────────────────────────────────────────────
@@ -233,9 +267,7 @@ mod tests {
     #[test]
     fn validate_all_accepts_existing_paths() {
         let tmp = std::env::temp_dir();
-        let cfg = config_with(vec![
-            entry("pdf", tmp.to_str().unwrap_or("/tmp")),
-        ]);
+        let cfg = config_with(vec![entry("pdf", tmp.to_str().unwrap_or("/tmp"))]);
         let stale = cfg.validate_all();
         assert_eq!(stale.len(), 0);
     }

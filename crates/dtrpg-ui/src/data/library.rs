@@ -1,9 +1,9 @@
 //! Data model, filtering, sorting, and stub catalog for the Libri library view.
 
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use crate::data::enums::ItemStatus;
 use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
+use crate::data::enums::ItemStatus;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 // ── LibraryItem ───────────────────────────────────────────────────────────────
 
@@ -134,7 +134,9 @@ const THUMBNAIL_COOLDOWN_SECS: u64 = 300;
 /// was more than 5 minutes ago.
 #[must_use]
 pub fn thumbnail_cooldown_elapsed(item: &LibraryItem) -> bool {
-    let Some(last) = item.thumbnail_last_attempted else { return true; };
+    let Some(last) = item.thumbnail_last_attempted else {
+        return true;
+    };
     std::time::SystemTime::now()
         .duration_since(last)
         .is_ok_and(|d| d.as_secs() >= THUMBNAIL_COOLDOWN_SECS)

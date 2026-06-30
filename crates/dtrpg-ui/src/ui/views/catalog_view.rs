@@ -5,23 +5,23 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    div, px, uniform_list, AnyElement, App, Context, Entity, IntoElement, ParentElement,
-    Render, Styled, UniformListScrollHandle, Window,
+    AnyElement, App, Context, Entity, IntoElement, ParentElement, Render, Styled,
+    UniformListScrollHandle, Window, div, px, uniform_list,
 };
 use gpui_component::badge::Badge;
 use gpui_component::pagination::Pagination;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::spinner::Spinner;
-use gpui_component::{Sizable, Size};
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
+use gpui_component::{Sizable, Size};
 
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::data::enums::*;
 use crate::data::enums::CatalogPresentation;
+use crate::data::enums::*;
 use crate::data::events::LibraryChanged;
 use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
@@ -48,14 +48,25 @@ fn list_columns() -> Vec<Column> {
             .width(300.)
             .min_width(150.)
             .resizable(true),
-        Column::new("publisher", "Publisher").width(130.).resizable(true),
+        Column::new("publisher", "Publisher")
+            .width(130.)
+            .resizable(true),
         Column::new("system", "System").width(110.).resizable(true),
         Column::new("pages", "Pages").width(60.).resizable(true),
         Column::new("size", "Size").width(60.).resizable(true),
         Column::new("added", "Added").width(80.).resizable(true),
-        Column::new("status", "").width(24.).resizable(false).selectable(false),
-        Column::new("reveal", "").width(28.).resizable(false).selectable(false),
-        Column::new("ctx", "").width(28.).resizable(false).selectable(false),
+        Column::new("status", "")
+            .width(24.)
+            .resizable(false)
+            .selectable(false),
+        Column::new("reveal", "")
+            .width(28.)
+            .resizable(false)
+            .selectable(false),
+        Column::new("ctx", "")
+            .width(28.)
+            .resizable(false)
+            .selectable(false),
     ]
 }
 
@@ -106,7 +117,9 @@ impl TableDelegate for CatalogListDelegate {
             SortMethod::Publisher => Some(1),
             SortMethod::PageCount => Some(3),
             SortMethod::DateAdded => Some(5),
-            SortMethod::Custom { col_key: "publisher" } => Some(1),
+            SortMethod::Custom {
+                col_key: "publisher",
+            } => Some(1),
             SortMethod::Custom { col_key: "system" } => Some(2),
             SortMethod::Custom { col_key: "pages" } => Some(3),
             SortMethod::Custom { col_key: "size" } => Some(4),
@@ -142,7 +155,9 @@ impl TableDelegate for CatalogListDelegate {
         }
         let method = match col_ix {
             0 => SortMethod::Title,
-            1 => SortMethod::Custom { col_key: "publisher" },
+            1 => SortMethod::Custom {
+                col_key: "publisher",
+            },
             2 => SortMethod::Custom { col_key: "system" },
             3 => SortMethod::Custom { col_key: "pages" },
             4 => SortMethod::Custom { col_key: "size" },
@@ -167,7 +182,10 @@ impl TableDelegate for CatalogListDelegate {
         _window: &mut Window,
         cx: &mut Context<TableState<Self>>,
     ) -> PopupMenu {
-        let items = self.controller.read(cx).visible_items_slice(row_ix..row_ix + 1);
+        let items = self
+            .controller
+            .read(cx)
+            .visible_items_slice(row_ix..row_ix + 1);
         let Some(item) = items.into_iter().next() else {
             return menu;
         };
@@ -180,25 +198,24 @@ impl TableDelegate for CatalogListDelegate {
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
                 menu.item(
-                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                            if !item_path.exists() {
-                                tracing::warn!(
-                                    path = %item_path.display(),
-                                    "reveal: file not found"
-                                );
-                                return;
-                            }
-                            if let Err(e) = reveal_in_file_manager(&item_path) {
-                                tracing::warn!("reveal_in_file_manager failed: {e}");
-                            }
-                        }),
-                    )
-                    .item(
-                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                        }),
-                    )
+                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                        if !item_path.exists() {
+                            tracing::warn!(
+                                path = %item_path.display(),
+                                "reveal: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = reveal_in_file_manager(&item_path) {
+                            tracing::warn!("reveal_in_file_manager failed: {e}");
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                    }),
+                )
             }
             ItemStatus::Cloud => {
                 menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
@@ -215,7 +232,10 @@ impl TableDelegate for CatalogListDelegate {
         _window: &mut Window,
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
-        let items = self.controller.read(cx).visible_items_slice(row_ix..row_ix + 1);
+        let items = self
+            .controller
+            .read(cx)
+            .visible_items_slice(row_ix..row_ix + 1);
         let Some(item) = items.into_iter().next() else {
             return div().into_any_element();
         };
@@ -306,8 +326,7 @@ impl TableDelegate for CatalogListDelegate {
             7 => {
                 if item.status == ItemStatus::Downloaded {
                     let item_reveal_path = self.storage_root.join("items").join(&*item.id);
-                    let reveal_elem_id: Arc<str> =
-                        Arc::from(format!("reveal-row-{}", &*item.id));
+                    let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-row-{}", &*item.id));
                     div()
                         .id(reveal_elem_id)
                         .h_full()
@@ -327,12 +346,7 @@ impl TableDelegate for CatalogListDelegate {
                                 tracing::warn!("reveal_in_file_manager failed: {e}");
                             }
                         })
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(colors.text_tertiary)
-                                .child("↗"),
-                        )
+                        .child(div().text_xs().text_color(colors.text_tertiary).child("↗"))
                         .into_any_element()
                 } else {
                     div().h_full().into_any_element()
@@ -395,46 +409,41 @@ impl CatalogView {
                 .sortable(true)
         });
 
-        cx.subscribe(
-            &controller,
-            {
-                let table = catalog_list_table.clone();
-                move |_this, _ctrl, _event: &LibraryChanged, cx| {
-                    table.update(cx, |state, cx| state.refresh(cx));
-                }
-            },
-        )
+        cx.subscribe(&controller, {
+            let table = catalog_list_table.clone();
+            move |_this, _ctrl, _event: &LibraryChanged, cx| {
+                table.update(cx, |state, cx| state.refresh(cx));
+            }
+        })
         .detach();
 
         cx.subscribe(
             &catalog_list_table,
-            |this, table, event: &TableEvent, cx| {
-                match event {
-                    TableEvent::SelectRow(row_ix) => {
-                        let row_ix = *row_ix;
-                        let items = this
-                            .controller
-                            .read(cx)
-                            .visible_items_slice(row_ix..row_ix + 1);
-                        if let Some(item) = items.first() {
-                            let id = Arc::clone(&item.id);
-                            this.controller
-                                .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
-                        }
+            |this, table, event: &TableEvent, cx| match event {
+                TableEvent::SelectRow(row_ix) => {
+                    let row_ix = *row_ix;
+                    let items = this
+                        .controller
+                        .read(cx)
+                        .visible_items_slice(row_ix..row_ix + 1);
+                    if let Some(item) = items.first() {
+                        let id = Arc::clone(&item.id);
+                        this.controller
+                            .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
                     }
-                    TableEvent::ColumnWidthsChanged(widths) => {
-                        let widths = widths.clone();
-                        table.update(cx, |state, _cx| {
-                            let delegate = state.delegate_mut();
-                            if widths.len() == delegate.user_widths.len() {
-                                for (slot, &w) in delegate.user_widths.iter_mut().zip(widths.iter()) {
-                                    *slot = Some(w);
-                                }
-                            }
-                        });
-                    }
-                    _ => {}
                 }
+                TableEvent::ColumnWidthsChanged(widths) => {
+                    let widths = widths.clone();
+                    table.update(cx, |state, _cx| {
+                        let delegate = state.delegate_mut();
+                        if widths.len() == delegate.user_widths.len() {
+                            for (slot, &w) in delegate.user_widths.iter_mut().zip(widths.iter()) {
+                                *slot = Some(w);
+                            }
+                        }
+                    });
+                }
+                _ => {}
             },
         )
         .detach();
@@ -495,7 +504,11 @@ impl Render for CatalogView {
 
         if snap.catalog_loading && item_count == 0 {
             return outer
-                .child(root.justify_center().items_center().child(Spinner::new().with_size(Size::Large)))
+                .child(
+                    root.justify_center()
+                        .items_center()
+                        .child(Spinner::new().with_size(Size::Large)),
+                )
                 .into_any_element();
         }
 
@@ -613,40 +626,33 @@ impl Render for CatalogView {
                 let s = storage_root.clone();
                 root.px(pad_side)
                     .child(
-                        uniform_list(
-                            "catalog-grid",
-                            row_count,
-                            move |row_range, _window, cx| {
-                                let range_start = row_range.start;
-                                let item_start = range_start * items_per_row;
-                                let item_end =
-                                    (row_range.end * items_per_row).min(item_count);
-                                let items =
-                                    ctrl.read(cx).visible_items_slice(item_start..item_end);
-                                row_range
-                                    .map(|row| {
-                                        let offset = (row - range_start) * items_per_row;
-                                        let row_end =
-                                            (offset + items_per_row).min(items.len());
-                                        let row_items = &items[offset..row_end];
-                                        div()
-                                            .flex()
-                                            .gap(d.card_gap_x)
-                                            .mb(d.card_gap_y)
-                                            .children(row_items.iter().map(|item| {
-                                                render_grid_card(
-                                                    item,
-                                                    &c,
-                                                    d.card_min_width,
-                                                    ctrl.clone(),
-                                                    s.clone(),
-                                                )
-                                            }))
-                                            .into_any_element()
-                                    })
-                                    .collect()
-                            },
-                        )
+                        uniform_list("catalog-grid", row_count, move |row_range, _window, cx| {
+                            let range_start = row_range.start;
+                            let item_start = range_start * items_per_row;
+                            let item_end = (row_range.end * items_per_row).min(item_count);
+                            let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                            row_range
+                                .map(|row| {
+                                    let offset = (row - range_start) * items_per_row;
+                                    let row_end = (offset + items_per_row).min(items.len());
+                                    let row_items = &items[offset..row_end];
+                                    div()
+                                        .flex()
+                                        .gap(d.card_gap_x)
+                                        .mb(d.card_gap_y)
+                                        .children(row_items.iter().map(|item| {
+                                            render_grid_card(
+                                                item,
+                                                &c,
+                                                d.card_min_width,
+                                                ctrl.clone(),
+                                                s.clone(),
+                                            )
+                                        }))
+                                        .into_any_element()
+                                })
+                                .collect()
+                        })
                         .track_scroll(&scroll_handle)
                         .flex_1()
                         .min_h_0(),
@@ -720,7 +726,10 @@ impl Render for CatalogView {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-fn render_no_matches_state(search_query: &str, text_color: gpui::Hsla) -> impl IntoElement + 'static {
+fn render_no_matches_state(
+    search_query: &str,
+    text_color: gpui::Hsla,
+) -> impl IntoElement + 'static {
     let hint = if search_query.is_empty() {
         "Try selecting a different section."
     } else {
@@ -741,12 +750,7 @@ fn render_no_matches_state(search_query: &str, text_color: gpui::Hsla) -> impl I
                 .text_color(text_color)
                 .child("No titles match."),
         )
-        .child(
-            div()
-                .text_xs()
-                .text_color(text_color)
-                .child(hint),
-        )
+        .child(div().text_xs().text_color(text_color).child(hint))
 }
 
 fn render_library_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'static {
@@ -1066,25 +1070,24 @@ fn render_grouped_list_row(
                 let remove_id = Arc::clone(&ctx_id);
                 let entity_remove = ctx_entity.clone();
                 menu.item(
-                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                            if !reveal_path.exists() {
-                                tracing::warn!(
-                                    path = %reveal_path.display(),
-                                    "reveal: file not found"
-                                );
-                                return;
-                            }
-                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
-                                tracing::warn!("reveal_in_file_manager failed: {e}");
-                            }
-                        }),
-                    )
-                    .item(
-                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                        }),
-                    )
+                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                        if !reveal_path.exists() {
+                            tracing::warn!(
+                                path = %reveal_path.display(),
+                                "reveal: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                            tracing::warn!("reveal_in_file_manager failed: {e}");
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                    }),
+                )
             }
             ItemStatus::Cloud => {
                 let dl_id = Arc::clone(&ctx_id);
@@ -1134,7 +1137,11 @@ fn render_thumb_row(
             .flex_none()
             .child(cover);
         if status == ItemStatus::Downloaded {
-            Badge::new().dot().color(gpui::green()).child(inner).into_any_element()
+            Badge::new()
+                .dot()
+                .color(gpui::green())
+                .child(inner)
+                .into_any_element()
         } else {
             inner.into_any_element()
         }
@@ -1181,12 +1188,7 @@ fn render_thumb_row(
                         .flex()
                         .items_center()
                         .gap(px(8.0))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(colors.text_tertiary)
-                                .child(kind),
-                        )
+                        .child(div().text_xs().text_color(colors.text_tertiary).child(kind))
                         .child(
                             div()
                                 .text_xs()
@@ -1203,25 +1205,24 @@ fn render_thumb_row(
                 let remove_id = Arc::clone(&ctx_id);
                 let entity_remove = ctx_entity.clone();
                 menu.item(
-                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                            if !reveal_path.exists() {
-                                tracing::warn!(
-                                    path = %reveal_path.display(),
-                                    "reveal: file not found"
-                                );
-                                return;
-                            }
-                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
-                                tracing::warn!("reveal_in_file_manager failed: {e}");
-                            }
-                        }),
-                    )
-                    .item(
-                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                        }),
-                    )
+                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                        if !reveal_path.exists() {
+                            tracing::warn!(
+                                path = %reveal_path.display(),
+                                "reveal: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                            tracing::warn!("reveal_in_file_manager failed: {e}");
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                    }),
+                )
             }
             ItemStatus::Cloud => {
                 let dl_id = Arc::clone(&ctx_id);
@@ -1252,7 +1253,13 @@ fn render_grid(
         .gap(gap_x)
         .mb(gap_y)
         .children(items.into_iter().map(move |item| {
-            render_grid_card(&item, &colors, min_w, entity.clone(), storage_root_path.clone())
+            render_grid_card(
+                &item,
+                &colors,
+                min_w,
+                entity.clone(),
+                storage_root_path.clone(),
+            )
         }))
 }
 
@@ -1310,7 +1317,11 @@ fn render_grid_card(
     let cover_cell: AnyElement = {
         let inner = div().w(px(card_w)).h(px(cover_h)).child(cover);
         if status == ItemStatus::Downloaded {
-            Badge::new().dot().color(gpui::green()).child(inner).into_any_element()
+            Badge::new()
+                .dot()
+                .color(gpui::green())
+                .child(inner)
+                .into_any_element()
         } else {
             inner.into_any_element()
         }
@@ -1367,25 +1378,24 @@ fn render_grid_card(
                 let remove_id = Arc::clone(&ctx_id);
                 let entity_remove = ctx_entity.clone();
                 menu.item(
-                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                            if !reveal_path.exists() {
-                                tracing::warn!(
-                                    path = %reveal_path.display(),
-                                    "reveal: file not found"
-                                );
-                                return;
-                            }
-                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
-                                tracing::warn!("reveal_in_file_manager failed: {e}");
-                            }
-                        }),
-                    )
-                    .item(
-                        PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                        }),
-                    )
+                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                        if !reveal_path.exists() {
+                            tracing::warn!(
+                                path = %reveal_path.display(),
+                                "reveal: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                            tracing::warn!("reveal_in_file_manager failed: {e}");
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
+                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                    }),
+                )
             }
             ItemStatus::Cloud => {
                 let dl_id = Arc::clone(&ctx_id);

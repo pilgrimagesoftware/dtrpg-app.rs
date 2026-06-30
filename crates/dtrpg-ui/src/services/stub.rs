@@ -47,10 +47,9 @@ impl LibraryService for StubLibraryService {
 
     fn get_item(&self, _id: u64) -> Result<LibraryItem, LibraryServiceError> {
         match self.mode {
-            StubMode::Seeded => stub_catalog()
-                .into_iter()
-                .next()
-                .ok_or_else(|| LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "stub: no items")),
+            StubMode::Seeded => stub_catalog().into_iter().next().ok_or_else(|| {
+                LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "stub: no items")
+            }),
             StubMode::Empty => Err(LibraryServiceError::new(
                 LibraryServiceErrorKind::NotFound,
                 "stub: no items in empty mode",

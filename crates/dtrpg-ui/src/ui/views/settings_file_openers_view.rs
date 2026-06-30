@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 
 use gpui::prelude::*;
-use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
-use gpui_component::tooltip::Tooltip;
+use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::WindowExt as _;
+use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::file_openers::FileOpenerEntry;
@@ -222,7 +222,13 @@ fn render_add_button(
                 ctrl.add_file_opener(stub, cx);
             });
         })
-        .child(div().text_sm().font_weight(gpui::FontWeight::MEDIUM).text_color(accent_on).child("+"))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .text_color(accent_on)
+                .child("+"),
+        )
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

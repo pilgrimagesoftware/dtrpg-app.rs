@@ -1,24 +1,24 @@
 //! Library UI state and interaction controller.
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Arc;
-use gpui::{Context, Entity};
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_catalog_cache, save_catalog_cache};
+use crate::data::enums::*;
+use crate::data::events::*;
+use crate::data::library::*;
+use crate::data::selection::Selection;
 use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
-use crate::data::enums::*;
 use crate::data::theme::*;
-use crate::util::filter::*;
-use crate::data::selection::Selection;
-use crate::data::library::*;
-use crate::util::sort::*;
-use crate::util::publisher::*;
-use crate::util::matching::*;
-use crate::data::events::*;
 use crate::services::{LibraryService, LibraryServiceErrorKind};
 use crate::ui::library::cover::CoverCache;
+use crate::util::filter::*;
+use crate::util::matching::*;
+use crate::util::publisher::*;
+use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
+use gpui::{Context, Entity};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 
 // ── LibraryController ─────────────────────────────────────────────────────────
 
@@ -100,7 +100,11 @@ impl LibraryController {
     /// # Panics
     ///
     /// Does not panic; service errors are reflected in [`pane_state`].
-    pub fn new(service: Box<dyn LibraryService>, activity: Entity<ActivityController>, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        service: Box<dyn LibraryService>,
+        activity: Entity<ActivityController>,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let vm = LibraryViewModel::new(service);
 
         let mut ctrl = Self {
@@ -123,7 +127,9 @@ impl LibraryController {
             thumbnail_activity_id: None,
             catalog_loading: true,
             current_page: 1,
-            page_size: crate::data::ui_prefs::UiPrefs::load().page_size().unwrap_or(25),
+            page_size: crate::data::ui_prefs::UiPrefs::load()
+                .page_size()
+                .unwrap_or(25),
         };
         ctrl.start_load(cx);
         ctrl
@@ -291,7 +297,10 @@ impl LibraryController {
                 Ok((lib_collections, membership)) => {
                     let entries: Vec<CollectionEntry> = lib_collections
                         .into_iter()
-                        .map(|c| CollectionEntry { name: c.name, count: c.item_count })
+                        .map(|c| CollectionEntry {
+                            name: c.name,
+                            count: c.item_count,
+                        })
                         .collect();
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.apply_collections(entries, membership, cx);
@@ -373,7 +382,8 @@ impl LibraryController {
         };
         for (id, url) in &to_enqueue {
             cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(id));
-            self.thumbnail_queue.push_back((Arc::clone(id), Arc::clone(url)));
+            self.thumbnail_queue
+                .push_back((Arc::clone(id), Arc::clone(url)));
         }
         self.drain_thumbnail_queue(cx);
     }
@@ -383,13 +393,16 @@ impl LibraryController {
         if self.thumbnail_loading || self.thumbnail_queue.is_empty() {
             return;
         }
-        let Some((item_id, url)) = self.thumbnail_queue.pop_front() else { return; };
+        let Some((item_id, url)) = self.thumbnail_queue.pop_front() else {
+            return;
+        };
 
         self.thumbnail_loading = true;
 
         let activity_id = if let Some(id) = self.thumbnail_activity_id {
-            self.activity
-                .update(cx, |a, cx| a.update_label(id, "Loading thumbnails\u{2026}", cx));
+            self.activity.update(cx, |a, cx| {
+                a.update_label(id, "Loading thumbnails\u{2026}", cx)
+            });
             id
         } else {
             let id = self
@@ -413,7 +426,8 @@ impl LibraryController {
             match result {
                 Ok(bytes) => {
                     this.update(async_cx, |ctrl, cx| {
-                        cx.global_mut::<CoverCache>().insert(Arc::clone(&item_id), bytes);
+                        cx.global_mut::<CoverCache>()
+                            .insert(Arc::clone(&item_id), bytes);
                         if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
                             item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
                         }
@@ -444,7 +458,8 @@ impl LibraryController {
                 weak_activity
                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                     .ok();
-                this.update(async_cx, |ctrl, _cx| ctrl.thumbnail_activity_id = None).ok();
+                this.update(async_cx, |ctrl, _cx| ctrl.thumbnail_activity_id = None)
+                    .ok();
             } else {
                 let label = format!("Loading thumbnails\u{2026} ({remaining} remaining)");
                 weak_activity
@@ -466,7 +481,8 @@ impl LibraryController {
 
         if let Some(id) = item_id {
             self.thumbnail_queue.retain(|(i, _)| i != &id);
-            cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(&id));
+            cx.global_mut::<CoverCache>()
+                .mark_in_flight(Arc::clone(&id));
             self.thumbnail_queue.push_front((id, cover_url));
             self.drain_thumbnail_queue(cx);
         }
@@ -480,7 +496,11 @@ impl LibraryController {
         let matched_count = all_items.len();
         let total_pages = matched_count.div_ceil(self.page_size).max(1);
         let page_start = (self.current_page - 1) * self.page_size;
-        let items: Vec<LibraryItem> = all_items.into_iter().skip(page_start).take(self.page_size).collect();
+        let items: Vec<LibraryItem> = all_items
+            .into_iter()
+            .skip(page_start)
+            .take(self.page_size)
+            .collect();
         let selected_item = self.selected_item().cloned();
         LibrarySnapshot {
             filter: self.filter.clone(),
@@ -589,7 +609,10 @@ impl LibraryController {
         let items = self.visible_items();
         let abs_start = page_start + range.start;
         let abs_end = page_start + range.end;
-        items.get(abs_start..abs_end).map(|s| s.to_vec()).unwrap_or_default()
+        items
+            .get(abs_start..abs_end)
+            .map(|s| s.to_vec())
+            .unwrap_or_default()
     }
 
     /// Returns all items on the current page.
@@ -597,7 +620,11 @@ impl LibraryController {
     pub fn visible_page_items(&self) -> Vec<LibraryItem> {
         let page_start = (self.current_page - 1) * self.page_size;
         let items = self.visible_items();
-        items.into_iter().skip(page_start).take(self.page_size).collect()
+        items
+            .into_iter()
+            .skip(page_start)
+            .take(self.page_size)
+            .collect()
     }
 
     // ── Sidebar filter mutations ──────────────────────────────────────────────
@@ -749,8 +776,6 @@ fn app_backtrace() -> String {
         out.join("\n")
     }
 }
-
-
 
 // //! Library UI state and interaction controller.
 

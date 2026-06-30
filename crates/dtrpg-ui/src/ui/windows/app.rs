@@ -13,11 +13,13 @@ impl Render for AppWindow {
             .justify_center()
             .bg(rgb(0x010101))
             .child("Hello, World!")
-            .child(Button::new("ok")
-                .primary()
-                .text_color(rgb(0xEFEFEF))
-                .bg(rgb(0x1A1A1A))
-                .label("Click Me")
-                .on_click(|_, _, _| println!("Button clicked!")))
+            .child(
+                Button::new("ok")
+                    .primary()
+                    .text_color(rgb(0xEFEFEF))
+                    .bg(rgb(0x1A1A1A))
+                    .label("Click Me")
+                    .on_click(|_, _, _| println!("Button clicked!")),
+            )
     }
 }
