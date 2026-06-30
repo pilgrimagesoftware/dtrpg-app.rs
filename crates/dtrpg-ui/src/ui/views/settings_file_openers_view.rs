@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use gpui::prelude::*;
 use gpui::{div, px, AnyElement, Entity, IntoElement, ParentElement, Styled};
+use gpui_component::tooltip::Tooltip;
+use gpui_component::WindowExt as _;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::file_openers::FileOpenerEntry;
@@ -159,20 +161,34 @@ fn render_entry_row(
         .child(
             div()
                 .id(format!("remove-opener-{extension}"))
-                .h(px(28.0))
-                .px(px(10.0))
+                .size(px(28.0))
                 .rounded(px(6.0))
                 .border_1()
                 .border_color(border)
                 .flex()
                 .items_center()
+                .justify_center()
                 .cursor_pointer()
-                .on_click(move |_, _, cx| {
-                    entity_remove.update(cx, |ctrl, cx| {
-                        ctrl.remove_file_opener(&extension_for_remove, cx);
+                .tooltip(|window, cx| Tooltip::new("Remove").build(window, cx))
+                .on_click(move |_, window, cx| {
+                    let ext = extension_for_remove.clone();
+                    let entity = entity_remove.clone();
+                    window.open_alert_dialog(cx, move |alert, _, _| {
+                        let ext2 = ext.clone();
+                        let entity2 = entity.clone();
+                        alert
+                            .confirm()
+                            .title(format!("Remove .{ext} opener?"))
+                            .description("This file opener entry will be deleted.")
+                            .on_ok(move |_, _window, cx| {
+                                entity2.update(cx, |ctrl, cx| {
+                                    ctrl.remove_file_opener(&ext2, cx);
+                                });
+                                true
+                            })
                     });
                 })
-                .child(div().text_xs().text_color(text_tertiary).child("Remove")),
+                .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")),
         )
         .into_any_element()
 }
@@ -186,17 +202,17 @@ fn render_add_button(
 ) -> impl IntoElement + 'static {
     div()
         .id("add-file-opener")
-        .h(px(30.0))
-        .px(px(14.0))
+        .size(px(30.0))
         .rounded(px(8.0))
         .bg(accent)
         .flex()
         .items_center()
+        .justify_center()
         .cursor_pointer()
+        .tooltip(|window, cx| Tooltip::new("Add file opener").build(window, cx))
         // Adding an entry requires a native app picker dialog (rfd crate, pending
         // open-item-in-default-app change). For now clicking opens a no-op stub.
         .on_click(move |_, _, cx| {
-            // TODO: open rfd FileDialog once open-item-in-default-app is implemented.
             // Stub: add a placeholder entry so the list renders correctly.
             let stub = FileOpenerEntry {
                 extension: "example".to_owned(),
@@ -206,7 +222,7 @@ fn render_add_button(
                 ctrl.add_file_opener(stub, cx);
             });
         })
-        .child(div().text_sm().font_weight(gpui::FontWeight::MEDIUM).text_color(accent_on).child("Add"))
+        .child(div().text_sm().font_weight(gpui::FontWeight::MEDIUM).text_color(accent_on).child("+"))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
