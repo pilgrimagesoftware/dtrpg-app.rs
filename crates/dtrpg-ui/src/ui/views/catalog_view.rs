@@ -1,12 +1,13 @@
 //! Catalog view: list, thumbs, and grid layouts with grouping and empty state.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Entity, IntoElement, ParentElement, Render, Styled,
-    UniformListScrollHandle, Window, div, px, uniform_list,
+    AnyElement, App, Context, Entity, Image, IntoElement, ObjectFit, ParentElement, Render, Styled,
+    StyledImage, UniformListScrollHandle, Window, div, img, px, uniform_list,
 };
 use gpui_component::badge::Badge;
 use gpui_component::pagination::Pagination;
@@ -25,7 +26,7 @@ use crate::data::enums::*;
 use crate::data::events::LibraryChanged;
 use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
-use crate::ui::library::cover::render_generative_cover;
+use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::util::publisher::group_by_publisher;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::sort::{SortDirection, SortMethod};
@@ -584,10 +585,15 @@ impl Render for CatalogView {
                     .child(
                         uniform_list("catalog-thumbs", item_count, move |range, _window, cx| {
                             let items = ctrl.read(cx).visible_items_slice(range);
+                            let covers: Vec<Option<Arc<Image>>> = {
+                                let cache = cx.global::<CoverCache>();
+                                items.iter().map(|item| cache.get(&item.id)).collect()
+                            };
                             items
                                 .iter()
-                                .map(|item| {
-                                    render_thumb_row(item, &c, &d, ctrl.clone(), s.clone())
+                                .zip(covers)
+                                .map(|(item, cover)| {
+                                    render_thumb_row(item, cover, &c, &d, ctrl.clone(), s.clone())
                                         .into_any_element()
                                 })
                                 .collect()
@@ -603,16 +609,22 @@ impl Render for CatalogView {
             (CatalogPresentation::Thumbs, true) => {
                 let items = self.controller.read(cx).visible_items();
                 let groups = group_by_publisher(items);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
                 root.px(pad_side)
                     .children(groups.into_iter().map(|g| {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
                         let s = storage_root.clone();
+                        let cc = cover_cache.clone();
                         div()
                             .child(render_group_header(&g.publisher, g.items.len(), &c))
                             .children(g.items.into_iter().map(move |item| {
-                                render_thumb_row(&item, &c, &d, e.clone(), s.clone())
+                                let cover = cc.get(&item.id).cloned();
+                                render_thumb_row(&item, cover, &c, &d, e.clone(), s.clone())
                             }))
                     }))
                     .into_any_element()
@@ -631,24 +643,32 @@ impl Render for CatalogView {
                             let item_start = range_start * items_per_row;
                             let item_end = (row_range.end * items_per_row).min(item_count);
                             let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                            let covers: Vec<Option<Arc<Image>>> = {
+                                let cache = cx.global::<CoverCache>();
+                                items.iter().map(|item| cache.get(&item.id)).collect()
+                            };
                             row_range
                                 .map(|row| {
                                     let offset = (row - range_start) * items_per_row;
                                     let row_end = (offset + items_per_row).min(items.len());
                                     let row_items = &items[offset..row_end];
+                                    let row_covers = &covers[offset..row_end];
                                     div()
                                         .flex()
                                         .gap(d.card_gap_x)
                                         .mb(d.card_gap_y)
-                                        .children(row_items.iter().map(|item| {
-                                            render_grid_card(
-                                                item,
-                                                &c,
-                                                d.card_min_width,
-                                                ctrl.clone(),
-                                                s.clone(),
-                                            )
-                                        }))
+                                        .children(row_items.iter().zip(row_covers.iter()).map(
+                                            |(item, cover)| {
+                                                render_grid_card(
+                                                    item,
+                                                    cover.clone(),
+                                                    &c,
+                                                    d.card_min_width,
+                                                    ctrl.clone(),
+                                                    s.clone(),
+                                                )
+                                            },
+                                        ))
                                         .into_any_element()
                                 })
                                 .collect()
@@ -664,15 +684,20 @@ impl Render for CatalogView {
             (CatalogPresentation::Grid, true) => {
                 let items = self.controller.read(cx).visible_items();
                 let groups = group_by_publisher(items);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
                 root.px(pad_side)
                     .children(groups.into_iter().map(|g| {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
                         let s = storage_root.clone();
+                        let cc = cover_cache.clone();
                         div()
                             .child(render_group_header(&g.publisher, g.items.len(), &c))
-                            .child(render_grid(g.items, c, d, e, s))
+                            .child(render_grid(g.items, cc, c, d, e, s))
                     }))
                     .into_any_element()
             }
@@ -1103,6 +1128,7 @@ fn render_grouped_list_row(
 
 fn render_thumb_row(
     item: &LibraryItem,
+    cover_image: Option<Arc<Image>>,
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
@@ -1126,12 +1152,18 @@ fn render_thumb_row(
     let ctx_entity = entity.clone();
     let ctx_path = storage_root_path.join("items").join(&*id);
 
-    let cover = render_generative_cover(item, thumb_w, thumb_h, false);
+    let cover: AnyElement = if let Some(image) = cover_image {
+        img(image)
+            .w(px(thumb_w))
+            .h(px(thumb_h))
+            .object_fit(ObjectFit::Cover)
+            .into_any_element()
+    } else {
+        render_generative_cover(item, thumb_w, thumb_h, false).into_any_element()
+    };
 
     let cover_cell: AnyElement = {
         let inner = div()
-            .w(px(thumb_w))
-            .h(px(thumb_h))
             .rounded(px(3.0))
             .overflow_hidden()
             .flex_none()
@@ -1238,6 +1270,7 @@ fn render_thumb_row(
 
 fn render_grid(
     items: Vec<LibraryItem>,
+    cover_cache: HashMap<Arc<str>, Arc<Image>>,
     colors: ColorTokens,
     density: DensityConstants,
     entity: Entity<LibraryController>,
@@ -1253,8 +1286,10 @@ fn render_grid(
         .gap(gap_x)
         .mb(gap_y)
         .children(items.into_iter().map(move |item| {
+            let cover = cover_cache.get(&item.id).cloned();
             render_grid_card(
                 &item,
+                cover,
                 &colors,
                 min_w,
                 entity.clone(),
@@ -1265,6 +1300,7 @@ fn render_grid(
 
 fn render_grid_card(
     item: &LibraryItem,
+    cover_image: Option<Arc<Image>>,
     colors: &ColorTokens,
     card_w: f32,
     entity: Entity<LibraryController>,
@@ -1277,7 +1313,15 @@ fn render_grid_card(
     let cover_h = card_w * 10.0 / 7.0;
     let reveal_item_id = Arc::clone(&item.id);
 
-    let cover = render_generative_cover(item, card_w, cover_h, true);
+    let cover: AnyElement = if let Some(image) = cover_image {
+        img(image)
+            .w(px(card_w))
+            .h(px(cover_h))
+            .object_fit(ObjectFit::Cover)
+            .into_any_element()
+    } else {
+        render_generative_cover(item, card_w, cover_h, true).into_any_element()
+    };
     let colors = colors.clone();
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
@@ -1315,7 +1359,7 @@ fn render_grid_card(
     };
 
     let cover_cell: AnyElement = {
-        let inner = div().w(px(card_w)).h(px(cover_h)).child(cover);
+        let inner = div().child(cover);
         if status == ItemStatus::Downloaded {
             Badge::new()
                 .dot()

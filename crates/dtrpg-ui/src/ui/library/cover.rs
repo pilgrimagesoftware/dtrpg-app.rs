@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use gpui::{Hsla, IntoElement, ParentElement, Styled, div, px, rgb};
+use gpui::{Hsla, Image, ImageFormat, IntoElement, ParentElement, Styled, div, px, rgb};
 
 use crate::data::library::LibraryItem;
 
@@ -14,8 +14,8 @@ use crate::data::library::LibraryItem;
 /// Stored as a GPUI app-level global so all views share the same cache without
 /// coordination overhead.
 pub struct CoverCache {
-    /// Encoded image bytes keyed by item id.
-    pub images: HashMap<Arc<str>, Arc<Vec<u8>>>,
+    /// Decoded GPUI images keyed by item id.
+    pub images: HashMap<Arc<str>, Arc<Image>>,
     /// Tracks items whose download is currently in flight.
     pub in_flight: HashSet<Arc<str>>,
 }
@@ -31,15 +31,18 @@ impl CoverCache {
         }
     }
 
-    /// Returns the cached image bytes for `id`, if present.
-    pub fn get(&self, id: &str) -> Option<Arc<Vec<u8>>> {
+    /// Returns the cached GPUI image for `id`, if present.
+    pub fn get(&self, id: &str) -> Option<Arc<Image>> {
         self.images.get(id).cloned()
     }
 
-    /// Stores image bytes for `id` and clears its in-flight marker.
+    /// Stores encoded image bytes for `id`, auto-detecting the image format,
+    /// and clears its in-flight marker.
     pub fn insert(&mut self, id: Arc<str>, bytes: Vec<u8>) {
         self.in_flight.remove(&id);
-        self.images.insert(id, Arc::new(bytes));
+        let format = sniff_image_format(&bytes);
+        let image = Image::from_bytes(format, bytes);
+        self.images.insert(id, Arc::new(image));
     }
 
     /// Returns `true` if a download is already in flight for `id`.
@@ -50,6 +53,32 @@ impl CoverCache {
     /// Marks `id` as having an in-flight download.
     pub fn mark_in_flight(&mut self, id: Arc<str>) {
         self.in_flight.insert(id);
+    }
+}
+
+/// Detects image format from leading magic bytes; defaults to JPEG.
+fn sniff_image_format(bytes: &[u8]) -> ImageFormat {
+    match bytes {
+        [0x89, b'P', b'N', b'G', ..] => ImageFormat::Png,
+        [0xFF, 0xD8, 0xFF, ..] => ImageFormat::Jpeg,
+        [
+            b'R',
+            b'I',
+            b'F',
+            b'F',
+            _,
+            _,
+            _,
+            _,
+            b'W',
+            b'E',
+            b'B',
+            b'P',
+            ..,
+        ] => ImageFormat::Webp,
+        [b'G', b'I', b'F', b'8', ..] => ImageFormat::Gif,
+        [b'B', b'M', ..] => ImageFormat::Bmp,
+        _ => ImageFormat::Jpeg,
     }
 }
 
