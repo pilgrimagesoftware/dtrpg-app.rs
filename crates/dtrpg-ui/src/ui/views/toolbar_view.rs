@@ -34,8 +34,10 @@ fn section_title_for(filter: &SidebarFilter) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn render_toolbar(
     filter: &SidebarFilter,
+    filter_count: usize,
     matched_count: usize,
     total_count: usize,
+    search_query: &str,
     search_input: Entity<InputState>,
     sort: SortMethod,
     sort_direction: SortDirection,
@@ -53,14 +55,19 @@ pub fn render_toolbar(
     let text_tertiary = colors.text_tertiary;
 
     let title = section_title_for(filter);
-    let count_label = if matched_count < total_count {
-        format!("{matched_count} of {total_count}")
-    } else {
-        total_count.to_string()
+    let is_publisher = matches!(filter, SidebarFilter::Publisher(_));
+    let has_search = !search_query.is_empty();
+    let count_label = match (is_publisher, has_search) {
+        (true, false) => format!("{filter_count} publisher items, {total_count} total items"),
+        (true, true) => format!(
+            "{filter_count} publisher items, {total_count} total items ({matched_count} filtered)"
+        ),
+        (false, true) => format!("{total_count} items ({matched_count} filtered)"),
+        (false, false) => format!("{total_count} items"),
     };
 
     div()
-        .h(px(53.0))
+        .h(px(57.0))
         .flex_none()
         .flex()
         .items_center()
@@ -73,8 +80,8 @@ pub fn render_toolbar(
         .child(
             div()
                 .flex()
-                .items_baseline()
-                .gap(px(11.0))
+                .flex_col()
+                .gap(px(1.0))
                 .min_w_0()
                 .child(
                     div()

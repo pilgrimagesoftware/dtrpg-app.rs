@@ -9,6 +9,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, div, px,
 };
 use gpui_component::Disableable;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::tooltip::Tooltip;
@@ -96,7 +97,7 @@ pub fn render_detail_panel(
             div()
                 .flex_1()
                 .min_h_0()
-                .overflow_y_hidden()
+                .overflow_y_scrollbar()
                 .p(px(20.0))
                 .flex()
                 .flex_col()
@@ -216,6 +217,7 @@ fn render_metadata_table(
 
     let mut list = DescriptionList::vertical()
         .columns(1)
+        .bordered(false)
         .child(DescriptionItem::new("System").value(item.line.to_string()))
         .child(DescriptionItem::new("Category").value(item.kind.to_string()))
         .child(DescriptionItem::new("Format").value(item.format.to_string()))

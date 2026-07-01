@@ -34,8 +34,12 @@ pub struct LibrarySnapshot {
     /// All numeric product IDs in the full catalog; used by the sidebar to compute
     /// per-collection resolved item counts.
     pub catalog_ids: HashSet<u64>,
+    /// Total items in the full catalog (no filter, no search).
     pub total_count: usize,
     pub total_mb: f64,
+    /// Items matching the active sidebar filter but ignoring the search query.
+    pub filter_count: usize,
+    /// Items matching both the active sidebar filter and the search query.
     pub matched_count: usize,
     pub search_query: String,
     pub sort: SortMethod,
@@ -404,6 +408,17 @@ impl LibraryController {
     /// Stores the fetched collections and emits a change event.
     fn apply_collections(&mut self, collections: Vec<CollectionEntry>, cx: &mut Context<Self>) {
         self.collections = collections;
+        // Refresh collection_members if the current filter is a Collection filter,
+        // in case the filter was set before the collections loaded.
+        if let SidebarFilter::Collection(id, _) = &self.filter {
+            let id = *id;
+            self.collection_members = self
+                .collections
+                .iter()
+                .find(|c| c.id == id)
+                .map(|c| c.member_ids.iter().copied().collect())
+                .unwrap_or_default();
+        }
         cx.emit(LibraryChanged);
     }
 
@@ -679,6 +694,11 @@ impl LibraryController {
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
+        let filter_count = self
+            .catalog
+            .iter()
+            .filter(|i| item_matches_filter(i, &self.filter, &self.collection_members))
+            .count();
         let all_items = self.visible_items();
         let matched_count = all_items.len();
         let total_pages = matched_count.div_ceil(self.page_size).max(1);
@@ -714,6 +734,7 @@ impl LibraryController {
             catalog_ids,
             total_count: self.section_counts.all,
             total_mb: self.total_size_mb(),
+            filter_count,
             matched_count,
             search_query: self.search_query.clone(),
             sort: self.sort,

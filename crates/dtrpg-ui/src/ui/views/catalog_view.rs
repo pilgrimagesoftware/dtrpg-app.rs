@@ -528,11 +528,9 @@ impl Render for CatalogView {
 
         let current_page = snap.current_page;
         let total_pages = snap.total_pages;
-        let page_size = snap.page_size;
         let ctrl_for_page = self.controller.clone();
         let ctrl_for_first = self.controller.clone();
         let ctrl_for_last = self.controller.clone();
-        let ctrl_for_size = self.controller.clone();
 
         let content: AnyElement = match (snap.presentation, snap.grouped) {
             // ── List, ungrouped — DataTable (handles header/row alignment) ──
@@ -708,24 +706,6 @@ impl Render for CatalogView {
         let mut result = outer.child(content);
 
         if total_pages > 1 {
-            let size_picker = Button::new("page-size-btn")
-                .ghost()
-                .label(format!("{page_size} / page"))
-                .dropdown_caret(true)
-                .dropdown_menu(move |menu, _, _| {
-                    let c = ctrl_for_size.clone();
-                    [10usize, 25, 50, 100, 200].into_iter().fold(menu, |m, n| {
-                        let c2 = c.clone();
-                        m.item(
-                            PopupMenuItem::new(format!("{n}"))
-                                .checked(n == page_size)
-                                .on_click(move |_, _, cx| {
-                                    c2.update(cx, |ctrl, cx| ctrl.set_page_size(n, cx));
-                                }),
-                        )
-                    })
-                });
-
             result = result.child(
                 div()
                     .flex_none()
@@ -735,7 +715,6 @@ impl Render for CatalogView {
                     .items_center()
                     .justify_center()
                     .gap(px(16.0))
-                    .child(size_picker)
                     .child(
                         Button::new("page-first-btn")
                             .ghost()

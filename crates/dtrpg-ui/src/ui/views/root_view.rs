@@ -410,8 +410,10 @@ impl Render for LibraryRootView {
         );
         let toolbar = render_toolbar(
             &filter,
+            snap.filter_count,
             matched_count,
             total_count,
+            &snap.search_query,
             self.search_input.clone(),
             sort,
             sort_direction,

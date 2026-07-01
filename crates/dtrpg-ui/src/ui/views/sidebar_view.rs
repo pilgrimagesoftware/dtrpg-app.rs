@@ -202,6 +202,10 @@ pub fn render_sidebar(
                     let input = input.clone();
                     let ctrl = ctrl.clone();
                     div()
+                        .id("collections-suffix")
+                        // Stop click propagation so the suffix button does not also
+                        // fire the SidebarMenuItem header's on_click (which toggles collapse).
+                        .on_click(|_, _, cx| cx.stop_propagation())
                         .flex()
                         .items_center()
                         .gap(px(4.))
