@@ -84,19 +84,17 @@ pub fn render_settings_panel(
                     }),
                 )),
             )
-            .page(
-                SettingPage::new(t!("settings.downloads_tab")).group(SettingGroup::new().item(
-                    SettingItem::render(move |_, _window, _cx| {
-                        render_storage_section(
-                            storage_path.clone(),
-                            storage_path_exists,
-                            storage_entity.clone(),
-                            &storage_colors,
-                            storage_path_input.clone(),
-                        )
-                    }),
-                )),
-            )
+            .page(SettingPage::new(t!("settings.downloads_location")).group(
+                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
+                    render_storage_section(
+                        storage_path.clone(),
+                        storage_path_exists,
+                        storage_entity.clone(),
+                        &storage_colors,
+                        storage_path_input.clone(),
+                    )
+                })),
+            ))
             .page(SettingPage::new(t!("settings.file_openers_title")).group(
                 SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
                     render_file_openers_section(

@@ -30,6 +30,14 @@ pub const MONTH_ABBRS: [&str; 12] = [
 
 pub const APP_NAME: &str = "dtrpg";
 
+/// Reverse-domain bundle identifier.
+///
+/// macOS convention names filesystem locations (Application Support, Preferences,
+/// Caches) with the reverse-domain bundle ID rather than the bare app name. Used
+/// by [`crate::data::paths`] for those directories; also reused as the keyring
+/// service namespace via [`KEYRING_SERVICE`].
+pub const MACOS_BUNDLE_ID: &str = "com.pilgrimagesoftware.dtrpg";
+
 pub const COLLECTIONS_CACHE_FILE: &str = "collections_cache.json";
 pub const COLLECTIONS_CACHE_TMP: &str = "collections_cache.json.tmp";
 pub const CATALOG_CACHE_FILE: &str = "catalog_cache.json";
@@ -38,7 +46,7 @@ pub const CATALOG_CACHE_METADATA_FILE: &str = "catalog_cache_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
 /// Reverse-DNS service namespace used for all keyring entries.
-pub const KEYRING_SERVICE: &str = "com.pilgrimagesoftware.dtrpg";
+pub const KEYRING_SERVICE: &str = MACOS_BUNDLE_ID;
 
 /// Account key for the DriveThruRPG API key credential.
 ///
