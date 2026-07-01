@@ -406,13 +406,19 @@ mod tests {
     #[test]
     fn publisher_filter_includes_name() {
         let title = section_title_for(&SidebarFilter::Publisher("Kobold Press".into()));
-        assert!(title.contains("Kobold Press"), "publisher name must appear in label");
+        assert!(
+            title.contains("Kobold Press"),
+            "publisher name must appear in label"
+        );
     }
 
     #[test]
     fn collection_filter_includes_name() {
         let title = section_title_for(&SidebarFilter::Collection(42, "My Shelf".into()));
-        assert!(title.contains("My Shelf"), "collection name must appear in label");
+        assert!(
+            title.contains("My Shelf"),
+            "collection name must appear in label"
+        );
     }
 
     #[test]

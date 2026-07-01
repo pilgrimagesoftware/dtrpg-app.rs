@@ -1,4 +1,4 @@
-//! Storage settings section: catalog root path display, folder picker, and reveal action.
+//! Downloads settings section: download root path display, folder picker, and reveal action.
 
 use std::path::PathBuf;
 
@@ -171,7 +171,7 @@ pub fn render_storage_section(
             div()
                 .text_xs()
                 .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0))
-                .child("\u{26A0} Changing the storage location will not move existing downloaded files."),
+                .child("\u{26A0} Changing the download location will not move existing downloaded files."),
         )
 }
 

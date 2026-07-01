@@ -38,9 +38,7 @@ impl ItemOpener {
     pub fn open(path: &Path) -> Result<(), OpenError> {
         // Check if the file exists first
         if !path.exists() {
-            return Err(OpenError::FileNotFound(
-                path.display().to_string(),
-            ));
+            return Err(OpenError::FileNotFound(path.display().to_string()));
         }
 
         // Attempt to open the file with the system's default application
@@ -49,7 +47,8 @@ impl ItemOpener {
 
             // Try to classify the error
             if error_msg.contains("no default application")
-                || error_msg.contains("no associated application") {
+                || error_msg.contains("no associated application")
+            {
                 OpenError::NoDefaultApp
             } else {
                 OpenError::OsFailed(error_msg)

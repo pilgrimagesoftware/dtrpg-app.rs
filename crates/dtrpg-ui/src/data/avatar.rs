@@ -1,25 +1,21 @@
 //! Gravatar URL computation and avatar image fetching.
 
-use crate::data::constants::APP_NAME;
 use crate::data::constants::AVATAR_CACHE_FILE;
+use crate::data::paths::app_cache_dir;
 use std::path::PathBuf;
 use std::time::Duration;
 
-fn avatar_cache_path() -> Option<PathBuf> {
-    dirs::cache_dir().map(|d| d.join(APP_NAME).join(AVATAR_CACHE_FILE))
+fn avatar_cache_path() -> PathBuf {
+    app_cache_dir().join(AVATAR_CACHE_FILE)
 }
 
 fn load_cached_avatar() -> Option<Vec<u8>> {
-    let path = avatar_cache_path()?;
-    let bytes = std::fs::read(path).ok()?;
+    let bytes = std::fs::read(avatar_cache_path()).ok()?;
     if bytes.is_empty() { None } else { Some(bytes) }
 }
 
 fn save_cached_avatar(bytes: &[u8]) {
-    let Some(path) = avatar_cache_path() else {
-        tracing::warn!("avatar cache: cache_dir unavailable");
-        return;
-    };
+    let path = avatar_cache_path();
     if let Some(parent) = path.parent()
         && let Err(e) = std::fs::create_dir_all(parent)
     {

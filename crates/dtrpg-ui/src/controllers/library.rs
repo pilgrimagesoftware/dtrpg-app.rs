@@ -7,8 +7,8 @@ use crate::data::collections_cache::{load_collections_cache, save_collections_ca
 use crate::data::enums::*;
 use crate::data::events::*;
 use crate::data::library::*;
+use crate::data::paths::cache_dir;
 use crate::data::selection::Selection;
-use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::services::collections::CollectionsService;
@@ -165,8 +165,7 @@ impl LibraryController {
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
         let service_arc = self.vm.service_arc();
         let weak_activity = self.activity.downgrade();
-        let storage_cfg = StorageConfig::load();
-        let storage_root = storage_cfg.metadata_path();
+        let storage_root = cache_dir();
         let save_root = storage_root.clone();
 
         cx.spawn(async move |this, async_cx| {
@@ -367,8 +366,7 @@ impl LibraryController {
     /// Spawns a background task to fetch product lists from the API and apply them.
     pub fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
-        let storage_cfg = StorageConfig::load();
-        let cache_root = storage_cfg.metadata_path();
+        let cache_root = cache_dir();
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
             let result = async_cx

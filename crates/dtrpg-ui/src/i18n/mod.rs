@@ -29,4 +29,3 @@ pub fn init() {
     rust_i18n::set_locale(&chosen);
     tracing::debug!(locale = %chosen, "i18n locale initialized");
 }
-

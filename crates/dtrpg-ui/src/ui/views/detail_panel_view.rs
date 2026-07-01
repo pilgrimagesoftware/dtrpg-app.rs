@@ -144,7 +144,8 @@ pub fn render_detail_panel(
                         .flex_col()
                         .gap(px(8.0))
                         .child({
-                            let read_path = storage_root_path.join("items").join(read_item_id.as_ref());
+                            let read_path =
+                                storage_root_path.join("items").join(read_item_id.as_ref());
                             Button::new("detail-read")
                                 .primary()
                                 .label(t!("detail.read_button"))
@@ -170,13 +171,17 @@ pub fn render_detail_panel(
                                                     tracing::warn!("open: file not found: {path}");
                                                 }
                                                 OpenError::NoDefaultApp => {
-                                                    tracing::warn!("open: no default application configured");
+                                                    tracing::warn!(
+                                                        "open: no default application configured"
+                                                    );
                                                 }
                                                 OpenError::OsFailed(msg) => {
                                                     tracing::warn!("open: OS failed: {msg}");
                                                 }
                                                 OpenError::MultipleFilesRequireSelection => {
-                                                    tracing::warn!("open: multiple files require selection");
+                                                    tracing::warn!(
+                                                        "open: multiple files require selection"
+                                                    );
                                                 }
                                             }
                                         }

@@ -1,6 +1,6 @@
 //! Lightweight UI preference storage: panel widths and other layout state.
 
-use crate::data::constants::APP_NAME;
+use crate::data::paths::app_preferences_dir;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -19,7 +19,7 @@ pub struct UiPrefsFile {
 
 /// Persists and restores small UI preferences.
 ///
-/// Backed by `{config_dir}/dtrpg/ui_prefs.toml`.
+/// Backed by `{app_preferences_dir}/ui_prefs.toml`.
 pub struct UiPrefs {
     data: UiPrefsFile,
 }
@@ -27,8 +27,8 @@ pub struct UiPrefs {
 impl UiPrefs {
     /// Load from disk; returns defaults on any error.
     pub fn load() -> Self {
-        let data = prefs_path()
-            .and_then(|p| std::fs::read_to_string(p).ok())
+        let data = std::fs::read_to_string(prefs_path())
+            .ok()
             .and_then(|text| toml::from_str::<UiPrefsFile>(&text).ok())
             .unwrap_or_default();
         Self { data }
@@ -91,17 +91,16 @@ impl UiPrefs {
     }
 
     fn flush(&self) {
-        if let Some(path) = prefs_path() {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            if let Ok(text) = toml::to_string(&self.data) {
-                let _ = std::fs::write(&path, text);
-            }
+        let path = prefs_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(text) = toml::to_string(&self.data) {
+            let _ = std::fs::write(&path, text);
         }
     }
 }
 
-fn prefs_path() -> Option<std::path::PathBuf> {
-    Some(dirs::config_dir()?.join(APP_NAME).join("ui_prefs.toml"))
+fn prefs_path() -> std::path::PathBuf {
+    app_preferences_dir().join("ui_prefs.toml")
 }

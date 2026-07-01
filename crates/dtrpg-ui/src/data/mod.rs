@@ -10,6 +10,7 @@ pub mod events;
 pub mod file_openers;
 pub mod library;
 pub mod notification;
+pub mod paths;
 pub mod profile;
 pub mod selection;
 pub mod storage;

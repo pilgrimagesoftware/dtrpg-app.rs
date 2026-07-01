@@ -141,11 +141,7 @@ pub fn render_sidebar(
                 UiPrefs::load().save_publishers_open(!publishers_open);
                 entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
             })
-            .suffix(move |_, _| {
-                div()
-                    .text_xs()
-                    .child(publishers_count.to_string())
-            })
+            .suffix(move |_, _| div().text_xs().child(publishers_count.to_string()))
             .children(pub_children),
     );
 

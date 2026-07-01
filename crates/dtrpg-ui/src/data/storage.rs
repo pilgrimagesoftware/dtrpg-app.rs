@@ -1,6 +1,12 @@
-//! Storage configuration: root path preference and per-item path derivation.
+//! Download location configuration: root path preference and per-item path derivation.
+//!
+//! This module governs only where downloaded catalog files are stored on disk. It
+//! is intentionally decoupled from application cache/metadata (see
+//! [`crate::data::paths::cache_dir`]) and from preferences (see
+//! [`crate::data::paths::app_preferences_dir`]) — those live in fixed, non-user-facing
+//! locations regardless of where the user chooses to store downloads.
 
-use crate::data::constants::APP_NAME;
+use crate::data::paths::{app_preferences_dir, default_download_dir};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -51,10 +57,11 @@ struct StorageConfigFile {
     root_path: Option<String>,
 }
 
-/// Manages the root directory where catalog data (downloads, metadata cache) is stored.
+/// Manages the root directory where downloaded catalog files are stored.
 ///
-/// Persists the user's chosen override in `{config_dir}/dtrpg/storage.toml`.
-/// Falls back to `{data_dir}/dtrpg/` when no override is set.
+/// Persists the user's chosen override in `{app_preferences_dir}/storage.toml`.
+/// Falls back to the platform default download directory (e.g. `~/Downloads/dtrpg`)
+/// when no override is set.
 pub struct StorageConfig {
     override_path: Option<PathBuf>,
 }
@@ -70,23 +77,16 @@ impl StorageConfig {
         Self { override_path }
     }
 
-    /// Returns the resolved storage root (saved override, or platform default).
+    /// Returns the resolved download root (saved override, or platform default).
     pub fn root_path(&self) -> PathBuf {
         self.override_path
             .clone()
-            .unwrap_or_else(default_storage_path)
+            .unwrap_or_else(default_download_dir)
     }
 
-    /// Returns `true` when the storage root has been verified accessible on disk.
+    /// Returns `true` when the download root has been verified accessible on disk.
     pub fn is_accessible(&self) -> bool {
         self.root_path().try_exists().unwrap_or(false)
-    }
-
-    /// Returns the directory where catalog metadata (e.g. the catalog cache) is stored.
-    ///
-    /// Maps to `{root}/metadata/`.
-    pub fn metadata_path(&self) -> PathBuf {
-        self.root_path().join("metadata")
     }
 
     /// Derives a stable per-item subdirectory under the downloads directory.
@@ -126,14 +126,8 @@ impl StorageConfig {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn default_storage_path() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(APP_NAME)
-}
-
 fn config_path() -> Option<PathBuf> {
-    Some(dirs::config_dir()?.join(APP_NAME).join("storage.toml"))
+    Some(app_preferences_dir().join("storage.toml"))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -161,14 +155,6 @@ mod tests {
             override_path: Some(custom.clone()),
         };
         assert_eq!(cfg.root_path(), custom);
-    }
-
-    #[test]
-    fn metadata_path_is_under_root() {
-        let cfg = StorageConfig {
-            override_path: Some(PathBuf::from("/tmp/dtrpg")),
-        };
-        assert_eq!(cfg.metadata_path(), Path::new("/tmp/dtrpg/metadata"));
     }
 
     #[test]
