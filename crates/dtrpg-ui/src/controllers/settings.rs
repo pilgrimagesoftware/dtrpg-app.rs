@@ -6,7 +6,7 @@ use std::sync::Arc;
 use gpui::{Context, Entity, EventEmitter};
 use gpui_component::input::InputState;
 
-use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore, keys};
+use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
 use crate::data::avatar::fetch_avatar_bytes;
 use crate::data::events::{
     LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
@@ -15,6 +15,7 @@ use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::profile::ProfileConfig;
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 use crate::services::LoginService;
+use crate::data::constants::{KEYRING_SERVICE, KEYRING_API_KEY};
 
 // ── AuthState ─────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ impl SettingsController {
     /// configured storage root is accessible. Spawns a background check for path existence.
     pub fn new(login_service: Box<dyn LoginService>, cx: &mut Context<Self>) -> Self {
         let file_openers = FileOpenerConfig::load();
-        let is_authenticated = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
+        let is_authenticated = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
             .load()
             .ok()
             .flatten()
@@ -400,10 +401,10 @@ impl SettingsController {
                 ctrl.sign_in_in_progress = false;
                 match result {
                     Ok((api_key, tokens)) => {
-                        let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
+                        let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
                         if let Err(e) = store.store(&Credential {
-                            service: keys::SERVICE.into(),
-                            account: keys::API_KEY.into(),
+                            service: KEYRING_SERVICE.into(),
+                            account: KEYRING_API_KEY.into(),
                             secret: api_key.clone(),
                         }) {
                             tracing::warn!("failed to save API key to keyring: {e}");

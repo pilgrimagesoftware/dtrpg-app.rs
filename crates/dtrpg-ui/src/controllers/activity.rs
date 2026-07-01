@@ -8,10 +8,7 @@ use gpui::Context;
 
 use crate::data::activity::{ActivityItem, ActivitySnapshot, ActivityStatus};
 use crate::data::events::{ActivityChanged, DownloadComplete, DownloadError};
-
-const RECENT_CAP: usize = 25;
-const EXPIRY_SECS: u64 = 15;
-const ERROR_EXPIRY_SECS: u64 = 120;
+use crate::data::constants::{RECENT_CAP, EXPIRY_SECS, ERROR_EXPIRY_SECS};
 
 /// Owns the activity item list and panel open/close state.
 pub struct ActivityController {

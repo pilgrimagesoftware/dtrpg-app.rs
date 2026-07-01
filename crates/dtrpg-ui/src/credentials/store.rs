@@ -118,7 +118,7 @@ impl CredentialStore for KeyringCredentialStore {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::credentials::keys;
+    use crate::data::constants::{KEYRING_SERVICE, KEYRING_API_KEY};
     use std::sync::{Arc, Mutex};
 
     // ── Mock store for unit testing call-site behavior ────────────────────────
@@ -159,8 +159,8 @@ mod tests {
                 .lock()
                 .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))?;
             Ok(guard.as_ref().map(|secret| Credential {
-                service: keys::SERVICE.into(),
-                account: keys::API_KEY.into(),
+                service: KEYRING_SERVICE.into(),
+                account: KEYRING_API_KEY.into(),
                 secret: secret.clone(),
             }))
         }
@@ -182,8 +182,8 @@ mod tests {
 
     fn make_credential(secret: &str) -> Credential {
         Credential {
-            service: keys::SERVICE.into(),
-            account: keys::API_KEY.into(),
+            service: KEYRING_SERVICE.into(),
+            account: KEYRING_API_KEY.into(),
             secret: secret.into(),
         }
     }

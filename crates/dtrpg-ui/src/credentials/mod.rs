@@ -19,7 +19,6 @@
 //! store.delete().expect("failed to delete credential");
 //! ```
 
-pub mod keys;
 mod model;
 mod store;
 
