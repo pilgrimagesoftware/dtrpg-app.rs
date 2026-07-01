@@ -67,7 +67,7 @@ settings:
   not_signed_in: "Not signed in to DriveThruRPG"
   sign_in_prompt: "Sign in with your DriveThruRPG API key to access your library."
   log_out_button: "Log Out"
-  downloads_tab: "Downloads"
+  downloads_location: "Downloads"
   storage_title: "Download Location"
   storage_missing: "Download folder does not exist. Downloads may fail."
   file_openers_title: "File Openers"
