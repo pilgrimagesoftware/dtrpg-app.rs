@@ -11,8 +11,9 @@ use dtrpg_sdk::{
 use tokio::runtime::{Builder, Runtime};
 
 use dtrpg_ui::{
-    credentials::{CredentialStore, KeyringCredentialStore, keys},
+    credentials::{CredentialStore, KeyringCredentialStore},
     data::{enums::ItemStatus, library::LibraryItem},
+    data::constants::{KEYRING_SERVICE, KEYRING_API_KEY},
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
 };
 
@@ -174,7 +175,7 @@ impl HttpSdkLibraryGateway {
     fn from_keyring_with_tokens(
         tokens: dtrpg_ui::services::LoginTokens,
     ) -> Result<Self, LibraryServiceError> {
-        let application_key = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
+        let application_key = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
             .load()
             .ok()
             .flatten()

@@ -22,8 +22,9 @@ use crate::{
         activity::ActivityController, auth_state::AuthStateController, library::LibraryController,
         settings::SettingsController,
     },
-    credentials::{CredentialStore, KeyringCredentialStore, keys},
+    credentials::{CredentialStore, KeyringCredentialStore},
     data::{
+        constants::{KEYRING_SERVICE, KEYRING_API_KEY},
         auth_state::AuthState,
         events::{
             ActivityChanged, AuthStateChanged, CollectionCreateFailed, DownloadComplete,
@@ -239,7 +240,7 @@ impl LibraryRootView {
         cx.subscribe(
             &settings,
             move |_this, _ctrl, _event: &LogoutRequested, cx| {
-                let store = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY);
+                let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
                 if let Err(e) = store.delete() {
                     tracing::warn!("credential delete (api-key): {e}");
                 }

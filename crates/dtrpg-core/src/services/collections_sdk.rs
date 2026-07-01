@@ -9,8 +9,9 @@ use dtrpg_sdk::{
 use tokio::runtime::{Builder, Runtime};
 
 use dtrpg_ui::{
-    credentials::{CredentialStore, KeyringCredentialStore, keys},
+    credentials::{CredentialStore, KeyringCredentialStore},
     data::collection::CollectionEntry,
+    data::constants::{KEYRING_SERVICE, KEYRING_API_KEY},
     services::{
         LoginTokens,
         collections::{CollectionsService, CollectionsServiceError, CollectionsServiceErrorKind},
@@ -187,7 +188,7 @@ impl HttpSdkCollectionsGateway {
     fn from_keyring_with_tokens(
         tokens: LoginTokens,
     ) -> Result<Self, CollectionsServiceError> {
-        let application_key = KeyringCredentialStore::new(keys::SERVICE, keys::API_KEY)
+        let application_key = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
             .load()
             .ok()
             .flatten()
