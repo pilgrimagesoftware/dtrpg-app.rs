@@ -1,8 +1,8 @@
 pub mod activity;
 pub mod auth_state;
-pub mod collection;
 pub mod avatar;
 pub mod catalog_cache;
+pub mod collection;
 pub mod collections_cache;
 pub mod constants;
 pub mod enums;

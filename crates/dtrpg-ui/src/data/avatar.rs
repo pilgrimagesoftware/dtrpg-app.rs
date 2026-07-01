@@ -1,9 +1,9 @@
 //! Gravatar URL computation and avatar image fetching.
 
+use crate::data::constants::APP_NAME;
+use crate::data::constants::AVATAR_CACHE_FILE;
 use std::path::PathBuf;
 use std::time::Duration;
-use crate::data::constants::AVATAR_CACHE_FILE;
-use crate::data::constants::APP_NAME;
 
 fn avatar_cache_path() -> Option<PathBuf> {
     dirs::cache_dir().map(|d| d.join(APP_NAME).join(AVATAR_CACHE_FILE))

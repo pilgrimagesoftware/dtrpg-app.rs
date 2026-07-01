@@ -10,6 +10,7 @@ use gpui_component::tooltip::Tooltip;
 use crate::controllers::activity::ActivityController;
 use crate::data::activity::{ActivitySnapshot, ActivityStatus};
 use crate::data::theme::ColorTokens;
+use rust_i18n::t;
 
 /// Renders the activity panel overlay anchored at the bottom of the sidebar column.
 pub fn render_activity_panel(
@@ -53,7 +54,7 @@ pub fn render_activity_panel(
                         .text_sm()
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(text_primary)
-                        .child("Activity"),
+                        .child(t!("activity.title")),
                 )
                 .child(
                     div()
@@ -112,13 +113,13 @@ fn render_empty(text_primary: gpui::Hsla, text_tertiary: gpui::Hsla) -> AnyEleme
             div()
                 .text_sm()
                 .text_color(text_primary)
-                .child("No recent activity."),
+                .child(t!("activity.empty")),
         )
         .child(
             div()
                 .text_xs()
                 .text_color(text_tertiary)
-                .child("Activity will appear here as operations run."),
+                .child(t!("activity.empty_hint")),
         )
         .into_any_element()
 }

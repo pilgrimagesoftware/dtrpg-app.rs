@@ -1,6 +1,8 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use crate::ui::actions::{AddCollection, ReloadCatalog, ShowActivity, ShowAlertHistory, ShowSettings};
+use crate::ui::actions::{
+    AddCollection, ReloadCatalog, ShowActivity, ShowAlertHistory, ShowSettings,
+};
 use crate::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory};
 use gpui::{
     AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
@@ -25,8 +27,8 @@ use crate::{
     },
     credentials::{CredentialStore, KeyringCredentialStore},
     data::{
-        constants::{KEYRING_SERVICE, KEYRING_API_KEY},
         auth_state::AuthState,
+        constants::{KEYRING_API_KEY, KEYRING_SERVICE},
         events::{
             ActivityChanged, AuthStateChanged, CollectionCreateFailed, DownloadComplete,
             DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded,
@@ -76,9 +78,8 @@ impl LibraryRootView {
         startup_api_key: Option<String>,
     ) -> Self {
         let activity = cx.new(|_| ActivityController::new());
-        let controller = cx.new(|cx| {
-            LibraryController::new(service, collections_service, activity.clone(), cx)
-        });
+        let controller =
+            cx.new(|cx| LibraryController::new(service, collections_service, activity.clone(), cx));
         let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
@@ -258,8 +259,7 @@ impl LibraryRootView {
             window,
             move |_this, _settings, event: &SignInSucceeded, window, cx| {
                 let tokens = event.0.clone();
-                let service =
-                    cx.global::<ServiceFactory>().0.as_ref()(Some(tokens.clone()));
+                let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens.clone()));
                 let collections_service =
                     cx.global::<CollectionsServiceFactory>().0.as_ref()(Some(tokens));
                 controller_for_signin.update(cx, |ctrl, cx| {

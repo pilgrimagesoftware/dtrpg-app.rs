@@ -12,12 +12,15 @@ use tokio::runtime::{Builder, Runtime};
 
 use dtrpg_ui::{
     credentials::{CredentialStore, KeyringCredentialStore},
+    data::constants::{KEYRING_API_KEY, KEYRING_SERVICE},
     data::{enums::ItemStatus, library::LibraryItem},
-    data::constants::{KEYRING_SERVICE, KEYRING_API_KEY},
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
 };
 
-use crate::constants::{DEFAULT_COLOR, APPLICATION_KEY_ENV, ACCESS_TOKEN_ENV, REFRESH_TOKEN_ENV, REFRESH_TOKEN_TTL_ENV, API_BASE_URL_ENV, BYTES_PER_MB};
+use crate::constants::{
+    ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, BYTES_PER_MB, DEFAULT_COLOR,
+    REFRESH_TOKEN_ENV, REFRESH_TOKEN_TTL_ENV,
+};
 
 /// SDK operation boundary used by the Rust library service adapter.
 pub trait SdkLibraryGateway: Send + Sync {
@@ -37,7 +40,6 @@ pub trait SdkLibraryGateway: Send + Sync {
     ///
     /// Returns [`LibraryServiceError`] on network, session, or not-found failures.
     fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError>;
-
 }
 
 /// Library service adapter backed by the Rust SDK.
@@ -162,7 +164,6 @@ impl LibraryService for RustSdkLibraryService {
         let response = self.gateway.get_order_product(id)?;
         Ok(map_order_product(&response.data, &HashMap::new(), 0))
     }
-
 }
 
 struct HttpSdkLibraryGateway {
@@ -273,7 +274,6 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
             .block_on(self.client.get_order_product(id))
             .map_err(map_client_error)
     }
-
 }
 
 struct UnavailableSdkGateway {
@@ -297,7 +297,6 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
     fn get_order_product(&self, _id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
         Err(self.error.clone())
     }
-
 }
 
 /// Extracts the last page number from a [`PaginationLinks`] `last` URL.
@@ -536,7 +535,6 @@ mod tests {
         ) -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
         }
-
     }
 
     /// Returns pages in order: first call gets page 1 with a `next` link,
@@ -584,7 +582,6 @@ mod tests {
                 "not used",
             ))
         }
-
     }
 
     #[test]

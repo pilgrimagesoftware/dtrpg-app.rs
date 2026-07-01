@@ -12,6 +12,7 @@ use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
+use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
@@ -98,7 +99,7 @@ fn render_authenticated(
                                         .text_sm()
                                         .font_weight(gpui::FontWeight::SEMIBOLD)
                                         .text_color(text_primary)
-                                        .child("Account"),
+                                        .child(t!("settings.account_title")),
                                 )
                                 .child(
                                     div().text_sm().text_color(text_secondary).child(email_text),
@@ -216,13 +217,13 @@ fn render_unauthenticated(
                         .text_sm()
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(text_primary)
-                        .child("Account"),
+                        .child(t!("settings.account_title")),
                 )
                 .child(
                     div()
                         .text_sm()
                         .text_color(text_secondary)
-                        .child("Not signed in to DriveThruRPG"),
+                        .child(t!("settings.not_signed_in")),
                 ),
         )
         .child(div().h(px(1.0)).bg(border))
@@ -231,7 +232,7 @@ fn render_unauthenticated(
                 div()
                     .text_xs()
                     .text_color(text_tertiary)
-                    .child("Sign in with your DriveThruRPG API key to access your library."),
+                    .child(t!("settings.sign_in_prompt")),
             ),
         );
 
@@ -295,7 +296,7 @@ fn render_unauthenticated(
 fn render_logout_button(entity: Entity<SettingsController>) -> impl IntoElement + 'static {
     Button::new("logout-btn")
         .danger()
-        .label("Log Out")
+        .label(t!("settings.log_out_button"))
         .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.request_logout(cx));
         })

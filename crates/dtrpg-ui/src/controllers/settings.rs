@@ -8,6 +8,7 @@ use gpui_component::input::InputState;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
 use crate::data::avatar::fetch_avatar_bytes;
+use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::events::{
     LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
 };
@@ -15,7 +16,6 @@ use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::profile::ProfileConfig;
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 use crate::services::LoginService;
-use crate::data::constants::{KEYRING_SERVICE, KEYRING_API_KEY};
 
 // ── AuthState ─────────────────────────────────────────────────────────────────
 

@@ -3,11 +3,11 @@ use gpui_component::{Root, init};
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore};
+use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::util::init::init_globals;
-use crate::data::constants::{KEYRING_SERVICE, KEYRING_API_KEY};
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
 ///
@@ -154,7 +154,8 @@ pub fn setup(cx: &mut App) {
         Menu::new("Help").items([MenuItem::action("About Libri", About)]),
     ]);
 
-    let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load() {
+    let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
+    {
         Ok(Some(cred)) => Some(cred.secret),
         Ok(None) => None,
         Err(e) => {

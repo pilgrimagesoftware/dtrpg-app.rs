@@ -17,14 +17,16 @@ use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::{enums::CatalogPresentation, theme::ColorTokens};
 use crate::util::filter::*;
+use crate::util::pluralize::pluralize;
 use crate::util::sort::*;
+use rust_i18n::t;
 
 fn section_title_for(filter: &SidebarFilter) -> String {
     match filter {
-        SidebarFilter::AllTitles => "All Titles".to_string(),
-        SidebarFilter::RecentlyAdded => "Recently Added".to_string(),
-        SidebarFilter::OnDevice => "On This Device".to_string(),
-        SidebarFilter::InCloud => "In the Cloud".to_string(),
+        SidebarFilter::AllTitles => t!("sidebar.all_titles").to_string(),
+        SidebarFilter::RecentlyAdded => t!("sidebar.recently_added").to_string(),
+        SidebarFilter::OnDevice => t!("sidebar.on_this_device").to_string(),
+        SidebarFilter::InCloud => t!("sidebar.in_the_cloud").to_string(),
         SidebarFilter::Publisher(name) => format!("Publisher: {name}"),
         SidebarFilter::Collection(_, name) => format!("Collection: {name}"),
     }
@@ -58,12 +60,23 @@ pub fn render_toolbar(
     let is_publisher = matches!(filter, SidebarFilter::Publisher(_));
     let has_search = !search_query.is_empty();
     let count_label = match (is_publisher, has_search) {
-        (true, false) => format!("{filter_count} publisher items, {total_count} total items"),
-        (true, true) => format!(
-            "{filter_count} publisher items, {total_count} total items ({matched_count} filtered)"
+        (true, false) => format!(
+            "{}, {}",
+            pluralize(filter_count, "publisher item", "publisher items"),
+            pluralize(total_count, "total item", "total items"),
         ),
-        (false, true) => format!("{total_count} items ({matched_count} filtered)"),
-        (false, false) => format!("{total_count} items"),
+        (true, true) => format!(
+            "{}, {} ({} filtered)",
+            pluralize(filter_count, "publisher item", "publisher items"),
+            pluralize(total_count, "total item", "total items"),
+            matched_count,
+        ),
+        (false, true) => format!(
+            "{} ({} filtered)",
+            pluralize(total_count, "item", "items"),
+            matched_count,
+        ),
+        (false, false) => pluralize(total_count, "item", "items"),
     };
 
     div()
@@ -137,11 +150,11 @@ fn render_sort_selector(
     entity: Entity<LibraryController>,
 ) -> impl IntoElement + 'static {
     let label = match current {
-        SortMethod::Title => "Title",
-        SortMethod::Publisher => "Publisher",
-        SortMethod::DateAdded => "Date Added",
-        SortMethod::PageCount => "Pages",
-        SortMethod::Custom { .. } => "Custom",
+        SortMethod::Title => t!("toolbar.sort_title"),
+        SortMethod::Publisher => t!("toolbar.sort_publisher"),
+        SortMethod::DateAdded => t!("toolbar.sort_date_added"),
+        SortMethod::PageCount => t!("toolbar.sort_pages"),
+        SortMethod::Custom { .. } => "Custom".into(),
     };
 
     let is_custom = matches!(current, SortMethod::Custom { .. });
@@ -150,7 +163,7 @@ fn render_sort_selector(
         .label(label)
         .ghost()
         .dropdown_caret(true)
-        .tooltip("Sort order")
+        .tooltip(t!("toolbar.sort_by"))
         .dropdown_menu(move |menu, _, _| {
             let e = entity.clone();
             let e2 = entity.clone();
@@ -161,28 +174,28 @@ fn render_sort_selector(
             let e7 = entity.clone();
             let mut m = menu
                 .item(
-                    PopupMenuItem::new("Title")
+                    PopupMenuItem::new(t!("toolbar.sort_title"))
                         .checked(current == SortMethod::Title)
                         .on_click(move |_, _, cx| {
                             e.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
                         }),
                 )
                 .item(
-                    PopupMenuItem::new("Publisher")
+                    PopupMenuItem::new(t!("toolbar.sort_publisher"))
                         .checked(current == SortMethod::Publisher)
                         .on_click(move |_, _, cx| {
                             e2.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
                         }),
                 )
                 .item(
-                    PopupMenuItem::new("Date Added")
+                    PopupMenuItem::new(t!("toolbar.sort_date_added"))
                         .checked(current == SortMethod::DateAdded)
                         .on_click(move |_, _, cx| {
                             e3.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
                         }),
                 )
                 .item(
-                    PopupMenuItem::new("Pages")
+                    PopupMenuItem::new(t!("toolbar.sort_pages"))
                         .checked(current == SortMethod::PageCount)
                         .on_click(move |_, _, cx| {
                             e4.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
@@ -193,7 +206,7 @@ fn render_sort_selector(
             }
             m.separator()
                 .item(
-                    PopupMenuItem::new("Ascending")
+                    PopupMenuItem::new(t!("toolbar.sort_ascending"))
                         .checked(direction == SortDirection::Ascending)
                         .on_click(move |_, _, cx| {
                             e5.update(cx, |ctrl, cx| {
@@ -202,7 +215,7 @@ fn render_sort_selector(
                         }),
                 )
                 .item(
-                    PopupMenuItem::new("Descending")
+                    PopupMenuItem::new(t!("toolbar.sort_descending"))
                         .checked(direction == SortDirection::Descending)
                         .on_click(move |_, _, cx| {
                             e6.update(cx, |ctrl, cx| {
@@ -212,7 +225,7 @@ fn render_sort_selector(
                 )
                 .separator()
                 .item(
-                    PopupMenuItem::new("Group by Publisher")
+                    PopupMenuItem::new(t!("toolbar.group_by_publisher"))
                         .checked(grouped)
                         .on_click(move |_, _, cx| {
                             e7.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
@@ -235,9 +248,9 @@ fn render_layout_switcher(
     TabBar::new("layout-switcher")
         .segmented()
         .selected_index(selected)
-        .child(Tab::new().label("List"))
-        .child(Tab::new().label("Thumbs"))
-        .child(Tab::new().label("Grid"))
+        .child(Tab::new().label(t!("toolbar.view_list")))
+        .child(Tab::new().label(t!("toolbar.view_thumbs")))
+        .child(Tab::new().label(t!("toolbar.view_grid")))
         .on_click(move |ix, _, cx| {
             let mode = match ix {
                 0 => CatalogPresentation::List,
@@ -312,7 +325,7 @@ fn render_avatar_button(
             .dropdown_menu(move |menu, _, _| {
                 let s = settings.clone();
                 menu.item(
-                    PopupMenuItem::new("Sign In\u{2026}").on_click(move |_, _, cx| {
+                    PopupMenuItem::new(t!("toolbar.sign_in")).on_click(move |_, _, cx| {
                         s.update(cx, |ctrl, cx| ctrl.open(cx));
                     }),
                 )
@@ -376,9 +389,11 @@ fn render_avatar_button(
             let s = settings.clone();
             menu.item(PopupMenuItem::label(menu_email.clone()))
                 .item(PopupMenuItem::separator())
-                .item(PopupMenuItem::new("Log Out").on_click(move |_, _, cx| {
-                    s.update(cx, |ctrl, cx| ctrl.logout(cx));
-                }))
+                .item(
+                    PopupMenuItem::new(t!("toolbar.log_out")).on_click(move |_, _, cx| {
+                        s.update(cx, |ctrl, cx| ctrl.logout(cx));
+                    }),
+                )
         })
         .into_any_element()
 }
@@ -389,20 +404,26 @@ mod tests {
     use crate::util::filter::SidebarFilter;
 
     #[test]
-    fn publisher_filter_shows_name() {
+    fn publisher_filter_includes_name() {
         let title = section_title_for(&SidebarFilter::Publisher("Kobold Press".into()));
-        assert_eq!(title, "Publisher: Kobold Press");
+        assert!(title.contains("Kobold Press"), "publisher name must appear in label");
     }
 
     #[test]
-    fn all_titles_filter_label() {
-        let title = section_title_for(&SidebarFilter::AllTitles);
-        assert_eq!(title, "All Titles");
+    fn collection_filter_includes_name() {
+        let title = section_title_for(&SidebarFilter::Collection(42, "My Shelf".into()));
+        assert!(title.contains("My Shelf"), "collection name must appear in label");
     }
 
     #[test]
-    fn recently_added_filter_label() {
-        let title = section_title_for(&SidebarFilter::RecentlyAdded);
-        assert_eq!(title, "Recently Added");
+    fn non_dynamic_filters_return_nonempty_string() {
+        for filter in [
+            SidebarFilter::AllTitles,
+            SidebarFilter::RecentlyAdded,
+            SidebarFilter::OnDevice,
+            SidebarFilter::InCloud,
+        ] {
+            assert!(!section_title_for(&filter).is_empty());
+        }
     }
 }

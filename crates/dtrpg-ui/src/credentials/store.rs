@@ -118,7 +118,7 @@ impl CredentialStore for KeyringCredentialStore {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::data::constants::{KEYRING_SERVICE, KEYRING_API_KEY};
+    use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
     use std::sync::{Arc, Mutex};
 
     // ── Mock store for unit testing call-site behavior ────────────────────────

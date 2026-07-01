@@ -10,6 +10,7 @@ use gpui_component::tooltip::Tooltip;
 use crate::controllers::settings::SettingsController;
 use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
+use rust_i18n::t;
 
 /// Renders the File Openers settings section.
 pub fn render_file_openers_section(
@@ -51,13 +52,13 @@ pub fn render_file_openers_section(
                                 .text_sm()
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
                                 .text_color(text_primary)
-                                .child("File Openers"),
+                                .child(t!("settings.file_openers_title")),
                         )
                         .child(
                             div()
                                 .text_xs()
                                 .text_color(text_tertiary)
-                                .child("Override which application opens a file type."),
+                                .child(t!("settings.file_openers_description")),
                         ),
                 )
                 .child(render_add_button(entity.clone(), accent, accent_on)),
@@ -89,7 +90,7 @@ fn render_empty_state(text_tertiary: gpui::Hsla) -> impl IntoElement + 'static {
             div()
                 .text_sm()
                 .text_color(text_tertiary)
-                .child("No overrides configured. Click Add to set up an opener."),
+                .child(t!("settings.file_openers_empty")),
         )
 }
 

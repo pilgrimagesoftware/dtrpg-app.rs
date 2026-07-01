@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 use gpui::Context;
 
 use crate::data::activity::{ActivityItem, ActivitySnapshot, ActivityStatus};
+use crate::data::constants::{ERROR_EXPIRY_SECS, EXPIRY_SECS, RECENT_CAP};
 use crate::data::events::{ActivityChanged, DownloadComplete, DownloadError};
-use crate::data::constants::{RECENT_CAP, EXPIRY_SECS, ERROR_EXPIRY_SECS};
 
 /// Owns the activity item list and panel open/close state.
 pub struct ActivityController {

@@ -12,6 +12,7 @@ use gpui_component::tooltip::Tooltip;
 use crate::controllers::settings::SettingsController;
 use crate::data::storage::validate_writable;
 use crate::data::theme::ColorTokens;
+use rust_i18n::t;
 
 /// Renders the Storage settings section.
 ///
@@ -49,7 +50,7 @@ pub fn render_storage_section(
                 .text_sm()
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(text_primary)
-                .child("Catalog Storage Location"),
+                .child(t!("settings.storage_title")),
         )
         // ── Path row with inline action buttons ───────────────────────────
         .child(
@@ -157,7 +158,7 @@ pub fn render_storage_section(
                     div()
                         .text_xs()
                         .text_color(warning_text)
-                        .child("Storage folder does not exist. Downloads may fail."),
+                        .child(t!("settings.storage_missing")),
                 ),
         );
     }

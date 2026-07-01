@@ -1,8 +1,8 @@
 //! Storage configuration: root path preference and per-item path derivation.
 
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use crate::data::constants::APP_NAME;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 // ── StorageError ──────────────────────────────────────────────────────────────
 

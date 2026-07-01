@@ -2,8 +2,8 @@
 
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_cache_metadata, load_catalog_cache, save_catalog_cache};
-use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
 use crate::data::collection::CollectionEntry;
+use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
 use crate::data::enums::*;
 use crate::data::events::*;
 use crate::data::library::*;
@@ -203,14 +203,12 @@ impl LibraryController {
             // ── Auto-load policy ──────────────────────────────────────────────
             // Skip the live fetch when: the cache is non-empty, was written within
             // the last 7 days, and force_reload is false.
-            if !force_reload {
-                if let Some(items) = cached.as_ref() {
-                    if !items.is_empty() {
+            if !force_reload && let Some(items) = cached.as_ref().filter(|items| !items.is_empty()) {
                         let meta = async_cx
                             .background_executor()
                             .spawn(async move { load_cache_metadata(&meta_root) })
                             .await;
-                        let is_fresh = meta.as_ref().map_or(false, |m| !m.is_stale());
+                        let is_fresh = meta.as_ref().is_some_and(|m| !m.is_stale());
 
                         if is_fresh {
                             // Check remote count if the service supports it cheaply.
@@ -237,8 +235,6 @@ impl LibraryController {
                                 return;
                             }
                         }
-                    }
-                }
             }
 
             // ── Fetch live catalog from API ───────────────────────────────────
@@ -381,7 +377,11 @@ impl LibraryController {
                 .await;
             match result {
                 Ok(entries) => {
-                    tracing::debug!(count = entries.len(), "load_collections: fetched {} entries", entries.len());
+                    tracing::debug!(
+                        count = entries.len(),
+                        "load_collections: fetched {} entries",
+                        entries.len()
+                    );
                     let to_save = entries.clone();
                     let save_root = cache_root.clone();
                     async_cx
@@ -461,9 +461,7 @@ impl LibraryController {
     /// emitted so the window can push an error notification.
     pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
         let label = format!("Creating collection '{name}'...");
-        let activity_id = self
-            .activity
-            .update(cx, |a, cx| a.start(&label, None, cx));
+        let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
@@ -476,7 +474,8 @@ impl LibraryController {
                 Ok(entry) => {
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.collections.push(entry);
-                        ctrl.activity.update(cx, |a, cx| a.complete(activity_id, cx));
+                        ctrl.activity
+                            .update(cx, |a, cx| a.complete(activity_id, cx));
                         cx.emit(LibraryChanged);
                     })
                     .ok();
@@ -486,7 +485,9 @@ impl LibraryController {
                         ctrl.activity.update(cx, |a, cx| {
                             a.error(activity_id, e.to_string(), cx);
                         });
-                        cx.emit(CollectionCreateFailed { message: e.message.clone() });
+                        cx.emit(CollectionCreateFailed {
+                            message: e.message.clone(),
+                        });
                     })
                     .ok();
                 }
@@ -515,7 +516,7 @@ impl LibraryController {
     ///
     /// Logs failures to the activity panel and leaves the collection in place on error.
     pub fn delete_collection(&mut self, id: u64, cx: &mut Context<Self>) {
-        let label = format!("Deleting collection\u{2026}");
+        let label = "Deleting collection\u{2026}".to_string();
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
@@ -527,13 +528,14 @@ impl LibraryController {
                 Ok(()) => {
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.collections.retain(|c| c.id != id);
-                        if let SidebarFilter::Collection(cid, _) = &ctrl.filter {
-                            if *cid == id {
-                                ctrl.filter = SidebarFilter::default();
-                                ctrl.collection_members.clear();
-                            }
+                        if let SidebarFilter::Collection(cid, _) = &ctrl.filter
+                            && *cid == id
+                        {
+                            ctrl.filter = SidebarFilter::default();
+                            ctrl.collection_members.clear();
                         }
-                        ctrl.activity.update(cx, |a, cx| a.complete(activity_id, cx));
+                        ctrl.activity
+                            .update(cx, |a, cx| a.complete(activity_id, cx));
                         cx.emit(LibraryChanged);
                     })
                     .ok();

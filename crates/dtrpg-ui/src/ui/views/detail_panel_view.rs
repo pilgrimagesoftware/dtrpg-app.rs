@@ -9,9 +9,9 @@ use gpui::{
     StatefulInteractiveElement, Styled, div, px,
 };
 use gpui_component::Disableable;
-use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::library::LibraryController;
@@ -21,6 +21,7 @@ use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::render_generative_cover;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
+use rust_i18n::t;
 
 /// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
 pub fn render_detail_panel(
@@ -144,19 +145,21 @@ pub fn render_detail_panel(
                         .child(
                             Button::new("detail-read")
                                 .primary()
-                                .label("Read")
+                                .label(t!("detail.read_button"))
                                 .w_full()
                                 .disabled(!is_downloaded)
-                                .when(!is_downloaded, |b| b.tooltip("Download this item first")),
+                                .when(!is_downloaded, |b| {
+                                    b.tooltip(t!("detail.tooltip_download_first"))
+                                }),
                         )
                         .child(
                             Button::new("detail-download")
                                 .ghost()
                                 .outline()
                                 .label(if is_downloaded {
-                                    "Downloaded"
+                                    t!("detail.downloaded_button")
                                 } else {
-                                    "Download"
+                                    t!("detail.download_button")
                                 })
                                 .w_full()
                                 .on_click(move |_, _, cx| {
@@ -197,34 +200,55 @@ pub fn render_detail_panel(
         .into_any_element()
 }
 
-fn platform_reveal_label() -> &'static str {
+fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     #[cfg(target_os = "macos")]
-    return "Show in Finder";
+    return t!("detail.show_in_finder");
     #[cfg(target_os = "windows")]
-    return "Show in Explorer";
+    return t!("detail.show_in_explorer");
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    return "Show in Files";
+    return t!("detail.show_in_files");
 }
 
 fn render_metadata_table(
     item: &LibraryItem,
     _colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
-    let status_str: String = match item.status {
-        ItemStatus::Downloaded => "On this device".into(),
-        ItemStatus::Cloud => "In the cloud".into(),
+    let status_str = match item.status {
+        ItemStatus::Downloaded => t!("detail.status_on_device"),
+        ItemStatus::Cloud => t!("detail.status_in_cloud"),
     };
 
     let mut list = DescriptionList::vertical()
         .columns(1)
         .bordered(false)
-        .child(DescriptionItem::new("System").value(item.line.to_string()))
-        .child(DescriptionItem::new("Category").value(item.kind.to_string()))
-        .child(DescriptionItem::new("Format").value(item.format.to_string()))
-        .child(DescriptionItem::new("Pages").value(item.pages.to_string()))
-        .child(DescriptionItem::new("File size").value(format!("{:.0} MB", item.size_mb)))
-        .child(DescriptionItem::new("Released").value(item.year.to_string()))
-        .child(DescriptionItem::new("Status").value(status_str));
+        .child(
+            DescriptionItem::new(t!("detail.field_system").to_string())
+                .value(item.line.to_string()),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_category").to_string())
+                .value(item.kind.to_string()),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_format").to_string())
+                .value(item.format.to_string()),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_pages").to_string())
+                .value(item.pages.to_string()),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_file_size").to_string())
+                .value(format!("{:.0} MB", item.size_mb)),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_released").to_string())
+                .value(item.year.to_string()),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_status").to_string())
+                .value(status_str.to_string()),
+        );
 
     if let Some(ts) = item.date_added {
         let relative = format_relative(ts);
@@ -235,7 +259,7 @@ fn render_metadata_table(
             .child(relative)
             .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
             .into_any_element();
-        list = list.child(DescriptionItem::new("Added").value(value));
+        list = list.child(DescriptionItem::new(t!("detail.field_added").to_string()).value(value));
     }
 
     list

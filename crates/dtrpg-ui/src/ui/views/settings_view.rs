@@ -15,6 +15,7 @@ use crate::ui::views::{
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
+use rust_i18n::t;
 
 // ── Public render entry point ─────────────────────────────────────────────────
 
@@ -65,47 +66,46 @@ pub fn render_settings_panel(
 
     // ── Build the Settings component ──────────────────────────────────────────
 
-    let settings = Settings::new("settings-panel")
-        .sidebar_width(px(160.0))
-        .page(
-            SettingPage::new("Account").group(SettingGroup::new().item(SettingItem::render(
-                move |_, _window, _cx| {
-                    render_account_section(
-                        &account_auth,
-                        account_entity.clone(),
-                        &account_colors,
-                        account_api_key_input.clone(),
-                        account_email_input.clone(),
-                        sign_in_in_progress,
-                        sign_in_error.clone(),
-                    )
-                },
-            ))),
-        )
-        .page(
-            SettingPage::new("Storage").group(SettingGroup::new().item(SettingItem::render(
-                move |_, _window, _cx| {
-                    render_storage_section(
-                        storage_path.clone(),
-                        storage_path_exists,
-                        storage_entity.clone(),
-                        &storage_colors,
-                        storage_path_input.clone(),
-                    )
-                },
-            ))),
-        )
-        .page(
-            SettingPage::new("File Openers").group(SettingGroup::new().item(SettingItem::render(
-                move |_, _window, _cx| {
+    let settings =
+        Settings::new("settings-panel")
+            .sidebar_width(px(160.0))
+            .page(
+                SettingPage::new(t!("settings.account_title")).group(SettingGroup::new().item(
+                    SettingItem::render(move |_, _window, _cx| {
+                        render_account_section(
+                            &account_auth,
+                            account_entity.clone(),
+                            &account_colors,
+                            account_api_key_input.clone(),
+                            account_email_input.clone(),
+                            sign_in_in_progress,
+                            sign_in_error.clone(),
+                        )
+                    }),
+                )),
+            )
+            .page(
+                SettingPage::new("Storage").group(SettingGroup::new().item(SettingItem::render(
+                    move |_, _window, _cx| {
+                        render_storage_section(
+                            storage_path.clone(),
+                            storage_path_exists,
+                            storage_entity.clone(),
+                            &storage_colors,
+                            storage_path_input.clone(),
+                        )
+                    },
+                ))),
+            )
+            .page(SettingPage::new(t!("settings.file_openers_title")).group(
+                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
                     render_file_openers_section(
                         &file_openers_vec,
                         file_openers_entity.clone(),
                         &file_openers_colors,
                     )
-                },
-            ))),
-        );
+                })),
+            ));
 
     div()
         .id("settings-backdrop")
@@ -150,7 +150,7 @@ pub fn render_settings_panel(
                                 .text_base()
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
                                 .text_color(text_primary)
-                                .child("Settings"),
+                                .child(t!("settings.title")),
                         )
                         .child(
                             div()

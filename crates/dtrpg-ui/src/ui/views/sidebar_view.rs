@@ -8,8 +8,8 @@ use gpui::{App, ElementId, Entity, IntoElement, Window, div, px};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
-use gpui_component::menu::PopupMenuItem;
 use gpui_component::input::{Input, InputState};
+use gpui_component::menu::PopupMenuItem;
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarFooter, SidebarHeader, SidebarItem, SidebarMenu,
     SidebarMenuItem,
@@ -22,7 +22,9 @@ use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
 use crate::data::ui_prefs::UiPrefs;
 use crate::util::filter::SidebarFilter;
+use crate::util::pluralize::pluralize;
 use crate::util::publisher::PublisherEntry;
+use rust_i18n::t;
 
 /// A sidebar child that is either a [`SidebarMenu`] or a thin horizontal divider.
 #[derive(Clone)]
@@ -91,28 +93,28 @@ pub fn render_sidebar(
     // ── Library smart-filter menu ─────────────────────────────────────────────
     let lib_menu = SidebarMenu::new()
         .child(nav_item(
-            "All Titles",
+            &t!("sidebar.all_titles"),
             counts.all,
             active == SidebarFilter::AllTitles,
             SidebarFilter::AllTitles,
             entity.clone(),
         ))
         .child(nav_item(
-            "Recently Added",
+            &t!("sidebar.recently_added"),
             counts.recently_added,
             active == SidebarFilter::RecentlyAdded,
             SidebarFilter::RecentlyAdded,
             entity.clone(),
         ))
         .child(nav_item(
-            "On This Device",
+            &t!("sidebar.on_this_device"),
             counts.on_device,
             active == SidebarFilter::OnDevice,
             SidebarFilter::OnDevice,
             entity.clone(),
         ))
         .child(nav_item(
-            "In the Cloud",
+            &t!("sidebar.in_the_cloud"),
             counts.in_cloud,
             active == SidebarFilter::InCloud,
             SidebarFilter::InCloud,
@@ -133,13 +135,17 @@ pub fn render_sidebar(
 
     let entity_for_pub = entity.clone();
     let pub_menu = SidebarMenu::new().child(
-        SidebarMenuItem::new("Publishers")
+        SidebarMenuItem::new(t!("sidebar.publishers"))
             .collapsed(!publishers_open)
             .on_click(move |_, _, cx| {
                 UiPrefs::load().save_publishers_open(!publishers_open);
                 entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
             })
-            .suffix(move |_, _| div().text_xs().child(publishers_count.to_string()))
+            .suffix(move |_, _| {
+                div()
+                    .text_xs()
+                    .child(pluralize(publishers_count, "publisher", "publishers"))
+            })
             .children(pub_children),
     );
 
@@ -189,7 +195,7 @@ pub fn render_sidebar(
 
     let entity_for_col = entity.clone();
     let col_menu = SidebarMenu::new().child(
-        SidebarMenuItem::new("Collections")
+        SidebarMenuItem::new(t!("sidebar.collections"))
             .collapsed(!collections_open)
             .on_click(move |_, _, cx| {
                 UiPrefs::load().save_collections_open(!collections_open);
@@ -209,54 +215,54 @@ pub fn render_sidebar(
                         .flex()
                         .items_center()
                         .gap(px(4.))
-                        .child(div().text_xs().child(collections_count.to_string()))
-                        .child(Dialog::new(cx)
-                        .trigger(
-                            Button::new("add-collection")
-                                .ghost()
-                                .compact()
-                                .icon(IconName::Plus),
+                        .child(div().text_xs().child(pluralize(
+                            collections_count,
+                            "collection",
+                            "collections",
+                        )))
+                        .child(
+                            Dialog::new(cx)
+                                .trigger(
+                                    Button::new("add-collection")
+                                        .ghost()
+                                        .compact()
+                                        .icon(IconName::Plus),
+                                )
+                                .w(px(320.))
+                                .close_button(false)
+                                .overlay_closable(true)
+                                .button_props(
+                                    DialogButtonProps::default()
+                                        .ok_text("Create")
+                                        .show_cancel(true)
+                                        .cancel_text("Cancel"),
+                                )
+                                .on_ok({
+                                    let input = input.clone();
+                                    let ctrl = ctrl.clone();
+                                    move |_, _, cx| {
+                                        let name = input.read(cx).value().trim().to_string();
+                                        if name.is_empty() {
+                                            return false;
+                                        }
+                                        ctrl.update(cx, |c, cx| c.create_collection(name, cx));
+                                        true
+                                    }
+                                })
+                                .on_cancel(|_, _, _| true)
+                                .content({
+                                    let input = collection_name_input.clone();
+                                    move |content, _, _| {
+                                        content
+                                            .child(
+                                                DialogHeader::new().px_4().pt_4().child(
+                                                    DialogTitle::new().child("New Collection"),
+                                                ),
+                                            )
+                                            .child(div().px_4().py_2().child(Input::new(&input)))
+                                    }
+                                }),
                         )
-                        .w(px(320.))
-                        .close_button(false)
-                        .overlay_closable(true)
-                        .button_props(
-                            DialogButtonProps::default()
-                                .ok_text("Create")
-                                .show_cancel(true)
-                                .cancel_text("Cancel"),
-                        )
-                        .on_ok({
-                            let input = input.clone();
-                            let ctrl = ctrl.clone();
-                            move |_, _, cx| {
-                                let name = input.read(cx).value().trim().to_string();
-                                if name.is_empty() {
-                                    return false;
-                                }
-                                ctrl.update(cx, |c, cx| c.create_collection(name, cx));
-                                true
-                            }
-                        })
-                        .on_cancel(|_, _, _| true)
-                        .content({
-                            let input = collection_name_input.clone();
-                            move |content, _, _| {
-                                content
-                                    .child(
-                                        DialogHeader::new()
-                                            .px_4()
-                                            .pt_4()
-                                            .child(DialogTitle::new().child("New Collection")),
-                                    )
-                                    .child(
-                                        div()
-                                            .px_4()
-                                            .py_2()
-                                            .child(Input::new(&input)),
-                                    )
-                            }
-                        }))
                 }
             })
             .children(col_children),
@@ -286,7 +292,7 @@ fn build_header() -> SidebarHeader {
         div()
             .text_xl()
             .font_weight(gpui::FontWeight::SEMIBOLD)
-            .child("Libri"),
+            .child(t!("sidebar.app_name")),
     )
 }
 
@@ -324,7 +330,7 @@ fn build_footer(
                     .flex()
                     .justify_between()
                     .text_xs()
-                    .child(format!("{total_count} titles"))
+                    .child(pluralize(total_count, "title", "titles"))
                     .child(total_size_str),
             )
             .child(

@@ -1,7 +1,7 @@
 //! Formatting helpers for timestamps in the detail panel.
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use crate::data::constants::{MONTH_ABBRS, MONTH_NAMES};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Returns the current Unix timestamp in seconds.
 fn now_secs() -> i64 {

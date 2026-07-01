@@ -30,6 +30,7 @@ use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::util::publisher::group_by_publisher;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::sort::{SortDirection, SortMethod};
+use rust_i18n::t;
 
 #[derive(Clone, Copy)]
 enum EmptyReason {
@@ -45,17 +46,25 @@ enum EmptyReason {
 /// to ensure column widths are always in sync between headers and cells.
 fn list_columns() -> Vec<Column> {
     vec![
-        Column::new("title", "Title")
+        Column::new("title", t!("catalog.col_title"))
             .width(300.)
             .min_width(150.)
             .resizable(true),
-        Column::new("publisher", "Publisher")
+        Column::new("publisher", t!("catalog.col_publisher"))
             .width(130.)
             .resizable(true),
-        Column::new("system", "System").width(110.).resizable(true),
-        Column::new("pages", "Pages").width(60.).resizable(true),
-        Column::new("size", "Size").width(60.).resizable(true),
-        Column::new("added", "Added").width(80.).resizable(true),
+        Column::new("system", t!("catalog.col_system"))
+            .width(110.)
+            .resizable(true),
+        Column::new("pages", t!("catalog.col_pages"))
+            .width(60.)
+            .resizable(true),
+        Column::new("size", t!("catalog.col_size"))
+            .width(60.)
+            .resizable(true),
+        Column::new("added", t!("catalog.col_added"))
+            .width(80.)
+            .resizable(true),
         Column::new("status", "")
             .width(24.)
             .resizable(false)
@@ -213,16 +222,19 @@ impl TableDelegate for CatalogListDelegate {
                     }),
                 )
                 .item(
-                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                    }),
+                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                        move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        },
+                    ),
                 )
             }
-            ItemStatus::Cloud => {
-                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
+            ItemStatus::Cloud => menu.item(
+                PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
                     entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
-                }))
-            }
+                }),
+            ),
         }
     }
 
@@ -738,8 +750,7 @@ impl Render for CatalogView {
                             .label("Last \u{00bb}")
                             .disabled(current_page == total_pages)
                             .on_click(move |_, _, cx| {
-                                ctrl_for_last
-                                    .update(cx, |ctrl, cx| ctrl.set_page(total_pages, cx));
+                                ctrl_for_last.update(cx, |ctrl, cx| ctrl.set_page(total_pages, cx));
                             }),
                     ),
             );
@@ -756,9 +767,9 @@ fn render_no_matches_state(
     text_color: gpui::Hsla,
 ) -> impl IntoElement + 'static {
     let hint = if search_query.is_empty() {
-        "Try selecting a different section."
+        t!("catalog.try_different_section")
     } else {
-        "Try clearing your search."
+        t!("catalog.try_clear_search")
     };
 
     div()
@@ -773,7 +784,7 @@ fn render_no_matches_state(
             div()
                 .text_sm()
                 .text_color(text_color)
-                .child("No titles match."),
+                .child(t!("catalog.no_titles_match")),
         )
         .child(div().text_xs().text_color(text_color).child(hint))
 }
@@ -791,7 +802,7 @@ fn render_library_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'sta
             div()
                 .text_sm()
                 .text_color(text_color)
-                .child("Your library is empty."),
+                .child(t!("catalog.library_empty")),
         )
 }
 
@@ -867,7 +878,7 @@ fn render_thumbnail_menu(
             let eu = entity.clone();
             let url = cover_url.clone();
             menu.item(
-                PopupMenuItem::new("Load Thumbnail")
+                PopupMenuItem::new(t!("catalog.action_load_thumbnail"))
                     .disabled(!can_load)
                     .on_click(move |_, _, cx| {
                         if let Some(ref u) = url {
@@ -880,13 +891,13 @@ fn render_thumbnail_menu(
 
 // ── Reveal action ─────────────────────────────────────────────────────────────
 
-fn platform_reveal_label() -> &'static str {
+fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     #[cfg(target_os = "macos")]
-    return "Show in Finder";
+    return t!("catalog.action_show_in_finder");
     #[cfg(target_os = "windows")]
-    return "Show in Explorer";
+    return t!("catalog.action_show_in_explorer");
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    return "Show in Files";
+    return t!("catalog.action_show_in_files");
 }
 
 // ── Grouped list layout ───────────────────────────────────────────────────────
@@ -1076,7 +1087,7 @@ fn render_grouped_list_row(
                             let eu2 = eu.clone();
                             let url = ctx_cover_url.clone();
                             menu.item(
-                                PopupMenuItem::new("Load Thumbnail")
+                                PopupMenuItem::new(t!("catalog.action_load_thumbnail"))
                                     .disabled(!ctx_can_load)
                                     .on_click(move |_, _, cx| {
                                         if let Some(ref u) = url {
@@ -1109,17 +1120,22 @@ fn render_grouped_list_row(
                     }),
                 )
                 .item(
-                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                    }),
+                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                        move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        },
+                    ),
                 )
             }
             ItemStatus::Cloud => {
                 let dl_id = Arc::clone(&ctx_id);
                 let entity_dl = ctx_entity.clone();
-                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
-                    entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
-                }))
+                menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
+                    move |_, _, cx| {
+                        entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                    },
+                ))
             }
         })
 }
@@ -1251,17 +1267,22 @@ fn render_thumb_row(
                     }),
                 )
                 .item(
-                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                    }),
+                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                        move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        },
+                    ),
                 )
             }
             ItemStatus::Cloud => {
                 let dl_id = Arc::clone(&ctx_id);
                 let entity_dl = ctx_entity.clone();
-                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
-                    entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
-                }))
+                menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
+                    move |_, _, cx| {
+                        entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                    },
+                ))
             }
         })
 }
@@ -1436,17 +1457,22 @@ fn render_grid_card(
                     }),
                 )
                 .item(
-                    PopupMenuItem::new("Remove Download").on_click(move |_, _, cx| {
-                        entity_remove.update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                    }),
+                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                        move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        },
+                    ),
                 )
             }
             ItemStatus::Cloud => {
                 let dl_id = Arc::clone(&ctx_id);
                 let entity_dl = ctx_entity.clone();
-                menu.item(PopupMenuItem::new("Download").on_click(move |_, _, cx| {
-                    entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
-                }))
+                menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
+                    move |_, _, cx| {
+                        entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                    },
+                ))
             }
         })
 }

@@ -56,10 +56,7 @@ pub trait CollectionsService: Send + Sync + 'static {
     /// # Errors
     ///
     /// Returns a [`CollectionsServiceError`] if the request fails or the session is invalid.
-    fn create_collection(
-        &self,
-        name: &str,
-    ) -> Result<CollectionEntry, CollectionsServiceError>;
+    fn create_collection(&self, name: &str) -> Result<CollectionEntry, CollectionsServiceError>;
 
     /// Deletes the product list with the given id.
     ///
@@ -118,13 +115,11 @@ pub mod stub {
             name: &str,
         ) -> Result<CollectionEntry, CollectionsServiceError> {
             match self.mode {
-                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => {
-                    Ok(CollectionEntry {
-                        id: 1,
-                        name: Arc::from(name),
-                        member_ids: Arc::from(&[][..]),
-                    })
-                }
+                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(CollectionEntry {
+                    id: 1,
+                    name: Arc::from(name),
+                    member_ids: Arc::from(&[][..]),
+                }),
                 CollectionsStubMode::Error => Err(CollectionsServiceError::new(
                     CollectionsServiceErrorKind::Session,
                     "stub: simulated session error",

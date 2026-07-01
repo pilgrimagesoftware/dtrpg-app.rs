@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
-use crate::data::library::LibraryItem;
 use crate::data::constants::{CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, CATALOG_CACHE_TMP};
+use crate::data::library::LibraryItem;
 
 /// 7 days in seconds — caches older than this are considered stale.
 const STALE_SECS: u64 = 7 * 24 * 60 * 60;
@@ -59,7 +59,10 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
         .duration_since(UNIX_EPOCH)
         .unwrap_or(Duration::ZERO)
         .as_secs();
-    let meta = CacheMetadata { saved_at_secs, item_count };
+    let meta = CacheMetadata {
+        saved_at_secs,
+        item_count,
+    };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
@@ -119,9 +122,9 @@ pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), Cata
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
     use crate::data::enums::ItemStatus;
     use crate::data::library::LibraryItem;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_dir(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!("dtrpg_cache_test_{name}"))
