@@ -5,6 +5,10 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{App, ElementId, Entity, IntoElement, Window, div, px};
+use gpui_component::IconName;
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_component::input::{Input, InputState};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarFooter, SidebarHeader, SidebarItem, SidebarMenu,
     SidebarMenuItem,
@@ -75,6 +79,7 @@ pub fn render_sidebar(
     activity_in_progress: usize,
     activity_recent_count: usize,
     activity_recent_error_count: usize,
+    collection_name_input: Entity<InputState>,
 ) -> impl IntoElement + 'static {
     let active = filter.clone();
 
@@ -126,22 +131,21 @@ pub fn render_sidebar(
             .children(pub_children),
     );
 
-    // ── Sidebar assembly ──────────────────────────────────────────────────────
+    // ── Sidebar assembly (collections before publishers) ──────────────────────
     let mut sidebar_builder = Sidebar::new("sidebar")
         .collapsible(SidebarCollapsible::None)
         .side(Side::Left)
         .w(px(250.))
         .header(build_header())
         .child(SidebarContent::Menu(Box::new(lib_menu)))
-        .child(SidebarContent::Separator)
-        .child(SidebarContent::Menu(Box::new(pub_menu)));
+        .child(SidebarContent::Separator);
 
     // ── Collections menu (always present) ────────────────────────────────────
     let col_children: Vec<SidebarMenuItem> = collections
         .into_iter()
         .map(|c| {
-            let is_active = active == SidebarFilter::Collection(c.id);
-            let f = SidebarFilter::Collection(c.id);
+            let is_active = matches!(&active, SidebarFilter::Collection(id, _) if *id == c.id);
+            let f = SidebarFilter::Collection(c.id, Arc::clone(&c.name));
             let count = c
                 .member_ids
                 .iter()
@@ -155,12 +159,68 @@ pub fn render_sidebar(
         SidebarMenuItem::new("Collections")
             .click_to_toggle(true)
             .default_open(true)
+            .suffix({
+                let input = collection_name_input.clone();
+                let ctrl = entity.clone();
+                move |_window, cx| {
+                    let input = input.clone();
+                    let ctrl = ctrl.clone();
+                    Dialog::new(cx)
+                        .trigger(
+                            Button::new("add-collection")
+                                .ghost()
+                                .compact()
+                                .icon(IconName::Plus),
+                        )
+                        .w(px(320.))
+                        .close_button(false)
+                        .overlay_closable(true)
+                        .button_props(
+                            DialogButtonProps::default()
+                                .ok_text("Create")
+                                .show_cancel(true)
+                                .cancel_text("Cancel"),
+                        )
+                        .on_ok({
+                            let input = input.clone();
+                            let ctrl = ctrl.clone();
+                            move |_, _, cx| {
+                                let name = input.read(cx).value().trim().to_string();
+                                if name.is_empty() {
+                                    return false;
+                                }
+                                ctrl.update(cx, |c, cx| c.create_collection(name, cx));
+                                true
+                            }
+                        })
+                        .on_cancel(|_, _, _| true)
+                        .content({
+                            let input = collection_name_input.clone();
+                            move |content, _, _| {
+                                content
+                                    .child(
+                                        DialogHeader::new()
+                                            .px_4()
+                                            .pt_4()
+                                            .child(DialogTitle::new().child("New Collection")),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_4()
+                                            .py_2()
+                                            .child(Input::new(&input)),
+                                    )
+                            }
+                        })
+                }
+            })
             .children(col_children),
     );
 
     sidebar_builder = sidebar_builder
+        .child(SidebarContent::Menu(Box::new(col_menu)))
         .child(SidebarContent::Separator)
-        .child(SidebarContent::Menu(Box::new(col_menu)));
+        .child(SidebarContent::Menu(Box::new(pub_menu)));
 
     sidebar_builder.footer(build_footer(
         total_count,
@@ -175,7 +235,9 @@ pub fn render_sidebar(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn build_header() -> SidebarHeader {
-    SidebarHeader::new().child(
+    // Remove the default SidebarHeader top padding so the wordmark aligns with
+    // the macOS traffic lights (the Sidebar wrapper already adds pt_3 = 12px).
+    SidebarHeader::new().pt_0().child(
         div()
             .text_xl()
             .font_weight(gpui::FontWeight::SEMIBOLD)

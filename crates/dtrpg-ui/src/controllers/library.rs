@@ -2,6 +2,7 @@
 
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_catalog_cache, save_catalog_cache};
+use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
 use crate::data::collection::CollectionEntry;
 use crate::data::enums::*;
 use crate::data::events::*;
@@ -158,6 +159,18 @@ impl LibraryController {
 
         cx.spawn(async move |this, async_cx| {
             // ── Pre-populate from disk cache ──────────────────────────────────
+            let col_cache_root = storage_root.clone();
+            let cached_collections = async_cx
+                .background_executor()
+                .spawn(async move { load_collections_cache(&col_cache_root) })
+                .await;
+            if let Some(entries) = cached_collections {
+                this.update(async_cx, |ctrl, cx| {
+                    ctrl.apply_collections(entries, cx);
+                })
+                .ok();
+            }
+
             let cache_root = storage_root.clone();
             let cached = async_cx
                 .background_executor()
@@ -240,7 +253,6 @@ impl LibraryController {
                 Ok(()) => {
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.set_catalog(live_items, cx);
-                        ctrl.load_collections(cx);
                     }).ok();
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
@@ -298,6 +310,8 @@ impl LibraryController {
     /// Spawns a background task to fetch product lists from the API and apply them.
     fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
+        let storage_cfg = StorageConfig::load();
+        let cache_root = storage_cfg.metadata_path();
         cx.spawn(async move |this, async_cx| {
             let result = async_cx
                 .background_executor()
@@ -305,6 +319,16 @@ impl LibraryController {
                 .await;
             match result {
                 Ok(entries) => {
+                    let to_save = entries.clone();
+                    let save_root = cache_root.clone();
+                    async_cx
+                        .background_executor()
+                        .spawn(async move {
+                            if let Err(e) = save_collections_cache(&save_root, &to_save) {
+                                tracing::warn!(error = %e, "failed to save collections cache");
+                            }
+                        })
+                        .await;
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.apply_collections(entries, cx);
                     })
@@ -349,7 +373,51 @@ impl LibraryController {
         self.selection = Selection::default();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
+        // Load collections concurrently with the catalog — don't wait for the
+        // full catalog fetch to complete before showing collection names.
+        self.load_collections(cx);
         self.start_load(cx);
+    }
+
+    /// Starts a background task to create a new collection with the given name.
+    ///
+    /// Tracks progress in the activity panel. On success the new entry is appended
+    /// and [`LibraryChanged`] is emitted. On failure [`CollectionCreateFailed`] is
+    /// emitted so the window can push an error notification.
+    pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
+        let label = format!("Creating collection '{name}'...");
+        let activity_id = self
+            .activity
+            .update(cx, |a, cx| a.start(&label, None, cx));
+
+        let collections_service = Arc::clone(&self.collections_service);
+        cx.spawn(async move |this, async_cx| {
+            let result = async_cx
+                .background_executor()
+                .spawn(async move { collections_service.create_collection(&name) })
+                .await;
+
+            match result {
+                Ok(entry) => {
+                    this.update(async_cx, |ctrl, cx| {
+                        ctrl.collections.push(entry);
+                        ctrl.activity.update(cx, |a, cx| a.complete(activity_id, cx));
+                        cx.emit(LibraryChanged);
+                    })
+                    .ok();
+                }
+                Err(e) => {
+                    this.update(async_cx, |ctrl, cx| {
+                        ctrl.activity.update(cx, |a, cx| {
+                            a.error(activity_id, e.to_string(), cx);
+                        });
+                        cx.emit(CollectionCreateFailed { message: e.message.clone() });
+                    })
+                    .ok();
+                }
+            }
+        })
+        .detach();
     }
 
     /// Reloads catalog from the service and resets selection.
@@ -505,7 +573,13 @@ impl LibraryController {
             .take(self.page_size)
             .collect();
         let selected_item = self.selected_item().cloned();
-        let catalog_ids: HashSet<u64> = self.catalog.iter().map(|i| i.numeric_id).collect();
+        // Exclude 0 values (unset / pre-cache items that lack order_product_id).
+        let catalog_ids: HashSet<u64> = self
+            .catalog
+            .iter()
+            .filter(|i| i.order_product_id > 0)
+            .map(|i| i.order_product_id)
+            .collect();
         LibrarySnapshot {
             filter: self.filter.clone(),
             counts: self.section_counts,
@@ -629,10 +703,10 @@ impl LibraryController {
 
     /// Sets the active sidebar filter.
     ///
-    /// When the new filter is `Collection(id)`, `collection_members` is populated from the
+    /// When the new filter is `Collection(id, _)`, `collection_members` is populated from the
     /// matching entry's `member_ids`. For all other filters, `collection_members` is cleared.
     pub fn set_filter(&mut self, filter: SidebarFilter, cx: &mut Context<Self>) {
-        if let SidebarFilter::Collection(id) = &filter {
+        if let SidebarFilter::Collection(id, _) = &filter {
             self.collection_members = self
                 .collections
                 .iter()

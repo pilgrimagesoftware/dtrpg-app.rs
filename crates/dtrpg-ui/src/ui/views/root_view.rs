@@ -26,8 +26,9 @@ use crate::{
     data::{
         auth_state::AuthState,
         events::{
-            ActivityChanged, AuthStateChanged, DownloadComplete, DownloadError, LibraryChanged,
-            LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
+            ActivityChanged, AuthStateChanged, CollectionCreateFailed, DownloadComplete,
+            DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded,
+            StartupAuthBegun, StartupAuthFailed,
         },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
@@ -58,6 +59,8 @@ pub struct LibraryRootView {
     settings_focus: FocusHandle,
     /// Editable search input wired to the library controller's search query.
     search_input: Entity<InputState>,
+    /// Draft name input for the "Create Collection" dialog.
+    collection_name_input: Entity<InputState>,
 }
 
 impl LibraryRootView {
@@ -159,6 +162,24 @@ impl LibraryRootView {
                         ctrl.set_search_query(value, cx);
                     });
                 }
+            },
+        )
+        .detach();
+
+        let collection_name_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Collection name\u{2026}"));
+
+        cx.subscribe_in(
+            &controller,
+            window,
+            |_this, _ctrl, event: &CollectionCreateFailed, window, cx| {
+                window.push_notification(
+                    Notification::new()
+                        .message(event.message.clone())
+                        .with_type(NotificationType::Error)
+                        .autohide(false),
+                    cx,
+                );
             },
         )
         .detach();
@@ -313,6 +334,7 @@ impl LibraryRootView {
             root_focus,
             settings_focus,
             search_input,
+            collection_name_input,
         }
     }
 }
@@ -387,6 +409,7 @@ impl Render for LibraryRootView {
             activity_snap.in_progress_count,
             activity_snap.recent_count,
             activity_snap.recent_error_count,
+            self.collection_name_input.clone(),
         );
         let toolbar = render_toolbar(
             &filter,

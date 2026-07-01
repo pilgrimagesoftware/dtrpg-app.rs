@@ -11,8 +11,8 @@ use crate::util::filter::SidebarFilter;
 
 /// Returns `true` if `item` passes the given sidebar filter.
 ///
-/// For `Collection` filters, `collection_members` must contain the set of numeric product IDs
-/// belonging to the active collection; the item passes if its `numeric_id` is in the set.
+/// For `Collection` filters, `collection_members` must contain the set of `order_product_id`
+/// values belonging to the active collection; the item passes if its `order_product_id` matches.
 #[must_use]
 pub fn item_matches_filter(
     item: &LibraryItem,
@@ -25,7 +25,10 @@ pub fn item_matches_filter(
         SidebarFilter::OnDevice => item.status == ItemStatus::Downloaded,
         SidebarFilter::InCloud => item.status == ItemStatus::Cloud,
         SidebarFilter::Publisher(name) => item.publisher.as_ref() == name.as_ref(),
-        SidebarFilter::Collection(_) => collection_members.contains(&item.numeric_id),
+        SidebarFilter::Collection(_, _) => {
+            item.order_product_id > 0
+                && collection_members.contains(&item.order_product_id)
+        }
     }
 }
 

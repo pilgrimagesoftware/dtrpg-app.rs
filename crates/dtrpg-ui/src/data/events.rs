@@ -79,6 +79,18 @@ pub struct StartupAuthBegun;
 
 impl EventEmitter<StartupAuthBegun> for SettingsController {}
 
+// ── CollectionCreateFailed ────────────────────────────────────────────────────
+
+/// Emitted by `LibraryController` when a background collection create call fails.
+///
+/// The receiver should push an error `Notification` to the window.
+pub struct CollectionCreateFailed {
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl EventEmitter<CollectionCreateFailed> for LibraryController {}
+
 // ── StartupAuthFailed ─────────────────────────────────────────────────────────
 
 /// Emitted by `SettingsController` when background startup re-authentication fails.

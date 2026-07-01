@@ -48,6 +48,18 @@ pub trait CollectionsService: Send + Sync + 'static {
     ///
     /// Returns a [`CollectionsServiceError`] if the request fails or the session is invalid.
     fn list_collections(&self) -> Result<Vec<CollectionEntry>, CollectionsServiceError>;
+
+    /// Creates a new product list with the given name.
+    ///
+    /// Returns the newly created [`CollectionEntry`] with an empty `member_ids` slice.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CollectionsServiceError`] if the request fails or the session is invalid.
+    fn create_collection(
+        &self,
+        name: &str,
+    ) -> Result<CollectionEntry, CollectionsServiceError>;
 }
 
 #[cfg(test)]
@@ -87,6 +99,25 @@ pub mod stub {
                     member_ids: Arc::from([42u64, 99u64]),
                 }]),
                 CollectionsStubMode::Empty => Ok(vec![]),
+                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
+                    CollectionsServiceErrorKind::Session,
+                    "stub: simulated session error",
+                )),
+            }
+        }
+
+        fn create_collection(
+            &self,
+            name: &str,
+        ) -> Result<CollectionEntry, CollectionsServiceError> {
+            match self.mode {
+                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => {
+                    Ok(CollectionEntry {
+                        id: 1,
+                        name: Arc::from(name),
+                        member_ids: Arc::from(&[][..]),
+                    })
+                }
                 CollectionsStubMode::Error => Err(CollectionsServiceError::new(
                     CollectionsServiceErrorKind::Session,
                     "stub: simulated session error",

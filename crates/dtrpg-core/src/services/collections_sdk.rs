@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
-    PageParams, ProductListCollectionResponse, ProductListItemsResponse, SdkError,
+    PageParams, ProductListCollectionResponse, ProductListItem, ProductListItemsResponse, SdkError,
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -47,6 +47,16 @@ pub trait SdkCollectionsGateway: Send + Sync {
         product_list_id: u64,
         page: u32,
     ) -> Result<ProductListItemsResponse, CollectionsServiceError>;
+
+    /// Creates a new product list with the given name and returns it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CollectionsServiceError`] on network or session failures.
+    fn create_product_list(
+        &self,
+        name: &str,
+    ) -> Result<ProductListItem, CollectionsServiceError>;
 }
 
 // ── Service implementation ────────────────────────────────────────────────────
@@ -156,6 +166,18 @@ impl CollectionsService for RustSdkCollectionsService {
         }
 
         Ok(entries)
+    }
+
+    fn create_collection(
+        &self,
+        name: &str,
+    ) -> Result<CollectionEntry, CollectionsServiceError> {
+        let item = self.gateway.create_product_list(name.trim())?;
+        Ok(CollectionEntry {
+            id: item.attributes.product_list_id,
+            name: Arc::from(item.attributes.name.as_str()),
+            member_ids: Arc::from(&[][..]),
+        })
     }
 }
 
@@ -276,6 +298,15 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
             ))
             .map_err(map_client_error)
     }
+
+    fn create_product_list(
+        &self,
+        name: &str,
+    ) -> Result<ProductListItem, CollectionsServiceError> {
+        self.runtime
+            .block_on(self.client.create_product_list(name))
+            .map_err(map_client_error)
+    }
 }
 
 // ── Unavailable gateway ───────────────────────────────────────────────────────
@@ -308,6 +339,13 @@ impl SdkCollectionsGateway for UnavailableCollectionsGateway {
         _product_list_id: u64,
         _page: u32,
     ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+        Err(self.error.clone())
+    }
+
+    fn create_product_list(
+        &self,
+        _name: &str,
+    ) -> Result<ProductListItem, CollectionsServiceError> {
         Err(self.error.clone())
     }
 }
@@ -394,6 +432,7 @@ mod tests {
     struct FakeCollectionsGateway {
         lists: Result<Vec<ProductListItem>, CollectionsServiceError>,
         items: Result<Vec<serde_json::Value>, CollectionsServiceError>,
+        create_result: Result<ProductListItem, CollectionsServiceError>,
     }
 
     impl FakeCollectionsGateway {
@@ -404,6 +443,7 @@ mod tests {
                     json!({ "orderProductId": 42 }),
                     json!({ "orderProductId": 99 }),
                 ]),
+                create_result: Ok(product_list_item(8, "New List")),
             }
         }
 
@@ -414,7 +454,8 @@ mod tests {
             );
             Self {
                 lists: Err(err.clone()),
-                items: Err(err),
+                items: Err(err.clone()),
+                create_result: Err(err),
             }
         }
 
@@ -426,6 +467,7 @@ mod tests {
                     json!({ "someOtherField": "abc" }),
                     json!({ "orderProductId": 99 }),
                 ]),
+                create_result: Ok(product_list_item(8, "New List")),
             }
         }
     }
@@ -452,6 +494,13 @@ mod tests {
                 meta: PaginationMeta { items_per_page: 100, current_page: 1 },
                 data,
             })
+        }
+
+        fn create_product_list(
+            &self,
+            _name: &str,
+        ) -> Result<ProductListItem, CollectionsServiceError> {
+            self.create_result.clone()
         }
     }
 
@@ -484,5 +533,23 @@ mod tests {
         assert_eq!(collections.len(), 1);
         let member_ids = &collections[0].member_ids;
         assert_eq!(member_ids.as_ref(), &[42u64, 99u64]);
+    }
+
+    #[test]
+    fn create_collection_returns_correct_entry() {
+        let service = RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
+        let entry = service.create_collection("New List").expect("create collection");
+
+        assert_eq!(entry.id, 8);
+        assert_eq!(entry.name.as_ref(), "New List");
+        assert!(entry.member_ids.is_empty());
+    }
+
+    #[test]
+    fn create_collection_propagates_session_error() {
+        let service =
+            RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
+        let err = service.create_collection("Anything").expect_err("session error");
+        assert_eq!(err.kind, CollectionsServiceErrorKind::Session);
     }
 }
