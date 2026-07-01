@@ -1,25 +1,7 @@
 //! Formatting helpers for timestamps in the detail panel.
 
 use std::time::{SystemTime, UNIX_EPOCH};
-
-const MONTH_NAMES: [&str; 12] = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
-
-const MONTH_ABBRS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+use crate::data::constants::{MONTH_ABBRS, MONTH_NAMES};
 
 /// Returns the current Unix timestamp in seconds.
 fn now_secs() -> i64 {

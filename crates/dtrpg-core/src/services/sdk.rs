@@ -16,14 +16,7 @@ use dtrpg_ui::{
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
 };
 
-const APPLICATION_KEY_ENV: &str = "DTRPG_APPLICATION_KEY";
-const ACCESS_TOKEN_ENV: &str = "DTRPG_ACCESS_TOKEN";
-const REFRESH_TOKEN_ENV: &str = "DTRPG_REFRESH_TOKEN";
-const REFRESH_TOKEN_TTL_ENV: &str = "DTRPG_REFRESH_TOKEN_TTL";
-const API_BASE_URL_ENV: &str = "DTRPG_API_BASE_URL";
-
-const DEFAULT_COLOR: &str = "#2E3A45";
-const BYTES_PER_MB: f64 = 1_048_576.0;
+use crate::constants::{DEFAULT_COLOR, APPLICATION_KEY_ENV, ACCESS_TOKEN_ENV, REFRESH_TOKEN_ENV, REFRESH_TOKEN_TTL_ENV, API_BASE_URL_ENV, BYTES_PER_MB};
 
 /// SDK operation boundary used by the Rust library service adapter.
 pub trait SdkLibraryGateway: Send + Sync {

@@ -16,12 +16,7 @@ use dtrpg_ui::{
         collections::{CollectionsService, CollectionsServiceError, CollectionsServiceErrorKind},
     },
 };
-
-const APPLICATION_KEY_ENV: &str = "DTRPG_APPLICATION_KEY";
-const ACCESS_TOKEN_ENV: &str = "DTRPG_ACCESS_TOKEN";
-const REFRESH_TOKEN_ENV: &str = "DTRPG_REFRESH_TOKEN";
-const REFRESH_TOKEN_TTL_ENV: &str = "DTRPG_REFRESH_TOKEN_TTL";
-const API_BASE_URL_ENV: &str = "DTRPG_API_BASE_URL";
+use crate::constants::{APPLICATION_KEY_ENV, ACCESS_TOKEN_ENV, REFRESH_TOKEN_ENV, REFRESH_TOKEN_TTL_ENV, API_BASE_URL_ENV};
 
 // ── Gateway trait ─────────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ use dtrpg_sdk::{auth_client, config::Config};
 
 use dtrpg_ui::services::{LoginError, LoginService, LoginTokens};
 
-const API_BASE_URL_ENV: &str = "DTRPG_API_BASE_URL";
+use crate::constants::{API_BASE_URL_ENV};
 
 /// [`LoginService`] implementation backed by the DriveThruRPG SDK auth endpoint.
 pub struct SdkLoginService {
