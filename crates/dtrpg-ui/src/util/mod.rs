@@ -1,6 +1,7 @@
 pub mod datetime;
 pub mod filter;
 pub mod init;
+pub mod item_opener;
 pub mod matching;
 pub mod pluralize;
 pub mod publisher;

@@ -55,3 +55,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 rust-i18n = "3"
 sys-locale = "0.3"
+open = "5"

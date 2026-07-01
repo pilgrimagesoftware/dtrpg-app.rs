@@ -69,7 +69,7 @@ fn list_columns() -> Vec<Column> {
             .width(24.)
             .resizable(false)
             .selectable(false),
-        Column::new("reveal", "")
+        Column::new("open", "")
             .width(28.)
             .resizable(false)
             .selectable(false),
@@ -207,16 +207,47 @@ impl TableDelegate for CatalogListDelegate {
                 let item_path = self.storage_root.join("items").join(&*id);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
+                let item_path_open = item_path.clone();
+                let item_path_reveal = item_path.clone();
                 menu.item(
-                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                        if !item_path.exists() {
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
+                        use crate::util::item_opener::{ItemOpener, OpenError};
+
+                        if !item_path_open.exists() {
                             tracing::warn!(
-                                path = %item_path.display(),
+                                path = %item_path_open.display(),
+                                "open: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = ItemOpener::open(&item_path_open) {
+                            match e {
+                                OpenError::FileNotFound(path) => {
+                                    tracing::warn!("open: file not found: {path}");
+                                }
+                                OpenError::NoDefaultApp => {
+                                    tracing::warn!("open: no default application configured");
+                                }
+                                OpenError::OsFailed(msg) => {
+                                    tracing::warn!("open: OS failed: {msg}");
+                                }
+                                OpenError::MultipleFilesRequireSelection => {
+                                    tracing::warn!("open: multiple files require selection");
+                                }
+                            }
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                        if !item_path_reveal.exists() {
+                            tracing::warn!(
+                                path = %item_path_reveal.display(),
                                 "reveal: file not found"
                             );
                             return;
                         }
-                        if let Err(e) = reveal_in_file_manager(&item_path) {
+                        if let Err(e) = reveal_in_file_manager(&item_path_reveal) {
                             tracing::warn!("reveal_in_file_manager failed: {e}");
                         }
                     }),
@@ -338,28 +369,43 @@ impl TableDelegate for CatalogListDelegate {
 
             7 => {
                 if item.status == ItemStatus::Downloaded {
-                    let item_reveal_path = self.storage_root.join("items").join(&*item.id);
-                    let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-row-{}", &*item.id));
+                    let item_open_path = self.storage_root.join("items").join(&*item.id);
+                    let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
                     div()
-                        .id(reveal_elem_id)
+                        .id(open_elem_id)
                         .h_full()
                         .flex()
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
                         .on_click(move |_, _, _| {
-                            if !item_reveal_path.exists() {
+                            use crate::util::item_opener::{ItemOpener, OpenError};
+
+                            if !item_open_path.exists() {
                                 tracing::warn!(
-                                    path = %item_reveal_path.display(),
-                                    "reveal: file not found — item may need re-download"
+                                    path = %item_open_path.display(),
+                                    "open: file not found — item may need re-download"
                                 );
                                 return;
                             }
-                            if let Err(e) = reveal_in_file_manager(&item_reveal_path) {
-                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            if let Err(e) = ItemOpener::open(&item_open_path) {
+                                match e {
+                                    OpenError::FileNotFound(path) => {
+                                        tracing::warn!("open: file not found: {path}");
+                                    }
+                                    OpenError::NoDefaultApp => {
+                                        tracing::warn!("open: no default application configured");
+                                    }
+                                    OpenError::OsFailed(msg) => {
+                                        tracing::warn!("open: OS failed: {msg}");
+                                    }
+                                    OpenError::MultipleFilesRequireSelection => {
+                                        tracing::warn!("open: multiple files require selection");
+                                    }
+                                }
                             }
                         })
-                        .child(div().text_xs().text_color(colors.text_tertiary).child("↗"))
+                        .child(div().text_xs().text_color(colors.text_tertiary).child("▶"))
                         .into_any_element()
                 } else {
                     div().h_full().into_any_element()
@@ -1102,10 +1148,40 @@ fn render_grouped_list_row(
         )
         .context_menu(move |menu, _, _| match status {
             ItemStatus::Downloaded => {
+                let open_path = ctx_path.clone();
                 let reveal_path = ctx_path.clone();
                 let remove_id = Arc::clone(&ctx_id);
                 let entity_remove = ctx_entity.clone();
                 menu.item(
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
+                        use crate::util::item_opener::{ItemOpener, OpenError};
+
+                        if !open_path.exists() {
+                            tracing::warn!(
+                                path = %open_path.display(),
+                                "open: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = ItemOpener::open(&open_path) {
+                            match e {
+                                OpenError::FileNotFound(path) => {
+                                    tracing::warn!("open: file not found: {path}");
+                                }
+                                OpenError::NoDefaultApp => {
+                                    tracing::warn!("open: no default application configured");
+                                }
+                                OpenError::OsFailed(msg) => {
+                                    tracing::warn!("open: OS failed: {msg}");
+                                }
+                                OpenError::MultipleFilesRequireSelection => {
+                                    tracing::warn!("open: multiple files require selection");
+                                }
+                            }
+                        }
+                    }),
+                )
+                .item(
                     PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
                         if !reveal_path.exists() {
                             tracing::warn!(
@@ -1249,10 +1325,40 @@ fn render_thumb_row(
         .child(ctx_menu)
         .context_menu(move |menu, _, _| match status {
             ItemStatus::Downloaded => {
+                let open_path = ctx_path.clone();
                 let reveal_path = ctx_path.clone();
                 let remove_id = Arc::clone(&ctx_id);
                 let entity_remove = ctx_entity.clone();
                 menu.item(
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
+                        use crate::util::item_opener::{ItemOpener, OpenError};
+
+                        if !open_path.exists() {
+                            tracing::warn!(
+                                path = %open_path.display(),
+                                "open: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = ItemOpener::open(&open_path) {
+                            match e {
+                                OpenError::FileNotFound(path) => {
+                                    tracing::warn!("open: file not found: {path}");
+                                }
+                                OpenError::NoDefaultApp => {
+                                    tracing::warn!("open: no default application configured");
+                                }
+                                OpenError::OsFailed(msg) => {
+                                    tracing::warn!("open: OS failed: {msg}");
+                                }
+                                OpenError::MultipleFilesRequireSelection => {
+                                    tracing::warn!("open: multiple files require selection");
+                                }
+                            }
+                        }
+                    }),
+                )
+                .item(
                     PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
                         if !reveal_path.exists() {
                             tracing::warn!(
@@ -1439,10 +1545,40 @@ fn render_grid_card(
         )
         .context_menu(move |menu, _, _| match status {
             ItemStatus::Downloaded => {
+                let open_path = ctx_path.clone();
                 let reveal_path = ctx_path.clone();
                 let remove_id = Arc::clone(&ctx_id);
                 let entity_remove = ctx_entity.clone();
                 menu.item(
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
+                        use crate::util::item_opener::{ItemOpener, OpenError};
+
+                        if !open_path.exists() {
+                            tracing::warn!(
+                                path = %open_path.display(),
+                                "open: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = ItemOpener::open(&open_path) {
+                            match e {
+                                OpenError::FileNotFound(path) => {
+                                    tracing::warn!("open: file not found: {path}");
+                                }
+                                OpenError::NoDefaultApp => {
+                                    tracing::warn!("open: no default application configured");
+                                }
+                                OpenError::OsFailed(msg) => {
+                                    tracing::warn!("open: OS failed: {msg}");
+                                }
+                                OpenError::MultipleFilesRequireSelection => {
+                                    tracing::warn!("open: multiple files require selection");
+                                }
+                            }
+                        }
+                    }),
+                )
+                .item(
                     PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
                         if !reveal_path.exists() {
                             tracing::warn!(

@@ -47,6 +47,7 @@ pub fn render_detail_panel(
     let entity_download = entity.clone();
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
+    let read_item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
 
     div()
@@ -142,7 +143,8 @@ pub fn render_detail_panel(
                         .flex()
                         .flex_col()
                         .gap(px(8.0))
-                        .child(
+                        .child({
+                            let read_path = storage_root_path.join("items").join(read_item_id.as_ref());
                             Button::new("detail-read")
                                 .primary()
                                 .label(t!("detail.read_button"))
@@ -150,8 +152,37 @@ pub fn render_detail_panel(
                                 .disabled(!is_downloaded)
                                 .when(!is_downloaded, |b| {
                                     b.tooltip(t!("detail.tooltip_download_first"))
-                                }),
-                        )
+                                })
+                                .when(is_downloaded, |b| {
+                                    b.on_click(move |_, _, _| {
+                                        use crate::util::item_opener::{ItemOpener, OpenError};
+
+                                        if !read_path.exists() {
+                                            tracing::warn!(
+                                                path = %read_path.display(),
+                                                "open: file not found — item may need re-download"
+                                            );
+                                            return;
+                                        }
+                                        if let Err(e) = ItemOpener::open(&read_path) {
+                                            match e {
+                                                OpenError::FileNotFound(path) => {
+                                                    tracing::warn!("open: file not found: {path}");
+                                                }
+                                                OpenError::NoDefaultApp => {
+                                                    tracing::warn!("open: no default application configured");
+                                                }
+                                                OpenError::OsFailed(msg) => {
+                                                    tracing::warn!("open: OS failed: {msg}");
+                                                }
+                                                OpenError::MultipleFilesRequireSelection => {
+                                                    tracing::warn!("open: multiple files require selection");
+                                                }
+                                            }
+                                        }
+                                    })
+                                })
+                        })
                         .child(
                             Button::new("detail-download")
                                 .ghost()
