@@ -1,10 +1,8 @@
 //! User profile config: optional email address persisted for avatar lookup.
 
 use std::path::PathBuf;
-
 use serde::{Deserialize, Serialize};
-
-const APP_NAME: &str = "dtrpg";
+use crate::data::constants::APP_NAME;
 
 #[derive(Serialize, Deserialize, Default)]
 struct ProfileConfigFile {

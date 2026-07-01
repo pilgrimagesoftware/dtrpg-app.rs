@@ -1,10 +1,8 @@
 //! Storage configuration: root path preference and per-item path derivation.
 
 use std::path::{Path, PathBuf};
-
 use serde::{Deserialize, Serialize};
-
-const APP_NAME: &str = "dtrpg";
+use crate::data::constants::APP_NAME;
 
 // ── StorageError ──────────────────────────────────────────────────────────────
 

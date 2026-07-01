@@ -21,3 +21,11 @@ pub const MONTH_NAMES: [&str; 12] = [
 pub const MONTH_ABBRS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+
+pub const APP_NAME: &str = "dtrpg";
+
+pub const COLLECTIONS_CACHE_FILE: &str = "collections_cache.json";
+pub const COLLECTIONS_CACHE_TMP: &str = "collections_cache.json.tmp";
+pub const CATALOG_CACHE_FILE: &str = "catalog_cache.json";
+pub const CATALOG_CACHE_TMP: &str = "catalog_cache.json.tmp";
+pub const AVATAR_CACHE_FILE: &str = "avatar";

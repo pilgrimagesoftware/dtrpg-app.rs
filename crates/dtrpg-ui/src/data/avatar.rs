@@ -2,12 +2,11 @@
 
 use std::path::PathBuf;
 use std::time::Duration;
-
-const APP_NAME: &str = "dtrpg";
-const CACHE_FILE: &str = "avatar";
+use crate::data::constants::AVATAR_CACHE_FILE;
+use crate::data::constants::APP_NAME;
 
 fn avatar_cache_path() -> Option<PathBuf> {
-    dirs::cache_dir().map(|d| d.join(APP_NAME).join(CACHE_FILE))
+    dirs::cache_dir().map(|d| d.join(APP_NAME).join(AVATAR_CACHE_FILE))
 }
 
 fn load_cached_avatar() -> Option<Vec<u8>> {

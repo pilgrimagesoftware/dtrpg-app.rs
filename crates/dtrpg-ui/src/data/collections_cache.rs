@@ -7,9 +7,7 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::data::collection::CollectionEntry;
-
-const CACHE_FILE: &str = "collections_cache.json";
-const CACHE_TMP: &str = "collections_cache.json.tmp";
+use crate::data::constants::{COLLECTIONS_CACHE_FILE, COLLECTIONS_CACHE_TMP};
 
 // ── CollectionsCacheError ─────────────────────────────────────────────────────
 
@@ -31,7 +29,7 @@ pub enum CollectionsCacheError {
 /// Returns `None` on any error (missing file, malformed JSON) so callers
 /// can fall through to the live API fetch without surfacing errors to the user.
 pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
-    let path = root.join(CACHE_FILE);
+    let path = root.join(COLLECTIONS_CACHE_FILE);
     let text = fs::read_to_string(&path)
         .map_err(|e| warn!(path = %path.display(), error = %e, "collections cache not readable"))
         .ok()?;
@@ -54,10 +52,10 @@ pub fn save_collections_cache(
     entries: &[CollectionEntry],
 ) -> Result<(), CollectionsCacheError> {
     fs::create_dir_all(root)?;
-    let tmp = root.join(CACHE_TMP);
+    let tmp = root.join(COLLECTIONS_CACHE_TMP);
     let json = serde_json::to_string(entries)?;
     fs::write(&tmp, &json)?;
-    fs::rename(&tmp, root.join(CACHE_FILE))?;
+    fs::rename(&tmp, root.join(COLLECTIONS_CACHE_FILE))?;
     Ok(())
 }
 
@@ -91,7 +89,7 @@ mod tests {
     fn load_malformed_json_returns_none() {
         let dir = test_dir("malformed");
         fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join(CACHE_FILE), b"not valid json { ").unwrap();
+        fs::write(dir.join(COLLECTIONS_CACHE_FILE), b"not valid json { ").unwrap();
         let result = load_collections_cache(&dir);
         let _ = fs::remove_dir_all(&dir);
         assert!(result.is_none());

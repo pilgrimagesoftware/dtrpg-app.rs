@@ -1,8 +1,7 @@
 //! Lightweight UI preference storage: panel widths and other layout state.
 
 use serde::{Deserialize, Serialize};
-
-const APP_NAME: &str = "dtrpg";
+use crate::data::constants::APP_NAME;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UiPrefsFile {
