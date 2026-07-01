@@ -1,4 +1,6 @@
-//! Data model, filtering, sorting, and stub catalog for the Libri library view.
+//! Item filtering and text matching predicates.
+
+use std::collections::HashSet;
 
 use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
 use crate::data::enums::ItemStatus;
@@ -8,17 +10,22 @@ use crate::util::filter::SidebarFilter;
 // ── Matching functions ─────────────────────────────────────────────────────────────────
 
 /// Returns `true` if `item` passes the given sidebar filter.
+///
+/// For `Collection` filters, `collection_members` must contain the set of numeric product IDs
+/// belonging to the active collection; the item passes if its `numeric_id` is in the set.
 #[must_use]
-pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter) -> bool {
+pub fn item_matches_filter(
+    item: &LibraryItem,
+    filter: &SidebarFilter,
+    collection_members: &HashSet<u64>,
+) -> bool {
     match filter {
         SidebarFilter::AllTitles => true,
         SidebarFilter::RecentlyAdded => item.added_order <= RECENTLY_ADDED_THRESHOLD,
         SidebarFilter::OnDevice => item.status == ItemStatus::Downloaded,
         SidebarFilter::InCloud => item.status == ItemStatus::Cloud,
         SidebarFilter::Publisher(name) => item.publisher.as_ref() == name.as_ref(),
-        // Collection filtering requires membership data not available here;
-        // handled inline in LibraryController::visible_items().
-        SidebarFilter::Collection(_) => false,
+        SidebarFilter::Collection(_) => collection_members.contains(&item.numeric_id),
     }
 }
 

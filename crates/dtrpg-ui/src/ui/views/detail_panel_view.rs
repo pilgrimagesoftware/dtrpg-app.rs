@@ -215,7 +215,7 @@ fn render_metadata_table(
         ItemStatus::Cloud => "In the cloud".into(),
     };
 
-    let mut list = DescriptionList::new()
+    let mut list = DescriptionList::vertical()
         .columns(1)
         .child(DescriptionItem::new("System").value(item.line.to_string()))
         .child(DescriptionItem::new("Category").value(item.kind.to_string()))

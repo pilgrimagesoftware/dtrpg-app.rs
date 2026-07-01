@@ -2,22 +2,17 @@
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
-use std::sync::Arc;
 
 use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
     LibraryItemsParams, OrderProductItem, OrderProductItemResponse, OrderProductListResponse,
-    PageParams, PaginationLinks, ProductListCollectionResponse, ProductListItemsResponse,
-    PublisherItem, SdkError,
+    PaginationLinks, PublisherItem, SdkError,
 };
 use tokio::runtime::{Builder, Runtime};
 
 use dtrpg_ui::{
     credentials::{CredentialStore, KeyringCredentialStore, keys},
-    data::{
-        enums::ItemStatus,
-        library::{LibraryCollection, LibraryItem},
-    },
+    data::{enums::ItemStatus, library::LibraryItem},
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
 };
 
@@ -49,22 +44,6 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// Returns [`LibraryServiceError`] on network, session, or not-found failures.
     fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError>;
 
-    /// Lists the user's DTRPG product lists.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LibraryServiceError`] on network or session failures.
-    fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError>;
-
-    /// Lists the items within a specific product list.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LibraryServiceError`] on network or session failures.
-    fn list_product_list_items(
-        &self,
-        product_list_id: u64,
-    ) -> Result<ProductListItemsResponse, LibraryServiceError>;
 }
 
 /// Library service adapter backed by the Rust SDK.
@@ -190,43 +169,6 @@ impl LibraryService for RustSdkLibraryService {
         Ok(map_order_product(&response.data, &HashMap::new(), 0))
     }
 
-    fn list_collections(
-        &self,
-    ) -> Result<(Vec<LibraryCollection>, HashMap<Arc<str>, HashSet<u64>>), LibraryServiceError>
-    {
-        let response = self.gateway.list_product_lists()?;
-        let mut collections = Vec::new();
-        let mut membership: HashMap<Arc<str>, HashSet<u64>> = HashMap::new();
-
-        for list in &response.data {
-            let name: Arc<str> = list.attributes.name.as_str().into();
-            let id = list.attributes.product_list_id;
-            let item_count = list.attributes.item_count as usize;
-
-            let items_response = match self.gateway.list_product_list_items(id) {
-                Ok(r) => r,
-                Err(e) => {
-                    tracing::warn!(collection_id = id, error = %e, "failed to fetch collection items, skipping");
-                    continue;
-                }
-            };
-
-            let product_ids: HashSet<u64> = items_response
-                .data
-                .iter()
-                .filter_map(|v| v["productId"].as_u64())
-                .collect();
-
-            collections.push(LibraryCollection {
-                id,
-                name: Arc::clone(&name),
-                item_count,
-            });
-            membership.insert(name, product_ids);
-        }
-
-        Ok((collections, membership))
-    }
 }
 
 struct HttpSdkLibraryGateway {
@@ -338,29 +280,6 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
             .map_err(map_client_error)
     }
 
-    fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
-        self.runtime
-            .block_on(self.client.list_product_lists(PageParams {
-                page: None,
-                page_size: None,
-            }))
-            .map_err(map_client_error)
-    }
-
-    fn list_product_list_items(
-        &self,
-        product_list_id: u64,
-    ) -> Result<ProductListItemsResponse, LibraryServiceError> {
-        self.runtime
-            .block_on(self.client.list_product_list_items(
-                product_list_id,
-                PageParams {
-                    page: None,
-                    page_size: None,
-                },
-            ))
-            .map_err(map_client_error)
-    }
 }
 
 struct UnavailableSdkGateway {
@@ -385,16 +304,6 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
         Err(self.error.clone())
     }
 
-    fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
-        Err(self.error.clone())
-    }
-
-    fn list_product_list_items(
-        &self,
-        _product_list_id: u64,
-    ) -> Result<ProductListItemsResponse, LibraryServiceError> {
-        Err(self.error.clone())
-    }
 }
 
 /// Extracts the last page number from a [`PaginationLinks`] `last` URL.
@@ -632,30 +541,6 @@ mod tests {
             self.detail_result.clone()
         }
 
-        fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
-            Ok(ProductListCollectionResponse {
-                data: vec![],
-                links: pagination_links(None),
-                meta: PaginationMeta {
-                    items_per_page: 100,
-                    current_page: 1,
-                },
-            })
-        }
-
-        fn list_product_list_items(
-            &self,
-            _product_list_id: u64,
-        ) -> Result<ProductListItemsResponse, LibraryServiceError> {
-            Ok(ProductListItemsResponse {
-                links: pagination_links(None),
-                meta: PaginationMeta {
-                    items_per_page: 100,
-                    current_page: 1,
-                },
-                data: vec![],
-            })
-        }
     }
 
     /// Returns pages in order: first call gets page 1 with a `next` link,
@@ -704,30 +589,6 @@ mod tests {
             ))
         }
 
-        fn list_product_lists(&self) -> Result<ProductListCollectionResponse, LibraryServiceError> {
-            Ok(ProductListCollectionResponse {
-                data: vec![],
-                links: pagination_links(None),
-                meta: PaginationMeta {
-                    items_per_page: 100,
-                    current_page: 1,
-                },
-            })
-        }
-
-        fn list_product_list_items(
-            &self,
-            _product_list_id: u64,
-        ) -> Result<ProductListItemsResponse, LibraryServiceError> {
-            Ok(ProductListItemsResponse {
-                links: pagination_links(None),
-                meta: PaginationMeta {
-                    items_per_page: 100,
-                    current_page: 1,
-                },
-                data: vec![],
-            })
-        }
     }
 
     #[test]

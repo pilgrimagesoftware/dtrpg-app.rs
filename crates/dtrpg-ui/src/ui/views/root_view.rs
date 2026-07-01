@@ -1,10 +1,10 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
 use crate::ui::actions::ShowSettings;
-use crate::ui::app::{LoginServiceFactory, ServiceFactory};
+use crate::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory};
 use gpui::{
     AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    ParentElement, Render, Styled, div, px,
+    ParentElement, Pixels, Render, Styled, div, prelude::FluentBuilder as _, px,
 };
 use gpui_component::WindowExt as _;
 use gpui_component::input::{InputEvent, InputState};
@@ -32,7 +32,7 @@ use crate::{
         theme::LibriTheme,
         ui_prefs::UiPrefs,
     },
-    services::LibraryService,
+    services::{LibraryService, collections::CollectionsService},
 };
 /// Type-tag used to identify the startup-auth toast notification.
 struct AuthPendingNotif;
@@ -69,10 +69,13 @@ impl LibraryRootView {
         window: &mut gpui::Window,
         cx: &mut Context<Self>,
         service: Box<dyn LibraryService>,
+        collections_service: Box<dyn CollectionsService>,
         startup_api_key: Option<String>,
     ) -> Self {
         let activity = cx.new(|_| ActivityController::new());
-        let controller = cx.new(|cx| LibraryController::new(service, activity.clone(), cx));
+        let controller = cx.new(|cx| {
+            LibraryController::new(service, collections_service, activity.clone(), cx)
+        });
         let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
@@ -226,7 +229,7 @@ impl LibraryRootView {
         )
         .detach();
 
-        // Handle sign-in: replace the library service, mark authenticated, dismiss any auth toast.
+        // Handle sign-in: replace both services, mark authenticated, dismiss any auth toast.
         let auth_state_for_signin = auth_state.clone();
         let controller_for_signin = controller.clone();
         cx.subscribe_in(
@@ -234,8 +237,13 @@ impl LibraryRootView {
             window,
             move |_this, _settings, event: &SignInSucceeded, window, cx| {
                 let tokens = event.0.clone();
-                let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens));
-                controller_for_signin.update(cx, |ctrl, cx| ctrl.replace_service(service, cx));
+                let service =
+                    cx.global::<ServiceFactory>().0.as_ref()(Some(tokens.clone()));
+                let collections_service =
+                    cx.global::<CollectionsServiceFactory>().0.as_ref()(Some(tokens));
+                controller_for_signin.update(cx, |ctrl, cx| {
+                    ctrl.replace_service(service, collections_service, cx);
+                });
                 auth_state_for_signin
                     .update(cx, |ctrl, cx| ctrl.set_state(AuthState::Authenticated, cx));
                 window.remove_notification::<AuthPendingNotif>(cx);
@@ -328,7 +336,7 @@ impl Render for LibraryRootView {
             counts,
             publishers,
             collections,
-            collection_membership,
+            catalog_ids,
             total_count,
             total_mb,
             matched_count,
@@ -342,7 +350,7 @@ impl Render for LibraryRootView {
             snap.counts,
             snap.publishers,
             snap.collections,
-            snap.collection_membership,
+            snap.catalog_ids,
             snap.total_count,
             snap.total_mb,
             snap.matched_count,
@@ -371,7 +379,7 @@ impl Render for LibraryRootView {
             counts,
             publishers,
             collections,
-            collection_membership,
+            catalog_ids,
             total_count,
             total_mb,
             lib_entity.clone(),
@@ -478,14 +486,19 @@ impl Render for LibraryRootView {
                             .size_range(px(180.)..px(361.))
                             .child(sidebar_col),
                     )
-                    .child(resizable_panel().child(main_content))
                     .child(
                         resizable_panel()
-                            .size(px(detail_initial))
-                            .size_range(px(240.)..px(481.))
-                            .visible(has_detail)
-                            .child(panel),
-                    ),
+                            .size_range(px(280.)..Pixels::MAX)
+                            .child(main_content),
+                    )
+                    .when(has_detail, |group| {
+                        group.child(
+                            resizable_panel()
+                                .size(px(detail_initial))
+                                .size_range(px(240.)..px(481.))
+                                .child(panel),
+                        )
+                    }),
             )
     }
 }

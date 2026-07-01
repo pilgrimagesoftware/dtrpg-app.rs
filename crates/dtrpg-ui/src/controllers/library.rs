@@ -2,6 +2,7 @@
 
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_catalog_cache, save_catalog_cache};
+use crate::data::collection::CollectionEntry;
 use crate::data::enums::*;
 use crate::data::events::*;
 use crate::data::library::*;
@@ -9,6 +10,7 @@ use crate::data::selection::Selection;
 use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
+use crate::services::collections::CollectionsService;
 use crate::services::{LibraryService, LibraryServiceErrorKind};
 use crate::ui::library::cover::CoverCache;
 use crate::util::filter::*;
@@ -17,7 +19,7 @@ use crate::util::publisher::*;
 use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 use gpui::{Context, Entity};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 // ── LibraryController ─────────────────────────────────────────────────────────
@@ -28,7 +30,9 @@ pub struct LibrarySnapshot {
     pub counts: SectionCounts,
     pub publishers: Vec<PublisherEntry>,
     pub collections: Vec<CollectionEntry>,
-    pub collection_membership: HashMap<Arc<str>, HashSet<u64>>,
+    /// All numeric product IDs in the full catalog; used by the sidebar to compute
+    /// per-collection resolved item counts.
+    pub catalog_ids: HashSet<u64>,
     pub total_count: usize,
     pub total_mb: f64,
     pub matched_count: usize,
@@ -75,8 +79,12 @@ pub struct LibraryController {
     pub publishers: Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
     pub collections: Vec<CollectionEntry>,
-    /// Maps collection name to the set of numeric product IDs it contains.
-    pub collection_membership: HashMap<Arc<str>, HashSet<u64>>,
+    /// Backing service for collections; stored so it can be replaced on sign-in.
+    collections_service: Arc<dyn CollectionsService>,
+    /// Set of numeric product IDs belonging to the active collection filter.
+    /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
+    /// cleared when any other filter is active.
+    pub collection_members: HashSet<u64>,
     /// Queue of `(item_id, cover_url)` pairs pending thumbnail fetches.
     thumbnail_queue: VecDeque<(Arc<str>, Arc<str>)>,
     /// Whether a thumbnail fetch is currently in flight.
@@ -102,6 +110,7 @@ impl LibraryController {
     /// Does not panic; service errors are reflected in [`pane_state`].
     pub fn new(
         service: Box<dyn LibraryService>,
+        collections_service: Box<dyn CollectionsService>,
         activity: Entity<ActivityController>,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -121,7 +130,8 @@ impl LibraryController {
             section_counts: SectionCounts::default(),
             publishers: Vec::new(),
             collections: Vec::new(),
-            collection_membership: HashMap::new(),
+            collections_service: Arc::from(collections_service),
+            collection_members: HashSet::new(),
             thumbnail_queue: VecDeque::new(),
             thumbnail_loading: false,
             thumbnail_activity_id: None,
@@ -287,23 +297,16 @@ impl LibraryController {
 
     /// Spawns a background task to fetch product lists from the API and apply them.
     fn load_collections(&mut self, cx: &mut Context<Self>) {
-        let service_arc = self.vm.service_arc();
+        let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
             let result = async_cx
                 .background_executor()
-                .spawn(async move { service_arc.list_collections() })
+                .spawn(async move { collections_service.list_collections() })
                 .await;
             match result {
-                Ok((lib_collections, membership)) => {
-                    let entries: Vec<CollectionEntry> = lib_collections
-                        .into_iter()
-                        .map(|c| CollectionEntry {
-                            name: c.name,
-                            count: c.item_count,
-                        })
-                        .collect();
+                Ok(entries) => {
                     this.update(async_cx, |ctrl, cx| {
-                        ctrl.apply_collections(entries, membership, cx);
+                        ctrl.apply_collections(entries, cx);
                     })
                     .ok();
                 }
@@ -316,14 +319,8 @@ impl LibraryController {
     }
 
     /// Stores the fetched collections and emits a change event.
-    fn apply_collections(
-        &mut self,
-        collections: Vec<CollectionEntry>,
-        membership: HashMap<Arc<str>, HashSet<u64>>,
-        cx: &mut Context<Self>,
-    ) {
+    fn apply_collections(&mut self, collections: Vec<CollectionEntry>, cx: &mut Context<Self>) {
         self.collections = collections;
-        self.collection_membership = membership;
         cx.emit(LibraryChanged);
     }
 
@@ -332,17 +329,23 @@ impl LibraryController {
         self.vm.pane_state()
     }
 
-    /// Replaces the backing service and triggers a fresh catalog load.
+    /// Replaces the backing services and triggers a fresh catalog and collections load.
     ///
     /// Clears the activity panel so stale error messages from the previous
     /// (unauthenticated) service do not persist after sign-in.
-    pub fn replace_service(&mut self, service: Box<dyn LibraryService>, cx: &mut Context<Self>) {
+    pub fn replace_service(
+        &mut self,
+        service: Box<dyn LibraryService>,
+        collections_service: Box<dyn CollectionsService>,
+        cx: &mut Context<Self>,
+    ) {
         self.vm.replace_service(service);
+        self.collections_service = Arc::from(collections_service);
         self.catalog.clear();
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
         self.collections.clear();
-        self.collection_membership.clear();
+        self.collection_members.clear();
         self.selection = Selection::default();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
@@ -502,12 +505,13 @@ impl LibraryController {
             .take(self.page_size)
             .collect();
         let selected_item = self.selected_item().cloned();
+        let catalog_ids: HashSet<u64> = self.catalog.iter().map(|i| i.numeric_id).collect();
         LibrarySnapshot {
             filter: self.filter.clone(),
             counts: self.section_counts,
             publishers: self.publishers.clone(),
             collections: self.collections.clone(),
-            collection_membership: self.collection_membership.clone(),
+            catalog_ids,
             total_count: self.section_counts.all,
             total_mb: self.total_size_mb(),
             matched_count,
@@ -573,14 +577,8 @@ impl LibraryController {
             .catalog
             .iter()
             .filter(|i| {
-                let passes_filter = if let SidebarFilter::Collection(name) = &self.filter {
-                    self.collection_membership
-                        .get(name)
-                        .is_some_and(|ids| ids.contains(&i.numeric_id))
-                } else {
-                    item_matches_filter(i, &self.filter)
-                };
-                passes_filter && item_matches_query(i, &self.search_query)
+                item_matches_filter(i, &self.filter, &self.collection_members)
+                    && item_matches_query(i, &self.search_query)
             })
             .cloned()
             .collect();
@@ -630,7 +628,20 @@ impl LibraryController {
     // ── Sidebar filter mutations ──────────────────────────────────────────────
 
     /// Sets the active sidebar filter.
+    ///
+    /// When the new filter is `Collection(id)`, `collection_members` is populated from the
+    /// matching entry's `member_ids`. For all other filters, `collection_members` is cleared.
     pub fn set_filter(&mut self, filter: SidebarFilter, cx: &mut Context<Self>) {
+        if let SidebarFilter::Collection(id) = &filter {
+            self.collection_members = self
+                .collections
+                .iter()
+                .find(|c| c.id == *id)
+                .map(|c| c.member_ids.iter().copied().collect())
+                .unwrap_or_default();
+        } else {
+            self.collection_members.clear();
+        }
         self.filter = filter;
         self.current_page = 1;
         self.selection = Selection::None;

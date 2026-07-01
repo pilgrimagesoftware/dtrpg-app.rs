@@ -3,7 +3,7 @@ use gpui_component::{Root, init};
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore, keys};
-use crate::services::{LibraryService, LoginService, LoginTokens};
+use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::util::init::init_globals;
@@ -19,6 +19,18 @@ pub struct ServiceFactory(
 );
 
 impl Global for ServiceFactory {}
+
+/// Holds the factory closure used to create a [`CollectionsService`] on demand.
+///
+/// `None` tokens mean the user is not authenticated; the factory should return a
+/// service that reflects the unauthenticated state without crashing.
+///
+/// Set this global before calling [`setup`].
+pub struct CollectionsServiceFactory(
+    pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn CollectionsService> + Send + Sync + 'static>,
+);
+
+impl Global for CollectionsServiceFactory {}
 
 /// Holds the factory closure used to create a [`LoginService`] on demand.
 ///
@@ -38,6 +50,7 @@ impl Global for LoginServiceFactory {}
 #[allow(clippy::expect_used)]
 pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(None);
+    let collections_service = (cx.global::<CollectionsServiceFactory>().0)(None);
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
@@ -48,7 +61,9 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
             ..Default::default()
         },
         move |window, cx| {
-            let view = cx.new(|cx| LibraryRootView::new(window, cx, service, startup_api_key));
+            let view = cx.new(|cx| {
+                LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
+            });
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
     )

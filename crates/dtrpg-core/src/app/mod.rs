@@ -2,9 +2,9 @@
 
 use gpui::*;
 
-use dtrpg_ui::ui::app::{LoginServiceFactory, ServiceFactory, setup};
+use dtrpg_ui::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, setup};
 
-/// Boots the GPUI application with a keyring-backed library service.
+/// Boots the GPUI application with keyring-backed library and collections services.
 pub fn run() {
     gpui_platform::application()
         .with_assets(gpui_component_assets::Assets)
@@ -15,6 +15,14 @@ pub fn run() {
                     crate::services::sdk::RustSdkLibraryService::from_keyring_with_tokens(t),
                 ),
                 None => Box::new(crate::services::sdk::RustSdkLibraryService::unauthenticated()),
+            })));
+            cx.set_global(CollectionsServiceFactory(Box::new(|tokens| match tokens {
+                Some(t) => Box::new(
+                    crate::services::collections_sdk::RustSdkCollectionsService::from_keyring_with_tokens(t),
+                ),
+                None => Box::new(
+                    crate::services::collections_sdk::RustSdkCollectionsService::unauthenticated(),
+                ),
             })));
             cx.set_global(LoginServiceFactory(Box::new(
                 crate::services::login::build_login_service,

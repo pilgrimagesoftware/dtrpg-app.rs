@@ -1524,6 +1524,7 @@ dependencies = [
  "gpui-component",
  "gpui-component-assets",
  "gpui_platform",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-appender",

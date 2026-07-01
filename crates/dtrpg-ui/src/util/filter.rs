@@ -1,4 +1,4 @@
-//! Data model, filtering, sorting, and stub catalog for the Libri library view.
+//! Active sidebar filter variants.
 
 use std::sync::Arc;
 
@@ -13,6 +13,6 @@ pub enum SidebarFilter {
     OnDevice,
     InCloud,
     Publisher(Arc<str>),
-    /// Filter to items belonging to a named DTRPG product list.
-    Collection(Arc<str>),
+    /// Filter to items belonging to the DTRPG product list with this numeric id.
+    Collection(u64),
 }
