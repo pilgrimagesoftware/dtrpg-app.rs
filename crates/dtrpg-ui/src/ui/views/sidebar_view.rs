@@ -144,7 +144,7 @@ pub fn render_sidebar(
             .suffix(move |_, _| {
                 div()
                     .text_xs()
-                    .child(pluralize(publishers_count, "publisher", "publishers"))
+                    .child(publishers_count.to_string())
             })
             .children(pub_children),
     );
@@ -215,11 +215,7 @@ pub fn render_sidebar(
                         .flex()
                         .items_center()
                         .gap(px(4.))
-                        .child(div().text_xs().child(pluralize(
-                            collections_count,
-                            "collection",
-                            "collections",
-                        )))
+                        .child(div().text_xs().child(collections_count.to_string()))
                         .child(
                             Dialog::new(cx)
                                 .trigger(
