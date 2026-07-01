@@ -17,6 +17,10 @@ pub struct LibraryItem {
     /// The `orderProductId` from the API — used for collection membership matching.
     #[serde(default)]
     pub order_product_id: u64,
+    /// The `productId` from the API — used as a fallback for collection membership matching
+    /// when product list items return `productId` rather than `orderProductId`.
+    #[serde(default)]
+    pub product_id: u64,
     pub title: Arc<str>,
     pub publisher: Arc<str>,
     /// Game line / series name.
@@ -67,6 +71,7 @@ impl LibraryItem {
             id: id.into(),
             numeric_id: 0,
             order_product_id: 0,
+            product_id: 0,
             title: title.into(),
             publisher: publisher.into(),
             line: line.into(),

@@ -8,6 +8,7 @@ use gpui::{App, ElementId, Entity, IntoElement, Window, div, px};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_component::menu::PopupMenuItem;
 use gpui_component::input::{Input, InputState};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarFooter, SidebarHeader, SidebarItem, SidebarMenu,
@@ -19,6 +20,7 @@ use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
 use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
+use crate::data::ui_prefs::UiPrefs;
 use crate::util::filter::SidebarFilter;
 use crate::util::publisher::PublisherEntry;
 
@@ -82,6 +84,9 @@ pub fn render_sidebar(
     collection_name_input: Entity<InputState>,
 ) -> impl IntoElement + 'static {
     let active = filter.clone();
+    let prefs = UiPrefs::load();
+    let publishers_open = prefs.publishers_open();
+    let collections_open = prefs.collections_open();
 
     // ── Library smart-filter menu ─────────────────────────────────────────────
     let lib_menu = SidebarMenu::new()
@@ -114,6 +119,8 @@ pub fn render_sidebar(
             entity.clone(),
         ));
 
+    let publishers_count = publishers.len();
+
     // ── Publishers menu ───────────────────────────────────────────────────────
     let pub_children: Vec<SidebarMenuItem> = publishers
         .into_iter()
@@ -124,10 +131,15 @@ pub fn render_sidebar(
         })
         .collect();
 
+    let entity_for_pub = entity.clone();
     let pub_menu = SidebarMenu::new().child(
         SidebarMenuItem::new("Publishers")
-            .click_to_toggle(true)
-            .default_open(true)
+            .collapsed(!publishers_open)
+            .on_click(move |_, _, cx| {
+                UiPrefs::load().save_publishers_open(!publishers_open);
+                entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
+            })
+            .suffix(move |_, _| div().text_xs().child(publishers_count.to_string()))
             .children(pub_children),
     );
 
@@ -141,6 +153,8 @@ pub fn render_sidebar(
         .child(SidebarContent::Separator);
 
     // ── Collections menu (always present) ────────────────────────────────────
+    let collections_count = collections.len();
+
     let col_children: Vec<SidebarMenuItem> = collections
         .into_iter()
         .map(|c| {
@@ -151,21 +165,48 @@ pub fn render_sidebar(
                 .iter()
                 .filter(|id| catalog_ids.contains(id))
                 .count();
-            nav_item(c.name.as_ref(), count, is_active, f, entity.clone())
+            let col_id = c.id;
+            let entity_reload = entity.clone();
+            let entity_delete = entity.clone();
+            nav_item(c.name.as_ref(), count, is_active, f, entity.clone()).context_menu(
+                move |menu, _, _| {
+                    menu.item(PopupMenuItem::new("Reload").on_click({
+                        let entity = entity_reload.clone();
+                        move |_, _, cx| {
+                            entity.update(cx, |ctrl, cx| ctrl.load_collections(cx));
+                        }
+                    }))
+                    .item(PopupMenuItem::new("Delete").on_click({
+                        let entity = entity_delete.clone();
+                        move |_, _, cx| {
+                            entity.update(cx, |ctrl, cx| ctrl.delete_collection(col_id, cx));
+                        }
+                    }))
+                },
+            )
         })
         .collect();
 
+    let entity_for_col = entity.clone();
     let col_menu = SidebarMenu::new().child(
         SidebarMenuItem::new("Collections")
-            .click_to_toggle(true)
-            .default_open(true)
+            .collapsed(!collections_open)
+            .on_click(move |_, _, cx| {
+                UiPrefs::load().save_collections_open(!collections_open);
+                entity_for_col.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
+            })
             .suffix({
                 let input = collection_name_input.clone();
                 let ctrl = entity.clone();
                 move |_window, cx| {
                     let input = input.clone();
                     let ctrl = ctrl.clone();
-                    Dialog::new(cx)
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(4.))
+                        .child(div().text_xs().child(collections_count.to_string()))
+                        .child(Dialog::new(cx)
                         .trigger(
                             Button::new("add-collection")
                                 .ghost()
@@ -211,7 +252,7 @@ pub fn render_sidebar(
                                             .child(Input::new(&input)),
                                     )
                             }
-                        })
+                        }))
                 }
             })
             .children(col_children),

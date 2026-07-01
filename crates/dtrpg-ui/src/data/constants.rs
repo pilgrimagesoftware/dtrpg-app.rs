@@ -34,6 +34,7 @@ pub const COLLECTIONS_CACHE_FILE: &str = "collections_cache.json";
 pub const COLLECTIONS_CACHE_TMP: &str = "collections_cache.json.tmp";
 pub const CATALOG_CACHE_FILE: &str = "catalog_cache.json";
 pub const CATALOG_CACHE_TMP: &str = "catalog_cache.json.tmp";
+pub const CATALOG_CACHE_METADATA_FILE: &str = "catalog_cache_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
 /// Reverse-DNS service namespace used for all keyring entries.

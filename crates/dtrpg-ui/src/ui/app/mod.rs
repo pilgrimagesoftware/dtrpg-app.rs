@@ -129,6 +129,11 @@ pub fn setup(cx: &mut App) {
             MenuItem::separator(),
             MenuItem::action("Quit Libri", Quit),
         ]),
+        Menu::new("Catalog").items([
+            MenuItem::action("Add Collection\u{2026}", AddCollection),
+            MenuItem::separator(),
+            MenuItem::action("Reload", ReloadCatalog),
+        ]),
         Menu::new("Edit").items([
             MenuItem::os_action("Undo", Undo, OsAction::Undo),
             MenuItem::os_action("Redo", Redo, OsAction::Redo),
@@ -142,6 +147,9 @@ pub fn setup(cx: &mut App) {
         Menu::new("Window").items([
             MenuItem::action("Minimize", Minimize),
             MenuItem::action("Zoom", Zoom),
+            MenuItem::separator(),
+            MenuItem::action("Show Activity", ShowActivity),
+            MenuItem::action("Show Alert History", ShowAlertHistory),
         ]),
         Menu::new("Help").items([MenuItem::action("About Libri", About)]),
     ]);

@@ -14,7 +14,7 @@ use gpui_component::pagination::Pagination;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::spinner::Spinner;
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
-use gpui_component::{Sizable, Size};
+use gpui_component::{Disableable, Sizable, Size};
 
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
@@ -530,6 +530,8 @@ impl Render for CatalogView {
         let total_pages = snap.total_pages;
         let page_size = snap.page_size;
         let ctrl_for_page = self.controller.clone();
+        let ctrl_for_first = self.controller.clone();
+        let ctrl_for_last = self.controller.clone();
         let ctrl_for_size = self.controller.clone();
 
         let content: AnyElement = match (snap.presentation, snap.grouped) {
@@ -735,11 +737,30 @@ impl Render for CatalogView {
                     .gap(px(16.0))
                     .child(size_picker)
                     .child(
+                        Button::new("page-first-btn")
+                            .ghost()
+                            .label("\u{00ab} First")
+                            .disabled(current_page == 1)
+                            .on_click(move |_, _, cx| {
+                                ctrl_for_first.update(cx, |ctrl, cx| ctrl.set_page(1, cx));
+                            }),
+                    )
+                    .child(
                         Pagination::new("catalog-pagination")
                             .current_page(current_page)
                             .total_pages(total_pages)
                             .on_click(move |page, _, cx| {
                                 ctrl_for_page.update(cx, |ctrl, cx| ctrl.set_page(*page, cx));
+                            }),
+                    )
+                    .child(
+                        Button::new("page-last-btn")
+                            .ghost()
+                            .label("Last \u{00bb}")
+                            .disabled(current_page == total_pages)
+                            .on_click(move |_, _, cx| {
+                                ctrl_for_last
+                                    .update(cx, |ctrl, cx| ctrl.set_page(total_pages, cx));
                             }),
                     ),
             );

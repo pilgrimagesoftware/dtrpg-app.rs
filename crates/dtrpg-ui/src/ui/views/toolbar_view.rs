@@ -35,6 +35,7 @@ fn section_title_for(filter: &SidebarFilter) -> String {
 pub fn render_toolbar(
     filter: &SidebarFilter,
     matched_count: usize,
+    total_count: usize,
     search_input: Entity<InputState>,
     sort: SortMethod,
     sort_direction: SortDirection,
@@ -52,6 +53,11 @@ pub fn render_toolbar(
     let text_tertiary = colors.text_tertiary;
 
     let title = section_title_for(filter);
+    let count_label = if matched_count < total_count {
+        format!("{matched_count} of {total_count}")
+    } else {
+        total_count.to_string()
+    };
 
     div()
         .h(px(53.0))
@@ -83,7 +89,7 @@ pub fn render_toolbar(
                         .text_xs()
                         .text_color(text_tertiary)
                         .whitespace_nowrap()
-                        .child(matched_count.to_string()),
+                        .child(count_label),
                 ),
         )
         // ── Spacer / drag region ──────────────────────────────────────────
@@ -310,7 +316,7 @@ fn render_avatar_button(
     let initial_text = auth
         .display_initial
         .map(|c| c.to_string())
-        .unwrap_or_else(|| "?".to_string());
+        .unwrap_or_else(|| "D".to_string());
 
     let accent = colors.accent;
     let avatar_variant = ButtonCustomVariant::new(cx)
@@ -346,7 +352,11 @@ fn render_avatar_button(
             .into_any_element()
     };
 
-    let menu_email = auth.email.clone().unwrap_or_default();
+    let menu_email = auth
+        .email
+        .clone()
+        .or_else(|| auth.api_key_hint.clone())
+        .unwrap_or_else(|| "DriveThruRPG Account".to_string());
 
     Button::new("avatar-btn")
         .custom(avatar_variant)

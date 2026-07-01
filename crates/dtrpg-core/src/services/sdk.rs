@@ -397,6 +397,7 @@ fn map_order_product(
         id: item.id.as_str().into(),
         numeric_id,
         order_product_id: attributes.order_product_id,
+        product_id: attributes.product_id,
         title: attributes.name.as_str().into(),
         publisher: publisher.as_str().into(),
         line: "".into(),

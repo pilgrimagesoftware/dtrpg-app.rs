@@ -104,6 +104,18 @@ pub trait LibraryService: Send + Sync + 'static {
         Ok(())
     }
 
+    /// Returns the total number of items in the user's library without fetching their content.
+    ///
+    /// Returns `None` when a cheap count is not supported by this implementation; callers
+    /// should treat `None` as "count unknown" and fall back to trusting the local cache.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LibraryServiceError`] if the request fails or the session is invalid.
+    fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
+        None
+    }
+
     /// Loads detail data for a selected item by its numeric API identifier.
     ///
     /// # Errors

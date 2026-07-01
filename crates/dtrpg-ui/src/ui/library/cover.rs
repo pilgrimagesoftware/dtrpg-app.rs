@@ -291,6 +291,7 @@ mod tests {
             id: id.into(),
             numeric_id: 0,
             order_product_id: 0,
+            product_id: 0,
             title: title.into(),
             publisher: "Test".into(),
             line: "Test Line".into(),

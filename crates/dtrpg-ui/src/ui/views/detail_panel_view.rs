@@ -60,7 +60,6 @@ pub fn render_detail_panel(
         .border_color(border)
         .flex()
         .flex_col()
-        .overflow_hidden()
         // Close button
         .child(
             div()

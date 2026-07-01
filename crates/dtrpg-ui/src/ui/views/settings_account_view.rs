@@ -64,6 +64,7 @@ fn render_authenticated(
     let email_text = auth
         .email
         .clone()
+        .or_else(|| auth.api_key_hint.clone())
         .unwrap_or_else(|| "DriveThruRPG Account".to_string());
 
     let entity_reset = entity.clone();
@@ -176,7 +177,7 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
         .email
         .clone()
         .or_else(|| auth.display_initial.map(|c| c.to_string()))
-        .unwrap_or_else(|| "?".to_string());
+        .unwrap_or_else(|| "D".to_string());
 
     avatar.name(name).into_any_element()
 }

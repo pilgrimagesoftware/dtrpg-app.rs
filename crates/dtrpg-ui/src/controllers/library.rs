@@ -1,7 +1,7 @@
 //! Library UI state and interaction controller.
 
 use crate::controllers::activity::ActivityController;
-use crate::data::catalog_cache::{load_catalog_cache, save_catalog_cache};
+use crate::data::catalog_cache::{load_cache_metadata, load_catalog_cache, save_catalog_cache};
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
 use crate::data::collection::CollectionEntry;
 use crate::data::enums::*;
@@ -146,11 +146,19 @@ impl LibraryController {
         ctrl
     }
 
-    /// Spawns a background task to load the catalog from cache then the live API.
+    /// Spawns a background task to load the catalog from cache then optionally from the live API.
     ///
-    /// Pages are delivered incrementally via an mpsc channel so each page triggers
-    /// a UI update before the next page arrives.
+    /// When `force_reload` is true the auto-load policy is bypassed and a full live
+    /// fetch always runs. When false, the fetch is skipped if the cache is non-empty
+    /// and was written within the last 7 days.
+    ///
+    /// Pages are delivered via an mpsc channel so each page triggers a UI update
+    /// before the next page arrives.
     fn start_load(&mut self, cx: &mut Context<Self>) {
+        self.start_load_inner(cx, false);
+    }
+
+    fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
         let service_arc = self.vm.service_arc();
         let weak_activity = self.activity.downgrade();
         let storage_cfg = StorageConfig::load();
@@ -172,12 +180,61 @@ impl LibraryController {
             }
 
             let cache_root = storage_root.clone();
+            let meta_root = cache_root.clone();
+
             let cached = async_cx
                 .background_executor()
                 .spawn(async move { load_catalog_cache(&cache_root) })
                 .await;
-            if let Some(items) = cached {
-                this.update(async_cx, |ctrl, cx| ctrl.append_catalog_page(items, cx)).ok();
+            if let Some(items) = cached.as_ref() {
+                this.update(async_cx, |ctrl, cx| {
+                    if force_reload {
+                        ctrl.catalog.clear();
+                    }
+                    ctrl.append_catalog_page(items.clone(), cx);
+                })
+                .ok();
+            }
+
+            // ── Auto-load policy ──────────────────────────────────────────────
+            // Skip the live fetch when: the cache is non-empty, was written within
+            // the last 7 days, and force_reload is false.
+            if !force_reload {
+                if let Some(items) = cached.as_ref() {
+                    if !items.is_empty() {
+                        let meta = async_cx
+                            .background_executor()
+                            .spawn(async move { load_cache_metadata(&meta_root) })
+                            .await;
+                        let is_fresh = meta.as_ref().map_or(false, |m| !m.is_stale());
+
+                        if is_fresh {
+                            // Check remote count if the service supports it cheaply.
+                            let svc = service_arc.clone();
+                            let remote_count = async_cx
+                                .background_executor()
+                                .spawn(async move { svc.count_items() })
+                                .await;
+                            let count_matches = match remote_count {
+                                Some(Ok(n)) => n == items.len(),
+                                Some(Err(_)) => false, // count fetch failed; do live fetch
+                                None => true, // count not supported; trust fresh cache
+                            };
+                            if count_matches {
+                                tracing::debug!(
+                                    cached = items.len(),
+                                    "catalog auto-load: cache is fresh, skipping live fetch"
+                                );
+                                this.update(async_cx, |ctrl, cx| {
+                                    ctrl.catalog_loading = false;
+                                    cx.emit(LibraryChanged);
+                                })
+                                .ok();
+                                return;
+                            }
+                        }
+                    }
+                }
             }
 
             // ── Fetch live catalog from API ───────────────────────────────────
@@ -308,10 +365,11 @@ impl LibraryController {
     }
 
     /// Spawns a background task to fetch product lists from the API and apply them.
-    fn load_collections(&mut self, cx: &mut Context<Self>) {
+    pub fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
         let storage_cfg = StorageConfig::load();
         let cache_root = storage_cfg.metadata_path();
+        tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
             let result = async_cx
                 .background_executor()
@@ -319,6 +377,7 @@ impl LibraryController {
                 .await;
             match result {
                 Ok(entries) => {
+                    tracing::debug!(count = entries.len(), "load_collections: fetched {} entries", entries.len());
                     let to_save = entries.clone();
                     let save_root = cache_root.clone();
                     async_cx
@@ -363,6 +422,7 @@ impl LibraryController {
         collections_service: Box<dyn CollectionsService>,
         cx: &mut Context<Self>,
     ) {
+        tracing::debug!("replace_service: installing authenticated services");
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
         self.catalog.clear();
@@ -412,6 +472,62 @@ impl LibraryController {
                             a.error(activity_id, e.to_string(), cx);
                         });
                         cx.emit(CollectionCreateFailed { message: e.message.clone() });
+                    })
+                    .ok();
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Forces a full live catalog fetch, bypassing the auto-load policy.
+    ///
+    /// Used by the "Catalog > Reload" menu action.
+    pub fn reload_catalog(&mut self, cx: &mut Context<Self>) {
+        self.catalog_loading = true;
+        cx.emit(LibraryChanged);
+        self.start_load_inner(cx, true);
+    }
+
+    /// Emits `LibraryChanged` to trigger a UI re-render without modifying state.
+    ///
+    /// Used by sidebar section headers to force a re-render after persisting UI prefs.
+    pub fn notify_ui_change(&mut self, cx: &mut Context<Self>) {
+        cx.emit(LibraryChanged);
+    }
+
+    /// Deletes the collection with the given id via the service, then removes it locally.
+    ///
+    /// Logs failures to the activity panel and leaves the collection in place on error.
+    pub fn delete_collection(&mut self, id: u64, cx: &mut Context<Self>) {
+        let label = format!("Deleting collection\u{2026}");
+        let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
+        let collections_service = Arc::clone(&self.collections_service);
+        cx.spawn(async move |this, async_cx| {
+            let result = async_cx
+                .background_executor()
+                .spawn(async move { collections_service.delete_collection(id) })
+                .await;
+            match result {
+                Ok(()) => {
+                    this.update(async_cx, |ctrl, cx| {
+                        ctrl.collections.retain(|c| c.id != id);
+                        if let SidebarFilter::Collection(cid, _) = &ctrl.filter {
+                            if *cid == id {
+                                ctrl.filter = SidebarFilter::default();
+                                ctrl.collection_members.clear();
+                            }
+                        }
+                        ctrl.activity.update(cx, |a, cx| a.complete(activity_id, cx));
+                        cx.emit(LibraryChanged);
+                    })
+                    .ok();
+                }
+                Err(e) => {
+                    this.update(async_cx, |ctrl, cx| {
+                        ctrl.activity.update(cx, |a, cx| {
+                            a.error(activity_id, e.to_string(), cx);
+                        });
                     })
                     .ok();
                 }
@@ -573,12 +689,22 @@ impl LibraryController {
             .take(self.page_size)
             .collect();
         let selected_item = self.selected_item().cloned();
-        // Exclude 0 values (unset / pre-cache items that lack order_product_id).
+        // Build a set of all IDs that can match collection member_ids.
+        // Include both order_product_id and product_id since the product list items
+        // API returns productId (not orderProductId) in its response.
         let catalog_ids: HashSet<u64> = self
             .catalog
             .iter()
-            .filter(|i| i.order_product_id > 0)
-            .map(|i| i.order_product_id)
+            .flat_map(|i| {
+                let mut ids = Vec::with_capacity(2);
+                if i.order_product_id > 0 {
+                    ids.push(i.order_product_id);
+                }
+                if i.product_id > 0 {
+                    ids.push(i.product_id);
+                }
+                ids
+            })
             .collect();
         LibrarySnapshot {
             filter: self.filter.clone(),

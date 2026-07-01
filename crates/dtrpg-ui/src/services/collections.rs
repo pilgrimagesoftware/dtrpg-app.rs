@@ -60,6 +60,13 @@ pub trait CollectionsService: Send + Sync + 'static {
         &self,
         name: &str,
     ) -> Result<CollectionEntry, CollectionsServiceError>;
+
+    /// Deletes the product list with the given id.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CollectionsServiceError`] if the request fails or the session is invalid.
+    fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError>;
 }
 
 #[cfg(test)]
@@ -118,6 +125,16 @@ pub mod stub {
                         member_ids: Arc::from(&[][..]),
                     })
                 }
+                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
+                    CollectionsServiceErrorKind::Session,
+                    "stub: simulated session error",
+                )),
+            }
+        }
+
+        fn delete_collection(&self, _id: u64) -> Result<(), CollectionsServiceError> {
+            match self.mode {
+                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(()),
                 CollectionsStubMode::Error => Err(CollectionsServiceError::new(
                     CollectionsServiceErrorKind::Session,
                     "stub: simulated session error",

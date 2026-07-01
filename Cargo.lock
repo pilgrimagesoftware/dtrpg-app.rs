@@ -1533,7 +1533,7 @@ dependencies = [
 
 [[package]]
 name = "dtrpg-sdk"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "reqwest",
  "serde",
@@ -1565,6 +1565,7 @@ dependencies = [
  "pretty_assertions",
  "reqwest",
  "rfd",
+ "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

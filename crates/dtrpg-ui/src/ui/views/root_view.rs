@@ -1,13 +1,14 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use crate::ui::actions::ShowSettings;
+use crate::ui::actions::{AddCollection, ReloadCatalog, ShowActivity, ShowAlertHistory, ShowSettings};
 use crate::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory};
 use gpui::{
     AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    ParentElement, Pixels, Render, Styled, div, prelude::FluentBuilder as _, px,
+    ParentElement, Pixels, Render, Styled, div, px,
 };
 use gpui_component::WindowExt as _;
-use gpui_component::input::{InputEvent, InputState};
+use gpui_component::dialog::{DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 
@@ -46,12 +47,10 @@ pub struct LibraryRootView {
     activity: Entity<ActivityController>,
     auth_state: Entity<AuthStateController>,
     catalog_view: Entity<CatalogView>,
-    /// Resizable state for the three-column main layout (sidebar / catalog / detail).
+    /// Resizable state for the two-column main layout (sidebar / catalog).
     resize_state: Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
     sidebar_width: f32,
-    /// Restored or default detail panel initial width.
-    detail_width: f32,
     /// Default focus handle for the root div, ensuring menu-triggered actions
     /// always have a dispatch path even before any child element grabs focus.
     root_focus: FocusHandle,
@@ -310,15 +309,13 @@ impl LibraryRootView {
 
         let ui_prefs = UiPrefs::load();
         let sidebar_width = ui_prefs.sidebar_width().unwrap_or(250.0);
-        let detail_width = ui_prefs.detail_width().unwrap_or(320.0);
         let resize_state = cx.new(|_| ResizableState::default());
 
         cx.subscribe(&resize_state, move |_this, state, _event, cx| {
             let sizes = state.read(cx).sizes().clone();
-            if sizes.len() >= 3 {
+            if sizes.len() >= 2 {
                 let sidebar = sizes[0].as_f32();
-                let detail = sizes[2].as_f32();
-                UiPrefs::load().save_panel_widths(sidebar, detail);
+                UiPrefs::load().save_sidebar_width(sidebar);
             }
         })
         .detach();
@@ -331,7 +328,6 @@ impl LibraryRootView {
             catalog_view,
             resize_state,
             sidebar_width,
-            detail_width,
             root_focus,
             settings_focus,
             search_input,
@@ -415,6 +411,7 @@ impl Render for LibraryRootView {
         let toolbar = render_toolbar(
             &filter,
             matched_count,
+            total_count,
             self.search_input.clone(),
             sort,
             sort_direction,
@@ -438,8 +435,8 @@ impl Render for LibraryRootView {
         let surface = colors.surface;
         let text_primary = colors.text_primary;
 
-        // Settings overlay is rendered inside the main content area so the
-        // sidebar remains visible behind it.
+        // Settings overlay and detail panel are rendered inside the main content area
+        // so the sidebar remains visible behind them.
         let main_content = {
             let mut content = div()
                 .flex_1()
@@ -450,7 +447,8 @@ impl Render for LibraryRootView {
                 .bg(surface)
                 .child(toolbar)
                 .child(banner)
-                .child(self.catalog_view.clone());
+                .child(self.catalog_view.clone())
+                .child(panel);
 
             if settings_snap.is_open {
                 // Focus the backdrop on first open so Escape works immediately.
@@ -488,9 +486,11 @@ impl Render for LibraryRootView {
         }
 
         let settings_for_action = self.settings.clone();
+        let controller_for_reload = self.controller.clone();
+        let controller_for_add = self.controller.clone();
+        let collection_input_for_add = self.collection_name_input.clone();
+        let activity_for_show = self.activity.clone();
         let sidebar_initial = self.sidebar_width;
-        let detail_initial = self.detail_width;
-        let has_detail = selected_item.is_some();
 
         div()
             .size_full()
@@ -500,6 +500,59 @@ impl Render for LibraryRootView {
             .track_focus(&self.root_focus)
             .on_action(move |_: &ShowSettings, _, cx| {
                 settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
+            })
+            .on_action(move |_: &ReloadCatalog, _, cx| {
+                controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));
+            })
+            .on_action(move |_: &AddCollection, window, cx| {
+                let ctrl = controller_for_add.clone();
+                let input = collection_input_for_add.clone();
+                window.open_dialog(cx, move |dialog, _window, _cx| {
+                    let ctrl = ctrl.clone();
+                    let input = input.clone();
+                    dialog
+                        .close_button(false)
+                        .overlay_closable(true)
+                        .w(px(320.))
+                        .button_props(
+                            DialogButtonProps::default()
+                                .ok_text("Create")
+                                .show_cancel(true)
+                                .cancel_text("Cancel"),
+                        )
+                        .on_ok({
+                            let input = input.clone();
+                            let ctrl = ctrl.clone();
+                            move |_, _, cx| {
+                                let name = input.read(cx).value().trim().to_string();
+                                if name.is_empty() {
+                                    return false;
+                                }
+                                ctrl.update(cx, |c, cx| c.create_collection(name, cx));
+                                true
+                            }
+                        })
+                        .on_cancel(|_, _, _| true)
+                        .content({
+                            let input = input.clone();
+                            move |content, _, _| {
+                                content
+                                    .child(
+                                        DialogHeader::new()
+                                            .px_4()
+                                            .pt_4()
+                                            .child(DialogTitle::new().child("New Collection")),
+                                    )
+                                    .child(div().px_4().py_2().child(Input::new(&input)))
+                            }
+                        })
+                });
+            })
+            .on_action(move |_: &ShowActivity, _, cx| {
+                activity_for_show.update(cx, |a, cx| a.toggle_panel(cx));
+            })
+            .on_action(|_: &ShowAlertHistory, _, _cx| {
+                tracing::info!("ShowAlertHistory action triggered");
             })
             .child(
                 h_resizable("main-layout")
@@ -514,15 +567,7 @@ impl Render for LibraryRootView {
                         resizable_panel()
                             .size_range(px(280.)..Pixels::MAX)
                             .child(main_content),
-                    )
-                    .when(has_detail, |group| {
-                        group.child(
-                            resizable_panel()
-                                .size(px(detail_initial))
-                                .size_range(px(240.)..px(481.))
-                                .child(panel),
-                        )
-                    }),
+                    ),
             )
     }
 }

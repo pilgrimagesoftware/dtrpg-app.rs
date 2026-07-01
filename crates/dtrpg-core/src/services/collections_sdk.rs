@@ -53,6 +53,13 @@ pub trait SdkCollectionsGateway: Send + Sync {
         &self,
         name: &str,
     ) -> Result<ProductListItem, CollectionsServiceError>;
+
+    /// Deletes the product list with the given id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CollectionsServiceError`] on network or session failures.
+    fn delete_product_list(&self, id: u64) -> Result<(), CollectionsServiceError>;
 }
 
 // ── Service implementation ────────────────────────────────────────────────────
@@ -127,7 +134,9 @@ impl CollectionsService for RustSdkCollectionsService {
                     };
 
                 for item in &items_resp.data {
-                    // Try top-level first, then JSON:API-style attributes object.
+                    // Try orderProductId first (flat or JSON:API-style), then productId.
+                    // The product_list_items endpoint returns productId in attributes;
+                    // both IDs are stored so the sidebar filter can match either.
                     let extracted = item
                         .get("orderProductId")
                         .and_then(|v| v.as_u64())
@@ -135,15 +144,20 @@ impl CollectionsService for RustSdkCollectionsService {
                             item.get("attributes")
                                 .and_then(|a| a.get("orderProductId"))
                                 .and_then(|v| v.as_u64())
+                        })
+                        .or_else(|| {
+                            item.get("attributes")
+                                .and_then(|a| a.get("productId"))
+                                .and_then(|v| v.as_u64())
                         });
 
-                    if let Some(order_product_id) = extracted {
-                        member_ids.push(order_product_id);
+                    if let Some(id_value) = extracted {
+                        member_ids.push(id_value);
                     } else {
                         tracing::warn!(
                             collection_id = id,
                             item = ?item,
-                            "skipping list item with missing or non-numeric orderProductId"
+                            "skipping list item: no orderProductId or productId found"
                         );
                     }
                 }
@@ -174,6 +188,10 @@ impl CollectionsService for RustSdkCollectionsService {
             name: Arc::from(item.attributes.name.as_str()),
             member_ids: Arc::from(&[][..]),
         })
+    }
+
+    fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError> {
+        self.gateway.delete_product_list(id)
     }
 }
 
@@ -303,6 +321,12 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
             .block_on(self.client.create_product_list(name))
             .map_err(map_client_error)
     }
+
+    fn delete_product_list(&self, id: u64) -> Result<(), CollectionsServiceError> {
+        self.runtime
+            .block_on(self.client.delete_product_list(id))
+            .map_err(map_client_error)
+    }
 }
 
 // ── Unavailable gateway ───────────────────────────────────────────────────────
@@ -342,6 +366,10 @@ impl SdkCollectionsGateway for UnavailableCollectionsGateway {
         &self,
         _name: &str,
     ) -> Result<ProductListItem, CollectionsServiceError> {
+        Err(self.error.clone())
+    }
+
+    fn delete_product_list(&self, _id: u64) -> Result<(), CollectionsServiceError> {
         Err(self.error.clone())
     }
 }
@@ -497,6 +525,10 @@ mod tests {
             _name: &str,
         ) -> Result<ProductListItem, CollectionsServiceError> {
             self.create_result.clone()
+        }
+
+        fn delete_product_list(&self, _id: u64) -> Result<(), CollectionsServiceError> {
+            self.lists.as_ref().map(|_| ()).map_err(Clone::clone)
         }
     }
 

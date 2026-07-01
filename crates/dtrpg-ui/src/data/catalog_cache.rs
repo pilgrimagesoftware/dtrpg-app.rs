@@ -2,12 +2,68 @@
 
 use std::fs;
 use std::path::Path;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
 use crate::data::library::LibraryItem;
-use crate::data::constants::{CATALOG_CACHE_FILE, CATALOG_CACHE_TMP};
+use crate::data::constants::{CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, CATALOG_CACHE_TMP};
+
+/// 7 days in seconds — caches older than this are considered stale.
+const STALE_SECS: u64 = 7 * 24 * 60 * 60;
+
+// ── CacheMetadata ─────────────────────────────────────────────────────────────
+
+/// Sidecar metadata written alongside the catalog cache file.
+///
+/// Used to check whether the cached catalog is stale without reading the full
+/// cache file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheMetadata {
+    /// Unix timestamp (seconds since epoch) when the cache was written.
+    pub saved_at_secs: u64,
+    /// Number of items in the cache at write time.
+    pub item_count: usize,
+}
+
+impl CacheMetadata {
+    /// Returns true if the cache is older than 7 days.
+    pub fn is_stale(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+            .as_secs();
+        now.saturating_sub(self.saved_at_secs) > STALE_SECS
+    }
+}
+
+/// Reads the cache metadata from `{root}/catalog_cache_meta.json`.
+///
+/// Returns `None` on any error (missing file, malformed JSON). Callers that
+/// receive `None` should treat the cache as stale.
+pub fn load_cache_metadata(root: &Path) -> Option<CacheMetadata> {
+    let path = root.join(CATALOG_CACHE_METADATA_FILE);
+    let text = fs::read_to_string(&path)
+        .map_err(|e| warn!(path = %path.display(), error = %e, "cache metadata not readable"))
+        .ok()?;
+    serde_json::from_str(&text)
+        .map_err(|e| warn!(path = %path.display(), error = %e, "cache metadata malformed"))
+        .ok()
+}
+
+/// Writes cache metadata for `item_count` items to `{root}/catalog_cache_meta.json`.
+pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), CatalogCacheError> {
+    let saved_at_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::ZERO)
+        .as_secs();
+    let meta = CacheMetadata { saved_at_secs, item_count };
+    let json = serde_json::to_string(&meta)?;
+    fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
+    Ok(())
+}
 
 // ── CatalogCacheError ─────────────────────────────────────────────────────────
 
@@ -53,6 +109,7 @@ pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), Cata
     let json = serde_json::to_string(items)?;
     fs::write(&tmp, &json)?;
     fs::rename(&tmp, root.join(CATALOG_CACHE_FILE))?;
+    save_cache_metadata(root, items.len())?;
     Ok(())
 }
 
@@ -62,6 +119,7 @@ pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), Cata
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
     use crate::data::enums::ItemStatus;
     use crate::data::library::LibraryItem;
 
@@ -102,6 +160,48 @@ mod tests {
         let result = load_catalog_cache(&dir);
         let _ = fs::remove_dir_all(&dir);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn fresh_metadata_is_not_stale() {
+        let meta = CacheMetadata {
+            saved_at_secs: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            item_count: 10,
+        };
+        assert!(!meta.is_stale());
+    }
+
+    #[test]
+    fn old_metadata_is_stale() {
+        let meta = CacheMetadata {
+            saved_at_secs: 0, // epoch — very old
+            item_count: 10,
+        };
+        assert!(meta.is_stale());
+    }
+
+    #[test]
+    fn missing_metadata_returns_none() {
+        let dir = std::path::PathBuf::from("/nonexistent/dtrpg_meta_surely_missing");
+        assert!(load_cache_metadata(&dir).is_none());
+    }
+
+    #[test]
+    fn save_cache_writes_metadata() {
+        let dir = test_dir("metadata_roundtrip");
+        fs::create_dir_all(&dir).unwrap();
+        let items = vec![make_item("b1"), make_item("b2"), make_item("b3")];
+        save_catalog_cache(&dir, &items).unwrap();
+
+        let meta = load_cache_metadata(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let meta = meta.unwrap();
+        assert_eq!(meta.item_count, 3);
+        assert!(!meta.is_stale());
     }
 
     #[test]
