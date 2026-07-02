@@ -35,9 +35,9 @@ use crate::{
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
         enums::CatalogPresentation,
         events::{
-            ActivityChanged, AuthStateChanged, CollectionCreateFailed, DownloadComplete,
-            DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded,
-            StartupAuthBegun, StartupAuthFailed,
+            ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
+            DownloadComplete, DownloadError, LibraryChanged, LogoutRequested, SettingsChanged,
+            SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
         },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
@@ -385,6 +385,17 @@ impl LibraryRootView {
             move |_this, _settings, _event: &StartupAuthFailed, window, cx| {
                 auth_state_for_failed.update(cx, |ctrl, cx| ctrl.set_auth_pending(false, cx));
                 window.remove_notification::<AuthPendingNotif>(cx);
+            },
+        )
+        .detach();
+
+        // Handle cache clear: drop the in-memory catalog/collections and force a live
+        // re-fetch, so cleared content disappears immediately instead of lingering.
+        let controller_for_cache_cleared = controller.clone();
+        cx.subscribe(
+            &settings,
+            move |_this, _settings, _event: &CacheCleared, cx| {
+                controller_for_cache_cleared.update(cx, |ctrl, cx| ctrl.clear_and_reload(cx));
             },
         )
         .detach();

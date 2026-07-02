@@ -10,7 +10,8 @@ use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
 use crate::data::avatar::fetch_avatar_bytes;
 use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::events::{
-    LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
+    CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun,
+    StartupAuthFailed,
 };
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::profile::ProfileConfig;
@@ -325,17 +326,18 @@ impl SettingsController {
     }
 
     /// Deletes all regenerable app cache data (catalog/collections metadata cache and
-    /// the cached avatar image) from disk.
+    /// the cached avatar image) from disk, then emits [`CacheCleared`] so the library
+    /// view drops its in-memory catalog and re-fetches live.
     ///
-    /// Does not touch downloaded content, credentials, or preferences. The catalog and
-    /// collections will re-fetch from the API on next load.
-    pub fn clear_cache(&self) {
+    /// Does not touch downloaded content, credentials, or preferences.
+    pub fn clear_cache(&self, cx: &mut Context<Self>) {
         let dir = crate::data::paths::app_cache_dir();
         if let Err(e) = std::fs::remove_dir_all(&dir)
             && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
         }
+        cx.emit(CacheCleared);
     }
 
     // ── Panel visibility ──────────────────────────────────────────────────────

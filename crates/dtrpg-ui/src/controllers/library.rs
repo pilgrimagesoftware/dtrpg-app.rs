@@ -563,6 +563,21 @@ impl LibraryController {
         self.start_load_inner(cx, true);
     }
 
+    /// Drops the in-memory catalog and collections, then forces a full live fetch.
+    ///
+    /// Used after the on-disk app cache has been cleared, so stale content
+    /// disappears from the UI immediately instead of lingering until an
+    /// unrelated reload repopulates it from what is now a missing cache file.
+    pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
+        self.catalog.clear();
+        self.collections.clear();
+        self.collection_members.clear();
+        self.section_counts = SectionCounts::default();
+        self.publishers.clear();
+        self.invalidate_cache();
+        self.reload_catalog(cx);
+    }
+
     /// Emits `LibraryChanged` to trigger a UI re-render without modifying state.
     ///
     /// Used by sidebar section headers to force a re-render after persisting UI prefs.

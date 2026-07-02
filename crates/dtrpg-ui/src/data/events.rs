@@ -100,3 +100,14 @@ impl EventEmitter<CollectionCreateFailed> for LibraryController {}
 pub struct StartupAuthFailed;
 
 impl EventEmitter<StartupAuthFailed> for SettingsController {}
+
+// ── CacheCleared ───────────────────────────────────────────────────────────────
+
+/// Emitted by `SettingsController` after the on-disk app cache has been deleted.
+///
+/// The receiver should clear `LibraryController`'s in-memory catalog and collections
+/// and force a fresh live fetch, so cleared content disappears from the UI immediately
+/// instead of lingering until the next unrelated reload.
+pub struct CacheCleared;
+
+impl EventEmitter<CacheCleared> for SettingsController {}

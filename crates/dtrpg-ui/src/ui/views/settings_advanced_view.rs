@@ -59,7 +59,7 @@ pub fn render_advanced_section(
                                         t!("settings.clear_cache_confirm_description").to_string(),
                                     )
                                     .on_ok(move |_, _window, cx| {
-                                        entity.read(cx).clear_cache();
+                                        entity.update(cx, |ctrl, cx| ctrl.clear_cache(cx));
                                         true
                                     })
                             });

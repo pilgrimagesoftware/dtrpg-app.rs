@@ -37,6 +37,7 @@ pub fn render_alert_history_panel(
 
     div()
         .absolute()
+        .occlude()
         .bottom(px(44.0))
         .left(px(360.0))
         .w(px(340.0))
