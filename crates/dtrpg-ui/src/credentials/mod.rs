@@ -7,7 +7,7 @@
 //!
 //! ```rust,no_run
 //! use dtrpg_ui::credentials::{KeyringCredentialStore, CredentialStore, Credential};
-//! use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
+//! use dtrpg_ui::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 //! let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
 //! let credential = Credential {
 //!     service: KEYRING_SERVICE.into(),

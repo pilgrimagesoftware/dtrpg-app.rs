@@ -105,27 +105,6 @@ pub fn render_detail_panel(
                     cx.new(|_| DetailPanelResizeDrag)
                 }),
         )
-        // Close button
-        .child(
-            div()
-                .absolute()
-                .top(px(12.0))
-                .right(px(12.0))
-                .id("detail-close")
-                .size(px(24.0))
-                .rounded_full()
-                .bg(scrim)
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .text_sm()
-                .text_color(accent_on)
-                .on_click(move |_, _, cx| {
-                    entity_close.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
-                })
-                .child("✕"),
-        )
         // Cover — capped at `DETAIL_PANEL_COVER_MAX_WIDTH` and re-centered
         // horizontally (staying top-aligned) as the panel is resized wider.
         .child({
@@ -291,6 +270,30 @@ pub fn render_detail_panel(
                     // Metadata table
                     .child(render_metadata_table(&item, colors)),
             ),
+        )
+        // Close button — rendered last so it paints on top of the cover image and
+        // scroll body; GPUI stacks sibling children in child-list order regardless
+        // of `absolute()` positioning, so an earlier position in the chain would
+        // have the cover painted over it.
+        .child(
+            div()
+                .absolute()
+                .top(px(12.0))
+                .right(px(12.0))
+                .id("detail-close")
+                .size(px(24.0))
+                .rounded_full()
+                .bg(scrim)
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .text_sm()
+                .text_color(accent_on)
+                .on_click(move |_, _, cx| {
+                    entity_close.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+                })
+                .child("✕"),
         )
         .into_any_element()
 }
