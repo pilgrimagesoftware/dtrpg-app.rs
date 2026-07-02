@@ -1,7 +1,7 @@
 //! Activity data model for tracking background operations.
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 /// The lifecycle state of a single background operation.
 #[derive(Debug, Clone)]
@@ -61,4 +61,31 @@ pub struct ActivitySnapshot {
     pub items: Vec<ActivityItem>,
     /// The id of the currently expanded item row, if any.
     pub selected_id: Option<u64>,
+}
+
+/// A durable record of a single error-status activity item.
+///
+/// Unlike [`ActivityItem`] entries in the activity panel's `recent` list, alert
+/// entries never expire on a timer — they persist for the session (capped by
+/// [`crate::data::constants::ALERT_LOG_CAP`]) so the user can review past failures
+/// after the transient activity panel has already dismissed them.
+#[derive(Debug, Clone)]
+pub struct AlertEntry {
+    /// Identifier of the originating [`ActivityItem`]. Not guaranteed unique across
+    /// a full app session once eviction wraps, but unique among currently-retained entries.
+    pub id: u64,
+    /// Human-readable label of the operation that failed.
+    pub label: Arc<str>,
+    /// The error message associated with the failure.
+    pub message: String,
+    /// Wall-clock time the error occurred.
+    pub occurred_at: SystemTime,
+}
+
+/// Snapshot of the alert history log needed by the root view for one render pass.
+pub struct AlertHistorySnapshot {
+    /// Whether the alert history panel overlay is open.
+    pub open: bool,
+    /// All retained alert entries, newest first.
+    pub entries: Vec<AlertEntry>,
 }

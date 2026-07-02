@@ -17,10 +17,10 @@ use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 
 use crate::ui::views::{
-    activity_panel_view::render_activity_panel, catalog_view::CatalogView,
-    detail_panel_view::render_detail_panel, notification_banner_view::render_notification_banner,
-    settings_view::render_settings_panel, sidebar_view::render_sidebar,
-    toolbar_view::render_toolbar,
+    activity_panel_view::render_activity_panel, alert_history_view::render_alert_history_panel,
+    catalog_view::CatalogView, detail_panel_view::render_detail_panel,
+    notification_banner_view::render_notification_banner, settings_view::render_settings_panel,
+    sidebar_view::render_sidebar, toolbar_view::render_toolbar,
 };
 use crate::{
     controllers::{
@@ -594,13 +594,19 @@ impl Render for LibraryRootView {
         // top of everything.
         let activity_overlay = activity_snap
             .panel_open
-            .then(|| render_activity_panel(&activity_snap, activity_entity, colors));
+            .then(|| render_activity_panel(&activity_snap, activity_entity.clone(), colors));
+
+        let alert_snap = self.activity.read(cx).alert_snapshot();
+        let alert_history_overlay = alert_snap
+            .open
+            .then(|| render_alert_history_panel(&alert_snap, activity_entity, colors));
 
         let settings_for_action = self.settings.clone();
         let controller_for_reload = self.controller.clone();
         let controller_for_add = self.controller.clone();
         let collection_input_for_add = self.collection_name_input.clone();
         let activity_for_show = self.activity.clone();
+        let activity_for_alert_history = self.activity.clone();
         let sidebar_initial = self.sidebar_width;
 
         div()
@@ -679,8 +685,8 @@ impl Render for LibraryRootView {
             .on_action(move |_: &ShowActivity, _, cx| {
                 activity_for_show.update(cx, |a, cx| a.toggle_panel(cx));
             })
-            .on_action(|_: &ShowAlertHistory, _, _cx| {
-                tracing::info!("ShowAlertHistory action triggered");
+            .on_action(move |_: &ShowAlertHistory, _, cx| {
+                activity_for_alert_history.update(cx, |a, cx| a.toggle_alert_panel(cx));
             })
             .child(
                 h_resizable("main-layout")
@@ -698,6 +704,7 @@ impl Render for LibraryRootView {
                     ),
             )
             .children(activity_overlay)
+            .children(alert_history_overlay)
             .children(sheet_layer)
             .children(dialog_layer)
             .children(notification_layer)

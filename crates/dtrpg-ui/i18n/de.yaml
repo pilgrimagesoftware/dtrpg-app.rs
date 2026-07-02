@@ -105,6 +105,12 @@ activity:
   empty: "Keine kürzliche Aktivität."
   empty_hint: "Aktivitäten werden hier angezeigt, sobald Vorgänge ausgeführt werden."
 
+alert_history:
+  title: "Warnungsverlauf"
+  empty: "Keine Warnungen."
+  empty_hint: "Fehler aus Hintergrundvorgängen werden hier angezeigt."
+  clear: "Löschen"
+
 notification:
   set_up_account: "Konto einrichten"
   session_expired: "Sitzung abgelaufen — melden Sie sich erneut an, um Ihre Bibliothek zu aktualisieren"

@@ -2,12 +2,14 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use gpui::Context;
 
-use crate::data::activity::{ActivityItem, ActivitySnapshot, ActivityStatus};
-use crate::data::constants::{ERROR_EXPIRY_SECS, EXPIRY_SECS, RECENT_CAP};
+use crate::data::activity::{
+    ActivityItem, ActivitySnapshot, ActivityStatus, AlertEntry, AlertHistorySnapshot,
+};
+use crate::data::constants::{ALERT_LOG_CAP, ERROR_EXPIRY_SECS, EXPIRY_SECS, RECENT_CAP};
 use crate::data::events::{ActivityChanged, DownloadComplete, DownloadError};
 
 /// Owns the activity item list and panel open/close state.
@@ -18,6 +20,13 @@ pub struct ActivityController {
     panel_open: bool,
     /// The id of the item row currently expanded in the panel, if any.
     selected_id: Option<u64>,
+    /// Durable, non-expiring log of error-status activity items.
+    ///
+    /// Never cleared by [`clear`](Self::clear) — this is a session-long record
+    /// independent of the active service, capped at [`ALERT_LOG_CAP`].
+    alert_log: VecDeque<AlertEntry>,
+    /// Whether the alert history panel overlay is open.
+    alert_panel_open: bool,
 }
 
 impl ActivityController {
@@ -29,12 +38,15 @@ impl ActivityController {
             recent: VecDeque::with_capacity(RECENT_CAP),
             panel_open: false,
             selected_id: None,
+            alert_log: VecDeque::with_capacity(ALERT_LOG_CAP),
+            alert_panel_open: false,
         }
     }
 
     /// Clears all activity items (in-progress and recent) and closes the panel.
     ///
     /// Used when replacing the library service so stale error messages don't persist.
+    /// The durable alert history log is intentionally left intact.
     pub fn clear(&mut self, cx: &mut Context<Self>) {
         self.in_progress.clear();
         self.recent.clear();
@@ -112,6 +124,12 @@ impl ActivityController {
             item.elapsed_secs = Some(item.started_at.elapsed().as_secs());
             let title = item.label.clone();
             item.status = ActivityStatus::Error(message.clone());
+            self.push_alert(AlertEntry {
+                id: item.id,
+                label: title.clone(),
+                message: message.clone(),
+                occurred_at: SystemTime::now(),
+            });
             self.push_recent(item);
             cx.emit(ActivityChanged);
             cx.emit(DownloadError { title, message });
@@ -181,6 +199,27 @@ impl ActivityController {
         cx.emit(ActivityChanged);
     }
 
+    /// Toggles the alert history panel overlay open or closed.
+    pub fn toggle_alert_panel(&mut self, cx: &mut Context<Self>) {
+        self.alert_panel_open = !self.alert_panel_open;
+        cx.emit(ActivityChanged);
+    }
+
+    /// Removes all entries from the durable alert history log.
+    pub fn clear_alert_log(&mut self, cx: &mut Context<Self>) {
+        self.alert_log.clear();
+        cx.emit(ActivityChanged);
+    }
+
+    /// Returns a snapshot of the alert history log for rendering.
+    #[must_use]
+    pub fn alert_snapshot(&self) -> AlertHistorySnapshot {
+        AlertHistorySnapshot {
+            open: self.alert_panel_open,
+            entries: self.alert_log.iter().cloned().collect(),
+        }
+    }
+
     /// Returns a snapshot of current activity state for rendering.
     pub fn snapshot(&self) -> ActivitySnapshot {
         let recent_error_count = self
@@ -207,6 +246,14 @@ impl ActivityController {
             self.recent.pop_back();
         }
         self.recent.push_front(item);
+    }
+
+    /// Appends an entry to the durable alert log, evicting the oldest entry if full.
+    fn push_alert(&mut self, entry: AlertEntry) {
+        if self.alert_log.len() == ALERT_LOG_CAP {
+            self.alert_log.pop_back();
+        }
+        self.alert_log.push_front(entry);
     }
 }
 

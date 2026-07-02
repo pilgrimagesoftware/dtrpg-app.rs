@@ -106,6 +106,12 @@ activity:
   empty: "No recent activity."
   empty_hint: "Activity will appear here as operations run."
 
+alert_history:
+  title: "Alert History"
+  empty: "No alerts."
+  empty_hint: "Errors from background operations will appear here."
+  clear: "Clear"
+
 notification:
   set_up_account: "Set Up Account"
   session_expired: "Session expired — sign in again to refresh your library"

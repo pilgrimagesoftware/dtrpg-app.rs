@@ -58,6 +58,12 @@ pub const RECENT_CAP: usize = 25;
 pub const EXPIRY_SECS: u64 = 15;
 pub const ERROR_EXPIRY_SECS: u64 = 120;
 
+/// Maximum number of entries retained in the durable alert history log.
+///
+/// Unlike the transient activity panel's `recent` list, entries here never expire
+/// on a timer — the oldest entry is evicted only once this cap is reached.
+pub const ALERT_LOG_CAP: usize = 100;
+
 /// Default width of the detail panel, in pixels.
 pub const DETAIL_PANEL_DEFAULT_WIDTH: f32 = 320.0;
 /// Minimum allowed detail panel width, in pixels.
