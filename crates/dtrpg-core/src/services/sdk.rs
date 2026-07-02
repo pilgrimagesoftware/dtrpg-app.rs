@@ -164,6 +164,30 @@ impl LibraryService for RustSdkLibraryService {
         let response = self.gateway.get_order_product(id)?;
         Ok(map_order_product(&response.data, &HashMap::new(), 0))
     }
+
+    fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
+        // Request a single item per page: with `pageSize=1`, the last page number
+        // reported in `links.last` is numerically equal to the total item count,
+        // so this is a cheap way to detect remote changes without fetching all
+        // pages. Falls back to the single returned page's length when there is no
+        // `last` link (i.e. the whole library fits on one page of size 1: 0 or 1
+        // items).
+        let params = LibraryItemsParams {
+            page: Some(1),
+            page_size: Some(1),
+            get_checksum: Some(false),
+            get_filters: Some(false),
+            library: Some(true),
+            archived: Some(false),
+            updated_date_after: None,
+        };
+
+        Some(self.gateway.list_order_products(params).map(|response| {
+            last_page_from_links(&response.links)
+                .map(|last_page| last_page as usize)
+                .unwrap_or(response.data.len())
+        }))
+    }
 }
 
 struct HttpSdkLibraryGateway {
@@ -651,6 +675,54 @@ mod tests {
 
         assert_eq!(mapped.publisher.as_ref(), "Lantern Press");
         assert!(mapped.cover_url.is_none());
+    }
+
+    #[test]
+    fn count_items_uses_last_page_number_when_link_present() {
+        let mut gateway = FakeSdkGateway::seeded();
+        gateway.list_result = Ok(OrderProductListResponse {
+            links: PaginationLinks {
+                self_: "self".to_string(),
+                first: None,
+                last: Some(
+                    "https://api.example.com/order_products?pageSize=1&page=137".to_string(),
+                ),
+                prev: None,
+                next: None,
+            },
+            meta: PaginationMeta {
+                items_per_page: 1,
+                current_page: 1,
+            },
+            data: vec![order_product_item(1, "First Item")],
+            included: None,
+        });
+        let service = RustSdkLibraryService::new(Box::new(gateway));
+
+        let count = service.count_items().expect("count supported");
+
+        assert_eq!(count.expect("count succeeds"), 137);
+    }
+
+    #[test]
+    fn count_items_falls_back_to_page_length_without_last_link() {
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+
+        let count = service.count_items().expect("count supported");
+
+        assert_eq!(count.expect("count succeeds"), 1);
+    }
+
+    #[test]
+    fn count_items_propagates_gateway_error() {
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
+
+        let count = service.count_items().expect("count supported");
+
+        assert_eq!(
+            count.expect_err("session error propagated").kind,
+            LibraryServiceErrorKind::Session
+        );
     }
 
     #[test]
