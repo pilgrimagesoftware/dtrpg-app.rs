@@ -52,6 +52,13 @@ While the thumbnail queue is non-empty, the activity panel SHALL show a single a
 - **WHEN** the last item in the queue has been fetched
 - **THEN** the activity entry is marked complete
 
+### Requirement: Thumbnail fetches run without requiring an ambient async runtime
+The thumbnail HTTP fetch SHALL execute in a way that does not depend on an active Tokio (or other) async reactor being present on the executing thread, since `dtrpg-ui` does not own or depend on one and gpui's executors are not Tokio-backed.
+
+#### Scenario: Fetch succeeds without a Tokio runtime in scope
+- **WHEN** a thumbnail fetch runs on a `gpui` background-executor thread with no Tokio runtime entered anywhere in the process
+- **THEN** the fetch completes successfully (using a mechanism, such as `reqwest`'s blocking client, that manages its own runtime internally rather than requiring one)
+
 ### Requirement: Manual trigger via context menu
 Every catalog entry in all three layouts (list, thumbs, grid) SHALL expose a "Load Thumbnail" context menu item that enqueues the entry's thumbnail for loading.
 

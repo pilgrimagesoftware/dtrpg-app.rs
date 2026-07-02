@@ -12,7 +12,7 @@
 - [x] 3.1 Add `thumbnail_queue: VecDeque<Arc<str>>`, `thumbnail_loading: bool`, and `thumbnail_activity_id: Option<u64>` fields to `LibraryController`
 - [x] 3.2 Add `enqueue_thumbnails(items: &[LibraryItem], cx: &mut Context<Self>)` helper: for each item with `cover_url` not in `CoverCache` and not in-flight, push to `thumbnail_queue` and mark in-flight
 - [x] 3.3 Add `drain_thumbnail_queue(&mut self, cx: &mut Context<Self>)` helper: if not already loading and queue non-empty, dequeue one URL, spawn the async fetch task, and set `thumbnail_loading = true`
-- [x] 3.4 Implement the async fetch task body: call `reqwest::get(url)`, on success insert bytes into `CoverCache`, clear in-flight, update `thumbnail_last_attempted` on the matching `LibraryItem`; on failure clear in-flight only; in both cases call `drain_thumbnail_queue` for the next item and update/complete the activity entry
+- [x] 3.4 Implement the fetch task body: fetch `url`'s bytes on a background executor thread, on success insert bytes into `CoverCache`, clear in-flight, update `thumbnail_last_attempted` on the matching `LibraryItem`; on failure clear in-flight only; in both cases call `drain_thumbnail_queue` for the next item and update/complete the activity entry
 - [x] 3.5 Call `enqueue_thumbnails` then `drain_thumbnail_queue` at the end of `append_catalog_page`
 
 ## 4. Add reqwest dependency
@@ -37,3 +37,25 @@
 - [ ] 7.2 Manually launch the app and confirm thumbnails begin loading as catalog pages arrive, with the activity panel showing the aggregated label
 - [ ] 7.3 Confirm the context menu appears on right-click in all three catalog layouts
 - [ ] 7.4 Confirm the "Load Thumbnail" item is disabled within 5 minutes of a prior attempt and enabled after
+
+## 8. Bug fix: thumbnails never actually loaded
+
+- [x] 8.1 Root-caused why thumbnails never loaded in practice despite 1-7 being implemented:
+      `drain_thumbnail_queue` (`dtrpg-ui/src/controllers/library.rs`) called
+      `reqwest::get(&url_str).await` directly inside a `cx.spawn` future. `dtrpg-ui` does
+      not depend on `tokio` and gpui's executors (`BackgroundExecutor`/`ForegroundExecutor`)
+      are backed by a platform dispatcher (e.g. GCD on macOS), not a Tokio runtime — so the
+      async reqwest client, which needs an active Tokio reactor to resolve DNS/open sockets,
+      had nothing to run on. Every fetch failed immediately. `dtrpg-core`'s SDK gateway
+      (`services/sdk.rs`, `services/login.rs`, `services/collections_sdk.rs`) avoids this by
+      owning a dedicated `tokio::runtime::Runtime` and calling `.block_on(...)` from
+      background-executor threads; the thumbnail loader had no equivalent.
+- [x] 8.2 Fixed by switching the fetch to `reqwest::blocking::get(...)`, run inside
+      `async_cx.background_executor().spawn(async move { ... })` — `reqwest`'s blocking
+      client manages its own internal runtime per call and needs no ambient Tokio context,
+      matching the pattern the SDK gateway already uses for calling network code from these
+      same background-executor threads. The `blocking` reqwest feature was already enabled
+      in the workspace `Cargo.toml` (added previously, seemingly in anticipation of this
+      issue) but never wired into the actual call site until now.
+- [ ] 8.3 Manually launch the app, sign in, and confirm thumbnails now actually appear on
+      catalog items (not just that the queue drains without visible progress)

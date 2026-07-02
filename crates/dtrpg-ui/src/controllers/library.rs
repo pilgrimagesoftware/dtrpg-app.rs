@@ -732,12 +732,21 @@ impl LibraryController {
         let url_str = url.to_string();
 
         cx.spawn(async move |this, async_cx| {
-            let result: Result<Vec<u8>, String> = async {
-                let resp = reqwest::get(&url_str).await.map_err(|e| e.to_string())?;
-                let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-                Ok(bytes.to_vec())
-            }
-            .await;
+            // gpui's executors are not a Tokio runtime, and `dtrpg-ui` does not depend on
+            // `tokio` directly, so the async `reqwest::get(...).await` used here previously
+            // had no reactor to run on and always failed. `reqwest::blocking` manages its
+            // own internal runtime per call and works from a plain OS thread, matching the
+            // pattern the SDK gateway already uses (`tokio::runtime::Runtime::block_on`) to
+            // run network calls from these same background-executor threads.
+            let fetch_url = url_str.clone();
+            let result: Result<Vec<u8>, String> = async_cx
+                .background_executor()
+                .spawn(async move {
+                    let resp = reqwest::blocking::get(&fetch_url).map_err(|e| e.to_string())?;
+                    let bytes = resp.bytes().map_err(|e| e.to_string())?;
+                    Ok(bytes.to_vec())
+                })
+                .await;
 
             match result {
                 Ok(bytes) => {
