@@ -8,6 +8,7 @@ use gpui::{
     AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     ParentElement, Pixels, Render, Styled, div, px,
 };
+use gpui_component::Root;
 use gpui_component::WindowExt as _;
 use gpui_component::dialog::{DialogButtonProps, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputEvent, InputState};
@@ -349,6 +350,14 @@ impl Focusable for LibraryRootView {
 
 impl Render for LibraryRootView {
     fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // `Root` (gpui-component) tracks open dialogs/sheets/notifications as state but
+        // does not render them itself — the top-level app view must compose these layers
+        // explicitly, or `window.open_dialog()` / `open_alert_dialog()` / `push_notification()`
+        // calls silently have no visible effect. See gpui-component's `StoryRoot` example.
+        let sheet_layer = Root::render_sheet_layer(window, cx);
+        let dialog_layer = Root::render_dialog_layer(window, cx);
+        let notification_layer = Root::render_notification_layer(window, cx);
+
         let lib_entity = self.controller.clone();
         let settings_entity = self.settings.clone();
         let activity_entity = self.activity.clone();
@@ -582,5 +591,8 @@ impl Render for LibraryRootView {
                             .child(main_content),
                     ),
             )
+            .children(sheet_layer)
+            .children(dialog_layer)
+            .children(notification_layer)
     }
 }
