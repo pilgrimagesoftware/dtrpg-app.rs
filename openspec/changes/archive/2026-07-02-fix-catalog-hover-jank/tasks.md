@@ -29,8 +29,8 @@
 
 ## 5. Manual Verification
 
-- [ ] 5.1 Mouse movement over the catalog (Thumbs, ungrouped) no longer causes visible lag or beachball
-- [ ] 5.2 Mouse movement over the catalog (Thumbs, grouped) no longer causes visible lag or beachball
-- [ ] 5.3 Mouse movement over the detail panel no longer causes visible lag or beachball
-- [ ] 5.4 When a cover is cached, the detail panel shows the real thumbnail (not the generative cover)
-- [ ] 5.5 Switching filters/search updates the catalog correctly (cache invalidation works)
+- [x] 5.1 Mouse movement over the catalog (Thumbs, ungrouped) no longer causes visible lag or beachball
+- [x] 5.2 Mouse movement over the catalog (Thumbs, grouped) no longer causes visible lag or beachball
+- [x] 5.3 Mouse movement over the detail panel no longer causes visible lag or beachball
+- [x] 5.4 When a cover is cached, the detail panel shows the real thumbnail (not the generative cover)
+- [x] 5.5 Switching filters/search updates the catalog correctly (cache invalidation works)
