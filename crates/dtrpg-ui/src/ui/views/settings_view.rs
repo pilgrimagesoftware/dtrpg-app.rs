@@ -12,6 +12,7 @@ use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::{
     settings_account_view::render_account_section,
+    settings_advanced_view::{render_about_section, render_advanced_section},
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
@@ -68,6 +69,10 @@ pub fn render_settings_panel(
     let file_opener_extension_input = file_opener_extension_input.clone();
     let pending_file_opener = pending_file_opener.clone();
 
+    let advanced_entity = entity.clone();
+    let advanced_colors = colors.clone();
+    let about_colors = colors.clone();
+
     // ── Build the Settings component ──────────────────────────────────────────
 
     let settings =
@@ -109,7 +114,19 @@ pub fn render_settings_panel(
                         pending_file_opener.clone(),
                     )
                 })),
-            ));
+            ))
+            .page(
+                SettingPage::new(t!("settings.advanced_title")).group(SettingGroup::new().item(
+                    SettingItem::render(move |_, _window, _cx| {
+                        render_advanced_section(advanced_entity.clone(), &advanced_colors)
+                    }),
+                )),
+            )
+            .page(
+                SettingPage::new(t!("settings.about_title")).group(SettingGroup::new().item(
+                    SettingItem::render(move |_, _window, _cx| render_about_section(&about_colors)),
+                )),
+            );
 
     div()
         .id("settings-backdrop")

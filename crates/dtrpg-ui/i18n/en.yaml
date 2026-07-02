@@ -64,6 +64,8 @@ catalog:
   action_show_in_finder: "Show in Finder"
   action_show_in_explorer: "Show in Explorer"
   action_show_in_files: "Show in Files"
+  pagination_first: "First"
+  pagination_last: "Last"
 
 detail:
   read_button: "Read"
@@ -113,6 +115,12 @@ settings:
   sign_in_button: "Sign In"
   sign_in_in_progress: "Signing In…"
   file_opener_extension_placeholder: "Extension (e.g. pdf)"
+  advanced_title: "Advanced"
+  about_title: "About"
+  clear_cache_description: "Removes cached catalog metadata and the cached avatar image. Downloaded content and your account are not affected."
+  clear_cache_button: "Clear Cache"
+  clear_cache_confirm_title: "Clear cache?"
+  clear_cache_confirm_description: "The catalog and collections will re-fetch from DriveThruRPG the next time they load."
 
 collections:
   add_tooltip: "New collection"
@@ -138,6 +146,11 @@ notification:
   set_up_account: "Set Up Account"
   session_expired: "Session expired — sign in again to refresh your library"
   sign_in_again: "Sign In Again"
+
+about:
+  version: "Version %{version}"
+  description: "A native library manager for your DriveThruRPG collection."
+  ok: "OK"
 
 menu:
   app_about: "About Libri"

@@ -97,6 +97,8 @@ pub fn setup(cx: &mut App) {
     cx.on_action::<Quit>(|_, cx| cx.quit());
     cx.on_action::<HideApplication>(|_, cx| cx.hide());
     cx.on_action::<HideOthers>(|_, cx| cx.hide_other_apps());
+    // The real handler lives on `LibraryRootView` (opens the About dialog). This is a
+    // harmless fallback in case the action fires before any window has focus.
     cx.on_action::<About>(|_, _cx| {});
     cx.on_action::<Minimize>(|_, cx| {
         if let Some(win) = cx.active_window() {

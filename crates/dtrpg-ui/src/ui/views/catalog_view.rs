@@ -602,9 +602,11 @@ impl Render for CatalogView {
 
         let current_page = snap.current_page;
         let total_pages = snap.total_pages;
+        let page_size = snap.page_size;
         let ctrl_for_page = self.controller.clone();
         let ctrl_for_first = self.controller.clone();
         let ctrl_for_last = self.controller.clone();
+        let ctrl_for_page_size = self.controller.clone();
 
         let content: AnyElement = match (snap.presentation, snap.grouped) {
             // ── List, ungrouped — DataTable (handles header/row alignment) ──
@@ -776,20 +778,22 @@ impl Render for CatalogView {
 
         let mut result = outer.child(content);
 
-        if total_pages > 1 {
-            result = result.child(
-                div()
-                    .flex_none()
-                    .px(pad_side)
-                    .py(px(8.0))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .gap(px(16.0))
+        if item_count > 0 {
+            let mut bar = div()
+                .flex_none()
+                .px(pad_side)
+                .py(px(8.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .gap(px(16.0));
+
+            if total_pages > 1 {
+                bar = bar
                     .child(
                         Button::new("page-first-btn")
                             .ghost()
-                            .label("\u{00ab} First")
+                            .label(format!("\u{00ab} {}", t!("catalog.pagination_first")))
                             .disabled(current_page == 1)
                             .on_click(move |_, _, cx| {
                                 ctrl_for_first.update(cx, |ctrl, cx| ctrl.set_page(1, cx));
@@ -806,17 +810,55 @@ impl Render for CatalogView {
                     .child(
                         Button::new("page-last-btn")
                             .ghost()
-                            .label("Last \u{00bb}")
+                            .label(format!("{} \u{00bb}", t!("catalog.pagination_last")))
                             .disabled(current_page == total_pages)
                             .on_click(move |_, _, cx| {
                                 ctrl_for_last.update(cx, |ctrl, cx| ctrl.set_page(total_pages, cx));
                             }),
-                    ),
-            );
+                    );
+            }
+
+            bar = bar.child(render_page_size_selector(page_size, ctrl_for_page_size));
+
+            result = result.child(bar);
         }
 
         result.into_any_element()
     }
+}
+
+// ── Page size selector ──────────────────────────────────────────────────────────
+
+/// Page size options offered in the pagination area, mirroring
+/// [`LibraryController::set_page_size`](crate::controllers::library::LibraryController::set_page_size).
+const PAGE_SIZE_OPTIONS: [usize; 5] = [10, 25, 50, 100, 200];
+
+/// Renders the "N / page" dropdown control in the pagination area.
+fn render_page_size_selector(
+    current: usize,
+    entity: Entity<LibraryController>,
+) -> impl IntoElement + 'static {
+    let label = t!("toolbar.page_size_label", n = current).to_string();
+
+    Button::new("page-size-selector")
+        .ghost()
+        .label(label)
+        .dropdown_caret(true)
+        .dropdown_menu(move |menu, _, _| {
+            let mut m = menu;
+            for size in PAGE_SIZE_OPTIONS {
+                let e = entity.clone();
+                let item_label = t!("toolbar.page_size_label", n = size).to_string();
+                m = m.item(
+                    PopupMenuItem::new(item_label)
+                        .checked(size == current)
+                        .on_click(move |_, _, cx| {
+                            e.update(cx, |ctrl, cx| ctrl.set_page_size(size, cx));
+                        }),
+                );
+            }
+            m
+        })
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────

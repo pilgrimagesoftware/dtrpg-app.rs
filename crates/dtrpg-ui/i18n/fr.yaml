@@ -63,6 +63,8 @@ catalog:
   action_show_in_finder: "Afficher dans le Finder"
   action_show_in_explorer: "Afficher dans l'Explorateur"
   action_show_in_files: "Afficher dans Fichiers"
+  pagination_first: "Première"
+  pagination_last: "Dernière"
 
 detail:
   read_button: "Lire"
@@ -112,6 +114,12 @@ settings:
   storage_note: "Changer l'emplacement de téléchargement ne déplacera pas les fichiers déjà téléchargés."
   storage_change_tooltip: "Modifier…"
   file_opener_extension_placeholder: "Extension (ex. pdf)"
+  advanced_title: "Avancé"
+  about_title: "À propos"
+  clear_cache_description: "Supprime les métadonnées du catalogue mises en cache et l'image d'avatar mise en cache. Le contenu téléchargé et votre compte ne sont pas affectés."
+  clear_cache_button: "Vider le cache"
+  clear_cache_confirm_title: "Vider le cache ?"
+  clear_cache_confirm_description: "Le catalogue et les collections seront à nouveau récupérés depuis DriveThruRPG lors du prochain chargement."
 
 collections:
   add_tooltip: "Nouvelle collection"
@@ -137,6 +145,11 @@ notification:
   set_up_account: "Configurer le compte"
   session_expired: "Session expirée — reconnectez-vous pour actualiser votre bibliothèque"
   sign_in_again: "Se reconnecter"
+
+about:
+  version: "Version %{version}"
+  description: "Un gestionnaire de bibliothèque natif pour votre collection DriveThruRPG."
+  ok: "OK"
 
 menu:
   app_about: "À propos de Libri"

@@ -1,7 +1,7 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
 use crate::ui::actions::{
-    AddCollection, ReloadCatalog, ShowActivity, ShowAlertHistory, ShowSettings,
+    About, AddCollection, ReloadCatalog, ShowActivity, ShowAlertHistory, ShowSettings,
 };
 use crate::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory};
 use gpui::{
@@ -627,6 +627,45 @@ impl Render for LibraryRootView {
             .track_focus(&self.root_focus)
             .on_action(move |_: &ShowSettings, _, cx| {
                 settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
+            })
+            .on_action(move |_: &About, window, cx| {
+                window.open_dialog(cx, move |dialog, _window, _cx| {
+                    dialog
+                        .overlay_closable(true)
+                        .w(px(320.))
+                        .on_ok(|_, _, _| true)
+                        .content(move |content, _, _| {
+                            content.child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .items_center()
+                                    .gap_2()
+                                    .px_4()
+                                    .py_6()
+                                    .child(
+                                        div()
+                                            .text_lg()
+                                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                                            .child(t!("sidebar.app_name")),
+                                    )
+                                    .child(div().text_sm().child(t!(
+                                        "about.version",
+                                        version = env!("CARGO_PKG_VERSION")
+                                    )))
+                                    .child(div().text_xs().child(t!("about.description"))),
+                            )
+                        })
+                        .footer(
+                            DialogFooter::new()
+                                .px_4()
+                                .pb_4()
+                                .justify_center()
+                                .child(DialogAction::new().child(
+                                    Button::new("about-ok").primary().label(t!("about.ok")),
+                                )),
+                        )
+                });
             })
             .on_action(move |_: &ReloadCatalog, _, cx| {
                 controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));

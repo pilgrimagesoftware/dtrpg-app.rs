@@ -324,6 +324,20 @@ impl SettingsController {
         }
     }
 
+    /// Deletes all regenerable app cache data (catalog/collections metadata cache and
+    /// the cached avatar image) from disk.
+    ///
+    /// Does not touch downloaded content, credentials, or preferences. The catalog and
+    /// collections will re-fetch from the API on next load.
+    pub fn clear_cache(&self) {
+        let dir = crate::data::paths::app_cache_dir();
+        if let Err(e) = std::fs::remove_dir_all(&dir)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
+        }
+    }
+
     // ── Panel visibility ──────────────────────────────────────────────────────
 
     /// Returns `true` when the settings panel is visible.
