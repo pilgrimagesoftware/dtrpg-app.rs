@@ -52,6 +52,16 @@ pub struct LibrarySnapshot {
     pub current_page: usize,
     pub page_size: usize,
     pub total_pages: usize,
+    /// Whether the publishers section's inline search bar is expanded.
+    /// Session-only; never persisted.
+    pub publisher_search_open: bool,
+    /// Publishers section search filter text. Session-only; never persisted.
+    pub publisher_search_query: String,
+    /// Whether the collections section's inline search bar is expanded.
+    /// Session-only; never persisted.
+    pub collection_search_open: bool,
+    /// Collections section search filter text. Session-only; never persisted.
+    pub collection_search_query: String,
 }
 
 /// Owns all mutable state for the library view.
@@ -106,6 +116,16 @@ pub struct LibraryController {
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
     items_cache: Option<Vec<LibraryItem>>,
+    /// Whether the publishers section's inline search bar is expanded.
+    /// Session-only; never persisted.
+    publisher_search_open: bool,
+    /// Publishers section search filter text. Session-only; never persisted.
+    publisher_search_query: String,
+    /// Whether the collections section's inline search bar is expanded.
+    /// Session-only; never persisted.
+    collection_search_open: bool,
+    /// Collections section search filter text. Session-only; never persisted.
+    collection_search_query: String,
 }
 
 impl LibraryController {
@@ -150,6 +170,10 @@ impl LibraryController {
                 .page_size()
                 .unwrap_or(25),
             items_cache: None,
+            publisher_search_open: false,
+            publisher_search_query: String::new(),
+            collection_search_open: false,
+            collection_search_query: String::new(),
         };
         ctrl.start_load(cx);
         ctrl
@@ -758,6 +782,10 @@ impl LibraryController {
             current_page: self.current_page,
             page_size: self.page_size,
             total_pages,
+            publisher_search_open: self.publisher_search_open,
+            publisher_search_query: self.publisher_search_query.clone(),
+            collection_search_open: self.collection_search_open,
+            collection_search_query: self.collection_search_query.clone(),
         }
     }
 
@@ -904,6 +932,42 @@ impl LibraryController {
     pub fn clear_search_query(&mut self, cx: &mut Context<Self>) {
         self.search_query.clear();
         self.invalidate_cache();
+        cx.emit(LibraryChanged);
+    }
+
+    // ── Sidebar section search mutations ──────────────────────────────────────
+    //
+    // These filter the publishers/collections sidebar lists only. They never
+    // touch the catalog cache and are intentionally session-only: closing a
+    // section's search bar clears its query so reopening it always starts fresh.
+
+    /// Toggles the publishers section's inline search bar, clearing its query on close.
+    pub fn toggle_publisher_search(&mut self, cx: &mut Context<Self>) {
+        self.publisher_search_open = !self.publisher_search_open;
+        if !self.publisher_search_open {
+            self.publisher_search_query.clear();
+        }
+        cx.emit(LibraryChanged);
+    }
+
+    /// Updates the publishers section search filter text.
+    pub fn set_publisher_search_query(&mut self, query: String, cx: &mut Context<Self>) {
+        self.publisher_search_query = query;
+        cx.emit(LibraryChanged);
+    }
+
+    /// Toggles the collections section's inline search bar, clearing its query on close.
+    pub fn toggle_collection_search(&mut self, cx: &mut Context<Self>) {
+        self.collection_search_open = !self.collection_search_open;
+        if !self.collection_search_open {
+            self.collection_search_query.clear();
+        }
+        cx.emit(LibraryChanged);
+    }
+
+    /// Updates the collections section search filter text.
+    pub fn set_collection_search_query(&mut self, query: String, cx: &mut Context<Self>) {
+        self.collection_search_query = query;
         cx.emit(LibraryChanged);
     }
 

@@ -45,3 +45,12 @@ pub fn item_matches_query(item: &LibraryItem, query: &str) -> bool {
         || item.publisher.to_lowercase().contains(&q)
         || item.line.to_lowercase().contains(&q)
 }
+
+/// Returns `true` if `name` contains `query` (case-insensitive).
+///
+/// Used to filter the sidebar's publishers and collections sections by their
+/// inline search bars.
+#[must_use]
+pub fn name_matches_query(name: &str, query: &str) -> bool {
+    query.is_empty() || name.to_lowercase().contains(&query.to_lowercase())
+}

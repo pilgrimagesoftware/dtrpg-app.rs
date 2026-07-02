@@ -104,67 +104,72 @@ pub fn render_detail_panel(
             div().w(px(cover_w)).h(px(cover_h)).flex_none().child(cover)
         })
         // Scrollable body
+        //
+        // `overflow_y_scrollbar()` wraps this div in a `Scrollable` element whose outer
+        // wrapper only inherits explicit width/height from the wrapped element's style,
+        // not `flex_1`/`min_h_0`. Without an outer flex_1/min_h_0 wrapper the scroll
+        // area sizes to its content instead of the panel's remaining height, so it never
+        // scrolls. See `catalog_view.rs` for the same pattern.
         .child(
-            div()
-                .flex_1()
-                .min_h_0()
-                .overflow_y_scrollbar()
-                .p(px(20.0))
-                .flex()
-                .flex_col()
-                .gap(px(16.0))
-                // Publisher + title + line
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(4.0))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(text_tertiary)
-                                .child(item.publisher.to_string()),
-                        )
-                        .child(
-                            div()
-                                .text_xl()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .text_color(text_primary)
-                                .child(item.title.to_string()),
-                        )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(text_secondary)
-                                .child(item.line.to_string()),
-                        ),
-                )
-                // Description
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(text_secondary)
-                        .child(item.desc.to_string()),
-                )
-                // Actions
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(8.0))
-                        .child({
-                            let read_path =
-                                storage_root_path.join("items").join(read_item_id.as_ref());
-                            Button::new("detail-read")
-                                .primary()
-                                .label(t!("detail.read_button"))
-                                .w_full()
-                                .disabled(!is_downloaded)
-                                .when(!is_downloaded, |b| {
-                                    b.tooltip(t!("detail.tooltip_download_first"))
-                                })
-                                .when(is_downloaded, |b| {
-                                    b.on_click(move |_, _, _| {
+            div().flex_1().min_h_0().flex().flex_col().child(
+                div()
+                    .overflow_y_scrollbar()
+                    .p(px(20.0))
+                    .flex()
+                    .flex_col()
+                    .gap(px(16.0))
+                    // Publisher + title + line
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(4.0))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(text_tertiary)
+                                    .child(item.publisher.to_string()),
+                            )
+                            .child(
+                                div()
+                                    .text_xl()
+                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .text_color(text_primary)
+                                    .child(item.title.to_string()),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(text_secondary)
+                                    .child(item.line.to_string()),
+                            ),
+                    )
+                    // Description
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(text_secondary)
+                            .child(item.desc.to_string()),
+                    )
+                    // Actions
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .child({
+                                let read_path =
+                                    storage_root_path.join("items").join(read_item_id.as_ref());
+                                Button::new("detail-read")
+                                    .primary()
+                                    .label(t!("detail.read_button"))
+                                    .w_full()
+                                    .disabled(!is_downloaded)
+                                    .when(!is_downloaded, |b| {
+                                        b.tooltip(t!("detail.tooltip_download_first"))
+                                    })
+                                    .when(is_downloaded, |b| {
+                                        b.on_click(move |_, _, _| {
                                         use crate::util::item_opener::{ItemOpener, OpenError};
 
                                         if !read_path.exists() {
@@ -195,30 +200,30 @@ pub fn render_detail_panel(
                                             }
                                         }
                                     })
-                                })
-                        })
-                        .child(
-                            Button::new("detail-download")
-                                .ghost()
-                                .outline()
-                                .label(if is_downloaded {
-                                    t!("detail.downloaded_button")
-                                } else {
-                                    t!("detail.download_button")
-                                })
-                                .w_full()
-                                .on_click(move |_, _, cx| {
-                                    let id = Arc::clone(&item_id);
-                                    entity_download.update(cx, |ctrl, cx| {
-                                        ctrl.toggle_download(&id, cx);
-                                    });
-                                }),
-                        )
-                        .when(is_downloaded, |col| {
-                            let item_path = storage_root_path
-                                .join("items")
-                                .join(reveal_item_id.as_ref());
-                            col.child(
+                                    })
+                            })
+                            .child(
+                                Button::new("detail-download")
+                                    .ghost()
+                                    .outline()
+                                    .label(if is_downloaded {
+                                        t!("detail.downloaded_button")
+                                    } else {
+                                        t!("detail.download_button")
+                                    })
+                                    .w_full()
+                                    .on_click(move |_, _, cx| {
+                                        let id = Arc::clone(&item_id);
+                                        entity_download.update(cx, |ctrl, cx| {
+                                            ctrl.toggle_download(&id, cx);
+                                        });
+                                    }),
+                            )
+                            .when(is_downloaded, |col| {
+                                let item_path = storage_root_path
+                                    .join("items")
+                                    .join(reveal_item_id.as_ref());
+                                col.child(
                                 Button::new("detail-reveal")
                                     .ghost()
                                     .outline()
@@ -237,10 +242,11 @@ pub fn render_detail_panel(
                                         }
                                     }),
                             )
-                        }),
-                )
-                // Metadata table
-                .child(render_metadata_table(&item, colors)),
+                            }),
+                    )
+                    // Metadata table
+                    .child(render_metadata_table(&item, colors)),
+            ),
         )
         .into_any_element()
 }

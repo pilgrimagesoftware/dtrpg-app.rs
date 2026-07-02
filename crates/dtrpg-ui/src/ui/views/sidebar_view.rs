@@ -4,7 +4,9 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use gpui::prelude::*;
-use gpui::{App, ElementId, Entity, IntoElement, Window, div, px};
+use gpui::{
+    AnyElement, App, Context, ElementId, Entity, IntoElement, SharedString, Window, div, px,
+};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
@@ -14,7 +16,7 @@ use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarFooter, SidebarHeader, SidebarItem, SidebarMenu,
     SidebarMenuItem,
 };
-use gpui_component::{ActiveTheme, Collapsible, Side};
+use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _};
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
@@ -22,9 +24,24 @@ use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
 use crate::data::ui_prefs::UiPrefs;
 use crate::util::filter::SidebarFilter;
+use crate::util::matching::name_matches_query;
 use crate::util::pluralize::pluralize;
 use crate::util::publisher::PublisherEntry;
 use rust_i18n::t;
+
+/// Inline search bar state for a collapsible sidebar section (Publishers or Collections).
+///
+/// Session-only: the search query is never persisted and is cleared whenever the
+/// section's search bar is collapsed.
+pub struct SidebarSectionSearch {
+    /// Whether the section's search bar is currently expanded.
+    pub open: bool,
+    /// Current filter text; empty means no filtering.
+    pub query: String,
+    /// Backing text input, owned by the root view so its subscription lives
+    /// for the lifetime of the window.
+    pub input: Entity<InputState>,
+}
 
 /// A sidebar child that is either a [`SidebarMenu`] or a thin horizontal divider.
 #[derive(Clone)]
@@ -84,6 +101,8 @@ pub fn render_sidebar(
     activity_recent_count: usize,
     activity_recent_error_count: usize,
     collection_name_input: Entity<InputState>,
+    publisher_search: SidebarSectionSearch,
+    collection_search: SidebarSectionSearch,
 ) -> impl IntoElement + 'static {
     let active = filter.clone();
     let prefs = UiPrefs::load();
@@ -126,6 +145,7 @@ pub fn render_sidebar(
     // ── Publishers menu ───────────────────────────────────────────────────────
     let pub_children: Vec<SidebarMenuItem> = publishers
         .into_iter()
+        .filter(|p| name_matches_query(p.name.as_ref(), &publisher_search.query))
         .map(|p| {
             let is_active = active == SidebarFilter::Publisher(Arc::clone(&p.name));
             let f = SidebarFilter::Publisher(Arc::clone(&p.name));
@@ -134,15 +154,26 @@ pub fn render_sidebar(
         .collect();
 
     let entity_for_pub = entity.clone();
+    let pub_title: SharedString = if publisher_search.open {
+        "".into()
+    } else {
+        t!("sidebar.publishers").into()
+    };
     let pub_menu = SidebarMenu::new().child(
-        SidebarMenuItem::new(t!("sidebar.publishers"))
+        SidebarMenuItem::new(pub_title)
             .default_open(publishers_open)
             .click_to_toggle(true)
             .on_click(move |_, _, cx| {
                 UiPrefs::load().save_publishers_open(!publishers_open);
                 entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
             })
-            .suffix(move |_, _| div().text_xs().child(publishers_count.to_string()))
+            .suffix(render_section_search_suffix(
+                "publishers",
+                publishers_count,
+                publisher_search,
+                entity.clone(),
+                LibraryController::toggle_publisher_search,
+            ))
             .children(pub_children),
     );
 
@@ -166,6 +197,7 @@ pub fn render_sidebar(
 
     let col_children: Vec<SidebarMenuItem> = collections
         .into_iter()
+        .filter(|c| name_matches_query(c.name.as_ref(), &collection_search.query))
         .map(|c| {
             let is_active = matches!(&active, SidebarFilter::Collection(id, _) if *id == c.id);
             let f = SidebarFilter::Collection(c.id, Arc::clone(&c.name));
@@ -199,8 +231,15 @@ pub fn render_sidebar(
         .collect();
 
     let entity_for_col = entity.clone();
+    let col_title: SharedString = if collection_search.open {
+        "".into()
+    } else {
+        t!("sidebar.collections").into()
+    };
+    let collection_search_open = collection_search.open;
+    let collection_search_input = collection_search.input.clone();
     let col_menu = SidebarMenu::new().child(
-        SidebarMenuItem::new(t!("sidebar.collections"))
+        SidebarMenuItem::new(col_title)
             .default_open(collections_open)
             .click_to_toggle(true)
             .on_click(move |_, _, cx| {
@@ -210,9 +249,40 @@ pub fn render_sidebar(
             .suffix({
                 let input = collection_name_input.clone();
                 let ctrl = entity.clone();
+                let search_input = collection_search_input.clone();
+                let entity_for_toggle = entity.clone();
                 move |_window, cx| {
                     let input = input.clone();
                     let ctrl = ctrl.clone();
+
+                    if collection_search_open {
+                        let entity_for_close = entity_for_toggle.clone();
+                        let search_input_for_close = search_input.clone();
+                        return div()
+                            .id("collections-search-suffix")
+                            .on_click(|_, _, cx| cx.stop_propagation())
+                            .flex()
+                            .items_center()
+                            .w_full()
+                            .gap(px(4.))
+                            .child(div().flex_1().child(Input::new(&search_input).small()))
+                            .child(
+                                Button::new("collections-search-close")
+                                    .ghost()
+                                    .compact()
+                                    .icon(IconName::Close)
+                                    .on_click(move |_, window, cx| {
+                                        entity_for_close.update(cx, |ctrl, cx| {
+                                            ctrl.toggle_collection_search(cx);
+                                        });
+                                        search_input_for_close.update(cx, |st, cx| {
+                                            st.set_value("", window, cx);
+                                        });
+                                    }),
+                            )
+                            .into_any_element();
+                    }
+
                     div()
                         .id("collections-suffix")
                         // Stop click propagation so the suffix button does not also
@@ -222,6 +292,21 @@ pub fn render_sidebar(
                         .items_center()
                         .gap(px(4.))
                         .child(div().text_xs().child(collections_count.to_string()))
+                        .child(
+                            Button::new("collections-search-open")
+                                .ghost()
+                                .compact()
+                                .icon(IconName::Search)
+                                .tooltip(t!("sidebar.search_tooltip").to_string())
+                                .on_click({
+                                    let entity = entity_for_toggle.clone();
+                                    move |_, _, cx| {
+                                        entity.update(cx, |ctrl, cx| {
+                                            ctrl.toggle_collection_search(cx);
+                                        });
+                                    }
+                                }),
+                        )
                         .child(
                             Dialog::new(cx)
                                 .trigger(
@@ -269,6 +354,7 @@ pub fn render_sidebar(
                                     }
                                 }),
                         )
+                        .into_any_element()
                 }
             })
             .children(col_children),
@@ -367,4 +453,66 @@ fn nav_item(
         .on_click(move |_, _, cx| {
             entity.update(cx, |ctrl, cx| ctrl.set_filter(filter.clone(), cx));
         })
+}
+
+/// Builds a `SidebarMenuItem` suffix that toggles between a plain item count and a
+/// full-width search input, for sections like Publishers whose header carries no
+/// other actions.
+///
+/// When `search.open` is `false`, renders the item count plus a magnifying-glass
+/// button. When `true`, renders the search input (backed by `search.input`) plus a
+/// close button that toggles the section closed and clears the input's visible text.
+fn render_section_search_suffix(
+    id_prefix: &'static str,
+    count: usize,
+    search: SidebarSectionSearch,
+    entity: Entity<LibraryController>,
+    toggle: impl Fn(&mut LibraryController, &mut Context<LibraryController>) + Copy + 'static,
+) -> impl Fn(&mut Window, &mut App) -> AnyElement + 'static {
+    move |_window, _cx| {
+        if search.open {
+            let input = search.input.clone();
+            let entity_for_close = entity.clone();
+            let input_for_close = input.clone();
+            div()
+                .id(SharedString::from(format!("{id_prefix}-search-suffix")))
+                .on_click(|_, _, cx| cx.stop_propagation())
+                .flex()
+                .items_center()
+                .w_full()
+                .gap(px(4.))
+                .child(div().flex_1().child(Input::new(&input).small()))
+                .child(
+                    Button::new(SharedString::from(format!("{id_prefix}-search-close")))
+                        .ghost()
+                        .compact()
+                        .icon(IconName::Close)
+                        .on_click(move |_, window, cx| {
+                            entity_for_close.update(cx, |ctrl, cx| toggle(ctrl, cx));
+                            input_for_close.update(cx, |st, cx| st.set_value("", window, cx));
+                        }),
+                )
+                .into_any_element()
+        } else {
+            let entity_for_open = entity.clone();
+            div()
+                .id(SharedString::from(format!("{id_prefix}-search-suffix")))
+                .on_click(|_, _, cx| cx.stop_propagation())
+                .flex()
+                .items_center()
+                .gap(px(4.))
+                .child(div().text_xs().child(count.to_string()))
+                .child(
+                    Button::new(SharedString::from(format!("{id_prefix}-search-open")))
+                        .ghost()
+                        .compact()
+                        .icon(IconName::Search)
+                        .tooltip(t!("sidebar.search_tooltip").to_string())
+                        .on_click(move |_, _, cx| {
+                            entity_for_open.update(cx, |ctrl, cx| toggle(ctrl, cx));
+                        }),
+                )
+                .into_any_element()
+        }
+    }
 }

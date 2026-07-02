@@ -6,6 +6,7 @@ sidebar:
   publishers: "Publishers"
   collections: "Collections"
   app_name: "Libri"
+  search_tooltip: "Search"
 
 toolbar:
   sort_by: "Sort by"

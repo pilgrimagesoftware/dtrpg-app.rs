@@ -67,6 +67,10 @@ pub struct LibraryRootView {
     search_input: Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
     collection_name_input: Entity<InputState>,
+    /// Inline search input for the sidebar's Publishers section.
+    publisher_search_input: Entity<InputState>,
+    /// Inline search input for the sidebar's Collections section.
+    collection_search_input: Entity<InputState>,
     /// Draft extension input for the in-progress "add file opener" row in the
     /// File Openers settings list (inline, not a modal — see the subscription
     /// wired up in `new()` for the Enter/Blur commit behavior).
@@ -179,6 +183,38 @@ impl LibraryRootView {
             cx.new(|cx| InputState::new(window, cx).placeholder("Collection name\u{2026}"));
         let file_opener_extension_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Extension (e.g. pdf)"));
+
+        let publisher_search_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Search publishers\u{2026}"));
+        let controller_for_publisher_search = controller.clone();
+        cx.subscribe(
+            &publisher_search_input,
+            move |_this, input_entity, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let value = input_entity.read(cx).value().to_string();
+                    controller_for_publisher_search.update(cx, |ctrl, cx| {
+                        ctrl.set_publisher_search_query(value, cx);
+                    });
+                }
+            },
+        )
+        .detach();
+
+        let collection_search_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Search collections\u{2026}"));
+        let controller_for_collection_search = controller.clone();
+        cx.subscribe(
+            &collection_search_input,
+            move |_this, input_entity, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let value = input_entity.read(cx).value().to_string();
+                    controller_for_collection_search.update(cx, |ctrl, cx| {
+                        ctrl.set_collection_search_query(value, cx);
+                    });
+                }
+            },
+        )
+        .detach();
 
         // Commit the pending "add file opener" row on Enter; on blur, commit if the
         // user typed something, otherwise discard the pending row (matches clicking
@@ -370,6 +406,8 @@ impl LibraryRootView {
             search_input,
             collection_name_input,
             file_opener_extension_input,
+            publisher_search_input,
+            collection_search_input,
         }
     }
 }
@@ -439,6 +477,16 @@ impl Render for LibraryRootView {
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
 
+        let publisher_search = crate::ui::views::sidebar_view::SidebarSectionSearch {
+            open: snap.publisher_search_open,
+            query: snap.publisher_search_query,
+            input: self.publisher_search_input.clone(),
+        };
+        let collection_search = crate::ui::views::sidebar_view::SidebarSectionSearch {
+            open: snap.collection_search_open,
+            query: snap.collection_search_query,
+            input: self.collection_search_input.clone(),
+        };
         let sidebar = render_sidebar(
             filter.clone(),
             counts,
@@ -453,6 +501,8 @@ impl Render for LibraryRootView {
             activity_snap.recent_count,
             activity_snap.recent_error_count,
             self.collection_name_input.clone(),
+            publisher_search,
+            collection_search,
         );
         let toolbar = render_toolbar(
             &filter,
