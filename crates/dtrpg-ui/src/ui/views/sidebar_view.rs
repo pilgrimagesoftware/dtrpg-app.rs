@@ -300,10 +300,12 @@ pub fn render_sidebar(
                                 .tooltip(t!("sidebar.search_tooltip").to_string())
                                 .on_click({
                                     let entity = entity_for_toggle.clone();
-                                    move |_, _, cx| {
+                                    let input = search_input.clone();
+                                    move |_, window, cx| {
                                         entity.update(cx, |ctrl, cx| {
                                             ctrl.toggle_collection_search(cx);
                                         });
+                                        input.update(cx, |st, cx| st.focus(window, cx));
                                     }
                                 }),
                         )
@@ -495,6 +497,7 @@ fn render_section_search_suffix(
                 .into_any_element()
         } else {
             let entity_for_open = entity.clone();
+            let input_for_open = search.input.clone();
             div()
                 .id(SharedString::from(format!("{id_prefix}-search-suffix")))
                 .on_click(|_, _, cx| cx.stop_propagation())
@@ -508,8 +511,9 @@ fn render_section_search_suffix(
                         .compact()
                         .icon(IconName::Search)
                         .tooltip(t!("sidebar.search_tooltip").to_string())
-                        .on_click(move |_, _, cx| {
+                        .on_click(move |_, window, cx| {
                             entity_for_open.update(cx, |ctrl, cx| toggle(ctrl, cx));
+                            input_for_open.update(cx, |st, cx| st.focus(window, cx));
                         }),
                 )
                 .into_any_element()
