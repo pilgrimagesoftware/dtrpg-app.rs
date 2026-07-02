@@ -113,5 +113,5 @@ activity.empty_hint: "Activity will appear here as operations run."
 
 ## 6. Manual Verification
 
-- [ ] 6.1 Launch the app on an English system locale and confirm all UI strings render correctly
+- [x] 6.1 Launch the app on an English system locale and confirm all UI strings render correctly
 - [ ] 6.2 Temporarily set `rust_i18n::set_locale("fr")` in `i18n::init()` and confirm the app still renders (with English stub values -- no crashes, no empty labels)
