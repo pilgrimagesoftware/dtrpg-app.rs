@@ -5,8 +5,9 @@ use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, Entity, Image, InteractiveElement, IntoElement, ObjectFit, ParentElement,
-    SharedString, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
+    AnyElement, AppContext as _, Context, DragMoveEvent, Empty, Entity, Image, InteractiveElement,
+    IntoElement, ObjectFit, ParentElement, Render, SharedString, StatefulInteractiveElement,
+    Styled, StyledImage, Window, div, img, px,
 };
 use gpui_component::Disableable;
 use gpui_component::button::{Button, ButtonVariants};
@@ -23,6 +24,19 @@ use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
 use rust_i18n::t;
 
+/// Drag-payload marker identifying an in-progress detail panel resize drag.
+///
+/// Carries no state — the new width is computed on each drag-move event from
+/// the live cursor position and the panel's own bounds, so no drag-start
+/// offset needs to be captured here.
+struct DetailPanelResizeDrag;
+
+impl Render for DetailPanelResizeDrag {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        Empty
+    }
+}
+
 /// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
 ///
 /// `cover_image`, when `Some`, is rendered in place of the generative cover —
@@ -33,6 +47,7 @@ pub fn render_detail_panel(
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
     cover_image: Option<Arc<Image>>,
+    width: f32,
 ) -> AnyElement {
     let Some(item) = selected_item else {
         return div().into_any_element();
@@ -49,6 +64,7 @@ pub fn render_detail_panel(
     let item = item.clone();
     let entity_close = entity.clone();
     let entity_download = entity.clone();
+    let entity_resize = entity.clone();
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
     let read_item_id = Arc::clone(&item.id);
@@ -61,12 +77,34 @@ pub fn render_detail_panel(
         .right_0()
         .top_0()
         .bottom_0()
-        .w(px(320.0))
+        .w(px(width))
         .bg(surface)
         .border_l_1()
         .border_color(border)
         .flex()
         .flex_col()
+        .on_drag_move::<DetailPanelResizeDrag>(
+            move |event: &DragMoveEvent<DetailPanelResizeDrag>, _window, cx| {
+                let new_width = f32::from(event.bounds.right() - event.event.position.x);
+                entity_resize.update(cx, |ctrl, cx| ctrl.set_detail_panel_width(new_width, cx));
+            },
+        )
+        // Resize handle (left edge)
+        .child(
+            div()
+                .id("detail-panel-resize-handle")
+                .occlude()
+                .absolute()
+                .left_0()
+                .top_0()
+                .bottom_0()
+                .w(px(6.0))
+                .cursor_col_resize()
+                .hover(|s| s.bg(border))
+                .on_drag(DetailPanelResizeDrag, move |_value, _point, _window, cx| {
+                    cx.new(|_| DetailPanelResizeDrag)
+                }),
+        )
         // Close button
         .child(
             div()
@@ -90,7 +128,7 @@ pub fn render_detail_panel(
         )
         // Cover
         .child({
-            let cover_w = 320.0_f32;
+            let cover_w = width;
             let cover_h = cover_w * 10.0 / 7.0;
             let cover: AnyElement = if let Some(image) = cover_image {
                 img(image)

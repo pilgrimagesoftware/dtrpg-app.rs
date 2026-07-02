@@ -62,6 +62,8 @@ pub struct LibrarySnapshot {
     pub collection_search_open: bool,
     /// Collections section search filter text. Session-only; never persisted.
     pub collection_search_query: String,
+    /// Current width of the detail panel, in pixels.
+    pub detail_panel_width: f32,
 }
 
 /// Owns all mutable state for the library view.
@@ -126,6 +128,8 @@ pub struct LibraryController {
     collection_search_open: bool,
     /// Collections section search filter text. Session-only; never persisted.
     collection_search_query: String,
+    /// Current width of the detail panel, in pixels. Session-only; never persisted to disk.
+    detail_panel_width: f32,
 }
 
 impl LibraryController {
@@ -174,6 +178,7 @@ impl LibraryController {
             publisher_search_query: String::new(),
             collection_search_open: false,
             collection_search_query: String::new(),
+            detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
         };
         ctrl.start_load(cx);
         ctrl
@@ -809,6 +814,7 @@ impl LibraryController {
             publisher_search_query: self.publisher_search_query.clone(),
             collection_search_open: self.collection_search_open,
             collection_search_query: self.collection_search_query.clone(),
+            detail_panel_width: self.detail_panel_width,
         }
     }
 
@@ -1035,6 +1041,26 @@ impl LibraryController {
     /// Clears the selection (closes the detail panel).
     pub fn clear_selection(&mut self, cx: &mut Context<Self>) {
         self.selection = Selection::None;
+        cx.emit(LibraryChanged);
+    }
+
+    // ── Detail panel width ────────────────────────────────────────────────────
+
+    /// Returns the current detail panel width, in pixels.
+    #[must_use]
+    pub fn detail_panel_width(&self) -> f32 {
+        self.detail_panel_width
+    }
+
+    /// Sets the detail panel width, clamped to
+    /// `[DETAIL_PANEL_MIN_WIDTH, DETAIL_PANEL_MAX_WIDTH]`.
+    ///
+    /// Emits [`LibraryChanged`].
+    pub fn set_detail_panel_width(&mut self, width: f32, cx: &mut Context<Self>) {
+        self.detail_panel_width = width.clamp(
+            crate::data::constants::DETAIL_PANEL_MIN_WIDTH,
+            crate::data::constants::DETAIL_PANEL_MAX_WIDTH,
+        );
         cx.emit(LibraryChanged);
     }
 

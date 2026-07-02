@@ -57,3 +57,10 @@ pub const KEYRING_API_KEY: &str = "api-key";
 pub const RECENT_CAP: usize = 25;
 pub const EXPIRY_SECS: u64 = 15;
 pub const ERROR_EXPIRY_SECS: u64 = 120;
+
+/// Default width of the detail panel, in pixels.
+pub const DETAIL_PANEL_DEFAULT_WIDTH: f32 = 320.0;
+/// Minimum allowed detail panel width, in pixels.
+pub const DETAIL_PANEL_MIN_WIDTH: f32 = 240.0;
+/// Maximum allowed detail panel width, in pixels.
+pub const DETAIL_PANEL_MAX_WIDTH: f32 = 600.0;

@@ -533,6 +533,7 @@ impl Render for LibraryRootView {
             lib_entity,
             colors,
             cover_image,
+            snap.detail_panel_width,
         );
 
         let surface = colors.surface;
