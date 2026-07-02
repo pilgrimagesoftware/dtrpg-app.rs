@@ -8,6 +8,7 @@ The right-side detail panel is locked at 320 px with no way to make it wider, an
 - `.overflow_y_hidden()` on the panel body is replaced with `.overflow_y_scrollbar()` (from `gpui_component::scroll::ScrollableElement`) so content that exceeds the panel height becomes scrollable rather than clipped.
 - Text in the title, publisher, line, and description rows is allowed to wrap — any inadvertent `whitespace_nowrap` or `.truncate()` is removed from those elements so GPUI's default wrapping applies within the panel's width.
 - The metadata table value column gains explicit text wrapping so long values (e.g., a long publisher name) do not overflow the row.
+- The cover thumbnail no longer grows past its original 320 px width when the panel is widened. It stays capped at that size and is re-centered horizontally within the panel (remaining top-aligned) as the panel width changes.
 
 ## Capabilities
 
@@ -23,6 +24,7 @@ The right-side detail panel is locked at 320 px with no way to make it wider, an
 ## Impact
 
 - `dtrpg-ui/src/controllers/library.rs` — add `detail_panel_width: f32` field with default 320.0; add getter and `set_detail_panel_width` mutator (clamped); expose in `LibrarySnapshot`
-- `dtrpg-ui/src/ui/views/detail_panel_view.rs` — accept `width: f32` parameter; replace hard-coded `px(320.0)` with `px(width)`; add drag-handle div on left edge; fix `.overflow_y_hidden()` → `.overflow_y_scrollbar()`; fix text wrapping in title, description, and metadata value cells
+- `dtrpg-ui/src/ui/views/detail_panel_view.rs` — accept `width: f32` parameter; replace hard-coded `px(320.0)` with `px(width)`; add drag-handle div on left edge; fix `.overflow_y_hidden()` → `.overflow_y_scrollbar()`; fix text wrapping in title, description, and metadata value cells; cap the cover thumbnail width and center it horizontally
+- `dtrpg-ui/src/data/constants.rs` — add `DETAIL_PANEL_COVER_MAX_WIDTH`
 - `dtrpg-ui/src/ui/views/root_view.rs` — pass `snap.detail_panel_width` to `render_detail_panel`
 - No changes to the service layer or SDK

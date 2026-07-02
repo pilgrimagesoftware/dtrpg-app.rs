@@ -79,6 +79,12 @@ However, the metadata table uses `justify_between` on each row, which places the
 
 Preferred fix: add `.min_w_0()` and `.flex_wrap()` (or check if GPUI has `.text_wrap()`) to the value div in each metadata row. If the GPUI API does not expose explicit text wrapping, switching to a stacked label/value layout is the fallback.
 
+### Cover thumbnail: capped width, re-centered on resize
+
+The cover thumbnail's aspect ratio (7:10) and 320 px default width were sized for the panel's original fixed width. Letting it grow to fill a wider panel (up to 600 px) would look disproportionate next to the surrounding text content.
+
+`cover_w` is computed as `width.min(DETAIL_PANEL_COVER_MAX_WIDTH)` (`DETAIL_PANEL_COVER_MAX_WIDTH` = 320.0, same as the panel's original default width) rather than `width` directly. The cover is wrapped in a full-width `flex().justify_center()` row so it re-centers horizontally as the panel is resized, while remaining the first child of the panel's `flex_col` so it stays top-aligned. Below 320 px the cover still shrinks with the panel (no minimum applied), matching the panel's pre-resize behavior at that width.
+
 ## Risks / Trade-offs
 
 - [Risk] GPUI's drag event API may differ from the pattern described above. → Mitigation: task 3.4 explicitly requires checking the pinned Zed source before writing drag code; the fallback is mouse_down/mouse_move/mouse_up on the handle div.

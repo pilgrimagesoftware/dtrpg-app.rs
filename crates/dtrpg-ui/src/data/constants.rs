@@ -64,3 +64,8 @@ pub const DETAIL_PANEL_DEFAULT_WIDTH: f32 = 320.0;
 pub const DETAIL_PANEL_MIN_WIDTH: f32 = 240.0;
 /// Maximum allowed detail panel width, in pixels.
 pub const DETAIL_PANEL_MAX_WIDTH: f32 = 600.0;
+/// Maximum width of the detail panel's cover thumbnail, in pixels.
+///
+/// The thumbnail no longer grows with the panel past this size; instead it
+/// stays centered horizontally at the top of the panel.
+pub const DETAIL_PANEL_COVER_MAX_WIDTH: f32 = DETAIL_PANEL_DEFAULT_WIDTH;

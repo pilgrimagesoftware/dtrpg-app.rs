@@ -126,9 +126,10 @@ pub fn render_detail_panel(
                 })
                 .child("✕"),
         )
-        // Cover
+        // Cover — capped at `DETAIL_PANEL_COVER_MAX_WIDTH` and re-centered
+        // horizontally (staying top-aligned) as the panel is resized wider.
         .child({
-            let cover_w = width;
+            let cover_w = width.min(crate::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH);
             let cover_h = cover_w * 10.0 / 7.0;
             let cover: AnyElement = if let Some(image) = cover_image {
                 img(image)
@@ -139,7 +140,12 @@ pub fn render_detail_panel(
             } else {
                 render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
             };
-            div().w(px(cover_w)).h(px(cover_h)).flex_none().child(cover)
+            div()
+                .w_full()
+                .flex()
+                .flex_none()
+                .justify_center()
+                .child(div().w(px(cover_w)).h(px(cover_h)).flex_none().child(cover))
         })
         // Scrollable body
         //

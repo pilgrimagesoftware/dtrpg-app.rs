@@ -31,13 +31,20 @@
 - [x] 5.3 Update the cover image width variable from `let cover_w = 320.0_f32;` to `let cover_w = width;`
 - [x] 5.4 In `root_view.rs`, update the call to `render_detail_panel` to pass `snap.detail_panel_width` as the `width` argument
 
-## 6. Verify
+## 6. Cover thumbnail cap and re-center
 
-- [x] 6.1 Run `cargo check --all-targets` and confirm no compile errors
-- [x] 6.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any warnings
-- [x] 6.3 Run `cargo test --all-features --workspace` and confirm all tests pass (99/99 unit tests pass; the one doc-test failure in `credentials/mod.rs` is pre-existing and unrelated — reproduced on `develop` before this change)
-- [ ] 6.4 Manually launch the app, select an item, and confirm the drag handle appears on the left edge of the detail panel; drag it left and right and confirm the panel resizes smoothly between 240 px and 600 px
-- [ ] 6.5 Confirm the panel width is preserved after selecting a different catalog item
-- [ ] 6.6 Select an item with a long title or description and confirm text wraps rather than overflowing or being cut off
-- [ ] 6.7 Scroll the panel body and confirm content beyond the visible height is reachable (title, description, actions, metadata table all accessible)
-- [ ] 6.8 Select an item with a long metadata value (e.g., a long publisher name) and confirm the value wraps within the right column of the metadata table rather than overflowing
+- [x] 6.1 Add `DETAIL_PANEL_COVER_MAX_WIDTH` constant to `dtrpg-ui/src/data/constants.rs`, set to `320.0`
+- [x] 6.2 In `render_detail_panel`, compute `cover_w` as `width.min(DETAIL_PANEL_COVER_MAX_WIDTH)` instead of `width`
+- [x] 6.3 Wrap the cover div in a `w_full().flex().justify_center()` row so the (now-capped) cover re-centers horizontally as the panel is resized, while remaining the panel's first child so it stays top-aligned
+
+## 7. Verify
+
+- [x] 7.1 Run `cargo check --all-targets` and confirm no compile errors
+- [x] 7.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any warnings
+- [x] 7.3 Run `cargo test --all-features --workspace` and confirm all tests pass (99/99 unit tests pass; the one doc-test failure in `credentials/mod.rs` is pre-existing and unrelated — reproduced on `develop` before this change)
+- [x] 7.4 Manually launch the app, select an item, and confirm the drag handle appears on the left edge of the detail panel; drag it left and right and confirm the panel resizes smoothly between 240 px and 600 px
+- [x] 7.5 Confirm the panel width is preserved after selecting a different catalog item
+- [x] 7.6 Select an item with a long title or description and confirm text wraps rather than overflowing or being cut off
+- [x] 7.7 Scroll the panel body and confirm content beyond the visible height is reachable (title, description, actions, metadata table all accessible)
+- [x] 7.8 Select an item with a long metadata value (e.g., a long publisher name) and confirm the value wraps within the right column of the metadata table rather than overflowing
+- [x] 7.9 Confirm the cover thumbnail stays capped at 320 px and re-centers horizontally as the panel is dragged wider, remaining top-aligned
