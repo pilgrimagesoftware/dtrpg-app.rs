@@ -136,7 +136,8 @@ pub fn render_sidebar(
     let entity_for_pub = entity.clone();
     let pub_menu = SidebarMenu::new().child(
         SidebarMenuItem::new(t!("sidebar.publishers"))
-            .collapsed(!publishers_open)
+            .default_open(publishers_open)
+            .click_to_toggle(true)
             .on_click(move |_, _, cx| {
                 UiPrefs::load().save_publishers_open(!publishers_open);
                 entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
@@ -200,7 +201,8 @@ pub fn render_sidebar(
     let entity_for_col = entity.clone();
     let col_menu = SidebarMenu::new().child(
         SidebarMenuItem::new(t!("sidebar.collections"))
-            .collapsed(!collections_open)
+            .default_open(collections_open)
+            .click_to_toggle(true)
             .on_click(move |_, _, cx| {
                 UiPrefs::load().save_collections_open(!collections_open);
                 entity_for_col.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
