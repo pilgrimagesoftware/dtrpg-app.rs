@@ -1,5 +1,6 @@
 use gpui::*;
 use gpui_component::{Root, init};
+use rust_i18n::t;
 use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore};
@@ -55,7 +56,7 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
-                title: Some("Libri".into()),
+                title: Some(t!("sidebar.app_name").to_string().into()),
                 appears_transparent: true,
                 ..Default::default()
             }),
@@ -116,42 +117,56 @@ pub fn setup(cx: &mut App) {
 
     // Menu bar
     cx.set_menus([
-        Menu::new("Libri").items([
-            MenuItem::action("About Libri", About),
+        Menu::new(t!("sidebar.app_name").to_string()).items([
+            MenuItem::action(t!("menu.app_about").to_string(), About),
             MenuItem::separator(),
-            MenuItem::action("Settings\u{2026}", ShowSettings),
+            MenuItem::action(t!("menu.app_settings").to_string(), ShowSettings),
             MenuItem::separator(),
-            MenuItem::os_submenu("Services", SystemMenuType::Services),
+            MenuItem::os_submenu(
+                t!("menu.app_services").to_string(),
+                SystemMenuType::Services,
+            ),
             MenuItem::separator(),
-            MenuItem::action("Hide Libri", HideApplication),
-            MenuItem::action("Hide Others", HideOthers),
-            MenuItem::action("Show All", ShowAll),
+            MenuItem::action(t!("menu.app_hide").to_string(), HideApplication),
+            MenuItem::action(t!("menu.app_hide_others").to_string(), HideOthers),
+            MenuItem::action(t!("menu.app_show_all").to_string(), ShowAll),
             MenuItem::separator(),
-            MenuItem::action("Quit Libri", Quit),
+            MenuItem::action(t!("menu.app_quit").to_string(), Quit),
         ]),
-        Menu::new("Catalog").items([
-            MenuItem::action("Add Collection\u{2026}", AddCollection),
+        Menu::new(t!("menu.catalog_title").to_string()).items([
+            MenuItem::action(t!("menu.catalog_add_collection").to_string(), AddCollection),
             MenuItem::separator(),
-            MenuItem::action("Reload", ReloadCatalog),
+            MenuItem::action(t!("menu.catalog_reload").to_string(), ReloadCatalog),
         ]),
-        Menu::new("Edit").items([
-            MenuItem::os_action("Undo", Undo, OsAction::Undo),
-            MenuItem::os_action("Redo", Redo, OsAction::Redo),
+        Menu::new(t!("menu.edit_title").to_string()).items([
+            MenuItem::os_action(t!("menu.edit_undo").to_string(), Undo, OsAction::Undo),
+            MenuItem::os_action(t!("menu.edit_redo").to_string(), Redo, OsAction::Redo),
             MenuItem::separator(),
-            MenuItem::os_action("Cut", Cut, OsAction::Cut),
-            MenuItem::os_action("Copy", Copy, OsAction::Copy),
-            MenuItem::os_action("Paste", Paste, OsAction::Paste),
-            MenuItem::os_action("Select All", SelectAll, OsAction::SelectAll),
+            MenuItem::os_action(t!("menu.edit_cut").to_string(), Cut, OsAction::Cut),
+            MenuItem::os_action(t!("menu.edit_copy").to_string(), Copy, OsAction::Copy),
+            MenuItem::os_action(t!("menu.edit_paste").to_string(), Paste, OsAction::Paste),
+            MenuItem::os_action(
+                t!("menu.edit_select_all").to_string(),
+                SelectAll,
+                OsAction::SelectAll,
+            ),
         ]),
-        Menu::new("View").items([MenuItem::action("Enter Full Screen", ToggleFullscreen)]),
-        Menu::new("Window").items([
-            MenuItem::action("Minimize", Minimize),
-            MenuItem::action("Zoom", Zoom),
+        Menu::new(t!("menu.view_title").to_string()).items([MenuItem::action(
+            t!("menu.view_full_screen").to_string(),
+            ToggleFullscreen,
+        )]),
+        Menu::new(t!("menu.window_title").to_string()).items([
+            MenuItem::action(t!("menu.window_minimize").to_string(), Minimize),
+            MenuItem::action(t!("menu.window_zoom").to_string(), Zoom),
             MenuItem::separator(),
-            MenuItem::action("Show Activity", ShowActivity),
-            MenuItem::action("Show Alert History", ShowAlertHistory),
+            MenuItem::action(t!("menu.window_show_activity").to_string(), ShowActivity),
+            MenuItem::action(
+                t!("menu.window_show_alert_history").to_string(),
+                ShowAlertHistory,
+            ),
         ]),
-        Menu::new("Help").items([MenuItem::action("About Libri", About)]),
+        Menu::new(t!("menu.help_title").to_string())
+            .items([MenuItem::action(t!("menu.app_about").to_string(), About)]),
     ]);
 
     let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()

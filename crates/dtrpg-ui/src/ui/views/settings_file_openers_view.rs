@@ -250,7 +250,7 @@ fn render_entry_row(
                         div()
                             .text_xs()
                             .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0)) // amber warning
-                            .child("⚠ App not found"),
+                            .child(format!("⚠ {}", t!("settings.file_opener_app_not_found"))),
                     )
                 }),
         )
@@ -266,7 +266,10 @@ fn render_entry_row(
                 .items_center()
                 .justify_center()
                 .cursor_pointer()
-                .tooltip(|window, cx| Tooltip::new("Remove").build(window, cx))
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("settings.file_opener_remove_tooltip").to_string())
+                        .build(window, cx)
+                })
                 .on_click(move |_, window, cx| {
                     let ext = extension_for_remove.clone();
                     let entity = entity_remove.clone();
@@ -275,8 +278,13 @@ fn render_entry_row(
                         let entity2 = entity.clone();
                         alert
                             .confirm()
-                            .title(format!("Remove .{ext} opener?"))
-                            .description("This file opener entry will be deleted.")
+                            .title(
+                                t!("settings.file_opener_remove_confirm_title", ext = ext)
+                                    .to_string(),
+                            )
+                            .description(
+                                t!("settings.file_opener_remove_confirm_description").to_string(),
+                            )
                             .on_ok(move |_, _window, cx| {
                                 entity2.update(cx, |ctrl, cx| {
                                     ctrl.remove_file_opener(&ext2, cx);
@@ -348,7 +356,10 @@ fn pick_app_and_begin_add(
     // Native app picker; blocks the calling thread while the modal is open,
     // matching the existing "Change…" storage-folder picker's convention.
     let picked = rfd::FileDialog::new()
-        .add_filter("Applications", &["app"])
+        .add_filter(
+            t!("settings.file_opener_app_filter_name").to_string(),
+            &["app"],
+        )
         .set_directory("/Applications")
         .pick_file();
     let Some(app_path) = picked else { return };

@@ -66,7 +66,7 @@ fn render_authenticated(
         .email
         .clone()
         .or_else(|| auth.api_key_hint.clone())
-        .unwrap_or_else(|| "DriveThruRPG Account".to_string());
+        .unwrap_or_else(|| t!("settings.default_account_name").to_string());
 
     let entity_reset = entity.clone();
 
@@ -114,7 +114,7 @@ fn render_authenticated(
                                             div()
                                                 .text_xs()
                                                 .text_color(colors.text_tertiary)
-                                                .child("API Key"),
+                                                .child(t!("settings.api_key_label")),
                                         )
                                         .child(
                                             div()
@@ -139,7 +139,10 @@ fn render_authenticated(
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
-                        .tooltip(|window, cx| Tooltip::new("Reset API Key").build(window, cx))
+                        .tooltip(|window, cx| {
+                            Tooltip::new(t!("settings.reset_api_key_tooltip").to_string())
+                                .build(window, cx)
+                        })
                         .on_click(move |_, _, cx| {
                             entity_reset.update(cx, |ctrl, cx| ctrl.request_logout(cx));
                         })
@@ -244,9 +247,9 @@ fn render_unauthenticated(
             accent
         };
         let btn_label = if sign_in_in_progress {
-            "Signing In..."
+            t!("settings.sign_in_in_progress")
         } else {
-            "Sign In"
+            t!("settings.sign_in_button")
         };
 
         let mut form_section = div()

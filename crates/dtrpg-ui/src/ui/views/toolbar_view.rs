@@ -183,7 +183,7 @@ fn render_sort_selector(
         SortMethod::Publisher => t!("toolbar.sort_publisher"),
         SortMethod::DateAdded => t!("toolbar.sort_date_added"),
         SortMethod::PageCount => t!("toolbar.sort_pages"),
-        SortMethod::Custom { .. } => "Custom".into(),
+        SortMethod::Custom { .. } => t!("toolbar.sort_custom"),
     };
 
     let is_custom = matches!(current, SortMethod::Custom { .. });
@@ -231,7 +231,11 @@ fn render_sort_selector(
                         }),
                 );
             if is_custom {
-                m = m.item(PopupMenuItem::new("Custom").checked(true).disabled(true));
+                m = m.item(
+                    PopupMenuItem::new(t!("toolbar.sort_custom"))
+                        .checked(true)
+                        .disabled(true),
+                );
             }
             m.separator()
                 .item(
@@ -296,7 +300,7 @@ fn render_settings_button(settings: Entity<SettingsController>) -> impl IntoElem
     Button::new("settings-gear")
         .ghost()
         .icon(IconName::Settings)
-        .tooltip("Settings")
+        .tooltip(t!("toolbar.tooltip_settings").to_string())
         .on_click(move |_, _, cx| {
             settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
         })
@@ -344,7 +348,7 @@ fn render_avatar_button(
             .into_any_element();
         return Button::new("avatar-btn")
             .custom(unauthenticated_variant)
-            .tooltip("Not signed in")
+            .tooltip(t!("toolbar.tooltip_not_signed_in").to_string())
             .rounded_full()
             .w(px(30.0))
             .h(px(30.0))
@@ -405,11 +409,11 @@ fn render_avatar_button(
         .email
         .clone()
         .or_else(|| auth.api_key_hint.clone())
-        .unwrap_or_else(|| "DriveThruRPG Account".to_string());
+        .unwrap_or_else(|| t!("settings.default_account_name").to_string());
 
     Button::new("avatar-btn")
         .custom(avatar_variant)
-        .tooltip("Account")
+        .tooltip(t!("toolbar.tooltip_account").to_string())
         .rounded_full()
         .w(px(30.0))
         .h(px(30.0))

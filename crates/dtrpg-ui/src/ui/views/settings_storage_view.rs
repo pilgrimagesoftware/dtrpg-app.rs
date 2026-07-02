@@ -37,7 +37,7 @@ pub fn render_storage_section(
     let entity_change = entity.clone();
     let entity_reveal = entity.clone();
 
-    let reveal_label = platform_reveal_label();
+    let reveal_label = platform_reveal_label().into_owned();
 
     let mut section = div()
         .flex()
@@ -102,7 +102,10 @@ pub fn render_storage_section(
                             .items_center()
                             .justify_center()
                             .cursor_pointer()
-                            .tooltip(|window, cx| Tooltip::new("Change\u{2026}").build(window, cx))
+                            .tooltip(|window, cx| {
+                                Tooltip::new(t!("settings.storage_change_tooltip").to_string())
+                                    .build(window, cx)
+                            })
                             .on_click(move |_event, _window, cx| {
                                 let picked = rfd::FileDialog::new().pick_folder();
                                 if let Some(path) = picked {
@@ -133,7 +136,9 @@ pub fn render_storage_section(
                             .items_center()
                             .justify_center()
                             .cursor_pointer()
-                            .tooltip(move |window, cx| Tooltip::new(reveal_label).build(window, cx))
+                            .tooltip(move |window, cx| {
+                                Tooltip::new(reveal_label.clone()).build(window, cx)
+                            })
                             .on_click(move |_event, _window, cx| {
                                 entity_reveal.read(cx).reveal_storage_location();
                             })
@@ -171,17 +176,17 @@ pub fn render_storage_section(
             div()
                 .text_xs()
                 .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0))
-                .child("\u{26A0} Changing the download location will not move existing downloaded files."),
+                .child(format!("\u{26A0} {}", t!("settings.storage_note"))),
         )
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn platform_reveal_label() -> &'static str {
+fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     #[cfg(target_os = "macos")]
-    return "Show in Finder";
+    return t!("detail.show_in_finder");
     #[cfg(target_os = "windows")]
-    return "Show in Explorer";
+    return t!("detail.show_in_explorer");
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    return "Show in Files";
+    return t!("detail.show_in_files");
 }

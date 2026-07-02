@@ -3,6 +3,7 @@
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::alert::Alert;
 use gpui_component::button::{Button, ButtonVariants};
+use rust_i18n::t;
 
 use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::settings::SettingsController;
@@ -44,7 +45,7 @@ pub fn render_notification_banner(
                 .items_center()
                 .gap(px(8.0))
                 .child(
-                    Alert::warning(format!("notice-alert-{kind:?}"), message)
+                    Alert::warning(format!("notice-alert-{kind:?}"), message.to_string())
                         .banner()
                         .flex_1()
                         .on_close(move |_, _, cx| {
@@ -69,12 +70,20 @@ pub fn render_notification_banner(
         .into_any_element()
 }
 
-fn notice_strings(notice: &Notice) -> (&'static str, &'static str) {
+fn notice_strings(
+    notice: &Notice,
+) -> (
+    std::borrow::Cow<'static, str>,
+    std::borrow::Cow<'static, str>,
+) {
     match notice.kind {
-        NoticeKind::NotSignedIn => ("Not signed in to DriveThruRPG", "Set Up Account"),
+        NoticeKind::NotSignedIn => (
+            t!("settings.not_signed_in"),
+            t!("notification.set_up_account"),
+        ),
         NoticeKind::SessionExpired => (
-            "Session expired — sign in again to refresh your library",
-            "Sign In Again",
+            t!("notification.session_expired"),
+            t!("notification.sign_in_again"),
         ),
     }
 }

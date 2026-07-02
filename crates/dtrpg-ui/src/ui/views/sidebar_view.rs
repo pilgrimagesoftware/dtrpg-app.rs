@@ -178,18 +178,20 @@ pub fn render_sidebar(
             let entity_delete = entity.clone();
             nav_item(c.name.as_ref(), count, is_active, f, entity.clone()).context_menu(
                 move |menu, _, _| {
-                    menu.item(PopupMenuItem::new("Reload").on_click({
+                    menu.item(PopupMenuItem::new(t!("collections.reload")).on_click({
                         let entity = entity_reload.clone();
                         move |_, _, cx| {
                             entity.update(cx, |ctrl, cx| ctrl.load_collections(cx));
                         }
                     }))
-                    .item(PopupMenuItem::new("Delete").on_click({
-                        let entity = entity_delete.clone();
-                        move |_, _, cx| {
-                            entity.update(cx, |ctrl, cx| ctrl.delete_collection(col_id, cx));
-                        }
-                    }))
+                    .item(
+                        PopupMenuItem::new(t!("collections.delete")).on_click({
+                            let entity = entity_delete.clone();
+                            move |_, _, cx| {
+                                entity.update(cx, |ctrl, cx| ctrl.delete_collection(col_id, cx));
+                            }
+                        }),
+                    )
                 },
             )
         })
@@ -231,9 +233,11 @@ pub fn render_sidebar(
                                 .overlay_closable(true)
                                 .button_props(
                                     DialogButtonProps::default()
-                                        .ok_text("Create")
+                                        .ok_text(t!("collections.add_dialog_confirm").to_string())
                                         .show_cancel(true)
-                                        .cancel_text("Cancel"),
+                                        .cancel_text(
+                                            t!("collections.add_dialog_cancel").to_string(),
+                                        ),
                                 )
                                 .on_ok({
                                     let input = input.clone();
@@ -254,7 +258,8 @@ pub fn render_sidebar(
                                         content
                                             .child(
                                                 DialogHeader::new().px_4().pt_4().child(
-                                                    DialogTitle::new().child("New Collection"),
+                                                    DialogTitle::new()
+                                                        .child(t!("collections.add_dialog_title")),
                                                 ),
                                             )
                                             .child(div().px_4().py_2().child(Input::new(&input)))
