@@ -73,6 +73,12 @@ settings:
   file_openers_title: "File Openers"
   file_openers_description: "Override which application opens a file type."
   file_openers_empty: "No overrides configured. Click Add to set up an opener."
+  file_opener_add_tooltip: "Add file opener"
+  file_opener_add_title: "Add File Opener"
+  file_opener_opens_with: "Opens with: %{app_name}"
+  file_opener_extension_hint: "Extension without the leading dot, e.g. pdf"
+  file_opener_add_confirm: "Add"
+  file_opener_add_cancel: "Cancel"
 
 activity:
   title: "Activity"

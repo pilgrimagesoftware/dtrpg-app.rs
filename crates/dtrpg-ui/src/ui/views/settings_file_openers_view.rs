@@ -219,7 +219,9 @@ fn render_add_button(
         .items_center()
         .justify_center()
         .cursor_pointer()
-        .tooltip(|window, cx| Tooltip::new("Add file opener").build(window, cx))
+        .tooltip(|window, cx| {
+            Tooltip::new(t!("settings.file_opener_add_tooltip").to_string()).build(window, cx)
+        })
         .on_click(move |_, window, cx| {
             // Native app picker; blocks the calling thread while the modal is open,
             // matching the existing "Change…" storage-folder picker's convention.
@@ -234,6 +236,13 @@ fn render_add_button(
             let extension_input = extension_input.clone();
             extension_input.update(cx, |state, cx| state.set_value("", window, cx));
 
+            // The blocking native file panel above can leave the GPUI window without OS
+            // key-window status; without reclaiming it here, GPUI's own focus tracking
+            // still thinks a handle is focused but no keyboard events actually arrive,
+            // so the extension input below silently refuses focus.
+            window.activate_window();
+
+            let extension_input_for_focus = extension_input.clone();
             window.open_dialog(cx, move |dialog, _, _| {
                 let entity = entity.clone();
                 let extension_input = extension_input.clone();
@@ -245,9 +254,9 @@ fn render_add_button(
                     .w(px(320.))
                     .button_props(
                         DialogButtonProps::default()
-                            .ok_text("Add")
+                            .ok_text(t!("settings.file_opener_add_confirm"))
                             .show_cancel(true)
-                            .cancel_text("Cancel"),
+                            .cancel_text(t!("settings.file_opener_add_cancel")),
                     )
                     .on_ok({
                         let entity = entity.clone();
@@ -277,12 +286,9 @@ fn render_add_button(
                         let app_name = app_name.clone();
                         move |content, _, _| {
                             content
-                                .child(
-                                    DialogHeader::new()
-                                        .px_4()
-                                        .pt_4()
-                                        .child(DialogTitle::new().child("Add File Opener")),
-                                )
+                                .child(DialogHeader::new().px_4().pt_4().child(
+                                    DialogTitle::new().child(t!("settings.file_opener_add_title")),
+                                ))
                                 .child(
                                     div()
                                         .px_4()
@@ -290,21 +296,26 @@ fn render_add_button(
                                         .flex()
                                         .flex_col()
                                         .gap(px(8.0))
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .child(format!("Opens with: {app_name}")),
-                                        )
+                                        .child(div().text_sm().child(t!(
+                                            "settings.file_opener_opens_with",
+                                            app_name = app_name
+                                        )))
                                         .child(Input::new(&extension_input))
                                         .child(
-                                            div().text_xs().text_color(text_tertiary).child(
-                                                "Extension without the leading dot, e.g. pdf",
-                                            ),
+                                            div()
+                                                .text_xs()
+                                                .text_color(text_tertiary)
+                                                .child(t!("settings.file_opener_extension_hint")),
                                         ),
                                 )
                         }
                     })
             });
+
+            // `open_dialog` above focuses the dialog's own container focus handle (for
+            // Escape/tab-trap), not the input field inside it. Focus the field explicitly
+            // so the user can type immediately without an extra click.
+            extension_input_for_focus.update(cx, |state, cx| state.focus(window, cx));
         })
         .child(
             div()
