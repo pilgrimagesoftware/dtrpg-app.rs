@@ -13,7 +13,7 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Build and run the app; confirm the authenticated avatar displays as a circle with the correct initial and accent color
-- [ ] 3.2 Verify the logout dropdown appears on click of the authenticated avatar
-- [ ] 3.3 Confirm the unauthenticated placeholder is visually unchanged
+- [x] 3.1 Build and run the app; confirm the authenticated avatar displays as a circle with the correct initial and accent color
+- [x] 3.2 Verify the logout dropdown appears on click of the authenticated avatar
+- [x] 3.3 Confirm the unauthenticated placeholder is visually unchanged
 - [x] 3.4 Run `cargo clippy --all-targets --all-features -- -D warnings` with no new warnings

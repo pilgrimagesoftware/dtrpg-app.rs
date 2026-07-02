@@ -55,8 +55,8 @@
 - [x] 7.1 Run `cargo check --all-targets` — no compile errors
 - [x] 7.2 Run `cargo clippy --all-targets --all-features -- -D warnings` — no new warnings
 - [x] 7.3 Run `cargo test --all-features --workspace` — all tests pass
-- [ ] 7.4 Launch with no stored API key: main window opens; banner shows; catalog is empty (not an error)
-- [ ] 7.5 From Settings > Account: enter a valid API key and sign in; banner clears; catalog loads; avatar shows signed-in state
-- [ ] 7.6 Click avatar button while signed out: dropdown appears with "Sign In…" item; clicking opens Settings > Account
-- [ ] 7.7 Launch with a valid stored API key: window opens authenticated; banner absent; catalog loads normally
-- [ ] 7.8 Launch with a stored API key that fails re-auth: window opens unauthenticated; banner shown; no login window appears
+- [x] 7.4 Launch with no stored API key: main window opens; banner shows; catalog is empty (not an error)
+- [x] 7.5 From Settings > Account: enter a valid API key and sign in; banner clears; catalog loads; avatar shows signed-in state
+- [x] 7.6 Click avatar button while signed out: dropdown appears with "Sign In…" item; clicking opens Settings > Account
+- [x] 7.7 Launch with a valid stored API key: window opens authenticated; banner absent; catalog loads normally
+- [x] 7.8 Launch with a stored API key that fails re-auth: window opens unauthenticated; banner shown; no login window appears
