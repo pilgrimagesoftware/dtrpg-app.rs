@@ -114,7 +114,7 @@ activity.empty_hint: "Activity will appear here as operations run."
 ## 6. Manual Verification
 
 - [x] 6.1 Launch the app on an English system locale and confirm all UI strings render correctly
-- [ ] 6.2 Temporarily set `rust_i18n::set_locale("fr")` in `i18n::init()` and confirm the app still renders (with English stub values -- no crashes, no empty labels)
+- [x] 6.2 Temporarily set `rust_i18n::set_locale("fr")` in `i18n::init()` and confirm the app still renders (with English stub values -- no crashes, no empty labels)
 
 ## 7. Follow-up: strings missed in the initial pass
 
@@ -145,4 +145,3 @@ call sites still using literal English strings.
 - [x] 7.7 Investigate "Pagination labels" and "Autofill, dictation, emoji menu items"
       from the NOTES.md gap list — both are outside this app's control (see "Follow-up"
       section in `proposal.md`); no code change possible here
-
