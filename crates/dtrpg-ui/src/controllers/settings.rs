@@ -120,6 +120,13 @@ impl SettingsController {
     ///
     /// Checks the platform keyring to determine initial auth state, and verifies the
     /// configured storage root is accessible. Spawns a background check for path existence.
+    ///
+    /// When no storage override is configured (first launch, or after a reset), the
+    /// platform default download directory is created automatically if it does not
+    /// yet exist, rather than surfacing a "storage folder does not exist" warning for
+    /// a location the app itself owns. A user-chosen override path that is missing is
+    /// left untouched and still surfaces the warning — that more likely indicates an
+    /// unmounted volume than a fresh install.
     pub fn new(login_service: Box<dyn LoginService>, cx: &mut Context<Self>) -> Self {
         let file_openers = FileOpenerConfig::load();
         let is_authenticated = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
@@ -128,6 +135,16 @@ impl SettingsController {
             .flatten()
             .is_some();
         let storage = StorageConfig::load();
+        if storage.is_default()
+            && !storage.is_accessible()
+            && let Err(e) = storage.ensure_root_exists()
+        {
+            tracing::warn!(
+                error = %e,
+                path = %storage.root_path().display(),
+                "failed to create default download directory"
+            );
+        }
         let storage_unavailable = !storage.is_accessible();
         if storage_unavailable {
             tracing::warn!(

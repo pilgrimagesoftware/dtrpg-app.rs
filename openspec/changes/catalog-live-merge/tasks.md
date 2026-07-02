@@ -18,5 +18,5 @@
 - [x] 4.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 4.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings
 - [x] 4.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 4.4 Launch the app with an existing disk cache; verify the cached catalog is visible immediately and remains stable throughout the SDK fetch, with no flash or shrink
+- [x] 4.4 Launch the app with an existing disk cache; verify the cached catalog is visible immediately and remains stable throughout the SDK fetch, with no flash or shrink
 - [ ] 4.5 Simulate a fetch failure (e.g. network offline); verify the cached catalog remains in the UI after the error is shown in the activity panel

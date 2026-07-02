@@ -26,7 +26,7 @@
 
 - [x] 4.5 Run `cargo test --all-features --workspace` with no failures
 - [x] 4.6 Run `cargo clippy --all-targets --all-features -- -D warnings` with no new warnings
-- [ ] 4.1 Build and run the app: confirm catalog appears instantly on second launch (from cache)
-- [ ] 4.2 Confirm catalog updates to live API data after the fetch completes
+- [x] 4.1 Build and run the app: confirm catalog appears instantly on second launch (from cache)
+- [x] 4.2 Confirm catalog updates to live API data after the fetch completes
 - [ ] 4.3 Delete `catalog_cache.json` and relaunch: confirm graceful degradation to API-only load
 - [ ] 4.4 Corrupt `catalog_cache.json` and relaunch: confirm no error is surfaced to the user

@@ -53,7 +53,7 @@
 
 - [x] 8.1 Run `cargo check --all-targets` — no compile errors
 - [x] 8.2 Run `cargo clippy --all-targets --all-features -- -D warnings` — no new warnings
-- [ ] 8.3 Launch app in list view; confirm column headers show the neutral sort icon (⇕); confirm dragging a column border resizes it
+- [x] 8.3 Launch app in list view; confirm column headers show the neutral sort icon (⇕); confirm dragging a column border resizes it
 - [ ] 8.4 Click the "Publisher" column header; confirm rows sort descending by publisher and the sort dropdown shows "Publisher" checked
 - [ ] 8.5 Click "Publisher" again; confirm ascending sort and the dropdown "Ascending" item is checked
 - [ ] 8.6 Click "Publisher" a third time; confirm sort resets to Title ascending

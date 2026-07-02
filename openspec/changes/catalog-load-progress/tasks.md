@@ -20,6 +20,6 @@
 ## 4. Verify
 
 - [x] 4.1 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 4.2 Manually launch the app, sign in, and confirm the activity panel shows a filling progress bar during the initial catalog load (not just a spinner)
-- [ ] 4.3 Confirm the bar reaches 100% and the entry transitions to "complete" state after load finishes
+- [x] 4.2 Manually launch the app, sign in, and confirm the activity panel shows a filling progress bar during the initial catalog load (not just a spinner)
+- [x] 4.3 Confirm the bar reaches 100% and the entry transitions to "complete" state after load finishes
 - [ ] 4.4 Confirm a subsequent reload (replace_service / re-login) shows progress again from 0%

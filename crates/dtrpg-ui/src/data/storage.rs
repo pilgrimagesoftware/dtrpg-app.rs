@@ -89,6 +89,27 @@ impl StorageConfig {
         self.root_path().try_exists().unwrap_or(false)
     }
 
+    /// Returns `true` when no user override is set — `root_path()` resolves to the
+    /// platform default download directory.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        self.override_path.is_none()
+    }
+
+    /// Creates the resolved root directory (and any missing parents) if it does not
+    /// already exist.
+    ///
+    /// Only meaningful to call unconditionally for the platform default path — for a
+    /// user-chosen override, a missing directory more likely means an unmounted volume
+    /// than a fresh install, so callers should not blindly recreate it there.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying I/O error if directory creation fails (e.g. permissions).
+    pub fn ensure_root_exists(&self) -> std::io::Result<()> {
+        std::fs::create_dir_all(self.root_path())
+    }
+
     /// Derives a stable per-item subdirectory under the downloads directory.
     ///
     /// Maps to `{root}/items/{item_id}/`.
@@ -179,5 +200,45 @@ mod tests {
             validate_writable(&missing),
             Err(StorageError::PathDoesNotExist(_))
         ));
+    }
+
+    #[test]
+    fn is_default_true_without_override() {
+        let cfg = StorageConfig {
+            override_path: None,
+        };
+        assert!(cfg.is_default());
+    }
+
+    #[test]
+    fn is_default_false_with_override() {
+        let cfg = StorageConfig {
+            override_path: Some(PathBuf::from("/tmp/custom-storage")),
+        };
+        assert!(!cfg.is_default());
+    }
+
+    #[test]
+    fn ensure_root_exists_creates_missing_directory() {
+        let root =
+            std::env::temp_dir().join(format!("dtrpg-test-ensure-root-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let cfg = StorageConfig {
+            override_path: Some(root.clone()),
+        };
+        assert!(!cfg.is_accessible());
+        cfg.ensure_root_exists().unwrap();
+        assert!(cfg.is_accessible());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn ensure_root_exists_is_idempotent_on_existing_directory() {
+        let dir = std::env::temp_dir();
+        let cfg = StorageConfig {
+            override_path: Some(dir),
+        };
+        assert!(cfg.ensure_root_exists().is_ok());
+        assert!(cfg.ensure_root_exists().is_ok());
     }
 }
