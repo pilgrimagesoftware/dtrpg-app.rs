@@ -102,6 +102,10 @@ pub struct LibraryController {
     pub current_page: usize,
     /// Number of items per page. One of: 10, 25, 50, 100, 200.
     pub page_size: usize,
+    /// Cached filtered/sorted result of the current catalog, filter, search
+    /// query, and sort settings. `None` means stale; recomputed lazily by
+    /// [`cached_visible_items`](Self::cached_visible_items).
+    items_cache: Option<Vec<LibraryItem>>,
 }
 
 impl LibraryController {
@@ -145,6 +149,7 @@ impl LibraryController {
             page_size: crate::data::ui_prefs::UiPrefs::load()
                 .page_size()
                 .unwrap_or(25),
+            items_cache: None,
         };
         ctrl.start_load(cx);
         ctrl
@@ -349,6 +354,7 @@ impl LibraryController {
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
@@ -360,6 +366,7 @@ impl LibraryController {
         self.catalog.extend(items);
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
@@ -444,6 +451,7 @@ impl LibraryController {
         self.collections.clear();
         self.collection_members.clear();
         self.selection = Selection::default();
+        self.invalidate_cache();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
         // Load collections concurrently with the catalog — don't wait for the
@@ -558,6 +566,7 @@ impl LibraryController {
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
         self.selection = Selection::default();
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
@@ -633,6 +642,7 @@ impl LibraryController {
                         if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
                             item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
                         }
+                        ctrl.invalidate_cache();
                         ctrl.thumbnail_loading = false;
                         cx.emit(LibraryChanged);
                         ctrl.drain_thumbnail_queue(cx);
@@ -646,6 +656,7 @@ impl LibraryController {
                         if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
                             item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
                         }
+                        ctrl.invalidate_cache();
                         ctrl.thumbnail_loading = false;
                         ctrl.drain_thumbnail_queue(cx);
                     })
@@ -791,9 +802,12 @@ impl LibraryController {
 
     // ── Filtered result set ───────────────────────────────────────────────────
 
-    /// Returns the filtered, sorted result set for the current state.
-    #[must_use]
-    pub fn visible_items(&self) -> Vec<LibraryItem> {
+    /// Recomputes the filtered, sorted item cache from the current catalog,
+    /// filter, search query, and sort settings.
+    ///
+    /// Called eagerly at every mutation site that changes any of those inputs
+    /// so render-path accessors never re-scan the catalog.
+    fn invalidate_cache(&mut self) {
         let mut items: Vec<LibraryItem> = self
             .catalog
             .iter()
@@ -804,7 +818,13 @@ impl LibraryController {
             .cloned()
             .collect();
         sort_items(&mut items, self.sort, self.sort_direction);
-        items
+        self.items_cache = Some(items);
+    }
+
+    /// Returns the filtered, sorted result set for the current state.
+    #[must_use]
+    pub fn visible_items(&self) -> Vec<LibraryItem> {
+        self.items_cache.clone().unwrap_or_default()
     }
 
     /// Returns the number of items in the filtered, sorted result set.
@@ -866,6 +886,7 @@ impl LibraryController {
         self.filter = filter;
         self.current_page = 1;
         self.selection = Selection::None;
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
@@ -875,12 +896,14 @@ impl LibraryController {
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
         self.search_query = query;
         self.current_page = 1;
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
     /// Clears the text search query.
     pub fn clear_search_query(&mut self, cx: &mut Context<Self>) {
         self.search_query.clear();
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
@@ -889,12 +912,14 @@ impl LibraryController {
     /// Sets the sort method.
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
         self.sort = sort;
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
     /// Sets the sort direction.
     pub fn set_sort_direction(&mut self, direction: SortDirection, cx: &mut Context<Self>) {
         self.sort_direction = direction;
+        self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
 
@@ -937,6 +962,7 @@ impl LibraryController {
                 ItemStatus::Cloud => ItemStatus::Downloaded,
             };
             self.section_counts = section_counts(&self.catalog);
+            self.invalidate_cache();
         }
         cx.emit(LibraryChanged);
     }

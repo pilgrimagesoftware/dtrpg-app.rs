@@ -27,7 +27,7 @@ use crate::data::events::LibraryChanged;
 use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
-use crate::util::publisher::group_by_publisher;
+use crate::util::publisher::{PublisherGroup, group_by_publisher};
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::sort::{SortDirection, SortMethod};
 use rust_i18n::t;
@@ -440,6 +440,11 @@ pub struct CatalogView {
     /// Cached items-per-row for the grid layout; updated each render from
     /// the window viewport width. Initialized to 4 as a safe default.
     items_per_row: usize,
+    /// Cached publisher grouping of the controller's visible items.
+    /// Invalidated (set to `None`) on `LibraryChanged`; repopulated lazily
+    /// during `render()` so grouped presentation modes avoid re-grouping on
+    /// every hover-triggered re-render.
+    grouped_cache: Option<Vec<PublisherGroup>>,
 }
 
 impl CatalogView {
@@ -470,8 +475,9 @@ impl CatalogView {
 
         cx.subscribe(&controller, {
             let table = catalog_list_table.clone();
-            move |_this, _ctrl, _event: &LibraryChanged, cx| {
+            move |this, _ctrl, _event: &LibraryChanged, cx| {
                 table.update(cx, |state, cx| state.refresh(cx));
+                this.grouped_cache = None;
             }
         })
         .detach();
@@ -513,7 +519,17 @@ impl CatalogView {
             scroll_handle: UniformListScrollHandle::default(),
             catalog_list_table,
             items_per_row: 4,
+            grouped_cache: None,
         }
+    }
+
+    /// Returns the cached publisher grouping, computing and storing it first if stale.
+    fn grouped_items(&mut self, cx: &App) -> Vec<PublisherGroup> {
+        if self.grouped_cache.is_none() {
+            let items = self.controller.read(cx).visible_items();
+            self.grouped_cache = Some(group_by_publisher(items));
+        }
+        self.grouped_cache.clone().unwrap_or_default()
     }
 }
 
@@ -606,8 +622,7 @@ impl Render for CatalogView {
 
             // ── List, grouped — non-virtualized; raw flex rows with shared widths ──
             (CatalogPresentation::List, true) => {
-                let items = self.controller.read(cx).visible_items();
-                let groups = group_by_publisher(items);
+                let groups = self.grouped_items(cx);
                 let cols = list_columns();
                 root.px(pad_side)
                     .children(groups.into_iter().map(|g| {
@@ -665,8 +680,7 @@ impl Render for CatalogView {
 
             // ── Thumbs, grouped — non-virtualized ─────────────────────────
             (CatalogPresentation::Thumbs, true) => {
-                let items = self.controller.read(cx).visible_items();
-                let groups = group_by_publisher(items);
+                let groups = self.grouped_items(cx);
                 let cover_cache = {
                     let cache = cx.global::<CoverCache>();
                     cache.images.clone()
@@ -740,8 +754,7 @@ impl Render for CatalogView {
 
             // ── Grid, grouped — non-virtualized ───────────────────────────
             (CatalogPresentation::Grid, true) => {
-                let items = self.controller.read(cx).visible_items();
-                let groups = group_by_publisher(items);
+                let groups = self.grouped_items(cx);
                 let cover_cache = {
                     let cache = cx.global::<CoverCache>();
                     cache.images.clone()

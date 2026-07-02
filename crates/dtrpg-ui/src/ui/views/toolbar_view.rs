@@ -32,6 +32,54 @@ fn section_title_for(filter: &SidebarFilter) -> String {
     }
 }
 
+/// Builds the count text shown beneath the section title.
+///
+/// `filter_count` is the number of catalog items matching `filter` alone (ignoring
+/// search); `matched_count` additionally applies the search query; `total_count`
+/// is the whole-catalog count. Publisher filters keep the legacy "publisher item(s),
+/// total item(s)" wording; `AllTitles` shows the plain catalog total; every other
+/// filter (smart sections, collections) shows `filter_count` since the filter
+/// itself already narrows the result set below the catalog total.
+fn count_label_for(
+    filter: &SidebarFilter,
+    filter_count: usize,
+    matched_count: usize,
+    total_count: usize,
+    has_search: bool,
+) -> String {
+    if matches!(filter, SidebarFilter::Publisher(_)) {
+        return if has_search {
+            format!(
+                "{}, {} ({} filtered)",
+                pluralize(filter_count, "publisher item", "publisher items"),
+                pluralize(total_count, "total item", "total items"),
+                matched_count,
+            )
+        } else {
+            format!(
+                "{}, {}",
+                pluralize(filter_count, "publisher item", "publisher items"),
+                pluralize(total_count, "total item", "total items"),
+            )
+        };
+    }
+
+    let base_count = if matches!(filter, SidebarFilter::AllTitles) {
+        total_count
+    } else {
+        filter_count
+    };
+    if has_search {
+        format!(
+            "{} ({} filtered)",
+            pluralize(base_count, "item", "items"),
+            matched_count,
+        )
+    } else {
+        pluralize(base_count, "item", "items")
+    }
+}
+
 /// Renders the toolbar row above the catalog.
 #[allow(clippy::too_many_arguments)]
 pub fn render_toolbar(
@@ -57,27 +105,8 @@ pub fn render_toolbar(
     let text_tertiary = colors.text_tertiary;
 
     let title = section_title_for(filter);
-    let is_publisher = matches!(filter, SidebarFilter::Publisher(_));
     let has_search = !search_query.is_empty();
-    let count_label = match (is_publisher, has_search) {
-        (true, false) => format!(
-            "{}, {}",
-            pluralize(filter_count, "publisher item", "publisher items"),
-            pluralize(total_count, "total item", "total items"),
-        ),
-        (true, true) => format!(
-            "{}, {} ({} filtered)",
-            pluralize(filter_count, "publisher item", "publisher items"),
-            pluralize(total_count, "total item", "total items"),
-            matched_count,
-        ),
-        (false, true) => format!(
-            "{} ({} filtered)",
-            pluralize(total_count, "item", "items"),
-            matched_count,
-        ),
-        (false, false) => pluralize(total_count, "item", "items"),
-    };
+    let count_label = count_label_for(filter, filter_count, matched_count, total_count, has_search);
 
     div()
         .h(px(57.0))
@@ -419,6 +448,44 @@ mod tests {
             title.contains("My Shelf"),
             "collection name must appear in label"
         );
+    }
+
+    #[test]
+    fn collection_filter_count_reflects_filter_count_not_total() {
+        // Regression: selecting a collection must show the collection's own
+        // item count, not the whole-catalog total (which stays fixed across
+        // filter changes and made the count text look unresponsive).
+        let filter = SidebarFilter::Collection(42, "My Shelf".into());
+        let label = count_label_for(&filter, 3, 3, 500, false);
+        assert!(
+            label.contains('3'),
+            "expected collection filter count (3) in label, got: {label}"
+        );
+        assert!(
+            !label.contains("500"),
+            "collection label must not show the whole-catalog total, got: {label}"
+        );
+    }
+
+    #[test]
+    fn smart_section_filter_count_reflects_filter_count_not_total() {
+        let filter = SidebarFilter::OnDevice;
+        let label = count_label_for(&filter, 7, 7, 500, false);
+        assert!(label.contains('7'));
+        assert!(!label.contains("500"));
+    }
+
+    #[test]
+    fn all_titles_filter_count_shows_total() {
+        let label = count_label_for(&SidebarFilter::AllTitles, 500, 500, 500, false);
+        assert!(label.contains("500"));
+    }
+
+    #[test]
+    fn collection_filter_with_search_shows_matched_count() {
+        let filter = SidebarFilter::Collection(42, "My Shelf".into());
+        let label = count_label_for(&filter, 10, 2, 500, true);
+        assert!(label.contains("2 filtered"));
     }
 
     #[test]

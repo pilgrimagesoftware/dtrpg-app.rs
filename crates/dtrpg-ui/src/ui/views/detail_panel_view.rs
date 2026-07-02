@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
-    StatefulInteractiveElement, Styled, div, px,
+    AnyElement, Entity, Image, InteractiveElement, IntoElement, ObjectFit, ParentElement,
+    SharedString, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 };
 use gpui_component::Disableable;
 use gpui_component::button::{Button, ButtonVariants};
@@ -24,11 +24,15 @@ use crate::util::reveal::reveal_in_file_manager;
 use rust_i18n::t;
 
 /// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
+///
+/// `cover_image`, when `Some`, is rendered in place of the generative cover —
+/// callers should look it up from `CoverCache` for the selected item.
 pub fn render_detail_panel(
     selected_item: Option<&LibraryItem>,
     storage_root_path: PathBuf,
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
+    cover_image: Option<Arc<Image>>,
 ) -> AnyElement {
     let Some(item) = selected_item else {
         return div().into_any_element();
@@ -88,11 +92,16 @@ pub fn render_detail_panel(
         .child({
             let cover_w = 320.0_f32;
             let cover_h = cover_w * 10.0 / 7.0;
-            div()
-                .w(px(cover_w))
-                .h(px(cover_h))
-                .flex_none()
-                .child(render_generative_cover(&item, cover_w, cover_h, true))
+            let cover: AnyElement = if let Some(image) = cover_image {
+                img(image)
+                    .w(px(cover_w))
+                    .h(px(cover_h))
+                    .object_fit(ObjectFit::Cover)
+                    .into_any_element()
+            } else {
+                render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
+            };
+            div().w(px(cover_w)).h(px(cover_h)).flex_none().child(cover)
         })
         // Scrollable body
         .child(

@@ -427,11 +427,16 @@ impl Render for LibraryRootView {
         );
         let banner =
             render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
+        let cover_image = selected_item.as_ref().and_then(|item| {
+            cx.global::<crate::ui::library::cover::CoverCache>()
+                .get(&item.id)
+        });
         let panel = render_detail_panel(
             selected_item.as_ref(),
             settings_snap.storage_root_path.clone(),
             lib_entity,
             colors,
+            cover_image,
         );
 
         let surface = colors.surface;
