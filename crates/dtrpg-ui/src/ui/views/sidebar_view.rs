@@ -146,10 +146,16 @@ pub fn render_sidebar(
     );
 
     // ── Sidebar assembly (collections before publishers) ──────────────────────
+    // `w_full()` rather than a fixed pixel width: the parent `resizable_panel`
+    // in `root_view.rs` already owns width management (its divider IS the drag
+    // handle — no separate resize control). A fixed width here would leave the
+    // visible sidebar content pinned regardless of the panel's actual dragged
+    // width, decoupling what you drag from where the sidebar and catalog
+    // actually meet.
     let mut sidebar_builder = Sidebar::new("sidebar")
         .collapsible(SidebarCollapsible::None)
         .side(Side::Left)
-        .w(px(250.))
+        .w_full()
         .header(build_header())
         .child(SidebarContent::Menu(Box::new(lib_menu)))
         .child(SidebarContent::Separator);
