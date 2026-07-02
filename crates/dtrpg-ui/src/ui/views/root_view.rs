@@ -67,7 +67,9 @@ pub struct LibraryRootView {
     search_input: Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
     collection_name_input: Entity<InputState>,
-    /// Draft extension input for the "Add File Opener" dialog.
+    /// Draft extension input for the in-progress "add file opener" row in the
+    /// File Openers settings list (inline, not a modal — see the subscription
+    /// wired up in `new()` for the Enter/Blur commit behavior).
     file_opener_extension_input: Entity<InputState>,
 }
 
@@ -177,6 +179,33 @@ impl LibraryRootView {
             cx.new(|cx| InputState::new(window, cx).placeholder("Collection name\u{2026}"));
         let file_opener_extension_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Extension (e.g. pdf)"));
+
+        // Commit the pending "add file opener" row on Enter; on blur, commit if the
+        // user typed something, otherwise discard the pending row (matches clicking
+        // elsewhere in most inline-add UIs — no separate confirm step needed).
+        let settings_for_ext = settings.clone();
+        cx.subscribe(
+            &file_opener_extension_input,
+            move |_this, input_entity, event: &InputEvent, cx| match event {
+                InputEvent::PressEnter { .. } => {
+                    let value = input_entity.read(cx).value().to_string();
+                    settings_for_ext
+                        .update(cx, |ctrl, cx| ctrl.commit_pending_file_opener(&value, cx));
+                }
+                InputEvent::Blur => {
+                    let value = input_entity.read(cx).value().to_string();
+                    settings_for_ext.update(cx, |ctrl, cx| {
+                        if value.trim().is_empty() {
+                            ctrl.cancel_pending_file_opener(cx);
+                        } else {
+                            ctrl.commit_pending_file_opener(&value, cx);
+                        }
+                    });
+                }
+                _ => {}
+            },
+        )
+        .detach();
 
         cx.subscribe_in(
             &controller,
@@ -494,6 +523,7 @@ impl Render for LibraryRootView {
                     settings_snap.sign_in_error,
                     settings_snap.storage_path_input,
                     self.file_opener_extension_input.clone(),
+                    settings_snap.pending_file_opener,
                 );
                 content = content.child(overlay);
             }

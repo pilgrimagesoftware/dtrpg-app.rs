@@ -1,10 +1,10 @@
 //! File Openers settings section: CRUD for extension → application overrides.
 
+use std::path::PathBuf;
+
 use gpui::prelude::*;
-use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
 use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
 
@@ -14,11 +14,16 @@ use crate::data::theme::ColorTokens;
 use rust_i18n::t;
 
 /// Renders the File Openers settings section.
+///
+/// `pending_file_opener`, when `Some`, is the application path picked via the
+/// native file dialog and awaiting an extension; a pending row renders in its
+/// place in the list with `extension_input` focused for inline entry.
 pub fn render_file_openers_section(
     file_openers: &[FileOpenerEntry],
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
     extension_input: Entity<InputState>,
+    pending_file_opener: Option<PathBuf>,
 ) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
@@ -32,6 +37,8 @@ pub fn render_file_openers_section(
         .filter(|e| !e.app_path.exists())
         .map(|e| e.extension.clone())
         .collect();
+
+    let is_pending = pending_file_opener.is_some();
 
     let mut col = div()
         .flex()
@@ -65,16 +72,25 @@ pub fn render_file_openers_section(
                 )
                 .child(render_add_button(
                     entity.clone(),
-                    extension_input,
+                    extension_input.clone(),
                     accent,
                     accent_on,
-                    text_tertiary,
+                    is_pending,
                 )),
         )
         // ── Divider ───────────────────────────────────────────────────────
         .child(div().h(px(1.0)).bg(border));
 
-    if file_openers.is_empty() {
+    if let Some(app_path) = pending_file_opener {
+        col = col.child(render_pending_row(
+            &app_path,
+            extension_input,
+            entity.clone(),
+            colors,
+        ));
+    }
+
+    if file_openers.is_empty() && !is_pending {
         col = col.child(render_empty_state(text_tertiary));
     } else {
         for entry in file_openers {
@@ -102,6 +118,77 @@ fn render_empty_state(text_tertiary: gpui::Hsla) -> impl IntoElement + 'static {
         )
 }
 
+// ── Pending row (inline add) ───────────────────────────────────────────────────
+
+/// Renders the in-progress "add file opener" row: app name plus an editable,
+/// focused extension input, in place of the static extension badge used by
+/// committed entries.
+///
+/// Escape cancels the pending add without persisting anything, and stops the
+/// keystroke from bubbling to the settings panel's own Escape-to-close handler.
+fn render_pending_row(
+    app_path: &std::path::Path,
+    extension_input: Entity<InputState>,
+    entity: Entity<SettingsController>,
+    colors: &ColorTokens,
+) -> AnyElement {
+    let text_secondary = colors.text_secondary;
+    let text_tertiary = colors.text_tertiary;
+    let border = colors.border;
+    let app_name = app_name_from_path(app_path);
+
+    let entity_cancel = entity.clone();
+
+    div()
+        .id("file-opener-pending-row")
+        .flex()
+        .items_center()
+        .gap(px(12.0))
+        .py(px(8.0))
+        .border_b_1()
+        .border_color(border)
+        .on_key_down(move |event, _window, cx| {
+            if event.keystroke.key == "escape" {
+                cx.stop_propagation();
+                entity_cancel.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
+            }
+        })
+        // ── Extension input ───────────────────────────────────────────────
+        .child(div().w(px(90.0)).child(Input::new(&extension_input)))
+        // ── App name ──────────────────────────────────────────────────────
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .text_sm()
+                .text_color(text_secondary)
+                .truncate()
+                .child(app_name),
+        )
+        // ── Cancel button ─────────────────────────────────────────────────
+        .child(
+            div()
+                .id("cancel-pending-file-opener")
+                .size(px(28.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(border)
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("settings.file_opener_add_cancel").to_string())
+                        .build(window, cx)
+                })
+                .on_click(move |_, _, cx| {
+                    entity.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
+                })
+                .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")),
+        )
+        .into_any_element()
+}
+
 // ── Entry row ─────────────────────────────────────────────────────────────────
 
 fn render_entry_row(
@@ -123,6 +210,7 @@ fn render_entry_row(
     let extension_for_remove = extension.clone();
 
     div()
+        .id(format!("file-opener-row-{extension}"))
         .flex()
         .items_center()
         .gap(px(12.0))
@@ -209,131 +297,26 @@ fn render_add_button(
     extension_input: Entity<InputState>,
     accent: gpui::Hsla,
     accent_on: gpui::Hsla,
-    text_tertiary: gpui::Hsla,
+    is_pending: bool,
 ) -> impl IntoElement + 'static {
-    div()
+    // Disabled (dimmed, inert) while an add is already in progress, so a second
+    // click can't start a new pending row and orphan the first one.
+    let bg = if is_pending {
+        accent.opacity(0.4)
+    } else {
+        accent
+    };
+
+    let mut btn = div()
         .id("add-file-opener")
         .size(px(30.0))
         .rounded(px(8.0))
-        .bg(accent)
+        .bg(bg)
         .flex()
         .items_center()
         .justify_center()
-        .cursor_pointer()
         .tooltip(|window, cx| {
             Tooltip::new(t!("settings.file_opener_add_tooltip").to_string()).build(window, cx)
-        })
-        .on_click(move |_, window, cx| {
-            // Native app picker; blocks the calling thread while the modal is open,
-            // matching the existing "Change…" storage-folder picker's convention.
-            let picked = rfd::FileDialog::new()
-                .add_filter("Applications", &["app"])
-                .set_directory("/Applications")
-                .pick_file();
-            let Some(app_path) = picked else { return };
-            let app_name = app_name_from_path(&app_path);
-
-            let entity = entity.clone();
-            let extension_input = extension_input.clone();
-            extension_input.update(cx, |state, cx| state.set_value("", window, cx));
-
-            // The blocking native file panel above can leave the GPUI window without OS
-            // key-window status; without reclaiming it here, GPUI's own focus tracking
-            // still thinks a handle is focused but no keyboard events actually arrive,
-            // so the extension input below silently refuses focus.
-            window.activate_window();
-
-            let extension_input_for_focus = extension_input.clone();
-            window.open_dialog(cx, move |dialog, _, _| {
-                let entity = entity.clone();
-                let extension_input = extension_input.clone();
-                let app_path = app_path.clone();
-                let app_name = app_name.clone();
-                dialog
-                    .close_button(false)
-                    .overlay_closable(true)
-                    .w(px(320.))
-                    // Visible Cancel/Add buttons are rendered via `.footer(...)` below
-                    // (wrapped in `DialogClose`/`DialogAction`, which dispatch the same
-                    // `CancelDialog`/`ConfirmDialog` actions Escape/Enter use), so the
-                    // callbacks registered here run regardless of whether the user
-                    // clicks a button or uses the keyboard.
-                    .on_ok({
-                        let entity = entity.clone();
-                        let extension_input = extension_input.clone();
-                        let app_path = app_path.clone();
-                        move |_, window, cx| {
-                            let extension = extension_input.read(cx).value().trim().to_string();
-                            if extension.is_empty() {
-                                return false;
-                            }
-                            entity.update(cx, |ctrl, cx| {
-                                ctrl.add_file_opener(
-                                    FileOpenerEntry {
-                                        extension,
-                                        app_path: app_path.clone(),
-                                    },
-                                    cx,
-                                );
-                            });
-                            extension_input.update(cx, |state, cx| state.set_value("", window, cx));
-                            true
-                        }
-                    })
-                    .on_cancel(|_, _, _| true)
-                    .content({
-                        let extension_input = extension_input.clone();
-                        let app_name = app_name.clone();
-                        move |content, _, _| {
-                            content
-                                .child(DialogHeader::new().px_4().pt_4().child(
-                                    DialogTitle::new().child(t!("settings.file_opener_add_title")),
-                                ))
-                                .child(
-                                    div()
-                                        .px_4()
-                                        .py_2()
-                                        .flex()
-                                        .flex_col()
-                                        .gap(px(8.0))
-                                        .child(div().text_sm().child(t!(
-                                            "settings.file_opener_opens_with",
-                                            app_name = app_name
-                                        )))
-                                        .child(Input::new(&extension_input))
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(text_tertiary)
-                                                .child(t!("settings.file_opener_extension_hint")),
-                                        ),
-                                )
-                        }
-                    })
-                    .footer(
-                        DialogFooter::new()
-                            .px_4()
-                            .pb_4()
-                            .child(
-                                DialogClose::new().child(
-                                    Button::new("cancel-file-opener")
-                                        .label(t!("settings.file_opener_add_cancel")),
-                                ),
-                            )
-                            .child(
-                                DialogAction::new().child(
-                                    Button::new("confirm-file-opener")
-                                        .primary()
-                                        .label(t!("settings.file_opener_add_confirm")),
-                                ),
-                            ),
-                    )
-            });
-
-            // `open_dialog` above focuses the dialog's own container focus handle (for
-            // Escape/tab-trap), not the input field inside it. Focus the field explicitly
-            // so the user can type immediately without an extra click.
-            extension_input_for_focus.update(cx, |state, cx| state.focus(window, cx));
         })
         .child(
             div()
@@ -341,7 +324,46 @@ fn render_add_button(
                 .font_weight(gpui::FontWeight::MEDIUM)
                 .text_color(accent_on)
                 .child("+"),
-        )
+        );
+
+    if !is_pending {
+        btn = btn.cursor_pointer().on_click(move |_, window, cx| {
+            pick_app_and_begin_add(&entity, &extension_input, window, cx);
+        });
+    }
+
+    btn
+}
+
+/// Runs the native application picker and, if an app was chosen, starts the
+/// inline "add file opener" flow: resets and focuses `extension_input`,
+/// reclaims OS key-window status (the native panel can steal it), and tells
+/// the controller to render a pending row for the picked app.
+fn pick_app_and_begin_add(
+    entity: &Entity<SettingsController>,
+    extension_input: &Entity<InputState>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    // Native app picker; blocks the calling thread while the modal is open,
+    // matching the existing "Change…" storage-folder picker's convention.
+    let picked = rfd::FileDialog::new()
+        .add_filter("Applications", &["app"])
+        .set_directory("/Applications")
+        .pick_file();
+    let Some(app_path) = picked else { return };
+
+    extension_input.update(cx, |state, cx| state.set_value("", window, cx));
+
+    // The blocking native file panel above can leave the GPUI window without OS
+    // key-window status; without reclaiming it here, GPUI's own focus tracking
+    // still thinks a handle is focused but no keyboard events actually arrive,
+    // so the extension input below silently refuses focus.
+    window.activate_window();
+
+    entity.update(cx, |ctrl, cx| ctrl.begin_add_file_opener(app_path, cx));
+
+    extension_input.update(cx, |state, cx| state.focus(window, cx));
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

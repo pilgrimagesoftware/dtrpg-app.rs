@@ -80,6 +80,9 @@ pub struct SettingsSnapshot {
     pub storage_path_draft: String,
     /// Shared input state for the storage path text field in the Storage tab.
     pub storage_path_input: Option<Entity<InputState>>,
+    /// Application path picked via the native file dialog, awaiting an extension
+    /// typed inline in the File Openers list. `None` when no add is in progress.
+    pub pending_file_opener: Option<PathBuf>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -107,6 +110,9 @@ pub struct SettingsController {
     storage_path_input: Option<Entity<InputState>>,
     /// Masked API key hint computed at sign-in time (first 4 + bullets + last 1).
     api_key_hint: Option<String>,
+    /// Application path picked via the native file dialog, awaiting an extension
+    /// typed inline in the File Openers list. `None` when no add is in progress.
+    pending_file_opener: Option<PathBuf>,
 }
 
 impl SettingsController {
@@ -151,6 +157,7 @@ impl SettingsController {
             storage_path_draft,
             storage_path_input: None,
             api_key_hint: None,
+            pending_file_opener: None,
         };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
@@ -475,6 +482,46 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
+    /// Begins an in-place "add file opener" flow after the user has picked an
+    /// application via the native file dialog.
+    ///
+    /// The extension is entered inline in the File Openers list rather than in a
+    /// separate modal; the list renders a pending row for `app_path` until the
+    /// flow is committed or cancelled.
+    pub fn begin_add_file_opener(&mut self, app_path: PathBuf, cx: &mut Context<Self>) {
+        self.pending_file_opener = Some(app_path);
+        cx.emit(SettingsChanged);
+    }
+
+    /// Cancels an in-progress "add file opener" flow without persisting anything.
+    pub fn cancel_pending_file_opener(&mut self, cx: &mut Context<Self>) {
+        if self.pending_file_opener.take().is_some() {
+            cx.emit(SettingsChanged);
+        }
+    }
+
+    /// Commits the in-progress "add file opener" flow using `extension`.
+    ///
+    /// No-op if no add is in progress or `extension` is empty after trimming
+    /// (the caller should [`cancel_pending_file_opener`](Self::cancel_pending_file_opener)
+    /// explicitly in that case, e.g. on blur).
+    pub fn commit_pending_file_opener(&mut self, extension: &str, cx: &mut Context<Self>) {
+        let trimmed = extension.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let Some(app_path) = self.pending_file_opener.take() else {
+            return;
+        };
+        self.add_file_opener(
+            FileOpenerEntry {
+                extension: trimmed.to_string(),
+                app_path,
+            },
+            cx,
+        );
+    }
+
     // ── Snapshot ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the views for one render pass.
@@ -518,6 +565,7 @@ impl SettingsController {
             email_input: self.email_input.clone(),
             storage_path_draft: self.storage_path_draft.clone(),
             storage_path_input: self.storage_path_input.clone(),
+            pending_file_opener: self.pending_file_opener.clone(),
         }
     }
 }

@@ -39,6 +39,7 @@ pub fn render_settings_panel(
     sign_in_error: Option<String>,
     storage_path_input: Option<Entity<InputState>>,
     file_opener_extension_input: Entity<InputState>,
+    pending_file_opener: Option<PathBuf>,
 ) -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
@@ -65,6 +66,7 @@ pub fn render_settings_panel(
     let file_openers_entity = entity.clone();
     let file_openers_colors = colors.clone();
     let file_opener_extension_input = file_opener_extension_input.clone();
+    let pending_file_opener = pending_file_opener.clone();
 
     // ── Build the Settings component ──────────────────────────────────────────
 
@@ -104,6 +106,7 @@ pub fn render_settings_panel(
                         file_openers_entity.clone(),
                         &file_openers_colors,
                         file_opener_extension_input.clone(),
+                        pending_file_opener.clone(),
                     )
                 })),
             ));
