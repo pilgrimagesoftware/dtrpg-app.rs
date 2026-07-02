@@ -381,15 +381,17 @@ impl LibraryController {
                     weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                 }
                 Err(e) => {
-                    let detail = e.panel_detail();
                     // Session errors are expected when starting before auth completes;
-                    // network and other errors are genuine failures worth surfacing.
+                    // treat them as a quiet completion rather than a user-facing alert.
+                    // Network and other errors are genuine failures worth surfacing.
                     if e.kind == LibraryServiceErrorKind::Session {
                         tracing::debug!(error = %e, "catalog load skipped: no authenticated session");
+                        weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                     } else {
                         tracing::error!(error = %e, backtrace = %app_backtrace(), "catalog load failed");
+                        let detail = e.panel_detail();
+                        weak_activity.update(async_cx, |a, cx| a.error(activity_id, detail, cx)).ok();
                     }
-                    weak_activity.update(async_cx, |a, cx| a.error(activity_id, detail, cx)).ok();
                 }
             }
         })

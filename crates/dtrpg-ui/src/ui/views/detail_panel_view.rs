@@ -393,10 +393,6 @@ fn render_metadata_table(
                 .value(item.format.to_string()),
         )
         .child(
-            DescriptionItem::new(t!("detail.field_pages").to_string())
-                .value(item.pages.to_string()),
-        )
-        .child(
             DescriptionItem::new(t!("detail.field_file_size").to_string())
                 .value(format!("{:.0} MB", item.size_mb)),
         )
@@ -404,6 +400,15 @@ fn render_metadata_table(
             DescriptionItem::new(t!("detail.field_released").to_string())
                 .value(item.year.to_string()),
         );
+
+    // The DriveThruRPG order-product API does not always report a page count; omit the
+    // row entirely rather than showing a misleading "0".
+    if item.pages > 0 {
+        list = list.child(
+            DescriptionItem::new(t!("detail.field_pages").to_string())
+                .value(item.pages.to_string()),
+        );
+    }
 
     if let Some(ts) = item.date_added {
         let relative = format_relative(ts);

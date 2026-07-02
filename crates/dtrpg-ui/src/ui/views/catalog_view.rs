@@ -1328,6 +1328,7 @@ fn render_thumb_row(
 
     div()
         .id(Arc::clone(&id))
+        .w_full()
         .flex()
         .items_center()
         .gap(px(12.0))
