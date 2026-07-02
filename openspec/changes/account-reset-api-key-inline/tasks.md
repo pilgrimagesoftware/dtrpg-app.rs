@@ -7,6 +7,6 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Build and run the app; open Settings → Account; confirm the reload symbol button appears to the right of the account info text on the same row
-- [ ] 2.3 Hover over the reload symbol button and confirm the "Reset API Key" tooltip appears
-- [ ] 2.2 Confirm only "Log Out" appears in the actions area below the divider
+- [x] 2.1 Build and run the app; open Settings → Account; confirm the reload symbol button appears to the right of the account info text on the same row
+- [x] 2.3 Hover over the reload symbol button and confirm the "Reset API Key" tooltip appears
+- [x] 2.2 Confirm only "Log Out" appears in the actions area below the divider

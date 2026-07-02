@@ -430,7 +430,7 @@ fn build_footer(
             .child(
                 div()
                     .id("activity-button")
-                    .text_sm()
+                    .text_2xl()
                     .cursor_pointer()
                     .when(has_errors, |el| el.text_color(gpui::red()))
                     .child(activity_label)
