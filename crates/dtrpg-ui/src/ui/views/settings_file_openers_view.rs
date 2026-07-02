@@ -1,10 +1,10 @@
 //! File Openers settings section: CRUD for extension → application overrides.
 
-use std::path::PathBuf;
-
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::WindowExt as _;
+use gpui_component::dialog::{DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
 
 use crate::controllers::settings::SettingsController;
@@ -17,6 +17,7 @@ pub fn render_file_openers_section(
     file_openers: &[FileOpenerEntry],
     entity: Entity<SettingsController>,
     colors: &ColorTokens,
+    extension_input: Entity<InputState>,
 ) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
@@ -61,7 +62,13 @@ pub fn render_file_openers_section(
                                 .child(t!("settings.file_openers_description")),
                         ),
                 )
-                .child(render_add_button(entity.clone(), accent, accent_on)),
+                .child(render_add_button(
+                    entity.clone(),
+                    extension_input,
+                    accent,
+                    accent_on,
+                    text_tertiary,
+                )),
         )
         // ── Divider ───────────────────────────────────────────────────────
         .child(div().h(px(1.0)).bg(border));
@@ -198,8 +205,10 @@ fn render_entry_row(
 
 fn render_add_button(
     entity: Entity<SettingsController>,
+    extension_input: Entity<InputState>,
     accent: gpui::Hsla,
     accent_on: gpui::Hsla,
+    text_tertiary: gpui::Hsla,
 ) -> impl IntoElement + 'static {
     div()
         .id("add-file-opener")
@@ -211,16 +220,90 @@ fn render_add_button(
         .justify_center()
         .cursor_pointer()
         .tooltip(|window, cx| Tooltip::new("Add file opener").build(window, cx))
-        // Adding an entry requires a native app picker dialog (rfd crate, pending
-        // open-item-in-default-app change). For now clicking opens a no-op stub.
-        .on_click(move |_, _, cx| {
-            // Stub: add a placeholder entry so the list renders correctly.
-            let stub = FileOpenerEntry {
-                extension: "example".to_owned(),
-                app_path: PathBuf::from("/Applications/ExampleApp.app"),
-            };
-            entity.update(cx, |ctrl, cx| {
-                ctrl.add_file_opener(stub, cx);
+        .on_click(move |_, window, cx| {
+            // Native app picker; blocks the calling thread while the modal is open,
+            // matching the existing "Change…" storage-folder picker's convention.
+            let picked = rfd::FileDialog::new()
+                .add_filter("Applications", &["app"])
+                .set_directory("/Applications")
+                .pick_file();
+            let Some(app_path) = picked else { return };
+            let app_name = app_name_from_path(&app_path);
+
+            let entity = entity.clone();
+            let extension_input = extension_input.clone();
+            extension_input.update(cx, |state, cx| state.set_value("", window, cx));
+
+            window.open_dialog(cx, move |dialog, _, _| {
+                let entity = entity.clone();
+                let extension_input = extension_input.clone();
+                let app_path = app_path.clone();
+                let app_name = app_name.clone();
+                dialog
+                    .close_button(false)
+                    .overlay_closable(true)
+                    .w(px(320.))
+                    .button_props(
+                        DialogButtonProps::default()
+                            .ok_text("Add")
+                            .show_cancel(true)
+                            .cancel_text("Cancel"),
+                    )
+                    .on_ok({
+                        let entity = entity.clone();
+                        let extension_input = extension_input.clone();
+                        let app_path = app_path.clone();
+                        move |_, window, cx| {
+                            let extension = extension_input.read(cx).value().trim().to_string();
+                            if extension.is_empty() {
+                                return false;
+                            }
+                            entity.update(cx, |ctrl, cx| {
+                                ctrl.add_file_opener(
+                                    FileOpenerEntry {
+                                        extension,
+                                        app_path: app_path.clone(),
+                                    },
+                                    cx,
+                                );
+                            });
+                            extension_input.update(cx, |state, cx| state.set_value("", window, cx));
+                            true
+                        }
+                    })
+                    .on_cancel(|_, _, _| true)
+                    .content({
+                        let extension_input = extension_input.clone();
+                        let app_name = app_name.clone();
+                        move |content, _, _| {
+                            content
+                                .child(
+                                    DialogHeader::new()
+                                        .px_4()
+                                        .pt_4()
+                                        .child(DialogTitle::new().child("Add File Opener")),
+                                )
+                                .child(
+                                    div()
+                                        .px_4()
+                                        .py_2()
+                                        .flex()
+                                        .flex_col()
+                                        .gap(px(8.0))
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .child(format!("Opens with: {app_name}")),
+                                        )
+                                        .child(Input::new(&extension_input))
+                                        .child(
+                                            div().text_xs().text_color(text_tertiary).child(
+                                                "Extension without the leading dot, e.g. pdf",
+                                            ),
+                                        ),
+                                )
+                        }
+                    })
             });
         })
         .child(

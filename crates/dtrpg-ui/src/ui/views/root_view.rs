@@ -63,6 +63,8 @@ pub struct LibraryRootView {
     search_input: Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
     collection_name_input: Entity<InputState>,
+    /// Draft extension input for the "Add File Opener" dialog.
+    file_opener_extension_input: Entity<InputState>,
 }
 
 impl LibraryRootView {
@@ -169,6 +171,8 @@ impl LibraryRootView {
 
         let collection_name_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Collection name\u{2026}"));
+        let file_opener_extension_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Extension (e.g. pdf)"));
 
         cx.subscribe_in(
             &controller,
@@ -332,6 +336,7 @@ impl LibraryRootView {
             settings_focus,
             search_input,
             collection_name_input,
+            file_opener_extension_input,
         }
     }
 }
@@ -476,6 +481,7 @@ impl Render for LibraryRootView {
                     settings_snap.sign_in_in_progress,
                     settings_snap.sign_in_error,
                     settings_snap.storage_path_input,
+                    self.file_opener_extension_input.clone(),
                 );
                 content = content.child(overlay);
             }

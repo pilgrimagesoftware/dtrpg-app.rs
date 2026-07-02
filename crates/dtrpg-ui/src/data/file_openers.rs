@@ -143,9 +143,9 @@ impl FileOpenerConfig {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Strips a leading dot and lower-cases the extension string.
+/// Trims whitespace, strips a leading dot, and lower-cases the extension string.
 fn normalize_ext(ext: &str) -> String {
-    ext.trim_start_matches('.').to_lowercase()
+    ext.trim().trim_start_matches('.').to_lowercase()
 }
 
 /// Returns the path to `~/.config/dtrpg/app_config.toml` (macOS/Linux) or
@@ -236,6 +236,13 @@ mod tests {
     fn add_normalizes_extension() {
         let mut cfg = FileOpenerConfig::default();
         cfg.add(entry(".PDF", "/Applications/Preview.app"));
+        assert_eq!(cfg.entries()[0].extension, "pdf");
+    }
+
+    #[test]
+    fn add_trims_whitespace_in_extension() {
+        let mut cfg = FileOpenerConfig::default();
+        cfg.add(entry("  pdf  ", "/Applications/Preview.app"));
         assert_eq!(cfg.entries()[0].extension, "pdf");
     }
 
