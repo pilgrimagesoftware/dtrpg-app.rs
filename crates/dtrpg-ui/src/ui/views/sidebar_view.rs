@@ -226,7 +226,8 @@ pub fn render_sidebar(
                                     Button::new("add-collection")
                                         .ghost()
                                         .compact()
-                                        .icon(IconName::Plus),
+                                        .icon(IconName::Plus)
+                                        .tooltip(t!("collections.add_tooltip").to_string()),
                                 )
                                 .w(px(320.))
                                 .close_button(false)

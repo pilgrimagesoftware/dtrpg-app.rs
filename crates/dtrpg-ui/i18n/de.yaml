@@ -93,6 +93,7 @@ settings:
   storage_change_tooltip: "Change…"
 
 collections:
+  add_tooltip: "New collection"
   add_dialog_title: "New Collection"
   add_dialog_confirm: "Create"
   add_dialog_cancel: "Cancel"

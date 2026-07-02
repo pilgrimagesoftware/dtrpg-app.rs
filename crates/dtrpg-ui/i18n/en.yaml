@@ -93,6 +93,7 @@ settings:
   sign_in_in_progress: "Signing In…"
 
 collections:
+  add_tooltip: "New collection"
   add_dialog_title: "New Collection"
   add_dialog_confirm: "Create"
   add_dialog_cancel: "Cancel"
