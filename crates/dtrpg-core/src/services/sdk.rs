@@ -351,6 +351,15 @@ fn publisher_lookup(included: &[PublisherItem]) -> HashMap<u64, String> {
         .collect()
 }
 
+/// Derives an uppercase format label (e.g. `"PDF"`, `"EPUB"`) from a file's extension.
+///
+/// Returns `None` if `filename` has no extension.
+fn file_extension_label(filename: &str) -> Option<String> {
+    filename
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.to_ascii_uppercase())
+}
+
 fn map_order_product(
     item: &OrderProductItem,
     publishers: &HashMap<u64, String>,
@@ -395,10 +404,12 @@ fn map_order_product(
         })
         .unwrap_or_else(|| "Library item".to_string());
 
+    // File `title` is the document's display name (e.g. "Player's Handbook"), not a
+    // format type — derive the format from the file extension instead.
     let mut format_parts: Vec<String> = attributes
         .files
         .iter()
-        .map(|f| f.title.clone())
+        .filter_map(|f| file_extension_label(&f.filename))
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
@@ -547,6 +558,29 @@ mod tests {
             }
         }
 
+        fn seeded_with(item: OrderProductItem) -> Self {
+            Self {
+                list_result: Ok(OrderProductListResponse {
+                    links: pagination_links(None),
+                    meta: PaginationMeta {
+                        items_per_page: 100,
+                        current_page: 1,
+                    },
+                    data: vec![item.clone()],
+                    included: Some(vec![PublisherItem {
+                        id: "7".to_string(),
+                        resource_type: "publisher".to_string(),
+                        attributes: PublisherAttributes {
+                            name: "Lantern Press".to_string(),
+                            publisher_id: 7,
+                            slug: "lantern-press".to_string(),
+                        },
+                    }]),
+                }),
+                detail_result: Ok(OrderProductItemResponse { data: item }),
+            }
+        }
+
         fn session_error() -> Self {
             let error = LibraryServiceError::new(
                 LibraryServiceErrorKind::Session,
@@ -633,6 +667,57 @@ mod tests {
         assert_eq!(items[0].title.as_ref(), "A Better Dungeon");
         assert_eq!(items[0].publisher.as_ref(), "Lantern Press");
         assert_eq!(items[0].kind.as_ref(), "Adventure");
+    }
+
+    #[test]
+    fn map_order_product_derives_format_from_file_extension_not_title() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        // File `title` is the document's display name, distinct from its extension —
+        // the mapped format must come from the extension, not this field.
+        item.attributes.files = vec![OrderProductFile {
+            index: 0,
+            order_product_download_id: 1234,
+            title: "The Wellspring".to_string(),
+            filename: "the-wellspring.epub".to_string(),
+            size: 1_048_576,
+            size_mb: "1.0".to_string(),
+            checksums: vec![],
+        }];
+
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+        let items = service.list_items().expect("list items");
+
+        assert_eq!(items[0].format.as_ref(), "EPUB");
+    }
+
+    #[test]
+    fn map_order_product_joins_multiple_distinct_extensions() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.files = vec![
+            OrderProductFile {
+                index: 0,
+                order_product_download_id: 1234,
+                title: "The Wellspring".to_string(),
+                filename: "the-wellspring.pdf".to_string(),
+                size: 1_048_576,
+                size_mb: "1.0".to_string(),
+                checksums: vec![],
+            },
+            OrderProductFile {
+                index: 1,
+                order_product_download_id: 1235,
+                title: "The Wellspring".to_string(),
+                filename: "the-wellspring.epub".to_string(),
+                size: 1_048_576,
+                size_mb: "1.0".to_string(),
+                checksums: vec![],
+            },
+        ];
+
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+        let items = service.list_items().expect("list items");
+
+        assert_eq!(items[0].format.as_ref(), "EPUB + PDF");
     }
 
     #[test]
