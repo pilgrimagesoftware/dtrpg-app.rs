@@ -270,12 +270,13 @@ impl LibraryController {
                 .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", None, cx))
                 .unwrap_or(0);
 
-            // Two channels: one for page batches, one for the estimated total.
+            // Two channels: one for page batches, one for the API-reported total, if any.
             let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
             let (total_tx, total_rx) = std::sync::mpsc::channel::<usize>();
 
-            // Run the paginated fetch on the background executor. Each page is sent
-            // through the channel as it arrives; the result indicates overall success/failure.
+            // Run the paginated fetch on the background executor. Each page — and, when
+            // the API reports one (via `links.last`), the estimated total — is sent
+            // through its channel as it arrives; the result indicates overall success/failure.
             let fetch = async_cx
                 .background_executor()
                 .spawn(async move {
@@ -285,27 +286,49 @@ impl LibraryController {
                     )
                 });
 
-            // If the service reports an estimated total, seed the progress bar.
-            // Run on background executor so the main thread isn't blocked while
-            // waiting for the first API response.
-            let estimated_total: Option<usize> = async_cx
-                .background_executor()
-                .spawn(async move { total_rx.recv().ok() })
-                .await;
+            // Seed the progress denominator from the local cache count — a close
+            // approximation of the remote count in the common case — so the bar starts
+            // determinate and moves immediately, rather than blocking page delivery on
+            // a `total_rx.recv()` that may never resolve (the API's `links.last` is
+            // optional and often absent). If the API does report its own total later,
+            // it replaces this estimate the next time progress is recomputed below.
+            let mut estimated_total: Option<usize> =
+                cached.as_ref().map(|items| items.len()).filter(|&n| n > 0);
             if let Some(total) = estimated_total {
                 weak_activity
                     .update(async_cx, |a, cx| a.update_progress(activity_id, 0.0, cx))
                     .ok();
-                tracing::debug!(estimated_total = total, "catalog load: estimated item count");
+                tracing::debug!(estimated_total = total, "catalog load: seeded total from cache");
             }
 
             // Accumulate all live SDK pages into a local buffer so the cached catalog
             // remains visible in the UI throughout the fetch. The swap happens once,
             // after the channel closes, so there is no intermediate partially-loaded state.
             let mut rx = Some(rx);
+            let mut total_rx = Some(total_rx);
             let mut live_items: Vec<LibraryItem> = Vec::new();
             loop {
                 let Some(receiver) = rx.take() else { break; };
+
+                // Non-blocking check for an API-reported total before processing the
+                // next page, so the bar re-bases onto the real count as soon as it's
+                // known without ever blocking page delivery.
+                if let Some(total_receiver) = total_rx.take() {
+                    match total_receiver.try_recv() {
+                        Ok(total) => {
+                            estimated_total = Some(total);
+                            tracing::debug!(
+                                estimated_total = total,
+                                "catalog load: API-reported item count"
+                            );
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Empty) => {
+                            total_rx = Some(total_receiver);
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Disconnected) => {}
+                    }
+                }
+
                 let (msg, returned_rx) = async_cx
                     .background_executor()
                     .spawn(async move {
