@@ -10,7 +10,8 @@ use gpui::{
 };
 use gpui_component::Root;
 use gpui_component::WindowExt as _;
-use gpui_component::dialog::{DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
@@ -40,6 +41,8 @@ use crate::{
     },
     services::{LibraryService, collections::CollectionsService},
 };
+use rust_i18n::t;
+
 /// Type-tag used to identify the startup-auth toast notification.
 struct AuthPendingNotif;
 
@@ -536,12 +539,11 @@ impl Render for LibraryRootView {
                         .close_button(false)
                         .overlay_closable(true)
                         .w(px(320.))
-                        .button_props(
-                            DialogButtonProps::default()
-                                .ok_text("Create")
-                                .show_cancel(true)
-                                .cancel_text("Cancel"),
-                        )
+                        // Visible Cancel/Create buttons are rendered via `.footer(...)`
+                        // below (wrapped in `DialogClose`/`DialogAction`, which dispatch
+                        // the same `CancelDialog`/`ConfirmDialog` actions Escape/Enter
+                        // use), so the callbacks registered here run regardless of
+                        // whether the user clicks a button or uses the keyboard.
                         .on_ok({
                             let input = input.clone();
                             let ctrl = ctrl.clone();
@@ -560,14 +562,32 @@ impl Render for LibraryRootView {
                             move |content, _, _| {
                                 content
                                     .child(
-                                        DialogHeader::new()
-                                            .px_4()
-                                            .pt_4()
-                                            .child(DialogTitle::new().child("New Collection")),
+                                        DialogHeader::new().px_4().pt_4().child(
+                                            DialogTitle::new()
+                                                .child(t!("collections.add_dialog_title")),
+                                        ),
                                     )
                                     .child(div().px_4().py_2().child(Input::new(&input)))
                             }
                         })
+                        .footer(
+                            DialogFooter::new()
+                                .px_4()
+                                .pb_4()
+                                .child(
+                                    DialogClose::new().child(
+                                        Button::new("cancel-collection")
+                                            .label(t!("collections.add_dialog_cancel")),
+                                    ),
+                                )
+                                .child(
+                                    DialogAction::new().child(
+                                        Button::new("confirm-collection")
+                                            .primary()
+                                            .label(t!("collections.add_dialog_confirm")),
+                                    ),
+                                ),
+                        )
                 });
             })
             .on_action(move |_: &ShowActivity, _, cx| {

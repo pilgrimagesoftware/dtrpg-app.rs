@@ -80,6 +80,11 @@ settings:
   file_opener_add_confirm: "Add"
   file_opener_add_cancel: "Cancel"
 
+collections:
+  add_dialog_title: "New Collection"
+  add_dialog_confirm: "Create"
+  add_dialog_cancel: "Cancel"
+
 activity:
   title: "Activity"
   empty: "No recent activity."

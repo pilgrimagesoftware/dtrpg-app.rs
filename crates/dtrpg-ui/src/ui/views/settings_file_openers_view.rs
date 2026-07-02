@@ -3,7 +3,8 @@
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::WindowExt as _;
-use gpui_component::dialog::{DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
 
@@ -252,12 +253,11 @@ fn render_add_button(
                     .close_button(false)
                     .overlay_closable(true)
                     .w(px(320.))
-                    .button_props(
-                        DialogButtonProps::default()
-                            .ok_text(t!("settings.file_opener_add_confirm"))
-                            .show_cancel(true)
-                            .cancel_text(t!("settings.file_opener_add_cancel")),
-                    )
+                    // Visible Cancel/Add buttons are rendered via `.footer(...)` below
+                    // (wrapped in `DialogClose`/`DialogAction`, which dispatch the same
+                    // `CancelDialog`/`ConfirmDialog` actions Escape/Enter use), so the
+                    // callbacks registered here run regardless of whether the user
+                    // clicks a button or uses the keyboard.
                     .on_ok({
                         let entity = entity.clone();
                         let extension_input = extension_input.clone();
@@ -310,6 +310,24 @@ fn render_add_button(
                                 )
                         }
                     })
+                    .footer(
+                        DialogFooter::new()
+                            .px_4()
+                            .pb_4()
+                            .child(
+                                DialogClose::new().child(
+                                    Button::new("cancel-file-opener")
+                                        .label(t!("settings.file_opener_add_cancel")),
+                                ),
+                            )
+                            .child(
+                                DialogAction::new().child(
+                                    Button::new("confirm-file-opener")
+                                        .primary()
+                                        .label(t!("settings.file_opener_add_confirm")),
+                                ),
+                            ),
+                    )
             });
 
             // `open_dialog` above focuses the dialog's own container focus handle (for
