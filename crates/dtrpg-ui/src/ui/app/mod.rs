@@ -5,10 +5,25 @@ use tracing::warn;
 
 use crate::credentials::{CredentialStore, KeyringCredentialStore};
 use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
+use crate::data::enums::CatalogPresentation;
 use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::util::init::init_globals;
+use crate::util::sort::{SortDirection, SortMethod};
+
+/// Snapshot of catalog view state needed to render checkmarks in the native menu bar's
+/// View menu (presentation mode, sort field/direction, and grouping).
+///
+/// Rebuilt and passed to [`build_menus`] every time the catalog view state changes, so
+/// the OS menu's checkmarks stay in sync with the toolbar/keyboard-driven selection.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ViewMenuState {
+    pub presentation: CatalogPresentation,
+    pub sort: SortMethod,
+    pub sort_direction: SortDirection,
+    pub grouped: bool,
+}
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
 ///
@@ -126,7 +141,46 @@ pub fn setup(cx: &mut App) {
     });
 
     // Menu bar
-    cx.set_menus([
+    cx.set_menus(build_menus(&ViewMenuState::default()));
+
+    let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
+    {
+        Ok(Some(cred)) => Some(cred.secret),
+        Ok(None) => None,
+        Err(e) => {
+            warn!("keyring check failed: {e}");
+            None
+        }
+    };
+
+    open_library_window(startup_api_key, cx);
+    cx.activate(true);
+}
+
+/// Builds the full native menu bar, applying checkmarks to the View menu's
+/// Presentation and Sort submenus (and the Group toggle) based on `state`.
+///
+/// `cx.set_menus` replaces the entire menu bar on every call, so this must
+/// reconstruct the whole bar rather than just the affected submenus. Called once at
+/// startup with the default state, and again by `LibraryRootView` whenever the
+/// catalog's presentation/sort/grouping changes, so the OS menu's checkmarks track
+/// the toolbar's current selection.
+pub fn build_menus(state: &ViewMenuState) -> Vec<Menu> {
+    // Column-header clicks produce `SortMethod::Custom { col_key }` rather than the
+    // named variants the menu offers; map each back to the menu item it corresponds
+    // to so the checkmark still tracks column-driven sorts.
+    let normalized_sort = match state.sort {
+        SortMethod::Custom {
+            col_key: "publisher",
+        } => Some(SortMethod::Publisher),
+        SortMethod::Custom { col_key: "added" } => Some(SortMethod::DateAdded),
+        SortMethod::Custom { col_key: "pages" } => Some(SortMethod::PageCount),
+        SortMethod::Custom { .. } => None,
+        method => Some(method),
+    };
+    let sort_checked = |target: SortMethod| normalized_sort == Some(target);
+
+    vec![
         Menu::new(t!("sidebar.app_name").to_string()).items([
             MenuItem::action(t!("menu.app_about").to_string(), About),
             MenuItem::separator(),
@@ -168,25 +222,39 @@ pub fn setup(cx: &mut App) {
         Menu::new(t!("menu.view_title").to_string()).items([
             MenuItem::action(t!("menu.view_full_screen").to_string(), ToggleFullscreen),
             MenuItem::separator(),
-            MenuItem::submenu(Menu::new(t!("menu.view_mode_title").to_string()).items([
-                MenuItem::action(t!("menu.view_as_list").to_string(), ViewAsList),
-                MenuItem::action(t!("menu.view_as_thumbs").to_string(), ViewAsThumbs),
-                MenuItem::action(t!("menu.view_as_grid").to_string(), ViewAsGrid),
-            ])),
-            MenuItem::submenu(Menu::new(t!("menu.sort_title").to_string()).items([
-                MenuItem::action(t!("menu.sort_by_title").to_string(), SortByTitle),
-                MenuItem::action(t!("menu.sort_by_publisher").to_string(), SortByPublisher),
-                MenuItem::action(t!("menu.sort_by_date_added").to_string(), SortByDateAdded),
-                MenuItem::action(t!("menu.sort_by_pages").to_string(), SortByPages),
-                MenuItem::separator(),
-                MenuItem::action(t!("menu.sort_ascending").to_string(), SortAscending),
-                MenuItem::action(t!("menu.sort_descending").to_string(), SortDescending),
-                MenuItem::separator(),
-                MenuItem::action(
-                    t!("menu.toggle_group_by_publisher").to_string(),
-                    ToggleGroupByPublisher,
-                ),
-            ])),
+            MenuItem::submenu(
+                Menu::new(t!("menu.view_mode_title").to_string()).items([
+                    MenuItem::action(t!("menu.view_as_list").to_string(), ViewAsList)
+                        .checked(state.presentation == CatalogPresentation::List),
+                    MenuItem::action(t!("menu.view_as_thumbs").to_string(), ViewAsThumbs)
+                        .checked(state.presentation == CatalogPresentation::Thumbs),
+                    MenuItem::action(t!("menu.view_as_grid").to_string(), ViewAsGrid)
+                        .checked(state.presentation == CatalogPresentation::Grid),
+                ]),
+            ),
+            MenuItem::submenu(
+                Menu::new(t!("menu.sort_title").to_string()).items([
+                    MenuItem::action(t!("menu.sort_by_title").to_string(), SortByTitle)
+                        .checked(sort_checked(SortMethod::Title)),
+                    MenuItem::action(t!("menu.sort_by_publisher").to_string(), SortByPublisher)
+                        .checked(sort_checked(SortMethod::Publisher)),
+                    MenuItem::action(t!("menu.sort_by_date_added").to_string(), SortByDateAdded)
+                        .checked(sort_checked(SortMethod::DateAdded)),
+                    MenuItem::action(t!("menu.sort_by_pages").to_string(), SortByPages)
+                        .checked(sort_checked(SortMethod::PageCount)),
+                    MenuItem::separator(),
+                    MenuItem::action(t!("menu.sort_ascending").to_string(), SortAscending)
+                        .checked(state.sort_direction == SortDirection::Ascending),
+                    MenuItem::action(t!("menu.sort_descending").to_string(), SortDescending)
+                        .checked(state.sort_direction == SortDirection::Descending),
+                    MenuItem::separator(),
+                    MenuItem::action(
+                        t!("menu.toggle_group_by_publisher").to_string(),
+                        ToggleGroupByPublisher,
+                    )
+                    .checked(state.grouped),
+                ]),
+            ),
             MenuItem::separator(),
             MenuItem::action(t!("menu.focus_search").to_string(), FocusSearch),
         ]),
@@ -202,18 +270,5 @@ pub fn setup(cx: &mut App) {
         ]),
         Menu::new(t!("menu.help_title").to_string())
             .items([MenuItem::action(t!("menu.app_about").to_string(), About)]),
-    ]);
-
-    let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
-    {
-        Ok(Some(cred)) => Some(cred.secret),
-        Ok(None) => None,
-        Err(e) => {
-            warn!("keyring check failed: {e}");
-            None
-        }
-    };
-
-    open_library_window(startup_api_key, cx);
-    cx.activate(true);
+    ]
 }

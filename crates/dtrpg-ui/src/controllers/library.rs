@@ -110,6 +110,11 @@ pub struct LibraryController {
     thumbnail_activity_id: Option<u64>,
     /// True from startup until the first `set_catalog` call completes.
     catalog_loading: bool,
+    /// Incremented each time [`start_load_inner`](Self::start_load_inner) starts a new
+    /// load attempt. Background tasks from a superseded load compare their captured
+    /// generation against the current value before writing catalog state, so a load
+    /// started before a `clear_and_reload` cannot clobber it after the fact.
+    load_generation: u64,
     /// 1-based current page index.
     pub current_page: usize,
     /// Number of items per page. One of: 10, 25, 50, 100, 200.
@@ -169,6 +174,7 @@ impl LibraryController {
             thumbnail_loading: false,
             thumbnail_activity_id: None,
             catalog_loading: true,
+            load_generation: 0,
             current_page: 1,
             page_size: crate::data::ui_prefs::UiPrefs::load()
                 .page_size()
@@ -197,6 +203,8 @@ impl LibraryController {
     }
 
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
+        self.load_generation += 1;
+        let generation = self.load_generation;
         let service_arc = self.vm.service_arc();
         let weak_activity = self.activity.downgrade();
         let storage_root = cache_dir();
@@ -211,6 +219,9 @@ impl LibraryController {
                 .await;
             if let Some(entries) = cached_collections {
                 this.update(async_cx, |ctrl, cx| {
+                    if ctrl.load_generation != generation {
+                        return; // superseded by a newer load (e.g. cache-clear reload)
+                    }
                     ctrl.apply_collections(entries, cx);
                 })
                 .ok();
@@ -225,6 +236,9 @@ impl LibraryController {
                 .await;
             if let Some(items) = cached.as_ref() {
                 this.update(async_cx, |ctrl, cx| {
+                    if ctrl.load_generation != generation {
+                        return; // superseded by a newer load (e.g. cache-clear reload)
+                    }
                     if force_reload {
                         ctrl.catalog.clear();
                     }
@@ -261,6 +275,9 @@ impl LibraryController {
                                     "catalog auto-load: cache is fresh, skipping live fetch"
                                 );
                                 this.update(async_cx, |ctrl, cx| {
+                                    if ctrl.load_generation != generation {
+                                        return; // superseded by a newer load
+                                    }
                                     ctrl.catalog_loading = false;
                                     cx.emit(LibraryChanged);
                                 })
@@ -364,6 +381,15 @@ impl LibraryController {
             // On error: leave the cached catalog unchanged in memory.
             match fetch.await {
                 Ok(()) => {
+                    let is_current = this
+                        .update(async_cx, |ctrl, _cx| ctrl.load_generation == generation)
+                        .unwrap_or(false);
+                    if !is_current {
+                        // A newer load (e.g. triggered by a cache clear) has already
+                        // taken over; discard this stale result instead of clobbering it.
+                        weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
+                        return;
+                    }
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.set_catalog(live_items, cx);
                     }).ok();
@@ -570,6 +596,13 @@ impl LibraryController {
     /// Used after the on-disk app cache has been cleared, so stale content
     /// disappears from the UI immediately instead of lingering until an
     /// unrelated reload repopulates it from what is now a missing cache file.
+    ///
+    /// Any catalog load already in flight is superseded: `start_load_inner` bumps
+    /// `load_generation`, so the older task's completion is discarded rather than
+    /// clobbering the fresh reload triggered here. Queued-but-not-yet-started
+    /// thumbnail fetches are dropped too; a fetch already in flight still completes
+    /// and populates `CoverCache`, which is harmless since it only caches an image
+    /// for a URL that may no longer be visible.
     pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
         self.catalog.clear();
         self.collections.clear();
@@ -577,6 +610,9 @@ impl LibraryController {
         self.section_counts = SectionCounts::default();
         self.publishers.clear();
         self.invalidate_cache();
+        for (id, _url) in self.thumbnail_queue.drain(..) {
+            cx.global_mut::<CoverCache>().in_flight.remove(&id);
+        }
         self.reload_catalog(cx);
     }
 

@@ -426,6 +426,25 @@ impl TableDelegate for CatalogListDelegate {
             _ => div().into_any_element(),
         }
     }
+
+    fn render_th(
+        &mut self,
+        col_ix: usize,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        // `gpui-component`'s default `render_th` renders the column name in a plain
+        // non-flex `div`, so the text sits at the top of the header cell instead of
+        // vertically centered like every `render_td` cell. Match the cell style here.
+        let name = self.column(col_ix, cx).name;
+        div()
+            .h_full()
+            .flex()
+            .items_center()
+            .text_sm()
+            .font_weight(gpui::FontWeight::MEDIUM)
+            .child(name)
+    }
 }
 
 // ── CatalogView ───────────────────────────────────────────────────────────────

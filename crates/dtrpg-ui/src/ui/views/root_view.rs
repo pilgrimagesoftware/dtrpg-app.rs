@@ -5,7 +5,9 @@ use crate::ui::actions::{
     ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher,
     SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
-use crate::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory};
+use crate::ui::app::{
+    CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
+};
 use gpui::{
     AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     ParentElement, Pixels, Render, Styled, div, px,
@@ -272,7 +274,17 @@ impl LibraryRootView {
         )
         .detach();
 
-        cx.subscribe(&controller, |_this, _ctrl, _event: &LibraryChanged, cx| {
+        cx.subscribe(&controller, |_this, ctrl, _event: &LibraryChanged, cx| {
+            // Keep the native View menu's checkmarks (presentation, sort, grouping)
+            // in sync with the toolbar/keyboard-driven selection. `cx.set_menus`
+            // replaces the whole bar, so it's rebuilt from the current state each time.
+            let ctrl = ctrl.read(cx);
+            cx.set_menus(build_menus(&ViewMenuState {
+                presentation: ctrl.presentation,
+                sort: ctrl.sort,
+                sort_direction: ctrl.sort_direction,
+                grouped: ctrl.grouped,
+            }));
             cx.notify();
         })
         .detach();

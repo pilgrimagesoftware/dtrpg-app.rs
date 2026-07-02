@@ -373,6 +373,16 @@ fn render_status_icon(is_downloaded: bool, color: gpui::Hsla) -> impl IntoElemen
         .child(glyph)
 }
 
+/// Renders a metadata value, falling back to an em dash when the underlying data is
+/// empty (e.g. the API did not report a game system/line for this item).
+fn value_or_dash(value: &str) -> String {
+    if value.trim().is_empty() {
+        "\u{2014}".to_string()
+    } else {
+        value.to_string()
+    }
+}
+
 fn render_metadata_table(
     item: &LibraryItem,
     _colors: &ColorTokens,
@@ -382,7 +392,7 @@ fn render_metadata_table(
         .bordered(false)
         .child(
             DescriptionItem::new(t!("detail.field_system").to_string())
-                .value(item.line.to_string()),
+                .value(value_or_dash(&item.line)),
         )
         .child(
             DescriptionItem::new(t!("detail.field_category").to_string())
@@ -423,4 +433,24 @@ fn render_metadata_table(
     }
 
     list
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn value_or_dash_passes_through_non_empty_value() {
+        assert_eq!(value_or_dash("Pathfinder"), "Pathfinder");
+    }
+
+    #[test]
+    fn value_or_dash_falls_back_to_em_dash_on_empty_string() {
+        assert_eq!(value_or_dash(""), "\u{2014}");
+    }
+
+    #[test]
+    fn value_or_dash_falls_back_to_em_dash_on_whitespace_only() {
+        assert_eq!(value_or_dash("   "), "\u{2014}");
+    }
 }
