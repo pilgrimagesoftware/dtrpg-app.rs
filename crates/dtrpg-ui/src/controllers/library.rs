@@ -19,7 +19,7 @@ use crate::util::matching::*;
 use crate::util::publisher::*;
 use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
-use gpui::{Context, Entity};
+use gpui::{BorrowAppContext, Context, Entity};
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
@@ -1126,10 +1126,19 @@ impl LibraryController {
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
 
     /// Applies a new theme key (updates the GPUI global).
+    ///
+    /// Also re-syncs `gpui_component::Theme`'s table colors (see
+    /// [`crate::data::theme::apply_table_colors`]) so the catalog `DataTable`
+    /// tracks the newly selected Libri palette instead of staying on whichever
+    /// palette was active at startup.
     pub fn set_theme(&self, key: ThemeKey, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
         let new_theme = LibriTheme::new(key, current.density);
+        let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
+        cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+            apply_table_colors(theme, &colors);
+        });
         cx.notify();
     }
 

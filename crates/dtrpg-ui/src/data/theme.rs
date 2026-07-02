@@ -156,6 +156,44 @@ impl LibriTheme {
     }
 }
 
+// ── gpui-component table color sync ─────────────────────────────────────────────
+
+/// Overrides the table-related colors on a `gpui_component::Theme` to match `colors`.
+///
+/// `gpui-component`'s `DataTable`/`Table` widgets read their row/header/stripe colors
+/// from `cx.theme()` (`gpui_component::Theme`), which is a separate global from
+/// [`LibriTheme`] and is never otherwise synced with the active Libri palette — so the
+/// catalog list view's table rendered with `gpui-component`'s default light colors
+/// regardless of which Libri theme (including the dark "Ink" theme) was active.
+///
+/// Call this whenever [`LibriTheme`] changes, updating both `colors` (read directly by
+/// some components) and `tokens` (read by `DataTable`) so the two stay in sync. Only
+/// the table-specific fields are touched; the rest of `gpui_component::Theme` keeps
+/// whatever `Theme::apply_config` computed for the current light/dark mode.
+pub fn apply_table_colors(theme: &mut gpui_component::Theme, colors: &ColorTokens) {
+    theme.colors.table = colors.surface;
+    theme.colors.table_even = colors.surface_alt;
+    theme.colors.table_head = colors.surface_alt;
+    theme.colors.table_head_foreground = colors.text_secondary;
+    theme.colors.table_foot = colors.surface_alt;
+    theme.colors.table_foot_foreground = colors.text_secondary;
+    theme.colors.table_hover = colors.hover;
+    theme.colors.table_row_border = colors.border;
+    theme.colors.table_active = colors.accent_soft;
+    theme.colors.table_active_border = colors.accent;
+
+    theme.tokens.table = colors.surface.into();
+    theme.tokens.table_even = colors.surface_alt.into();
+    theme.tokens.table_head = colors.surface_alt.into();
+    theme.tokens.table_head_foreground = colors.text_secondary.into();
+    theme.tokens.table_foot = colors.surface_alt.into();
+    theme.tokens.table_foot_foreground = colors.text_secondary.into();
+    theme.tokens.table_hover = colors.hover.into();
+    theme.tokens.table_row_border = colors.border.into();
+    theme.tokens.table_active = colors.accent_soft.into();
+    theme.tokens.table_active_border = colors.accent.into();
+}
+
 // ── Color constructors ────────────────────────────────────────────────────────
 
 fn hex(r: u8, g: u8, b: u8) -> Hsla {

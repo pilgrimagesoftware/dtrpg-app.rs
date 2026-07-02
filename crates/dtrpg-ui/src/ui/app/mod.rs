@@ -83,6 +83,14 @@ pub fn setup(cx: &mut App) {
     });
     init_globals(cx);
 
+    // Sync gpui-component's table colors (DataTable/Table) with the active Libri
+    // theme; otherwise the catalog list view renders with gpui-component's default
+    // light table colors regardless of which Libri theme is active.
+    let initial_colors = cx.global::<crate::data::theme::LibriTheme>().colors.clone();
+    cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+        crate::data::theme::apply_table_colors(theme, &initial_colors);
+    });
+
     // Key bindings
     cx.bind_keys([
         KeyBinding::new("cmd-q", Quit, None),
