@@ -753,6 +753,34 @@ impl LibraryController {
         }
     }
 
+    /// Re-fetches thumbnails for every catalog item with a `cover_url`, overwriting
+    /// any cached image. Used by the "Refresh Thumbnails" catalog menu action.
+    ///
+    /// Unlike [`enqueue_thumbnails`](Self::enqueue_thumbnails), this does not skip
+    /// items already present in the cache — every eligible item is re-queued.
+    pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
+        let to_enqueue: Vec<(Arc<str>, Arc<str>)> = self
+            .catalog
+            .iter()
+            .filter_map(|item| {
+                let url = item.cover_url.as_ref()?;
+                Some((Arc::clone(&item.id), Arc::clone(url)))
+            })
+            .collect();
+
+        if to_enqueue.is_empty() {
+            return;
+        }
+
+        self.thumbnail_queue.clear();
+        let cache = cx.global_mut::<CoverCache>();
+        for (id, _) in &to_enqueue {
+            cache.mark_in_flight(Arc::clone(id));
+        }
+        self.thumbnail_queue.extend(to_enqueue);
+        self.drain_thumbnail_queue(cx);
+    }
+
     // ── Snapshot ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the root view for one render pass.

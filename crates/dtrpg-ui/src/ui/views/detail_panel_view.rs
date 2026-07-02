@@ -10,6 +10,7 @@ use gpui::{
     Styled, StyledImage, Window, div, img, px,
 };
 use gpui_component::Disableable;
+use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
@@ -65,6 +66,7 @@ pub fn render_detail_panel(
     let entity_close = entity.clone();
     let entity_download = entity.clone();
     let entity_resize = entity.clone();
+    let entity_refresh_thumbnail = entity.clone();
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
     let read_item_id = Arc::clone(&item.id);
@@ -119,12 +121,46 @@ pub fn render_detail_panel(
             } else {
                 render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
             };
+            let cover_url = item.cover_url.clone();
+            let mut cover_box = div()
+                .relative()
+                .w(px(cover_w))
+                .h(px(cover_h))
+                .flex_none()
+                .child(cover);
+            if let Some(cover_url) = cover_url {
+                cover_box = cover_box.child(
+                    div()
+                        .id("detail-refresh-thumbnail")
+                        .absolute()
+                        .top(px(8.0))
+                        .left(px(8.0))
+                        .size(px(24.0))
+                        .rounded_full()
+                        .bg(scrim)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .cursor_pointer()
+                        .text_sm()
+                        .text_color(accent_on)
+                        .tooltip(|window, cx| {
+                            Tooltip::new(t!("detail.refresh_thumbnail_tooltip").to_string())
+                                .build(window, cx)
+                        })
+                        .on_click(move |_, _, cx| {
+                            entity_refresh_thumbnail
+                                .update(cx, |ctrl, cx| ctrl.load_thumbnail(cover_url.clone(), cx));
+                        })
+                        .child("\u{27f3}"),
+                );
+            }
             div()
                 .w_full()
                 .flex()
                 .flex_none()
                 .justify_center()
-                .child(div().w(px(cover_w)).h(px(cover_h)).flex_none().child(cover))
+                .child(cover_box)
         })
         // Scrollable body
         //
@@ -155,10 +191,17 @@ pub fn render_detail_panel(
                             )
                             .child(
                                 div()
-                                    .text_xl()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                                    .text_color(text_primary)
-                                    .child(item.title.to_string()),
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(6.0))
+                                    .child(
+                                        div()
+                                            .text_xl()
+                                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                                            .text_color(text_primary)
+                                            .child(item.title.to_string()),
+                                    )
+                                    .child(render_status_icon(is_downloaded, text_secondary)),
                             )
                             .child(
                                 div()
@@ -174,25 +217,26 @@ pub fn render_detail_panel(
                             .text_color(text_secondary)
                             .child(item.desc.to_string()),
                     )
-                    // Actions
+                    // Actions — icon buttons with tooltips instead of full-width
+                    // labeled buttons, so the row stays compact regardless of panel width.
                     .child(
                         div()
                             .flex()
-                            .flex_col()
+                            .items_center()
                             .gap(px(8.0))
                             .child({
                                 let read_path =
                                     storage_root_path.join("items").join(read_item_id.as_ref());
                                 Button::new("detail-read")
                                     .primary()
-                                    .label(t!("detail.read_button"))
-                                    .w_full()
+                                    .icon(IconName::BookOpen)
                                     .disabled(!is_downloaded)
                                     .when(!is_downloaded, |b| {
                                         b.tooltip(t!("detail.tooltip_download_first"))
                                     })
                                     .when(is_downloaded, |b| {
-                                        b.on_click(move |_, _, _| {
+                                        b.tooltip(t!("detail.read_button"))
+                                        .on_click(move |_, _, _| {
                                         use crate::util::item_opener::{ItemOpener, OpenError};
 
                                         if !read_path.exists() {
@@ -229,12 +273,16 @@ pub fn render_detail_panel(
                                 Button::new("detail-download")
                                     .ghost()
                                     .outline()
-                                    .label(if is_downloaded {
+                                    .icon(if is_downloaded {
+                                        IconName::CircleCheck
+                                    } else {
+                                        IconName::ArrowDown
+                                    })
+                                    .tooltip(if is_downloaded {
                                         t!("detail.downloaded_button")
                                     } else {
                                         t!("detail.download_button")
                                     })
-                                    .w_full()
                                     .on_click(move |_, _, cx| {
                                         let id = Arc::clone(&item_id);
                                         entity_download.update(cx, |ctrl, cx| {
@@ -242,16 +290,16 @@ pub fn render_detail_panel(
                                         });
                                     }),
                             )
-                            .when(is_downloaded, |col| {
+                            .when(is_downloaded, |row| {
                                 let item_path = storage_root_path
                                     .join("items")
                                     .join(reveal_item_id.as_ref());
-                                col.child(
+                                row.child(
                                 Button::new("detail-reveal")
                                     .ghost()
                                     .outline()
-                                    .label(platform_reveal_label())
-                                    .w_full()
+                                    .icon(IconName::FolderOpen)
+                                    .tooltip(platform_reveal_label().into_owned())
                                     .on_click(move |_, _, _cx| {
                                         if !item_path.exists() {
                                             tracing::warn!(
@@ -307,15 +355,28 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     return t!("detail.show_in_files");
 }
 
+/// Renders a small status icon next to the item title: a checkmark when downloaded,
+/// a cloud glyph otherwise. Replaces the old text-only "Status" row in the metadata
+/// table.
+fn render_status_icon(is_downloaded: bool, color: gpui::Hsla) -> impl IntoElement + 'static {
+    let (glyph, tooltip_text) = if is_downloaded {
+        ("\u{2713}", t!("detail.status_on_device").to_string())
+    } else {
+        ("\u{2601}", t!("detail.status_in_cloud").to_string())
+    };
+
+    div()
+        .id("detail-status-icon")
+        .text_sm()
+        .text_color(color)
+        .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+        .child(glyph)
+}
+
 fn render_metadata_table(
     item: &LibraryItem,
     _colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
-    let status_str = match item.status {
-        ItemStatus::Downloaded => t!("detail.status_on_device"),
-        ItemStatus::Cloud => t!("detail.status_in_cloud"),
-    };
-
     let mut list = DescriptionList::vertical()
         .columns(1)
         .bordered(false)
@@ -342,10 +403,6 @@ fn render_metadata_table(
         .child(
             DescriptionItem::new(t!("detail.field_released").to_string())
                 .value(item.year.to_string()),
-        )
-        .child(
-            DescriptionItem::new(t!("detail.field_status").to_string())
-                .value(status_str.to_string()),
         );
 
     if let Some(ts) = item.date_added {

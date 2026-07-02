@@ -21,7 +21,7 @@ actions!(
 actions!(libri, [Minimize, Zoom, ToggleFullscreen]);
 
 // Catalog menu actions
-actions!(libri, [AddCollection, ReloadCatalog]);
+actions!(libri, [AddCollection, ReloadCatalog, RefreshThumbnails]);
 
 // Collection context menu actions
 #[derive(Clone, Debug, PartialEq, Deserialize, JsonSchema, gpui::Action)]
@@ -41,3 +41,21 @@ actions!(libri, [ShowActivity, ShowAlertHistory]);
 
 // Thin no-op action types for OS text-editing routing via OsAction
 actions!(libri, [Undo, Redo, Cut, Copy, Paste, SelectAll]);
+
+// View menu actions: catalog presentation mode, sort, and search focus.
+actions!(
+    libri,
+    [
+        ViewAsList,
+        ViewAsThumbs,
+        ViewAsGrid,
+        SortByTitle,
+        SortByPublisher,
+        SortByDateAdded,
+        SortByPages,
+        SortAscending,
+        SortDescending,
+        ToggleGroupByPublisher,
+        FocusSearch,
+    ]
+);

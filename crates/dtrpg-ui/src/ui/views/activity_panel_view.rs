@@ -30,8 +30,8 @@ pub fn render_activity_panel(
 
     div()
         .absolute()
-        .bottom(px(44.0))
-        .left_0()
+        .bottom(px(56.0))
+        .left(px(8.0))
         .w(px(340.0))
         .bg(surface_alt)
         .border_1()

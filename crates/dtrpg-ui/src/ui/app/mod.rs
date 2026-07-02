@@ -139,6 +139,10 @@ pub fn setup(cx: &mut App) {
             MenuItem::action(t!("menu.catalog_add_collection").to_string(), AddCollection),
             MenuItem::separator(),
             MenuItem::action(t!("menu.catalog_reload").to_string(), ReloadCatalog),
+            MenuItem::action(
+                t!("menu.catalog_refresh_thumbnails").to_string(),
+                RefreshThumbnails,
+            ),
         ]),
         Menu::new(t!("menu.edit_title").to_string()).items([
             MenuItem::os_action(t!("menu.edit_undo").to_string(), Undo, OsAction::Undo),
@@ -153,10 +157,28 @@ pub fn setup(cx: &mut App) {
                 OsAction::SelectAll,
             ),
         ]),
-        Menu::new(t!("menu.view_title").to_string()).items([MenuItem::action(
-            t!("menu.view_full_screen").to_string(),
-            ToggleFullscreen,
-        )]),
+        Menu::new(t!("menu.view_title").to_string()).items([
+            MenuItem::action(t!("menu.view_full_screen").to_string(), ToggleFullscreen),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.view_as_list").to_string(), ViewAsList),
+            MenuItem::action(t!("menu.view_as_thumbs").to_string(), ViewAsThumbs),
+            MenuItem::action(t!("menu.view_as_grid").to_string(), ViewAsGrid),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.sort_by_title").to_string(), SortByTitle),
+            MenuItem::action(t!("menu.sort_by_publisher").to_string(), SortByPublisher),
+            MenuItem::action(t!("menu.sort_by_date_added").to_string(), SortByDateAdded),
+            MenuItem::action(t!("menu.sort_by_pages").to_string(), SortByPages),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.sort_ascending").to_string(), SortAscending),
+            MenuItem::action(t!("menu.sort_descending").to_string(), SortDescending),
+            MenuItem::separator(),
+            MenuItem::action(
+                t!("menu.toggle_group_by_publisher").to_string(),
+                ToggleGroupByPublisher,
+            ),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.focus_search").to_string(), FocusSearch),
+        ]),
         Menu::new(t!("menu.window_title").to_string()).items([
             MenuItem::action(t!("menu.window_minimize").to_string(), Minimize),
             MenuItem::action(t!("menu.window_zoom").to_string(), Zoom),

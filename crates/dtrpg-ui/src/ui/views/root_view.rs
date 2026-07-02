@@ -1,7 +1,9 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
 use crate::ui::actions::{
-    About, AddCollection, ReloadCatalog, ShowActivity, ShowAlertHistory, ShowSettings,
+    About, AddCollection, FocusSearch, RefreshThumbnails, ReloadCatalog, ShowActivity,
+    ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher,
+    SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory};
 use gpui::{
@@ -31,6 +33,7 @@ use crate::{
     data::{
         auth_state::AuthState,
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
+        enums::CatalogPresentation,
         events::{
             ActivityChanged, AuthStateChanged, CollectionCreateFailed, DownloadComplete,
             DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded,
@@ -40,6 +43,7 @@ use crate::{
         ui_prefs::UiPrefs,
     },
     services::{LibraryService, collections::CollectionsService},
+    util::sort::{SortDirection, SortMethod},
 };
 use rust_i18n::t;
 
@@ -613,10 +617,22 @@ impl Render for LibraryRootView {
 
         let settings_for_action = self.settings.clone();
         let controller_for_reload = self.controller.clone();
+        let controller_for_refresh_thumbnails = self.controller.clone();
         let controller_for_add = self.controller.clone();
         let collection_input_for_add = self.collection_name_input.clone();
         let activity_for_show = self.activity.clone();
         let activity_for_alert_history = self.activity.clone();
+        let controller_for_view_list = self.controller.clone();
+        let controller_for_view_thumbs = self.controller.clone();
+        let controller_for_view_grid = self.controller.clone();
+        let controller_for_sort_title = self.controller.clone();
+        let controller_for_sort_publisher = self.controller.clone();
+        let controller_for_sort_date_added = self.controller.clone();
+        let controller_for_sort_pages = self.controller.clone();
+        let controller_for_sort_asc = self.controller.clone();
+        let controller_for_sort_desc = self.controller.clone();
+        let controller_for_group_toggle = self.controller.clone();
+        let search_input_for_focus = self.search_input.clone();
         let sidebar_initial = self.sidebar_width;
 
         div()
@@ -669,6 +685,60 @@ impl Render for LibraryRootView {
             })
             .on_action(move |_: &ReloadCatalog, _, cx| {
                 controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));
+            })
+            .on_action(move |_: &RefreshThumbnails, _, cx| {
+                controller_for_refresh_thumbnails
+                    .update(cx, |ctrl, cx| ctrl.refresh_all_thumbnails(cx));
+            })
+            .on_action(move |_: &ViewAsList, _, cx| {
+                controller_for_view_list.update(cx, |ctrl, cx| {
+                    ctrl.set_presentation(CatalogPresentation::List, cx)
+                });
+            })
+            .on_action(move |_: &ViewAsThumbs, _, cx| {
+                controller_for_view_thumbs.update(cx, |ctrl, cx| {
+                    ctrl.set_presentation(CatalogPresentation::Thumbs, cx);
+                });
+            })
+            .on_action(move |_: &ViewAsGrid, _, cx| {
+                controller_for_view_grid.update(cx, |ctrl, cx| {
+                    ctrl.set_presentation(CatalogPresentation::Grid, cx)
+                });
+            })
+            .on_action(move |_: &SortByTitle, _, cx| {
+                controller_for_sort_title
+                    .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
+            })
+            .on_action(move |_: &SortByPublisher, _, cx| {
+                controller_for_sort_publisher
+                    .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
+            })
+            .on_action(move |_: &SortByDateAdded, _, cx| {
+                controller_for_sort_date_added
+                    .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
+            })
+            .on_action(move |_: &SortByPages, _, cx| {
+                controller_for_sort_pages
+                    .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
+            })
+            .on_action(move |_: &SortAscending, _, cx| {
+                controller_for_sort_asc.update(cx, |ctrl, cx| {
+                    ctrl.set_sort_direction(SortDirection::Ascending, cx);
+                });
+            })
+            .on_action(move |_: &SortDescending, _, cx| {
+                controller_for_sort_desc.update(cx, |ctrl, cx| {
+                    ctrl.set_sort_direction(SortDirection::Descending, cx);
+                });
+            })
+            .on_action(move |_: &ToggleGroupByPublisher, _, cx| {
+                controller_for_group_toggle.update(cx, |ctrl, cx| {
+                    let grouped = ctrl.snapshot().grouped;
+                    ctrl.set_grouped(!grouped, cx);
+                });
+            })
+            .on_action(move |_: &FocusSearch, window, cx| {
+                search_input_for_focus.update(cx, |input, cx| input.focus(window, cx));
             })
             .on_action(move |_: &AddCollection, window, cx| {
                 let ctrl = controller_for_add.clone();
