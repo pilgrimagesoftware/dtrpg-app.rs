@@ -581,14 +581,19 @@ impl Render for LibraryRootView {
             content
         };
 
-        // Wrap the sidebar in a relative container so the activity panel overlay
-        // (which is absolute-positioned) is anchored within the sidebar column.
-        let mut sidebar_col = div().size_full().relative().child(sidebar);
+        let sidebar_col = div().size_full().relative().child(sidebar);
 
-        if activity_snap.panel_open {
-            let overlay = render_activity_panel(&activity_snap, activity_entity, colors);
-            sidebar_col = sidebar_col.child(overlay);
-        }
+        // The activity panel overlay is rendered at the root level (below), not
+        // nested inside `sidebar_col`. Both `sidebar_col` and `main_content` are
+        // siblings inside the resizable layout, painted in DOM order — an
+        // absolute-positioned child of `sidebar_col` that visually extends past
+        // the sidebar's width would be painted *under* `main_content`'s opaque
+        // background and appear clipped by the catalog area. Rendering it as a
+        // root-level sibling after the resizable layout guarantees it paints on
+        // top of everything.
+        let activity_overlay = activity_snap
+            .panel_open
+            .then(|| render_activity_panel(&activity_snap, activity_entity, colors));
 
         let settings_for_action = self.settings.clone();
         let controller_for_reload = self.controller.clone();
@@ -691,6 +696,7 @@ impl Render for LibraryRootView {
                             .child(main_content),
                     ),
             )
+            .children(activity_overlay)
             .children(sheet_layer)
             .children(dialog_layer)
             .children(notification_layer)
