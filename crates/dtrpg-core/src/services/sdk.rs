@@ -19,7 +19,7 @@ use dtrpg_ui::{
 
 use crate::constants::{
     ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, BYTES_PER_MB, DEFAULT_COLOR,
-    REFRESH_TOKEN_ENV, REFRESH_TOKEN_TTL_ENV,
+    DTRPG_IMAGES_BASE_URL, REFRESH_TOKEN_ENV, REFRESH_TOKEN_TTL_ENV,
 };
 
 /// SDK operation boundary used by the Rust library service adapter.
@@ -339,10 +339,24 @@ fn map_order_product(
         .max(item.id.parse::<u64>().unwrap_or_default())
         .max(attributes.product_id);
 
-    let publisher = publishers
-        .get(&attributes.royalty_publisher_id)
-        .cloned()
+    // Prefer the publisher name embedded directly on `attributes.publisher` (present on newer
+    // API responses); fall back to the sideloaded `included` publisher lookup, then a placeholder.
+    let publisher = attributes
+        .publisher
+        .as_ref()
+        .map(|p| p.name.clone())
+        .or_else(|| publishers.get(&attributes.royalty_publisher_id).cloned())
         .unwrap_or_else(|| format!("Publisher {}", attributes.royalty_publisher_id));
+
+    // Prefer the smallest thumbnail available for catalog rendering, falling back to
+    // progressively larger images if a thumbnail wasn't generated for this product.
+    let cover_url = attributes.product.as_ref().and_then(|p| {
+        p.thumbnail
+            .as_deref()
+            .or(p.thumbnail_100.as_deref())
+            .or(p.image.as_deref())
+            .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
+    });
 
     let kind = attributes
         .filters
@@ -409,7 +423,7 @@ fn map_order_product(
         status: ItemStatus::Cloud,
         color: DEFAULT_COLOR.into(),
         desc: desc.as_str().into(),
-        cover_url: None,
+        cover_url: cover_url.map(Into::into),
         date_added: None,
         thumbnail_last_attempted: None,
     }
@@ -598,6 +612,48 @@ mod tests {
     }
 
     #[test]
+    fn map_order_product_builds_cover_url_from_embedded_thumbnail() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.royalty_publisher_id = 4952;
+        item.attributes.publisher = Some(dtrpg_sdk::OrderProductPublisher {
+            name: "Monte Cook Games".to_string(),
+            publisher_id: 4952,
+            slug: "monte-cook-games".to_string(),
+        });
+        item.attributes.product = Some(dtrpg_sdk::OrderProductInfo {
+            image: Some("4952/515276.jpg".to_string()),
+            web_image: Some("4952/515276.webp".to_string()),
+            thumbnail: Some("4952/515276-thumb140.jpg".to_string()),
+            thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+            bundle_id: 0,
+            date_created: Some("2025-03-13T16:07:01-05:00".to_string()),
+            product_id: 515_276,
+            description: None,
+            filesize: Some(24.13),
+        });
+
+        let mapped = map_order_product(&item, &HashMap::new(), 0);
+
+        assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
+        assert_eq!(
+            mapped.cover_url.as_deref(),
+            Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg")
+        );
+    }
+
+    #[test]
+    fn map_order_product_falls_back_to_publisher_lookup_when_not_embedded() {
+        let item = order_product_item(7, "No Embedded Publisher");
+        let mut publishers = HashMap::new();
+        publishers.insert(7, "Lantern Press".to_string());
+
+        let mapped = map_order_product(&item, &publishers, 0);
+
+        assert_eq!(mapped.publisher.as_ref(), "Lantern Press");
+        assert!(mapped.cover_url.is_none());
+    }
+
+    #[test]
     fn sdk_service_preserves_session_error_classification() {
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
 
@@ -647,6 +703,9 @@ mod tests {
                 }]),
                 history: None,
                 attributes: None,
+                publisher: None,
+                product: None,
+                order: None,
             },
         }
     }
