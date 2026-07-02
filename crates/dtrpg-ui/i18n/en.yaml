@@ -27,6 +27,24 @@ toolbar:
   tooltip_settings: "Settings"
   tooltip_not_signed_in: "Not signed in"
   tooltip_account: "Account"
+  filter_title_publisher: "Publisher: %{name}"
+  filter_title_collection: "Collection: %{name}"
+  filtered_suffix: " (%{n} filtered)"
+
+count:
+  title: "title"
+  titles: "titles"
+  item: "item"
+  items: "items"
+  publisher_item: "publisher item"
+  publisher_items: "publisher items"
+  total_item: "total item"
+  total_items: "total items"
+
+search:
+  placeholder: "Search…"
+  publishers_placeholder: "Search publishers…"
+  collections_placeholder: "Search collections…"
 
 catalog:
   no_titles_match: "No titles match."
@@ -89,15 +107,19 @@ settings:
   file_opener_app_filter_name: "Applications"
   default_account_name: "DriveThruRPG Account"
   api_key_label: "API Key"
+  api_key_placeholder: "Paste API key here…"
+  email_placeholder: "Email (optional, for avatar)"
   reset_api_key_tooltip: "Reset API Key"
   sign_in_button: "Sign In"
   sign_in_in_progress: "Signing In…"
+  file_opener_extension_placeholder: "Extension (e.g. pdf)"
 
 collections:
   add_tooltip: "New collection"
   add_dialog_title: "New Collection"
   add_dialog_confirm: "Create"
   add_dialog_cancel: "Cancel"
+  name_placeholder: "Collection name…"
   reload: "Reload"
   delete: "Delete"
 

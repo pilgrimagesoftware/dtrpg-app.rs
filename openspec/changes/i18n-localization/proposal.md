@@ -32,3 +32,26 @@ All user-visible strings are hardcoded English literals scattered across the vie
 - `crates/dtrpg-ui/src/lib.rs`: call `i18n::init()` on startup
 - `crates/dtrpg-ui/src/ui/views/*.rs`: replace ~150 string literals with `t!()` calls
 - `crates/dtrpg-ui/src/util/filter.rs` and `util/datetime.rs`: any locale-sensitive formatting
+
+## Follow-up: remaining hardcoded strings found after initial rollout
+
+A later audit (see section 7 in `tasks.md`) found several strings the initial pass missed:
+search/collection/file-opener input placeholders, the "Publisher: %{name}" / "Collection:
+%{name}" section titles, and the count-noun words baked directly into `pluralize()` call
+sites (`"item"`/`"items"`, `"title"`/`"titles"`, `"publisher item"`/`"total item"` etc.).
+`util::pluralize::pluralize` now takes `t!()` key pairs instead of literal English words,
+consistent with its original doc comment ("so a future i18n layer has a single replacement
+point").
+
+Two items from the NOTES.md localization gap list are **not fixable at the app level**:
+
+- **Pagination "Previous"/"Next" labels**: these come from `gpui-component`'s own
+  `Pagination` widget, which uses its own separate `rust-i18n` bundle
+  (`gpui-component/crates/ui/locales/ui.yml`, keys `Pagination.previous` / `Pagination.next`).
+  That bundle ships `zh-CN`/`zh-HK`/`zh-TW`/`it` translations but no `de`/`fr` — falls back to
+  English for our supported locales. Fixing this requires an upstream contribution to
+  `gpui-component`, not a change in this app's codebase.
+- **"Start Dictation" / "Emoji & Symbols" / Autofill menu items**: these are injected by
+  macOS itself into any `NSApplication` Edit menu; the app does not construct them and they
+  follow the OS's own language setting (System Settings > Language & Region), not the app's
+  in-app locale selection.

@@ -27,8 +27,12 @@ fn section_title_for(filter: &SidebarFilter) -> String {
         SidebarFilter::RecentlyAdded => t!("sidebar.recently_added").to_string(),
         SidebarFilter::OnDevice => t!("sidebar.on_this_device").to_string(),
         SidebarFilter::InCloud => t!("sidebar.in_the_cloud").to_string(),
-        SidebarFilter::Publisher(name) => format!("Publisher: {name}"),
-        SidebarFilter::Collection(_, name) => format!("Collection: {name}"),
+        SidebarFilter::Publisher(name) => {
+            t!("toolbar.filter_title_publisher", name = name).to_string()
+        }
+        SidebarFilter::Collection(_, name) => {
+            t!("toolbar.filter_title_collection", name = name).to_string()
+        }
     }
 }
 
@@ -48,19 +52,19 @@ fn count_label_for(
     has_search: bool,
 ) -> String {
     if matches!(filter, SidebarFilter::Publisher(_)) {
+        let base = format!(
+            "{}, {}",
+            pluralize(
+                filter_count,
+                "count.publisher_item",
+                "count.publisher_items"
+            ),
+            pluralize(total_count, "count.total_item", "count.total_items"),
+        );
         return if has_search {
-            format!(
-                "{}, {} ({} filtered)",
-                pluralize(filter_count, "publisher item", "publisher items"),
-                pluralize(total_count, "total item", "total items"),
-                matched_count,
-            )
+            format!("{base}{}", t!("toolbar.filtered_suffix", n = matched_count))
         } else {
-            format!(
-                "{}, {}",
-                pluralize(filter_count, "publisher item", "publisher items"),
-                pluralize(total_count, "total item", "total items"),
-            )
+            base
         };
     }
 
@@ -69,14 +73,11 @@ fn count_label_for(
     } else {
         filter_count
     };
+    let base = pluralize(base_count, "count.item", "count.items");
     if has_search {
-        format!(
-            "{} ({} filtered)",
-            pluralize(base_count, "item", "items"),
-            matched_count,
-        )
+        format!("{base}{}", t!("toolbar.filtered_suffix", n = matched_count))
     } else {
-        pluralize(base_count, "item", "items")
+        base
     }
 }
 

@@ -115,3 +115,34 @@ activity.empty_hint: "Activity will appear here as operations run."
 
 - [x] 6.1 Launch the app on an English system locale and confirm all UI strings render correctly
 - [ ] 6.2 Temporarily set `rust_i18n::set_locale("fr")` in `i18n::init()` and confirm the app still renders (with English stub values -- no crashes, no empty labels)
+
+## 7. Follow-up: strings missed in the initial pass
+
+A later audit (prompted by NOTES.md "Localizations missing" items) found several
+call sites still using literal English strings.
+
+- [x] 7.1 Add `settings.api_key_placeholder`, `settings.email_placeholder`,
+      `settings.file_opener_extension_placeholder`, `search.placeholder`,
+      `search.publishers_placeholder`, `search.collections_placeholder`,
+      `collections.name_placeholder` keys and replace the `InputState::placeholder(...)`
+      literals in `root_view.rs` with `t!()` calls
+- [x] 7.2 Add `toolbar.filter_title_publisher` ("Publisher: %{name}") and
+      `toolbar.filter_title_collection` ("Collection: %{name}") keys; replace the
+      `format!("Publisher: {name}")` / `format!("Collection: {name}")` literals in
+      `toolbar_view.rs::section_title_for`
+- [x] 7.3 Add `toolbar.filtered_suffix` (" (%{n} filtered)") key; replace the
+      `format!("... ({} filtered)", ...)` literals in `toolbar_view.rs::count_label_for`
+- [x] 7.4 Add a `count:` locale section (`title`/`titles`, `item`/`items`,
+      `publisher_item`/`publisher_items`, `total_item`/`total_items`); change
+      `util::pluralize::pluralize` to take `t!()` key pairs instead of literal English
+      words, and update all call sites in `toolbar_view.rs` and `sidebar_view.rs`
+- [x] 7.5 Translate all new keys into `de.yaml` and `fr.yaml` (both are maintained
+      translations in this codebase, not English stubs as the section 2 task list
+      originally assumed)
+- [x] 7.6 Run `cargo check --workspace --all-targets`, `cargo clippy --workspace
+      --all-targets --all-features -- -D warnings`, `cargo fmt --all -- --check`, and
+      `cargo test --workspace` -- all pass (89 unit tests, 4 doctests)
+- [x] 7.7 Investigate "Pagination labels" and "Autofill, dictation, emoji menu items"
+      from the NOTES.md gap list — both are outside this app's control (see "Follow-up"
+      section in `proposal.md`); no code change possible here
+

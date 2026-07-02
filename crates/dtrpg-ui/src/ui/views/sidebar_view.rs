@@ -424,7 +424,7 @@ fn build_footer(
                     .flex()
                     .justify_between()
                     .text_xs()
-                    .child(pluralize(total_count, "title", "titles"))
+                    .child(pluralize(total_count, "count.title", "count.titles"))
                     .child(total_size_str),
             )
             .child(

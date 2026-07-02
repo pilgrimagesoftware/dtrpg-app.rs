@@ -27,6 +27,24 @@ toolbar:
   tooltip_settings: "Einstellungen"
   tooltip_not_signed_in: "Nicht angemeldet"
   tooltip_account: "Konto"
+  filter_title_publisher: "Verlag: %{name}"
+  filter_title_collection: "Sammlung: %{name}"
+  filtered_suffix: " (%{n} gefiltert)"
+
+count:
+  title: "Titel"
+  titles: "Titel"
+  item: "Titel"
+  items: "Titel"
+  publisher_item: "Verlagstitel"
+  publisher_items: "Verlagstitel"
+  total_item: "Titel insgesamt"
+  total_items: "Titel insgesamt"
+
+search:
+  placeholder: "Suchen…"
+  publishers_placeholder: "Verlage suchen…"
+  collections_placeholder: "Sammlungen suchen…"
 
 catalog:
   no_titles_match: "Keine Titel gefunden."
@@ -86,17 +104,21 @@ settings:
   file_opener_app_filter_name: "Anwendungen"
   default_account_name: "DriveThruRPG-Konto"
   api_key_label: "API-Schlüssel"
+  api_key_placeholder: "API-Schlüssel hier einfügen…"
+  email_placeholder: "E-Mail (optional, für Avatar)"
   reset_api_key_tooltip: "API-Schlüssel zurücksetzen"
   sign_in_button: "Anmelden"
   sign_in_in_progress: "Anmeldung läuft…"
   storage_note: "Das Ändern des Download-Speicherorts verschiebt keine bereits heruntergeladenen Dateien."
   storage_change_tooltip: "Ändern…"
+  file_opener_extension_placeholder: "Dateiendung (z. B. pdf)"
 
 collections:
   add_tooltip: "Neue Sammlung"
   add_dialog_title: "Neue Sammlung"
   add_dialog_confirm: "Erstellen"
   add_dialog_cancel: "Abbrechen"
+  name_placeholder: "Name der Sammlung…"
   reload: "Neu laden"
   delete: "Löschen"
 

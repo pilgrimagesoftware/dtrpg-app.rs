@@ -27,6 +27,24 @@ toolbar:
   tooltip_settings: "Réglages"
   tooltip_not_signed_in: "Non connecté"
   tooltip_account: "Compte"
+  filter_title_publisher: "Éditeur : %{name}"
+  filter_title_collection: "Collection : %{name}"
+  filtered_suffix: " (%{n} filtrés)"
+
+count:
+  title: "titre"
+  titles: "titres"
+  item: "titre"
+  items: "titres"
+  publisher_item: "titre de l'éditeur"
+  publisher_items: "titres de l'éditeur"
+  total_item: "titre au total"
+  total_items: "titres au total"
+
+search:
+  placeholder: "Rechercher…"
+  publishers_placeholder: "Rechercher des éditeurs…"
+  collections_placeholder: "Rechercher des collections…"
 
 catalog:
   no_titles_match: "Aucun titre ne correspond."
@@ -86,17 +104,21 @@ settings:
   file_opener_app_filter_name: "Applications"
   default_account_name: "Compte DriveThruRPG"
   api_key_label: "Clé API"
+  api_key_placeholder: "Collez la clé API ici…"
+  email_placeholder: "E-mail (facultatif, pour l'avatar)"
   reset_api_key_tooltip: "Réinitialiser la clé API"
   sign_in_button: "Se connecter"
   sign_in_in_progress: "Connexion en cours…"
   storage_note: "Changer l'emplacement de téléchargement ne déplacera pas les fichiers déjà téléchargés."
   storage_change_tooltip: "Modifier…"
+  file_opener_extension_placeholder: "Extension (ex. pdf)"
 
 collections:
   add_tooltip: "Nouvelle collection"
   add_dialog_title: "Nouvelle collection"
   add_dialog_confirm: "Créer"
   add_dialog_cancel: "Annuler"
+  name_placeholder: "Nom de la collection…"
   reload: "Actualiser"
   delete: "Supprimer"
 

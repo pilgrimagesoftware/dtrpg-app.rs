@@ -95,8 +95,9 @@ impl LibraryRootView {
         let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
-        let api_key_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Paste API key here\u{2026}"));
+        let api_key_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("settings.api_key_placeholder").to_string())
+        });
         let settings_for_input = settings.clone();
         cx.subscribe(
             &api_key_input,
@@ -112,7 +113,8 @@ impl LibraryRootView {
 
         let email_initial = settings.read(cx).email_draft().to_owned();
         let email_input = cx.new(|cx| {
-            let mut state = InputState::new(window, cx).placeholder("Email (optional, for avatar)");
+            let mut state = InputState::new(window, cx)
+                .placeholder(t!("settings.email_placeholder").to_string());
             if !email_initial.is_empty() {
                 state = state.default_value(&email_initial);
             }
@@ -163,7 +165,9 @@ impl LibraryRootView {
         root_focus.focus(window, cx);
         let settings_focus = cx.focus_handle();
 
-        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Search\u{2026}"));
+        let search_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("search.placeholder").to_string())
+        });
 
         let controller_for_search = controller.clone();
         cx.subscribe(
@@ -179,13 +183,17 @@ impl LibraryRootView {
         )
         .detach();
 
-        let collection_name_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Collection name\u{2026}"));
-        let file_opener_extension_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Extension (e.g. pdf)"));
+        let collection_name_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("collections.name_placeholder").to_string())
+        });
+        let file_opener_extension_input = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder(t!("settings.file_opener_extension_placeholder").to_string())
+        });
 
-        let publisher_search_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Search publishers\u{2026}"));
+        let publisher_search_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("search.publishers_placeholder").to_string())
+        });
         let controller_for_publisher_search = controller.clone();
         cx.subscribe(
             &publisher_search_input,
@@ -200,8 +208,10 @@ impl LibraryRootView {
         )
         .detach();
 
-        let collection_search_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Search collections\u{2026}"));
+        let collection_search_input = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder(t!("search.collections_placeholder").to_string())
+        });
         let controller_for_collection_search = controller.clone();
         cx.subscribe(
             &collection_search_input,
