@@ -14,8 +14,10 @@ use gpui_component::IconName;
 use gpui_component::badge::Badge;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_component::progress::ProgressCircle;
 use gpui_component::separator::Separator;
 use gpui_component::status_bar::StatusBar;
+use gpui_component::{Sizable as _, Size};
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
@@ -43,6 +45,11 @@ pub struct StatusBarSnapshot {
     /// Count of recent error-status operations, used as the notification
     /// indicator's unread badge.
     pub activity_recent_error_count: usize,
+    /// Mean of known `progress` values among in-progress activity items.
+    ///
+    /// `None` renders the activity button's progress circle in indeterminate mode
+    /// whenever `activity_in_progress > 0`.
+    pub activity_aggregate_progress: Option<f32>,
 }
 
 fn theme_label(key: ThemeKey) -> &'static str {
@@ -120,7 +127,7 @@ pub fn render_status_bar(
         "\u{25cb}"
     };
     let activity_for_click = activity.clone();
-    let activity_indicator = Button::new("status-bar-activity")
+    let mut activity_indicator = Button::new("status-bar-activity")
         .ghost()
         .compact()
         .label(format!("{activity_glyph} {activity_total}"))
@@ -135,6 +142,17 @@ pub fn render_status_bar(
         .on_click(move |_, _, cx| {
             activity_for_click.update(cx, |a, cx| a.toggle_panel(cx));
         });
+    if snap.activity_in_progress > 0 {
+        let progress_circle = match snap.activity_aggregate_progress {
+            Some(fraction) => ProgressCircle::new("status-bar-activity-progress")
+                .with_size(Size::Small)
+                .value(fraction * 100.0),
+            None => ProgressCircle::new("status-bar-activity-progress")
+                .with_size(Size::Small)
+                .loading(true),
+        };
+        activity_indicator = activity_indicator.child(progress_circle);
+    }
 
     let has_errors = snap.activity_recent_error_count > 0;
     let notification_button = Button::new("status-bar-notifications")

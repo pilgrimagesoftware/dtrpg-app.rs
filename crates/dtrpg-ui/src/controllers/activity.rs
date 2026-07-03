@@ -238,7 +238,20 @@ impl ActivityController {
             panel_open: self.panel_open,
             items,
             selected_id: self.selected_id,
+            aggregate_progress: self.aggregate_progress(),
         }
+    }
+
+    /// Computes the mean of known `progress` values among in-progress items.
+    ///
+    /// Returns `None` (indeterminate) when there are no in-progress items, or when
+    /// none of them report a known progress value.
+    fn aggregate_progress(&self) -> Option<f32> {
+        let known: Vec<f32> = self.in_progress.iter().filter_map(|i| i.progress).collect();
+        if known.is_empty() {
+            return None;
+        }
+        Some(known.iter().sum::<f32>() / known.len() as f32)
     }
 
     fn push_recent(&mut self, item: ActivityItem) {

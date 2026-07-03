@@ -604,6 +604,7 @@ impl Render for LibraryRootView {
                 activity_in_progress: activity_snap.in_progress_count,
                 activity_recent_count: activity_snap.recent_count,
                 activity_recent_error_count: activity_snap.recent_error_count,
+                activity_aggregate_progress: activity_snap.aggregate_progress,
             },
             lib_entity.clone(),
             activity_entity.clone(),

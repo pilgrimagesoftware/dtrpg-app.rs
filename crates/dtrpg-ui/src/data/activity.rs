@@ -61,6 +61,11 @@ pub struct ActivitySnapshot {
     pub items: Vec<ActivityItem>,
     /// The id of the currently expanded item row, if any.
     pub selected_id: Option<u64>,
+    /// Mean of known `progress` values among in-progress items.
+    ///
+    /// `None` when there are no in-progress items, or when none of them report a
+    /// known progress value (indeterminate).
+    pub aggregate_progress: Option<f32>,
 }
 
 /// A durable record of a single error-status activity item.
