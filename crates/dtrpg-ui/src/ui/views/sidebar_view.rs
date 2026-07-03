@@ -1,4 +1,7 @@
-//! Sidebar view: wordmark, smart nav, publisher nav, collections nav.
+//! Sidebar view: smart nav, publisher nav, collections nav.
+//!
+//! The app wordmark lives in `title_bar_view`, next to the macOS traffic
+//! lights — it is not repeated here.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -13,7 +16,7 @@ use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitl
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::PopupMenuItem;
 use gpui_component::sidebar::{
-    Sidebar, SidebarCollapsible, SidebarHeader, SidebarItem, SidebarMenu, SidebarMenuItem,
+    Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
 use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _};
 
@@ -183,7 +186,6 @@ pub fn render_sidebar(
         .collapsible(SidebarCollapsible::None)
         .side(Side::Left)
         .w_full()
-        .header(build_header())
         .child(SidebarContent::Menu(Box::new(lib_menu)))
         .child(SidebarContent::Separator);
 
@@ -364,17 +366,6 @@ pub fn render_sidebar(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn build_header() -> SidebarHeader {
-    // Remove the default SidebarHeader top padding so the wordmark aligns with
-    // the macOS traffic lights (the Sidebar wrapper already adds pt_3 = 12px).
-    SidebarHeader::new().pt_0().child(
-        div()
-            .text_xl()
-            .font_weight(gpui::FontWeight::SEMIBOLD)
-            .child(t!("sidebar.app_name")),
-    )
-}
 
 fn nav_item(
     label: &str,

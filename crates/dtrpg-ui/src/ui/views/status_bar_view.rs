@@ -22,6 +22,7 @@ use gpui_component::{Sizable as _, Size};
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, ThemeKey};
+use crate::util::pluralize::pluralize;
 use rust_i18n::t;
 
 /// Data the status bar needs to render, decoupled from where it's sourced.
@@ -77,14 +78,18 @@ pub fn render_status_bar(
     let library_summary = div()
         .text_xs()
         .text_color(colors.text_secondary)
-        .child(format!("{} \u{2022} {total_size_str}", snap.total_count));
+        .child(format!(
+            "{} \u{2022} {total_size_str}",
+            pluralize(snap.total_count, "count.total_item", "count.total_items")
+        ));
 
     let active_tab_summary = div()
         .text_xs()
         .text_color(colors.text_secondary)
         .child(format!(
             "{} \u{2022} {}",
-            snap.active_tab_label, snap.active_tab_count
+            snap.active_tab_label,
+            pluralize(snap.active_tab_count, "count.item", "count.items")
         ));
 
     let theme_picker = Button::new("status-bar-theme")

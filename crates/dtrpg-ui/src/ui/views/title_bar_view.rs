@@ -31,13 +31,25 @@ pub fn render_title_bar(
     let border = colors.border;
     let text_primary = colors.text_primary;
 
+    // Reserve clearance for the macOS traffic light buttons, which overlay the
+    // top-left of the window when the titlebar renders with
+    // `appears_transparent: true`. The wordmark sits immediately after this
+    // clearance — it is the app's only wordmark; `sidebar_view::build_header`
+    // no longer repeats it.
+    let leading_inset = if cfg!(target_os = "macos") {
+        px(78.0)
+    } else {
+        px(12.0)
+    };
+
     div()
         .h(px(44.0))
         .flex_none()
         .flex()
         .items_center()
         .gap(px(8.0))
-        .px(px(12.0))
+        .pl(leading_inset)
+        .pr(px(12.0))
         .border_b_1()
         .border_color(border)
         .bg(surface)
