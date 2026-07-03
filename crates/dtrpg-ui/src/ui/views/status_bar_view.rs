@@ -31,6 +31,7 @@ use crate::data::theme::{ColorTokens, ThemeKey};
 use crate::ui::views::activity_panel_view::render_activity_panel;
 use crate::ui::views::alert_history_view::render_alert_history_panel;
 use crate::util::pluralize::pluralize;
+use crate::util::size::size_format;
 use rust_i18n::t;
 
 /// Data the status bar needs to render, decoupled from where it's sourced.
@@ -60,12 +61,12 @@ pub struct ActivityBarData<'a> {
     pub alert_snap: &'a AlertHistorySnapshot,
 }
 
-fn theme_label(key: ThemeKey) -> &'static str {
+fn theme_label(key: ThemeKey) -> String {
     match key {
-        ThemeKey::Parchment => "Parchment",
-        ThemeKey::Slate => "Slate",
-        ThemeKey::Sage => "Sage",
-        ThemeKey::Ink => "Ink",
+        ThemeKey::Parchment => t!("theme.parchment").to_string(),
+        ThemeKey::Slate => t!("theme.slate").to_string(),
+        ThemeKey::Sage => t!("theme.sage").to_string(),
+        ThemeKey::Ink => t!("theme.ink").to_string(),
     }
 }
 
@@ -84,11 +85,7 @@ pub fn render_status_bar(
     activity_data: ActivityBarData<'_>,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static {
-    let total_size_str = if snap.total_mb >= 1024.0 {
-        format!("{:.1} GB", snap.total_mb / 1024.0)
-    } else {
-        format!("{:.0} MB", snap.total_mb)
-    };
+    let total_size_str = size_format(snap.total_mb);
 
     let library_summary = div()
         .text_xs()

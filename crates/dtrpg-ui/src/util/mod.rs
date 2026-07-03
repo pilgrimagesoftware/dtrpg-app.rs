@@ -8,5 +8,6 @@ pub mod pluralize;
 pub mod publisher;
 pub mod reveal;
 pub mod sort;
+pub mod size;
 #[cfg(test)]
 pub mod stubs;

@@ -206,3 +206,14 @@ status_bar:
   activity_tooltip: "%{in_progress} in progress, %{completed} completed"
   notifications_tooltip_title: "Notifications"
   notifications_tooltip: "%{n} unread"
+
+size:
+  tb: "TB"
+  gb: "GB"
+  mb: "MB"
+
+theme:
+  parchment: "Parchment"
+  ink: "Ink"
+  sage: "Sage"
+  slate: "Slate"
