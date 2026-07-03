@@ -13,12 +13,11 @@ use gpui::{
 use gpui_component::badge::Badge;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
-use gpui_component::pagination::Pagination;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::spinner::Spinner;
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
 use gpui_component::tooltip::Tooltip;
-use gpui_component::{Disableable, Sizable, Size};
+use gpui_component::{Sizable, Size};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -977,14 +976,6 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let current_page = snap.current_page;
-        let total_pages = snap.total_pages;
-        let page_size = snap.page_size;
-        let ctrl_for_page = self.controller.clone();
-        let ctrl_for_first = self.controller.clone();
-        let ctrl_for_last = self.controller.clone();
-        let ctrl_for_page_size = self.controller.clone();
-
         let content: AnyElement = match (snap.presentation, snap.grouped) {
             // ── List, ungrouped — DataTable (handles header/row alignment) ──
             (CatalogPresentation::List, false) => {
@@ -1174,85 +1165,8 @@ impl Render for CatalogView {
                                                       &colors));
         }
 
-        if item_count > 0 {
-            let mut bar = div().flex_none()
-                               .px(pad_side)
-                               .py(px(8.0))
-                               .flex()
-                               .items_center()
-                               .justify_center()
-                               .gap(px(16.0));
-
-            if total_pages > 1 {
-                bar = bar
-                    .child(
-                        Button::new("page-first-btn")
-                            .ghost()
-                            .label(format!("\u{00ab} {}", t!("catalog.pagination_first")))
-                            .disabled(current_page == 1)
-                            .on_click(move |_, _, cx| {
-                                ctrl_for_first.update(cx, |ctrl, cx| ctrl.set_page(1, cx));
-                            }),
-                    )
-                    .child(
-                        Pagination::new("catalog-pagination")
-                            .current_page(current_page)
-                            .total_pages(total_pages)
-                            .on_click(move |page, _, cx| {
-                                ctrl_for_page.update(cx, |ctrl, cx| ctrl.set_page(*page, cx));
-                            }),
-                    )
-                    .child(
-                        Button::new("page-last-btn")
-                            .ghost()
-                            .label(format!("{} \u{00bb}", t!("catalog.pagination_last")))
-                            .disabled(current_page == total_pages)
-                            .on_click(move |_, _, cx| {
-                                ctrl_for_last.update(cx, |ctrl, cx| ctrl.set_page(total_pages, cx));
-                            }),
-                    );
-            }
-
-            bar = bar.child(render_page_size_selector(page_size, ctrl_for_page_size));
-
-            result = result.child(bar);
-        }
-
         result.into_any_element()
     }
-}
-
-// ── Page size selector
-// ──────────────────────────────────────────────────────────
-
-/// Page size options offered in the pagination area, mirroring
-/// [`LibraryController::set_page_size`](crate::controllers::library::LibraryController::set_page_size).
-const PAGE_SIZE_OPTIONS: [usize; 5] = [10, 25, 50, 100, 200];
-
-/// Renders the "N / page" dropdown control in the pagination area.
-fn render_page_size_selector(current: usize, entity: Entity<LibraryController>)
-                             -> impl IntoElement + 'static {
-    let label = t!("toolbar.page_size_label", n = current).to_string();
-
-    Button::new("page-size-selector").ghost()
-                                     .label(label)
-                                     .dropdown_caret(true)
-                                     .dropdown_menu(move |menu, _, _| {
-                                         let mut m = menu;
-                                         for size in PAGE_SIZE_OPTIONS {
-                                             let e = entity.clone();
-                                             let item_label = t!("toolbar.page_size_label",
-                                                                 n = size).to_string();
-                                             m = m.item(
-                    PopupMenuItem::new(item_label)
-                        .checked(size == current)
-                        .on_click(move |_, _, cx| {
-                            e.update(cx, |ctrl, cx| ctrl.set_page_size(size, cx));
-                        }),
-                );
-                                         }
-                                         m
-                                     })
 }
 
 // ── Empty state
