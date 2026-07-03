@@ -1,10 +1,11 @@
 ## Context
 
-`catalog_view.rs` renders item titles in three layouts (grid card, flat list row, grouped list row). Each title
-element already has `.truncate()` applied via gpui's `TextOverflow::Truncate` styling, which clips overflowing text
-with an ellipsis at render time. Available column/card widths are already known at the call sites (`cols[0].width`
-for list layouts, a fixed card width for the grid layout), so truncation can be determined without a new layout
-pass over the whole row.
+`catalog_view.rs` renders item titles in four layouts: grid card (`render_grid_card`), flat list row (`render_td`,
+the `DataTable` delegate's title column), grouped list row (`render_grouped_list_row`), and thumbnail row
+(`render_thumb_row`). Each title element already has `.truncate()` applied via gpui's `TextOverflow::Truncate`
+styling, which clips overflowing text with an ellipsis at render time. Available column/card widths are already
+known at the call sites (`cols[0].width` for list layouts, a fixed card/thumb width for the grid and thumbnail
+layouts), so truncation can be determined without a new layout pass over the whole row.
 
 There is no existing "tooltip only when truncated" helper in `gpui` or `gpui-component`. Truncation must be
 detected explicitly.
@@ -15,8 +16,8 @@ detected explicitly.
 - Show a tooltip with the full title only when the rendered title text does not fit in its available width.
 - Reuse the existing `.tooltip()` builder pattern already used throughout the codebase (see `sidebar_view.rs`,
   `status_bar_view.rs`, `title_bar_view.rs`).
-- Cover all three title render paths: grid card (`render_grid_card`/similar), flat list row
-  (`render_grouped_list_row` and the flat-list equivalent), grouped list row.
+- Cover all four title render paths: grid card (`render_grid_card`), flat list row (`render_td`), grouped list row
+  (`render_grouped_list_row`), thumbnail row (`render_thumb_row`).
 
 **Non-Goals:**
 - No tooltip for any other truncated text in the catalog view (publisher, line/system columns) — title only, per

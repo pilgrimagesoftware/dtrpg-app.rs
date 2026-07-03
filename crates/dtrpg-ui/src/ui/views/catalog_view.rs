@@ -1,14 +1,14 @@
 //! Catalog view: list, thumbs, and grid layouts with grouping and empty state.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Entity, Image, IntoElement, MouseButton, MouseDownEvent,
-    ObjectFit, ParentElement, Pixels, Point, Render, Styled, StyledImage, UniformListScrollHandle,
-    Window, div, img, px, uniform_list,
+    AnyElement, App, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement,
+    MouseButton, MouseDownEvent, ObjectFit, ParentElement, Pixels, Point, Render, Styled,
+    StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
 use gpui_component::badge::Badge;
 use gpui_component::button::{Button, ButtonVariants};
@@ -17,6 +17,7 @@ use gpui_component::pagination::Pagination;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::spinner::Spinner;
 use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
+use gpui_component::tooltip::Tooltip;
 use gpui_component::{Disableable, Sizable, Size};
 use rust_i18n::t;
 
@@ -57,6 +58,47 @@ fn item_click_handler(id: Arc<str>, title: String, entity: Entity<LibraryControl
             entity.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
         }
     }
+}
+
+/// Returns the rendered pixel width of `text` shaped at the given
+/// `font_size`/`font_weight`.
+///
+/// The shaped color is irrelevant to width measurement, so a default `Hsla` is
+/// used.
+fn shaped_text_width(window: &Window, text: &str, font_size: Pixels, font_weight: FontWeight)
+                     -> Pixels {
+    let mut font = window.text_style().font();
+    font.weight = font_weight;
+    let run = TextRun { len: text.len(),
+                        font,
+                        color: Hsla::default(),
+                        background_color: None,
+                        underline: None,
+                        strikethrough: None };
+    window.text_system()
+          .shape_line(text.to_string().into(), font_size, &[run], None)
+          .width()
+}
+
+/// Returns whether `text`, shaped at the given `font_size`/`font_weight`, is
+/// wider than `available_width` — i.e. whether gpui's `.truncate()` would
+/// ellipsize it when rendered in a slot of that width.
+fn is_title_truncated(window: &Window, title: &str, font_size: Pixels, font_weight: FontWeight,
+                      available_width: Pixels)
+                      -> bool {
+    shaped_text_width(window, title, font_size, font_weight) > available_width
+}
+
+/// Font size for `.text_sm()` styled title text, resolved against the window's
+/// rem size.
+fn text_sm_size(window: &Window) -> Pixels {
+    rems(0.875).to_pixels(window.rem_size())
+}
+
+/// Font size for `.text_xs()` styled title text, resolved against the window's
+/// rem size.
+fn text_xs_size(window: &Window) -> Pixels {
+    rems(0.75).to_pixels(window.rem_size())
 }
 
 // ── Shared column definitions
@@ -113,6 +155,163 @@ fn kind_badge(kind: &str) -> &'static str {
     }
     else {
         "OTH"
+    }
+}
+
+/// Renders a single data cell (column `col_ix`) for `item`. Shared between
+/// the ungrouped `CatalogListDelegate` and the grouped
+/// `GroupedCatalogListDelegate` so grouped and ungrouped list rows stay
+/// visually identical and both benefit from `DataTable`'s virtualization.
+fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens,
+                         storage_root: &Path, controller: &Entity<LibraryController>,
+                         column_width: Pixels, window: &Window)
+                         -> AnyElement {
+    match col_ix {
+        0 => {
+            let title = item.title.to_string();
+            let badge = kind_badge(&item.kind);
+            let badge_w =
+                shaped_text_width(window, badge, text_xs_size(window), FontWeight::default());
+            // Container gap (6px) + badge horizontal padding (4px each side).
+            let title_available_w = column_width - px(6.0) - badge_w - px(8.0);
+            let title_truncated = is_title_truncated(window,
+                                                     &title,
+                                                     text_sm_size(window),
+                                                     FontWeight::default(),
+                                                     title_available_w);
+            let title_el_id: Arc<str> = Arc::from(format!("title-list-{}", &*item.id));
+            let mut title_el = div().id(title_el_id)
+                                    .text_sm()
+                                    .text_color(colors.text_primary)
+                                    .truncate()
+                                    .child(title.clone());
+            if title_truncated {
+                title_el = title_el.tooltip(move |window, cx| {
+                                       Tooltip::new(title.clone()).build(window, cx)
+                                   });
+            }
+            div().h_full()
+                 .flex()
+                 .items_center()
+                 .gap(px(6.0))
+                 .min_w_0()
+                 .child(title_el)
+                 .child(div().flex_none()
+                             .text_xs()
+                             .text_color(colors.text_tertiary)
+                             .px(px(4.0))
+                             .py(px(1.0))
+                             .rounded(px(3.0))
+                             .bg(colors.hover)
+                             .child(badge))
+                 .into_any_element()
+        }
+
+        1 => div().h_full()
+                  .flex()
+                  .items_center()
+                  .text_sm()
+                  .text_color(colors.text_secondary)
+                  .truncate()
+                  .child(item.publisher.to_string())
+                  .into_any_element(),
+
+        2 => div().h_full()
+                  .flex()
+                  .items_center()
+                  .text_sm()
+                  .text_color(colors.text_secondary)
+                  .truncate()
+                  .child(item.line.to_string())
+                  .into_any_element(),
+
+        3 => div().h_full()
+                  .flex()
+                  .items_center()
+                  .text_sm()
+                  .text_color(colors.text_secondary)
+                  .child(item.pages.to_string())
+                  .into_any_element(),
+
+        4 => div().h_full()
+                  .flex()
+                  .items_center()
+                  .text_sm()
+                  .text_color(colors.text_secondary)
+                  .child(format!("{:.0} MB", item.size_mb))
+                  .into_any_element(),
+
+        5 => div().h_full()
+                  .flex()
+                  .items_center()
+                  .text_sm()
+                  .text_color(colors.text_secondary)
+                  .child(item.year.to_string())
+                  .into_any_element(),
+
+        6 => div().h_full()
+                  .flex()
+                  .items_center()
+                  .justify_center()
+                  .child(render_status(item.status, colors))
+                  .into_any_element(),
+
+        7 => {
+            if item.status == ItemStatus::Downloaded {
+                let item_open_path = storage_root.join("items").join(&*item.id);
+                let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
+                div().id(open_elem_id)
+                     .h_full()
+                     .flex()
+                     .items_center()
+                     .justify_center()
+                     .cursor_pointer()
+                     .on_click(move |_, _, _| {
+                         use crate::util::item_opener::{ItemOpener, OpenError};
+
+                         if !item_open_path.exists() {
+                             tracing::warn!(
+                                 path = %item_open_path.display(),
+                                 "open: file not found — item may need re-download"
+                             );
+                             return;
+                         }
+                         if let Err(e) = ItemOpener::open(&item_open_path) {
+                             match e {
+                                 OpenError::FileNotFound(path) => {
+                                     tracing::warn!("open: file not found: {path}");
+                                 }
+                                 OpenError::NoDefaultApp => {
+                                     tracing::warn!("open: no default application configured");
+                                 }
+                                 OpenError::OsFailed(msg) => {
+                                     tracing::warn!("open: OS failed: {msg}");
+                                 }
+                                 OpenError::MultipleFilesRequireSelection => {
+                                     tracing::warn!("open: multiple files require selection");
+                                 }
+                             }
+                         }
+                     })
+                     .child(div().text_xs().text_color(colors.text_tertiary).child("▶"))
+                     .into_any_element()
+            }
+            else {
+                div().h_full().into_any_element()
+            }
+        }
+
+        8 => {
+            let ctrl = controller.clone();
+            div().h_full()
+                 .flex()
+                 .items_center()
+                 .justify_center()
+                 .child(render_thumbnail_menu(item, ctrl))
+                 .into_any_element()
+        }
+
+        _ => div().into_any_element(),
     }
 }
 
@@ -277,7 +476,7 @@ impl TableDelegate for CatalogListDelegate {
         }
     }
 
-    fn render_td(&mut self, row_ix: usize, col_ix: usize, _window: &mut Window,
+    fn render_td(&mut self, row_ix: usize, col_ix: usize, window: &mut Window,
                  cx: &mut Context<TableState<Self>>)
                  -> impl IntoElement {
         let items = self.controller
@@ -288,133 +487,14 @@ impl TableDelegate for CatalogListDelegate {
             return div().into_any_element();
         };
         let colors = cx.global::<LibriTheme>().colors.clone();
-
-        match col_ix {
-            0 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .gap(px(6.0))
-                      .min_w_0()
-                      .child(div().text_sm()
-                                  .text_color(colors.text_primary)
-                                  .truncate()
-                                  .child(item.title.to_string()))
-                      .child(div().flex_none()
-                                  .text_xs()
-                                  .text_color(colors.text_tertiary)
-                                  .px(px(4.0))
-                                  .py(px(1.0))
-                                  .rounded(px(3.0))
-                                  .bg(colors.hover)
-                                  .child(kind_badge(&item.kind)))
-                      .into_any_element(),
-
-            1 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .text_sm()
-                      .text_color(colors.text_secondary)
-                      .truncate()
-                      .child(item.publisher.to_string())
-                      .into_any_element(),
-
-            2 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .text_sm()
-                      .text_color(colors.text_secondary)
-                      .truncate()
-                      .child(item.line.to_string())
-                      .into_any_element(),
-
-            3 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .text_sm()
-                      .text_color(colors.text_secondary)
-                      .child(item.pages.to_string())
-                      .into_any_element(),
-
-            4 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .text_sm()
-                      .text_color(colors.text_secondary)
-                      .child(format!("{:.0} MB", item.size_mb))
-                      .into_any_element(),
-
-            5 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .text_sm()
-                      .text_color(colors.text_secondary)
-                      .child(item.year.to_string())
-                      .into_any_element(),
-
-            6 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .justify_center()
-                      .child(render_status(item.status, &colors))
-                      .into_any_element(),
-
-            7 => {
-                if item.status == ItemStatus::Downloaded {
-                    let item_open_path = self.storage_root.join("items").join(&*item.id);
-                    let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
-                    div().id(open_elem_id)
-                         .h_full()
-                         .flex()
-                         .items_center()
-                         .justify_center()
-                         .cursor_pointer()
-                         .on_click(move |_, _, _| {
-                             use crate::util::item_opener::{ItemOpener, OpenError};
-
-                             if !item_open_path.exists() {
-                                 tracing::warn!(
-                                     path = %item_open_path.display(),
-                                     "open: file not found — item may need re-download"
-                                 );
-                                 return;
-                             }
-                             if let Err(e) = ItemOpener::open(&item_open_path) {
-                                 match e {
-                                     OpenError::FileNotFound(path) => {
-                                         tracing::warn!("open: file not found: {path}");
-                                     }
-                                     OpenError::NoDefaultApp => {
-                                         tracing::warn!("open: no default application configured");
-                                     }
-                                     OpenError::OsFailed(msg) => {
-                                         tracing::warn!("open: OS failed: {msg}");
-                                     }
-                                     OpenError::MultipleFilesRequireSelection => {
-                                         tracing::warn!("open: multiple files require selection");
-                                     }
-                                 }
-                             }
-                         })
-                         .child(div().text_xs().text_color(colors.text_tertiary).child("▶"))
-                         .into_any_element()
-                }
-                else {
-                    div().h_full().into_any_element()
-                }
-            }
-
-            8 => {
-                let ctrl = self.controller.clone();
-                div().h_full()
-                     .flex()
-                     .items_center()
-                     .justify_center()
-                     .child(render_thumbnail_menu(&item, ctrl))
-                     .into_any_element()
-            }
-
-            _ => div().into_any_element(),
-        }
+        let column_width = self.column(col_ix, cx).width;
+        render_list_item_cell(&item,
+                              col_ix,
+                              &colors,
+                              &self.storage_root,
+                              &self.controller,
+                              column_width,
+                              window)
     }
 
     fn render_th(&mut self, col_ix: usize, _window: &mut Window,
@@ -428,7 +508,193 @@ impl TableDelegate for CatalogListDelegate {
              .flex()
              .items_center()
              .text_sm()
-             .font_weight(gpui::FontWeight::MEDIUM)
+             .font_weight(FontWeight::MEDIUM)
+             .child(name)
+    }
+}
+
+// ── GroupedCatalogListDelegate
+// ────────────────────────────────────────────
+
+/// A row in the flattened, publisher-grouped list: either a group header or
+/// a data row. Grouping is flattened into a single row list so the grouped
+/// list view can reuse `DataTable`'s virtualization instead of hand-rolling
+/// (and fully materializing) its own rows — see `CatalogView::grouped_items`.
+enum GroupedRow {
+    Header {
+        publisher: Arc<str>,
+        count:     usize,
+    },
+    Item(LibraryItem),
+}
+
+/// `TableDelegate` for the grouped list view. Backed by a flattened row list
+/// built from `group_by_publisher`, rebuilt only when the controller's
+/// visible items change (see `CatalogView::grouped_items`).
+struct GroupedCatalogListDelegate {
+    controller:   Entity<LibraryController>,
+    storage_root: PathBuf,
+    columns:      Vec<Column>,
+    user_widths:  Vec<Option<Pixels>>,
+    rows:         Vec<GroupedRow>,
+}
+
+impl GroupedCatalogListDelegate {
+    fn row_at(&self, row_ix: usize) -> Option<&GroupedRow> {
+        self.rows.get(row_ix)
+    }
+}
+
+impl TableDelegate for GroupedCatalogListDelegate {
+    fn columns_count(&self, _cx: &App) -> usize {
+        self.columns.len()
+    }
+
+    fn rows_count(&self, _cx: &App) -> usize {
+        self.rows.len()
+    }
+
+    fn column(&self, col_ix: usize, _cx: &App) -> Column {
+        let mut col = self.columns[col_ix].clone();
+        if let Some(Some(w)) = self.user_widths.get(col_ix) {
+            col = col.width(w.as_f32());
+        }
+        col
+    }
+
+    fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, _window: &mut Window,
+                    _cx: &mut Context<TableState<Self>>)
+                    -> PopupMenu {
+        let Some(GroupedRow::Item(item)) = self.row_at(row_ix)
+        else {
+            return menu;
+        };
+        let id = Arc::clone(&item.id);
+        let status = item.status;
+        let entity = self.controller.clone();
+        match status {
+            ItemStatus::Downloaded => {
+                let item_path = self.storage_root.join("items").join(&*id);
+                let entity_remove = entity.clone();
+                let remove_id = Arc::clone(&id);
+                let item_path_open = item_path.clone();
+                let item_path_reveal = item_path.clone();
+                menu.item(
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
+                        use crate::util::item_opener::{ItemOpener, OpenError};
+
+                        if !item_path_open.exists() {
+                            tracing::warn!(
+                                path = %item_path_open.display(),
+                                "open: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = ItemOpener::open(&item_path_open) {
+                            match e {
+                                OpenError::FileNotFound(path) => {
+                                    tracing::warn!("open: file not found: {path}");
+                                }
+                                OpenError::NoDefaultApp => {
+                                    tracing::warn!("open: no default application configured");
+                                }
+                                OpenError::OsFailed(msg) => {
+                                    tracing::warn!("open: OS failed: {msg}");
+                                }
+                                OpenError::MultipleFilesRequireSelection => {
+                                    tracing::warn!("open: multiple files require selection");
+                                }
+                            }
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                        if !item_path_reveal.exists() {
+                            tracing::warn!(
+                                path = %item_path_reveal.display(),
+                                "reveal: file not found"
+                            );
+                            return;
+                        }
+                        if let Err(e) = reveal_in_file_manager(&item_path_reveal) {
+                            tracing::warn!("reveal_in_file_manager failed: {e}");
+                        }
+                    }),
+                )
+                .item(
+                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                        move |_, _, cx| {
+                            entity_remove
+                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                        },
+                    ),
+                )
+            }
+            ItemStatus::Cloud => menu.item(
+                PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
+                    entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
+                }),
+            ),
+        }
+    }
+
+    fn render_tr(&mut self, row_ix: usize, _window: &mut Window,
+                 cx: &mut Context<TableState<Self>>)
+                 -> gpui::Stateful<gpui::Div> {
+        let id = ("grouped-row", row_ix);
+        match self.row_at(row_ix) {
+            Some(GroupedRow::Header { .. }) => {
+                let colors = cx.global::<LibriTheme>().colors.clone();
+                div().id(id).bg(colors.hover)
+            }
+            _ => div().id(id),
+        }
+    }
+
+    fn render_td(&mut self, row_ix: usize, col_ix: usize, window: &mut Window,
+                 cx: &mut Context<TableState<Self>>)
+                 -> impl IntoElement {
+        let colors = cx.global::<LibriTheme>().colors.clone();
+        match self.row_at(row_ix) {
+            Some(GroupedRow::Header { publisher, count }) if col_ix == 0 => {
+                div().h_full()
+                     .flex()
+                     .items_center()
+                     .gap(px(8.0))
+                     .child(div().text_sm()
+                                 .font_weight(FontWeight::SEMIBOLD)
+                                 .text_color(colors.text_primary)
+                                 .child(publisher.to_string()))
+                     .child(div().text_xs()
+                                 .text_color(colors.text_tertiary)
+                                 .child(count.to_string()))
+                     .into_any_element()
+            }
+            Some(GroupedRow::Header { .. }) => div().h_full().into_any_element(),
+            Some(GroupedRow::Item(item)) => {
+                let column_width = self.column(col_ix, cx).width;
+                render_list_item_cell(item,
+                                      col_ix,
+                                      &colors,
+                                      &self.storage_root,
+                                      &self.controller,
+                                      column_width,
+                                      window)
+            }
+            None => div().into_any_element(),
+        }
+    }
+
+    fn render_th(&mut self, col_ix: usize, _window: &mut Window,
+                 cx: &mut Context<TableState<Self>>)
+                 -> impl IntoElement {
+        let name = self.column(col_ix, cx).name;
+        div().h_full()
+             .flex()
+             .items_center()
+             .text_sm()
+             .font_weight(FontWeight::MEDIUM)
              .child(name)
     }
 }
@@ -439,25 +705,32 @@ impl TableDelegate for CatalogListDelegate {
 /// GPUI view for the catalog area. Holds scroll state and delegates to
 /// `DataTable` for list layout and `uniform_list` for thumbs/grid layouts.
 pub struct CatalogView {
-    controller:         Entity<LibraryController>,
-    settings:           Entity<SettingsController>,
-    tabs:               Entity<TabsController>,
-    scroll_handle:      UniformListScrollHandle,
-    catalog_list_table: Entity<TableState<CatalogListDelegate>>,
+    controller:                 Entity<LibraryController>,
+    settings:                   Entity<SettingsController>,
+    tabs:                       Entity<TabsController>,
+    scroll_handle:              UniformListScrollHandle,
+    catalog_list_table:         Entity<TableState<CatalogListDelegate>>,
+    /// Backs the grouped list presentation. Rows are a flattened list of
+    /// group headers and items (see `GroupedRow`), rebuilt only when
+    /// `grouped_cache` is refreshed — this is what lets the grouped list
+    /// reuse `DataTable`'s row virtualization instead of hand-rolling and
+    /// fully materializing its own rows.
+    catalog_grouped_list_table: Entity<TableState<GroupedCatalogListDelegate>>,
     /// Cached items-per-row for the grid layout; updated each render from
     /// the window viewport width. Initialized to 4 as a safe default.
-    items_per_row:      usize,
+    items_per_row:              usize,
     /// Cached publisher grouping of the controller's visible items.
     /// Invalidated (set to `None`) on `LibraryChanged`; repopulated lazily
     /// during `render()` so grouped presentation modes avoid re-grouping on
-    /// every hover-triggered re-render.
-    grouped_cache:      Option<Vec<PublisherGroup>>,
+    /// every hover-triggered re-render. Also drives the flattened rows
+    /// pushed into `catalog_grouped_list_table`.
+    grouped_cache:              Option<Vec<PublisherGroup>>,
     /// Cursor position captured at the most recent mouse-down within the
     /// catalog area, used to anchor the single-click item popover (see
     /// `render_item_popover`). Captured on mouse-down rather than tracked
     /// continuously on mouse-move so the popover stays put while the pointer
     /// wanders after opening it, instead of following the cursor.
-    last_mouse_pos:     Point<Pixels>,
+    last_mouse_pos:             Point<Pixels>,
 }
 
 impl CatalogView {
@@ -470,10 +743,10 @@ impl CatalogView {
         let storage_root = settings.read(cx).snapshot().storage_root_path;
         let cols = list_columns();
         let col_count = cols.len();
-        let delegate = CatalogListDelegate { controller: controller.clone(),
-                                             storage_root,
-                                             columns: cols,
-                                             user_widths: vec![None; col_count] };
+        let delegate = CatalogListDelegate { controller:   controller.clone(),
+                                             storage_root: storage_root.clone(),
+                                             columns:      cols.clone(),
+                                             user_widths:  vec![None; col_count], };
         let catalog_list_table = cx.new(|cx| {
                                        TableState::new(delegate, window, cx).row_selectable(true)
                                                                             .col_selectable(false)
@@ -481,6 +754,20 @@ impl CatalogView {
                                                                             .col_resizable(true)
                                                                             .sortable(true)
                                    });
+
+        let grouped_delegate = GroupedCatalogListDelegate { controller: controller.clone(),
+                                                            storage_root,
+                                                            columns: cols,
+                                                            user_widths: vec![None; col_count],
+                                                            rows: Vec::new() };
+        let catalog_grouped_list_table = cx.new(|cx| {
+                                               TableState::new(grouped_delegate, window,
+                                                             cx).row_selectable(true)
+                                                                .col_selectable(false)
+                                                                .col_movable(false)
+                                                                .col_resizable(true)
+                                                                .sortable(false)
+                                           });
 
         cx.subscribe(&controller, {
               let table = catalog_list_table.clone();
@@ -535,22 +822,90 @@ impl CatalogView {
                      })
           .detach();
 
+        cx.subscribe(&catalog_grouped_list_table,
+                     |this, table, event: &TableEvent, cx| match event {
+                         // Group header rows aren't selectable items — ignore clicks on them.
+                         TableEvent::SelectRow(row_ix) => {
+                             let row_ix = *row_ix;
+                             let id = table.read(cx).delegate().row_at(row_ix).and_then(|row| {
+                                                                                  match row {
+                                                  GroupedRow::Item(item) => {
+                                                      Some(Arc::clone(&item.id))
+                                                  }
+                                                  GroupedRow::Header { .. } => None,
+                                              }
+                                                                              });
+                             if let Some(id) = id {
+                                 this.controller
+                                     .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
+                             }
+                         }
+                         TableEvent::DoubleClickedRow(row_ix) => {
+                             let row_ix = *row_ix;
+                             let item = table.read(cx).delegate().row_at(row_ix).and_then(|row| {
+                                                                                    match row {
+                                                 GroupedRow::Item(item) => Some(item.clone()),
+                                                 GroupedRow::Header { .. } => None,
+                                             }
+                                                                                });
+                             if let Some(item) = item {
+                                 let id = Arc::clone(&item.id);
+                                 let title = item.title.to_string();
+                                 this.tabs
+                                     .update(cx, |t, cx| t.open_detail_tab(id, title, cx));
+                                 this.controller
+                                     .update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+                             }
+                         }
+                         TableEvent::ColumnWidthsChanged(widths) => {
+                             let widths = widths.clone();
+                             table.update(cx, |state, _cx| {
+                                      let delegate = state.delegate_mut();
+                                      if widths.len() == delegate.user_widths.len() {
+                                          for (slot, &w) in
+                                              delegate.user_widths.iter_mut().zip(widths.iter())
+                                          {
+                                              *slot = Some(w);
+                                          }
+                                      }
+                                  });
+                         }
+                         _ => {}
+                     })
+          .detach();
+
         Self { controller,
                settings,
                tabs,
                scroll_handle: UniformListScrollHandle::default(),
                catalog_list_table,
+               catalog_grouped_list_table,
                items_per_row: 4,
                grouped_cache: None,
                last_mouse_pos: Point::default() }
     }
 
     /// Returns the cached publisher grouping, computing and storing it first if
-    /// stale.
-    fn grouped_items(&mut self, cx: &App) -> Vec<PublisherGroup> {
+    /// stale. Also pushes the flattened row list into
+    /// `catalog_grouped_list_table` whenever the grouping is recomputed, so
+    /// the grouped `DataTable` stays in sync without re-flattening on every
+    /// render.
+    fn grouped_items(&mut self, cx: &mut Context<Self>) -> Vec<PublisherGroup> {
         if self.grouped_cache.is_none() {
             let items = self.controller.read(cx).visible_items();
-            self.grouped_cache = Some(group_by_publisher(items));
+            let groups = group_by_publisher(items);
+            self.grouped_cache = Some(groups.clone());
+
+            let mut rows = Vec::new();
+            for group in groups {
+                rows.push(GroupedRow::Header { publisher: Arc::clone(&group.publisher),
+                                               count:     group.items.len(), });
+                rows.extend(group.items.into_iter().map(GroupedRow::Item));
+            }
+            self.catalog_grouped_list_table.update(cx, |state, cx| {
+                                               state.delegate_mut().rows = rows;
+                                               state.refresh(cx);
+                                           });
         }
         self.grouped_cache.clone().unwrap_or_default()
     }
@@ -644,31 +999,19 @@ impl Render for CatalogView {
                     .into_any_element()
             }
 
-            // ── List, grouped — non-virtualized; raw flex rows with shared widths ──
+            // ── List, grouped — DataTable over a flattened header/item row
+            // list, so it gets the same virtualization as the ungrouped
+            // branch instead of hand-rolled, fully-materialized rows ──
             (CatalogPresentation::List, true) => {
-                let groups = self.grouped_items(cx);
-                let cols = list_columns();
+                use gpui_component::Size;
+                self.grouped_items(cx);
                 root.px(pad_side)
-                    .children(groups.into_iter().map(|g| {
-                        let c = colors.clone();
-                        let d = density.clone();
-                        let e = self.controller.clone();
-                        let t = self.tabs.clone();
-                        let s = storage_root.clone();
-                        let header_cols = cols.clone();
-                        let row_cols = cols.clone();
-                        div().child(render_group_header(&g.publisher, g.items.len(), &c))
-                             .child(render_grouped_list_header(&c, &header_cols))
-                             .children(g.items.into_iter().map(move |item| {
-                                                              render_grouped_list_row(&item,
-                                                                                      &c,
-                                                                                      &d,
-                                                                                      e.clone(),
-                                                                                      t.clone(),
-                                                                                      s.clone(),
-                                                                                      &row_cols)
-                                                          }))
-                    }))
+                    .child(
+                        DataTable::new(&self.catalog_grouped_list_table)
+                            .with_size(Size::Size(density.row_text_height))
+                            .bordered(false)
+                            .scrollbar_visible(true, false),
+                    )
                     .into_any_element()
             }
 
@@ -679,7 +1022,7 @@ impl Render for CatalogView {
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
                 root.px(pad_side)
-                    .child(uniform_list("catalog-thumbs", item_count, move |range, _window, cx| {
+                    .child(uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
                                let items = ctrl.read(cx).visible_items_slice(range);
                                let covers: Vec<Option<Arc<Image>>> = {
                                    let cache = cx.global::<CoverCache>();
@@ -694,7 +1037,8 @@ impl Render for CatalogView {
                                                          &d,
                                                          ctrl.clone(),
                                                          t.clone(),
-                                                         s.clone()).into_any_element()
+                                                         s.clone(),
+                                                         window).into_any_element()
                                     })
                                     .collect()
                            }).track_scroll(&scroll_handle)
@@ -718,6 +1062,10 @@ impl Render for CatalogView {
                                                     let t = tabs_entity.clone();
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
+                                                    // Reborrow as `&Window` (Copy) so the nested
+                                                    // `move` closure can capture it on every
+                                                    // outer iteration without moving `window`.
+                                                    let window: &Window = &*window;
                                                     div().child(render_group_header(&g.publisher,
                                                                                     g.items.len(),
                                                                                     &c))
@@ -733,7 +1081,8 @@ impl Render for CatalogView {
                                                                                          &d,
                                                                                          e.clone(),
                                                                                          t.clone(),
-                                                                                         s.clone())
+                                                                                         s.clone(),
+                                                                                         window)
                                                                     }))
                                                 }))
                     .into_any_element()
@@ -747,49 +1096,41 @@ impl Render for CatalogView {
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
                 root.px(pad_side)
-                    .child(uniform_list("catalog-grid",
-                                        row_count,
-                                        move |row_range, _window, cx| {
-                                            let range_start = row_range.start;
-                                            let item_start = range_start * items_per_row;
-                                            let item_end =
-                                                (row_range.end * items_per_row).min(item_count);
-                                            let items =
-                                                ctrl.read(cx)
-                                                    .visible_items_slice(item_start..item_end);
-                                            let covers: Vec<Option<Arc<Image>>> = {
-                                                let cache = cx.global::<CoverCache>();
-                                                items.iter()
-                                                     .map(|item| cache.get(&item.id))
-                                                     .collect()
-                                            };
-                                            row_range.map(|row| {
-                                                         let offset =
-                                                             (row - range_start) * items_per_row;
-                                                         let row_end =
-                                                    (offset + items_per_row).min(items.len());
-                                                         let row_items = &items[offset..row_end];
-                                                         let row_covers = &covers[offset..row_end];
-                                                         div().flex()
-                                                     .gap(d.card_gap_x)
-                                                     .mb(d.card_gap_y)
-                                                     .children(row_items.iter()
-                                                                        .zip(row_covers.iter())
-                                                                        .map(|(item, cover)| {
-                                                                            render_grid_card(item,
+                    .child(uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
+                               let range_start = row_range.start;
+                               let item_start = range_start * items_per_row;
+                               let item_end = (row_range.end * items_per_row).min(item_count);
+                               let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                               let covers: Vec<Option<Arc<Image>>> = {
+                                   let cache = cx.global::<CoverCache>();
+                                   items.iter().map(|item| cache.get(&item.id)).collect()
+                               };
+                               row_range.map(|row| {
+                                            let offset = (row - range_start) * items_per_row;
+                                            let row_end = (offset + items_per_row).min(items.len());
+                                            let row_items = &items[offset..row_end];
+                                            let row_covers = &covers[offset..row_end];
+                                            div().flex()
+                                                 .gap(d.card_gap_x)
+                                                 .mb(d.card_gap_y)
+                                                 .children(row_items.iter()
+                                                                    .zip(row_covers.iter())
+                                                                    .map(|(item, cover)| {
+                                                                        render_grid_card(item,
                                                                                   cover.clone(),
                                                                                   &c,
                                                                                   d.card_min_width,
                                                                                   ctrl.clone(),
                                                                                   t.clone(),
-                                                                                  s.clone())
-                                                                        }))
-                                                     .into_any_element()
-                                                     })
-                                                     .collect()
-                                        }).track_scroll(&scroll_handle)
-                                          .flex_1()
-                                          .min_h_0())
+                                                                                  s.clone(),
+                                                                                  window)
+                                                                    }))
+                                                 .into_any_element()
+                                        })
+                                        .collect()
+                           }).track_scroll(&scroll_handle)
+                             .flex_1()
+                             .min_h_0())
                     .into_any_element()
             }
 
@@ -812,7 +1153,7 @@ impl Render for CatalogView {
                                                                                     g.items.len(),
                                                                                     &c))
                                                          .child(render_grid(g.items, cc, c, d, e,
-                                                                            t, s))
+                                                                            t, s, &*window))
                                                 }))
                     .into_any_element()
             }
@@ -917,8 +1258,7 @@ fn render_page_size_selector(current: usize, entity: Entity<LibraryController>)
 // ── Empty state
 // ───────────────────────────────────────────────────────────────
 
-fn render_no_matches_state(search_query: &str, text_color: gpui::Hsla)
-                           -> impl IntoElement + 'static {
+fn render_no_matches_state(search_query: &str, text_color: Hsla) -> impl IntoElement + 'static {
     let hint = if search_query.is_empty() {
         t!("catalog.try_different_section")
     }
@@ -939,7 +1279,7 @@ fn render_no_matches_state(search_query: &str, text_color: gpui::Hsla)
          .child(div().text_xs().text_color(text_color).child(hint))
 }
 
-fn render_library_empty_state(text_color: gpui::Hsla) -> impl IntoElement + 'static {
+fn render_library_empty_state(text_color: Hsla) -> impl IntoElement + 'static {
     div().flex()
          .flex_col()
          .items_center()
@@ -965,7 +1305,7 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens)
          .gap(px(8.0))
          .py(px(10.0))
          .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .font_weight(FontWeight::SEMIBOLD)
                      .text_color(text_primary)
                      .child(publisher))
          .child(div().text_xs()
@@ -1035,166 +1375,119 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     return t!("catalog.action_show_in_files");
 }
 
-// ── Grouped list layout
-// ───────────────────────────────────────────────────────
+// ── Thumbs layout
+// ─────────────────────────────────────────────────────────────
 
-/// Header row for the grouped list. Column widths come from `cols` so they
-/// always match the data rows rendered by `render_grouped_list_row`.
-fn render_grouped_list_header(colors: &ColorTokens, cols: &[Column])
-                              -> impl IntoElement + 'static + use<> {
-    let border = colors.border;
-    let text_tertiary = colors.text_tertiary;
-    let mut row = div().flex()
-                       .items_center()
-                       .h(px(28.0))
-                       .border_b_1()
-                       .border_color(border)
-                       .text_xs()
-                       .text_color(text_tertiary)
-                       .child(div().flex_1().child(cols[0].name.to_string()));
-    for col in &cols[1..] {
-        let name = col.name.to_string();
-        let width = col.width;
-        row = row.child(div().w(width).child(name));
-    }
-    row
-}
-
-/// A single data row for the grouped list. Column widths come from `cols`.
-fn render_grouped_list_row(item: &LibraryItem, colors: &ColorTokens, density: &DensityConstants,
-                           entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-                           storage_root_path: PathBuf, cols: &[Column])
-                           -> impl IntoElement + 'static + use<> {
+// See the `render_grid` allow above — `window` is needed for title-truncation
+// measurement.
+#[allow(clippy::too_many_arguments)]
+fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
+                    density: &DensityConstants, entity: Entity<LibraryController>,
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
+                    -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
-    let kind = item.kind.to_string();
     let publisher = item.publisher.to_string();
     let line = item.line.to_string();
+    let kind = item.kind.to_string();
     let pages = item.pages;
     let size_mb = item.size_mb;
     let year = item.year;
     let status = item.status;
-    let h = density.row_text_height;
+    let thumb_w = density.thumb_width;
+    let thumb_h = thumb_w * 10.0 / 7.0;
+    let row_h = density.thumb_row_height;
     let colors = colors.clone();
-    let reveal_item_id = Arc::clone(&item.id);
-    let ctx_cover_url = item.cover_url.clone();
-    let ctx_can_load = item.cover_url.is_some() && thumbnail_cooldown_elapsed(item);
-    let ctx_btn_id: Arc<str> = Arc::from(format!("ctx-list-{}", &*item.id));
-
-    // Fixed-width columns 1–8 use widths from the shared column definitions.
-    let [_, pub_w, sys_w, pgs_w, sz_w, yr_w, st_w, rv_w, ctx_w] =
-        std::array::from_fn::<_, 9, _>(|i| cols.get(i).map_or(px(0.), |c| c.width));
-
-    let reveal_col: AnyElement = if status == ItemStatus::Downloaded {
-        let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
-        let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-row-{}", &*reveal_item_id));
-        div().id(reveal_elem_id)
-             .w(rv_w)
-             .flex()
-             .items_center()
-             .justify_center()
-             .cursor_pointer()
-             .on_click(move |_, _, _| {
-                 if !item_reveal_path.exists() {
-                     tracing::warn!(
-                         path = %item_reveal_path.display(),
-                         "reveal: file not found — item may need re-download"
-                     );
-                     return;
-                 }
-                 if let Err(e) = reveal_in_file_manager(&item_reveal_path) {
-                     tracing::warn!("reveal_in_file_manager failed: {e}");
-                 }
-             })
-             .child(div().text_xs().text_color(colors.text_tertiary).child("↗"))
-             .into_any_element()
-    }
-    else {
-        div().w(rv_w).into_any_element()
-    };
-
+    let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
+    // Approximation: the title column fills the remaining row width after the cover
+    // and gap, which depends on the actual panel layout (sidebar/detail panel
+    // state) that isn't known synchronously here. `window.viewport_size()`
+    // minus the catalog's own side padding, cover width, and gap is used as a
+    // best-effort proxy; this may under-detect truncation when side panels are
+    // open and the row is narrower than this estimate assumes.
+    let title_available_w =
+        window.viewport_size().width - (density.catalog_pad_side * 2.0) - px(thumb_w) - px(12.0);
+    let title_truncated = is_title_truncated(window,
+                                             &title,
+                                             text_sm_size(window),
+                                             FontWeight::MEDIUM,
+                                             title_available_w);
     let ctx_path = storage_root_path.join("items").join(&*id);
-    let click_title = title.clone();
+
+    let cover: AnyElement = if let Some(image) = cover_image {
+        img(image).w(px(thumb_w))
+                  .h(px(thumb_h))
+                  .object_fit(ObjectFit::Cover)
+                  .into_any_element()
+    }
+    else {
+        render_generative_cover(item, thumb_w, thumb_h, false).into_any_element()
+    };
+
+    let cover_cell: AnyElement = {
+        let inner = div().rounded(px(3.0))
+                         .overflow_hidden()
+                         .flex_none()
+                         .child(cover);
+        if status == ItemStatus::Downloaded {
+            Badge::new().dot()
+                        .color(gpui::green())
+                        .child(inner)
+                        .into_any_element()
+        }
+        else {
+            inner.into_any_element()
+        }
+    };
+
     div().id(Arc::clone(&id))
+         .w_full()
          .flex()
          .items_center()
-         .h(h)
+         .gap(px(12.0))
+         .h(row_h)
          .border_b_1()
          .border_color(colors.border)
          .cursor_pointer()
-         .on_click(item_click_handler(Arc::clone(&id), click_title, entity.clone(), tabs.clone()))
-         .child(div().flex_1()
-                     .flex()
-                     .items_center()
-                     .gap(px(6.0))
-                     .min_w_0()
-                     .child(div().text_sm()
-                                 .text_color(colors.text_primary)
-                                 .truncate()
-                                 .child(title))
-                     .child(div().flex_none()
-                                 .text_xs()
-                                 .text_color(colors.text_tertiary)
-                                 .px(px(4.0))
-                                 .py(px(1.0))
-                                 .rounded(px(3.0))
-                                 .bg(colors.hover)
-                                 .child(kind_badge(&kind))))
-         .child(div().w(pub_w)
-                     .text_sm()
-                     .text_color(colors.text_secondary)
-                     .truncate()
-                     .child(publisher))
-         .child(div().w(sys_w)
-                     .text_sm()
-                     .text_color(colors.text_secondary)
-                     .truncate()
-                     .child(line))
-         .child(div().w(pgs_w)
-                     .text_sm()
-                     .text_color(colors.text_secondary)
-                     .child(pages.to_string()))
-         .child(div().w(sz_w)
-                     .text_sm()
-                     .text_color(colors.text_secondary)
-                     .child(format!("{size_mb:.0} MB")))
-         .child(div().w(yr_w)
-                     .text_sm()
-                     .text_color(colors.text_secondary)
-                     .child(year.to_string()))
-         .child(div().w(st_w)
-                     .flex()
-                     .items_center()
-                     .justify_center()
-                     .child(render_status(status, &colors)))
-         .child(reveal_col)
-         .child(div().w(ctx_w)
-                     .flex()
-                     .items_center()
-                     .justify_center()
-                     .child({
-                         let eu = entity.clone();
-                         Button::new(ctx_btn_id).ghost()
-                                                .small()
-                                                .label("\u{22ef}")
-                                                .dropdown_menu(move |menu, _, _| {
-                                                    let eu2 = eu.clone();
-                                                    let url = ctx_cover_url.clone();
-                                                    menu.item(
-                                PopupMenuItem::new(t!("catalog.action_load_thumbnail"))
-                                    .disabled(!ctx_can_load)
-                                    .on_click(move |_, _, cx| {
-                                        if let Some(ref u) = url {
-                                            eu2.update(cx, |ctrl, cx| {
-                                                ctrl.load_thumbnail(Arc::clone(u), cx);
-                                            });
-                                        }
-                                    }),
-                            )
-                                                })
-                     }))
+         .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
+         .child(cover_cell)
+         .child({
+             let title_tooltip = title.clone();
+             let title_el_id: Arc<str> = Arc::from(format!("title-thumb-{}", &*id));
+             let mut title_el = div().id(title_el_id)
+                                     .text_sm()
+                                     .font_weight(FontWeight::MEDIUM)
+                                     .text_color(colors.text_primary)
+                                     .truncate()
+                                     .child(title);
+             if title_truncated {
+                 title_el = title_el.tooltip(move |window, cx| {
+                                        Tooltip::new(title_tooltip.clone()).build(window, cx)
+                                    });
+             }
+             div().flex_1()
+                  .min_w_0()
+                  .flex()
+                  .flex_col()
+                  .justify_center()
+                  .gap(px(2.0))
+                  .child(title_el)
+                  .child(div().text_xs()
+                              .text_color(colors.text_secondary)
+                              .truncate()
+                              .child(format!("{publisher} · {line}")))
+                  .child(div().flex()
+                              .items_center()
+                              .gap(px(8.0))
+                              .child(div().text_xs().text_color(colors.text_tertiary).child(kind))
+                              .child(div().text_xs()
+                                          .text_color(colors.text_tertiary)
+                                          .child(format!("{pages} pp · {size_mb:.0} MB · {year}"))))
+         })
+         .child(render_status(status, &colors))
+         .child(ctx_menu)
          .context_menu(move |menu, _, _| match status {
              ItemStatus::Downloaded => {
                  let open_path = ctx_path.clone();
@@ -1265,190 +1558,18 @@ fn render_grouped_list_row(item: &LibraryItem, colors: &ColorTokens, density: &D
          })
 }
 
-// ── Thumbs layout
-// ─────────────────────────────────────────────────────────────
-
-fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
-                    density: &DensityConstants, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf)
-                    -> impl IntoElement + 'static + use<> {
-    let id = Arc::clone(&item.id);
-    let title = item.title.to_string();
-    let publisher = item.publisher.to_string();
-    let line = item.line.to_string();
-    let kind = item.kind.to_string();
-    let pages = item.pages;
-    let size_mb = item.size_mb;
-    let year = item.year;
-    let status = item.status;
-    let thumb_w = density.thumb_width;
-    let thumb_h = thumb_w * 10.0 / 7.0;
-    let row_h = density.thumb_row_height;
-    let colors = colors.clone();
-    let ctx_menu = render_thumbnail_menu(item, entity.clone());
-    let ctx_id = Arc::clone(&id);
-    let ctx_entity = entity.clone();
-    let ctx_path = storage_root_path.join("items").join(&*id);
-
-    let cover: AnyElement = if let Some(image) = cover_image {
-        img(image).w(px(thumb_w))
-                  .h(px(thumb_h))
-                  .object_fit(ObjectFit::Cover)
-                  .into_any_element()
-    }
-    else {
-        render_generative_cover(item, thumb_w, thumb_h, false).into_any_element()
-    };
-
-    let cover_cell: AnyElement = {
-        let inner = div().rounded(px(3.0))
-                         .overflow_hidden()
-                         .flex_none()
-                         .child(cover);
-        if status == ItemStatus::Downloaded {
-            Badge::new().dot()
-                        .color(gpui::green())
-                        .child(inner)
-                        .into_any_element()
-        }
-        else {
-            inner.into_any_element()
-        }
-    };
-
-    div()
-        .id(Arc::clone(&id))
-        .w_full()
-        .flex()
-        .items_center()
-        .gap(px(12.0))
-        .h(row_h)
-        .border_b_1()
-        .border_color(colors.border)
-        .cursor_pointer()
-        .on_click(item_click_handler(
-            Arc::clone(&id),
-            title.clone(),
-            entity,
-            tabs,
-        ))
-        .child(cover_cell)
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .flex()
-                .flex_col()
-                .justify_center()
-                .gap(px(2.0))
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .text_color(colors.text_primary)
-                        .truncate()
-                        .child(title),
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(colors.text_secondary)
-                        .truncate()
-                        .child(format!("{publisher} · {line}")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(8.0))
-                        .child(div().text_xs().text_color(colors.text_tertiary).child(kind))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(colors.text_tertiary)
-                                .child(format!("{pages} pp · {size_mb:.0} MB · {year}")),
-                        ),
-                ),
-        )
-        .child(render_status(status, &colors))
-        .child(ctx_menu)
-        .context_menu(move |menu, _, _| match status {
-            ItemStatus::Downloaded => {
-                let open_path = ctx_path.clone();
-                let reveal_path = ctx_path.clone();
-                let remove_id = Arc::clone(&ctx_id);
-                let entity_remove = ctx_entity.clone();
-                menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
-                        use crate::util::item_opener::{ItemOpener, OpenError};
-
-                        if !open_path.exists() {
-                            tracing::warn!(
-                                path = %open_path.display(),
-                                "open: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = ItemOpener::open(&open_path) {
-                            match e {
-                                OpenError::FileNotFound(path) => {
-                                    tracing::warn!("open: file not found: {path}");
-                                }
-                                OpenError::NoDefaultApp => {
-                                    tracing::warn!("open: no default application configured");
-                                }
-                                OpenError::OsFailed(msg) => {
-                                    tracing::warn!("open: OS failed: {msg}");
-                                }
-                                OpenError::MultipleFilesRequireSelection => {
-                                    tracing::warn!("open: multiple files require selection");
-                                }
-                            }
-                        }
-                    }),
-                )
-                .item(
-                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                        if !reveal_path.exists() {
-                            tracing::warn!(
-                                path = %reveal_path.display(),
-                                "reveal: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = reveal_in_file_manager(&reveal_path) {
-                            tracing::warn!("reveal_in_file_manager failed: {e}");
-                        }
-                    }),
-                )
-                .item(
-                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
-                        move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
-                        },
-                    ),
-                )
-            }
-            ItemStatus::Cloud => {
-                let dl_id = Arc::clone(&ctx_id);
-                let entity_dl = ctx_entity.clone();
-                menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
-                    move |_, _, cx| {
-                        entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
-                    },
-                ))
-            }
-        })
-}
-
 // ── Grid layout
 // ───────────────────────────────────────────────────────────────
 
+// `window` is required to measure title-truncation width for the tooltip;
+// grouping the remaining rendering context into a struct is left for a
+// follow-up since these call sites are shared with the grouped/ungrouped list
+// delegates' own parameter lists.
+#[allow(clippy::too_many_arguments)]
 fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image>>,
                colors: ColorTokens, density: DensityConstants,
                entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-               storage_root_path: PathBuf)
+               storage_root_path: PathBuf, window: &Window)
                -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -1458,7 +1579,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
          .flex_wrap()
          .gap(gap_x)
          .mb(gap_y)
-         .children(items.into_iter().map(move |item| {
+         .children(items.into_iter().map(|item| {
                                         let cover = cover_cache.get(&item.id).cloned();
                                         render_grid_card(&item,
                                                          cover,
@@ -1466,13 +1587,17 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
                                                          min_w,
                                                          entity.clone(),
                                                          tabs.clone(),
-                                                         storage_root_path.clone())
+                                                         storage_root_path.clone(),
+                                                         window)
                                     }))
 }
 
+// See the `render_grid` allow above — `window` is needed for title-truncation
+// measurement.
+#[allow(clippy::too_many_arguments)]
 fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     card_w: f32, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1480,6 +1605,13 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let status = item.status;
     let cover_h = card_w * 10.0 / 7.0;
     let reveal_item_id = Arc::clone(&item.id);
+    // Card has 4px horizontal padding on each side around the title text.
+    let title_available_w = px(card_w) - px(8.0);
+    let title_truncated = is_title_truncated(window,
+                                             &title,
+                                             text_xs_size(window),
+                                             FontWeight::MEDIUM,
+                                             title_available_w);
 
     let cover: AnyElement = if let Some(image) = cover_image {
         img(image).w(px(card_w))
@@ -1536,6 +1668,20 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
         }
     };
 
+    let title_tooltip = title.clone();
+    let title_el_id: Arc<str> = Arc::from(format!("title-grid-{}", &*id));
+    let mut title_el = div().id(title_el_id)
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(colors.text_primary)
+                            .truncate()
+                            .child(title.clone());
+    if title_truncated {
+        title_el = title_el.tooltip(move |window, cx| {
+                               Tooltip::new(title_tooltip.clone()).build(window, cx)
+                           });
+    }
+
     div().id(Arc::clone(&id))
          .w(px(card_w))
          .flex()
@@ -1551,11 +1697,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      .flex()
                      .flex_col()
                      .gap(px(1.0))
-                     .child(div().text_xs()
-                                 .font_weight(gpui::FontWeight::MEDIUM)
-                                 .text_color(colors.text_primary)
-                                 .truncate()
-                                 .child(title))
+                     .child(title_el)
                      .child(div().flex()
                                  .items_center()
                                  .justify_between()
