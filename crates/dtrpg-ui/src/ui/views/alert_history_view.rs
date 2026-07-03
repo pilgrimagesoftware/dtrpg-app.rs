@@ -26,7 +26,6 @@ pub fn render_alert_history_panel(
     entity: Entity<ActivityController>,
     colors: &ColorTokens,
 ) -> AnyElement {
-    let surface_alt = colors.surface_alt;
     let border = colors.border;
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -36,14 +35,12 @@ pub fn render_alert_history_panel(
     let clear_entity = entity.clone();
     let has_entries = !snap.entries.is_empty();
 
+    // No bg/border/shadow/rounding here — the enclosing `Popover` content
+    // wrapper already supplies that framing (see `popover_style` in
+    // `gpui-component`); adding our own on top produced a nested double frame.
     div()
         .occlude()
         .w(px(340.0))
-        .bg(surface_alt)
-        .border_1()
-        .border_color(border)
-        .rounded(px(8.0))
-        .shadow_lg()
         .flex()
         .flex_col()
         // ── Header ────────────────────────────────────────────────────────
