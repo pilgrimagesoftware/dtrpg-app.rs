@@ -72,7 +72,6 @@ pub fn render_detail_tab_content(
         .flex_1()
         .min_h_0()
         .flex()
-        .flex_col()
         .bg(surface)
         .child({
             let mut cover_box = div().relative().w(px(cover_w)).flex_none().child(cover);
@@ -103,13 +102,7 @@ pub fn render_detail_tab_content(
                         .child("\u{27f3}"),
                 );
             }
-            div()
-                .w_full()
-                .flex()
-                .flex_none()
-                .justify_center()
-                .py(px(16.0))
-                .child(cover_box)
+            div().flex_none().pr(px(16.0)).py(px(16.0)).child(cover_box)
         })
         .child(
             div().flex_1().min_h_0().flex().flex_col().child(
