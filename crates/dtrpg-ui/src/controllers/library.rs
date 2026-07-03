@@ -4,6 +4,7 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use gpui::{BorrowAppContext, Context, Entity};
+use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_cache_metadata, load_catalog_cache, save_catalog_cache};
@@ -216,8 +217,12 @@ impl LibraryController {
         ctrl
     }
 
-    /// Spawns a background task to load the catalog from cache then optionally
-    /// from the live API.
+    /// Spawns a background task to load collections and the catalog — from
+    /// cache, then optionally from the live API.
+    ///
+    /// Progress is reported through a single activity item whose label
+    /// advances through each stage in turn: collections, the cache-freshness
+    /// count check, then one update per catalog page as it arrives.
     ///
     /// When `force_reload` is true the auto-load policy is bypassed and a full
     /// live fetch always runs. When false, the fetch is skipped if the
@@ -233,21 +238,28 @@ impl LibraryController {
         self.load_generation += 1;
         let generation = self.load_generation;
         let service_arc = self.vm.service_arc();
+        let collections_service = Arc::clone(&self.collections_service);
         let weak_activity = self.activity.downgrade();
         let storage_root = cache_dir();
         let save_root = storage_root.clone();
 
         cx.spawn(async move |this, async_cx| {
             // Single activity item for the whole load. Its label is updated in
-            // place as the load moves through stages (count check, live fetch,
-            // page-by-page progress) rather than starting a new activity per
-            // stage — the stages are not independent operations, they are
-            // phases of one catalog load.
+            // place as the load moves through stages (collections, count
+            // check, live fetch, page-by-page progress) rather than starting
+            // a new activity per stage — the stages are not independent
+            // operations, they are phases of one catalog load.
             let activity_id = weak_activity
-                .update(async_cx, |a, cx| a.start("Loading library\u{2026}", None, cx))
+                .update(async_cx, |a, cx| a.start(&t!("activity.loading_library"), None, cx))
                 .unwrap_or(0);
 
-            // ── Pre-populate from disk cache ──────────────────────────────────
+            // ── Stage: collections ──────────────────────────────────────────────
+            weak_activity
+                .update(async_cx, |a, cx| {
+                    a.update_label(activity_id, t!("activity.loading_library_collections"), cx)
+                })
+                .ok();
+
             let col_cache_root = storage_root.clone();
             let cached_collections = async_cx
                 .background_executor()
@@ -263,6 +275,45 @@ impl LibraryController {
                 .ok();
             }
 
+            let col_save_root = storage_root.clone();
+            let live_collections = async_cx
+                .background_executor()
+                .spawn(async move { collections_service.list_collections() })
+                .await;
+            match live_collections {
+                Ok(entries) => {
+                    let to_save = entries.clone();
+                    async_cx
+                        .background_executor()
+                        .spawn(async move {
+                            if let Err(e) = save_collections_cache(&col_save_root, &to_save) {
+                                tracing::warn!(error = %e, "failed to save collections cache");
+                            }
+                        })
+                        .await;
+                    this.update(async_cx, |ctrl, cx| {
+                        if ctrl.load_generation != generation {
+                            return; // superseded by a newer load
+                        }
+                        ctrl.apply_collections(entries, cx);
+                    })
+                    .ok();
+                }
+                Err(e) => {
+                    // Non-fatal: collections and catalog are independent
+                    // datasets sharing one activity item, so a collections
+                    // failure does not abort the catalog stages below.
+                    if e.kind == crate::services::collections::CollectionsServiceErrorKind::Session
+                    {
+                        tracing::debug!(error = %e, "collections load skipped: no authenticated session");
+                    }
+                    else {
+                        tracing::warn!(error = %e, "collections load failed");
+                    }
+                }
+            }
+
+            // ── Pre-populate catalog from disk cache ────────────────────────────
             let cache_root = storage_root.clone();
             let meta_root = cache_root.clone();
 
@@ -301,7 +352,7 @@ impl LibraryController {
                             // flurry of independent-looking activities.
                             weak_activity
                                 .update(async_cx, |a, cx| {
-                                    a.update_label(activity_id, "Getting count of items\u{2026}", cx)
+                                    a.update_label(activity_id, t!("activity.loading_library_count"), cx)
                                 })
                                 .ok();
                             let svc = service_arc.clone();
@@ -335,12 +386,16 @@ impl LibraryController {
                         }
             }
 
-            // ── Fetch live catalog from API ───────────────────────────────────
+            // ── Stage: page-by-page fetch from API ──────────────────────────────
             // Move the shared activity into its next stage — no new item is
             // created, so a count check that ran above doesn't leave a stale
-            // "Getting count of items…" label behind.
+            // "getting count of items…" label behind. The per-page label set
+            // below (`page N…`) replaces this as soon as the first page
+            // arrives.
             weak_activity
-                .update(async_cx, |a, cx| a.update_label(activity_id, "Loading library\u{2026}", cx))
+                .update(async_cx, |a, cx| {
+                    a.update_label(activity_id, t!("activity.loading_library"), cx)
+                })
                 .ok();
 
             // Two channels: one for page batches, one for the API-reported total, if any.
@@ -389,6 +444,7 @@ impl LibraryController {
             let mut rx = Some(rx);
             let mut total_rx = Some(total_rx);
             let mut live_items: Vec<LibraryItem> = Vec::new();
+            let mut page_num: u32 = 0;
             loop {
                 let Some(receiver) = rx.take() else { break; };
 
@@ -431,23 +487,23 @@ impl LibraryController {
                             .ok();
                         }
                         live_items.extend(items);
-                        // Update progress after each page if we have an estimate; the
-                        // real DriveThruRPG API never reports `links.last`, so in
-                        // practice this only fires when a local cache seeded a total
-                        // above. Without a total there is no way to compute a real
-                        // percentage — fall back to a growing item-count label instead
-                        // of leaving the activity item looking frozen (its progress bar
-                        // renders indeterminate, see `activity_panel_view`).
+                        page_num += 1;
+                        // Always advance the label to the current page — the
+                        // real DriveThruRPG API never reports `links.last`, so a
+                        // percentage is usually unavailable; the page number is
+                        // otherwise the only thing that shows the load is
+                        // actually making progress rather than being frozen (see
+                        // `activity_panel_view`'s indeterminate progress bar).
+                        let label = t!("activity.loading_library_page", page = page_num).to_string();
+                        weak_activity
+                            .update(async_cx, |a, cx| a.update_label(activity_id, label, cx))
+                            .ok();
+                        // When a total estimate is available, also drive the
+                        // progress bar's percentage from it.
                         if let Some(total) = estimated_total.filter(|&t| t > 0) {
                             let progress = (live_items.len() as f32 / total as f32).min(1.0);
                             weak_activity
                                 .update(async_cx, |a, cx| a.update_progress(activity_id, progress, cx))
-                                .ok();
-                        } else {
-                            let label =
-                                format!("Loading library\u{2026} ({} items)", live_items.len());
-                            weak_activity
-                                .update(async_cx, |a, cx| a.update_label(activity_id, label, cx))
                                 .ok();
                         }
                         rx = Some(returned_rx);
@@ -554,8 +610,9 @@ impl LibraryController {
         let collections_service = Arc::clone(&self.collections_service);
         let cache_root = cache_dir();
         let weak_activity = self.activity.downgrade();
-        let activity_id = self.activity
-                              .update(cx, |a, cx| a.start("Loading collections\u{2026}", None, cx));
+        let activity_id = self.activity.update(cx, |a, cx| {
+                                           a.start(&t!("activity.loading_collections"), None, cx)
+                                       });
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
             let result = async_cx
@@ -652,9 +709,8 @@ impl LibraryController {
         self.invalidate_cache();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
-        // Load collections concurrently with the catalog — don't wait for the
-        // full catalog fetch to complete before showing collection names.
-        self.load_collections(cx);
+        // Collections are loaded as the first stage of `start_load`, sharing
+        // its single activity item rather than starting a separate one.
         self.start_load(cx);
     }
 

@@ -135,6 +135,11 @@ activity:
   title: "Activité"
   empty: "Aucune activité récente."
   empty_hint: "L'activité apparaîtra ici au fur et à mesure des opérations."
+  loading_library: "Chargement de la bibliothèque…"
+  loading_library_collections: "Chargement de la bibliothèque : récupération des collections…"
+  loading_library_count: "Chargement de la bibliothèque : récupération du nombre d'éléments…"
+  loading_library_page: "Chargement de la bibliothèque : page %{page}…"
+  loading_collections: "Chargement des collections…"
 
 alert_history:
   title: "Historique des alertes"

@@ -135,6 +135,11 @@ activity:
   title: "Aktivität"
   empty: "Keine kürzliche Aktivität."
   empty_hint: "Aktivitäten werden hier angezeigt, sobald Vorgänge ausgeführt werden."
+  loading_library: "Bibliothek wird geladen…"
+  loading_library_collections: "Bibliothek wird geladen: Sammlungen werden abgerufen…"
+  loading_library_count: "Bibliothek wird geladen: Anzahl der Einträge wird abgerufen…"
+  loading_library_page: "Bibliothek wird geladen: Seite %{page}…"
+  loading_collections: "Sammlungen werden geladen…"
 
 alert_history:
   title: "Warnungsverlauf"

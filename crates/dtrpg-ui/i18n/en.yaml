@@ -136,6 +136,11 @@ activity:
   title: "Activity"
   empty: "No recent activity."
   empty_hint: "Activity will appear here as operations run."
+  loading_library: "Loading library…"
+  loading_library_collections: "Loading library: getting collections…"
+  loading_library_count: "Loading library: getting count of items…"
+  loading_library_page: "Loading library: page %{page}…"
+  loading_collections: "Loading collections…"
 
 alert_history:
   title: "Alert History"
