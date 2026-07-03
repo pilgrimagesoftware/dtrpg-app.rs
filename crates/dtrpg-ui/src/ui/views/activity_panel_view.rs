@@ -169,11 +169,10 @@ fn render_item_row(
         elapsed_secs.map(format_duration).unwrap_or_default()
     };
 
-    // Tooltip shows the full label, plus the error message on a second line for error items.
-    let tooltip_text = match &error_msg {
-        Some(err) => format!("{label}\n{err}"),
-        None => label.clone(),
-    };
+    // Tooltip shows the label as a bold title, plus the error message as a
+    // secondary line underneath for error items.
+    let tooltip_title = label.clone();
+    let tooltip_error = error_msg.clone();
 
     let select_entity = activity_entity.clone();
     let cancel_entity = activity_entity;
@@ -185,7 +184,23 @@ fn render_item_row(
         .px(px(14.0))
         .py(px(6.0))
         .cursor_pointer()
-        .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+        .tooltip(move |window, cx| {
+            let title = tooltip_title.clone();
+            let error = tooltip_error.clone();
+            Tooltip::element(move |_, _| {
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.0))
+                    .child(
+                        div()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child(title.clone()),
+                    )
+                    .children(error.clone().map(|err| div().child(err)))
+            })
+            .build(window, cx)
+        })
         .on_click(move |_, _, cx| {
             select_entity.update(cx, |a, cx| a.select_activity(item_id, cx));
         })

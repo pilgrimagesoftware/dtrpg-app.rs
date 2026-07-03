@@ -14,7 +14,7 @@
 //! regardless of window width or future status bar layout changes.
 
 use gpui::prelude::*;
-use gpui::{Anchor, Entity, IntoElement, Styled, div};
+use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -67,6 +67,14 @@ fn theme_label(key: ThemeKey) -> &'static str {
         ThemeKey::Sage => "Sage",
         ThemeKey::Ink => "Ink",
     }
+}
+
+/// Builds a `Button` tooltip with a title line above a descriptive body line.
+///
+/// `Button`'s tooltip only accepts plain text, so the title and body are
+/// joined with a newline rather than rendered as separate styled elements.
+fn status_bar_tooltip(title: &str, body: &str) -> String {
+    format!("{title}\n{body}")
 }
 
 /// Renders the status bar row below the main content area.
@@ -148,14 +156,14 @@ pub fn render_status_bar(
         .ghost()
         .compact()
         .label(format!("{activity_glyph} {activity_total}"))
-        .tooltip(
-            t!(
+        .tooltip(status_bar_tooltip(
+            &t!("activity.title"),
+            &t!(
                 "status_bar.activity_tooltip",
                 in_progress = activity_snap.in_progress_count,
                 completed = activity_snap.recent_count
-            )
-            .to_string(),
-        );
+            ),
+        ));
     if activity_snap.in_progress_count > 0 {
         let progress_circle = match activity_snap.aggregate_progress {
             Some(fraction) => ProgressCircle::new("status-bar-activity-progress")
@@ -187,13 +195,13 @@ pub fn render_status_bar(
         .ghost()
         .compact()
         .icon(IconName::Bell)
-        .tooltip(
-            t!(
+        .tooltip(status_bar_tooltip(
+            &t!("status_bar.notifications_tooltip_title"),
+            &t!(
                 "status_bar.notifications_tooltip",
                 n = activity_snap.recent_error_count
-            )
-            .to_string(),
-        );
+            ),
+        ));
 
     let alert_for_open_change = activity.clone();
     // `Popover::trigger` requires `Selectable`, which `Badge` doesn't implement, so the
@@ -217,7 +225,7 @@ pub fn render_status_bar(
                     .absolute()
                     .top_0()
                     .right_0()
-                    .size(gpui::px(6.0))
+                    .size(px(6.0))
                     .rounded_full()
                     .bg(gpui::red()),
             )

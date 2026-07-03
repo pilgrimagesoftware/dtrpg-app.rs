@@ -204,4 +204,5 @@ tabs:
 status_bar:
   theme_tooltip: "Theme: %{theme}"
   activity_tooltip: "%{in_progress} in progress, %{completed} completed"
+  notifications_tooltip_title: "Notifications"
   notifications_tooltip: "%{n} unread"
