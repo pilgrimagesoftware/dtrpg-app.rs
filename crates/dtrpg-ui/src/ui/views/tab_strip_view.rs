@@ -14,6 +14,8 @@ use gpui_component::tab::{Tab, TabBar};
 use rust_i18n::t;
 
 use crate::controllers::tabs::{TabTarget, TabsController};
+use crate::data::constants::DETAIL_TAB_TITLE_MAX_CHARS;
+use crate::util::text::truncate_with_ellipsis;
 
 /// Renders the tab strip: the non-closable catalog tab followed by any open,
 /// closable expanded detail tabs.
@@ -31,11 +33,14 @@ pub fn render_tab_strip(tabs: Entity<TabsController>, cx: &gpui::App)
         let label: SharedString = match target {
             TabTarget::Catalog => t!("tabs.catalog_tab").to_string().into(),
             TabTarget::Detail(id) => {
-                snap.titles
-                    .get(id)
-                    .cloned()
-                    .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string())
-                    .into()
+                let title = snap.titles
+                                .get(id)
+                                .cloned()
+                                .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
+                // The tab strip has no fixed per-tab width, so a long catalog
+                // item title otherwise stretches its tab — and the whole
+                // strip — rather than eliding.
+                truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into()
             }
         };
 

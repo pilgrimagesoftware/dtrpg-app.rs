@@ -74,3 +74,11 @@ pub const DETAIL_PANEL_MAX_WIDTH: f32 = 600.0;
 /// The thumbnail no longer grows with the panel past this size; instead it
 /// stays centered horizontally at the top of the panel.
 pub const DETAIL_PANEL_COVER_MAX_WIDTH: f32 = DETAIL_PANEL_DEFAULT_WIDTH;
+
+/// Maximum character count for a detail tab's title before it is truncated
+/// with an ellipsis.
+///
+/// The tab strip has no fixed per-tab width, so a long catalog item title
+/// otherwise stretches its tab (and the whole strip) rather than eliding —
+/// see [`crate::util::text::truncate_with_ellipsis`].
+pub const DETAIL_TAB_TITLE_MAX_CHARS: usize = 40;

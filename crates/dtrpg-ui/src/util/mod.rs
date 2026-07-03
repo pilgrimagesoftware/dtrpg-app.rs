@@ -11,3 +11,4 @@ pub mod size;
 pub mod sort;
 #[cfg(test)]
 pub mod stubs;
+pub mod text;

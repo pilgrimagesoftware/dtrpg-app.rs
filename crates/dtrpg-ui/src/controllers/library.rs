@@ -238,6 +238,15 @@ impl LibraryController {
         let save_root = storage_root.clone();
 
         cx.spawn(async move |this, async_cx| {
+            // Single activity item for the whole load. Its label is updated in
+            // place as the load moves through stages (count check, live fetch,
+            // page-by-page progress) rather than starting a new activity per
+            // stage — the stages are not independent operations, they are
+            // phases of one catalog load.
+            let activity_id = weak_activity
+                .update(async_cx, |a, cx| a.start("Loading library\u{2026}", None, cx))
+                .unwrap_or(0);
+
             // ── Pre-populate from disk cache ──────────────────────────────────
             let col_cache_root = storage_root.clone();
             let cached_collections = async_cx
@@ -285,23 +294,21 @@ impl LibraryController {
                         let is_fresh = meta.as_ref().is_some_and(|m| !m.is_stale());
 
                         if is_fresh {
-                            // Check remote count if the service supports it cheaply. Surface
-                            // this as its own activity item — it is usually fast, but on a
-                            // slow connection it is otherwise indistinguishable from the app
-                            // being stuck doing nothing.
-                            let count_activity_id = weak_activity
+                            // Check remote count if the service supports it cheaply — this
+                            // is a stage of the same load, surfaced via a label update on
+                            // the existing activity rather than a separate item, so the
+                            // user sees one operation moving through phases instead of a
+                            // flurry of independent-looking activities.
+                            weak_activity
                                 .update(async_cx, |a, cx| {
-                                    a.start("Getting count of items\u{2026}", None, cx)
+                                    a.update_label(activity_id, "Getting count of items\u{2026}", cx)
                                 })
-                                .unwrap_or(0);
+                                .ok();
                             let svc = service_arc.clone();
                             let remote_count = async_cx
                                 .background_executor()
                                 .spawn(async move { svc.count_items() })
                                 .await;
-                            weak_activity
-                                .update(async_cx, |a, cx| a.complete(count_activity_id, cx))
-                                .ok();
                             let count_matches = match remote_count {
                                 Some(Ok(n)) => n == items.len(),
                                 Some(Err(_)) => false, // count fetch failed; do live fetch
@@ -312,6 +319,9 @@ impl LibraryController {
                                     cached = items.len(),
                                     "catalog auto-load: cache is fresh, skipping live fetch"
                                 );
+                                weak_activity
+                                    .update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                    .ok();
                                 this.update(async_cx, |ctrl, cx| {
                                     if ctrl.load_generation != generation {
                                         return; // superseded by a newer load
@@ -326,9 +336,12 @@ impl LibraryController {
             }
 
             // ── Fetch live catalog from API ───────────────────────────────────
-            let activity_id = weak_activity
-                .update(async_cx, |a, cx| a.start("Loading library\u{2026}", None, cx))
-                .unwrap_or(0);
+            // Move the shared activity into its next stage — no new item is
+            // created, so a count check that ran above doesn't leave a stale
+            // "Getting count of items…" label behind.
+            weak_activity
+                .update(async_cx, |a, cx| a.update_label(activity_id, "Loading library\u{2026}", cx))
+                .ok();
 
             // Two channels: one for page batches, one for the API-reported total, if any.
             let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
@@ -780,17 +793,6 @@ impl LibraryController {
               }
           })
           .detach();
-    }
-
-    /// Reloads catalog from the service and resets selection.
-    pub fn reload(&mut self, cx: &mut Context<Self>) {
-        self.vm.refresh();
-        self.catalog = self.vm.items().to_vec();
-        self.section_counts = section_counts(&self.catalog);
-        self.publishers = publisher_entries(&self.catalog);
-        self.selection = Selection::default();
-        self.invalidate_cache();
-        cx.emit(LibraryChanged);
     }
 
     // ── Thumbnail loading ──────────────────────────────────────────────────────
