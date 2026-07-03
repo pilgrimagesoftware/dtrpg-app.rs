@@ -2,9 +2,10 @@
 
 /// FNV-1a 32-bit hash of `s`.
 ///
-/// Deterministic across runs and platforms — used wherever a stable, filename-safe
-/// or bucket-safe digest of a string is needed (e.g. deriving a cache filename from
-/// an item id, or picking a deterministic generative-cover motif from a title).
+/// Deterministic across runs and platforms — used wherever a stable,
+/// filename-safe or bucket-safe digest of a string is needed (e.g. deriving a
+/// cache filename from an item id, or picking a deterministic generative-cover
+/// motif from a title).
 ///
 /// # Examples
 ///

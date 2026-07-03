@@ -23,6 +23,7 @@ use gpui_component::progress::ProgressCircle;
 use gpui_component::separator::Separator;
 use gpui_component::status_bar::StatusBar;
 use gpui_component::{Sizable as _, Size};
+use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
@@ -32,14 +33,13 @@ use crate::ui::views::activity_panel_view::render_activity_panel;
 use crate::ui::views::alert_history_view::render_alert_history_panel;
 use crate::util::pluralize::pluralize;
 use crate::util::size::size_format;
-use rust_i18n::t;
 
 /// Data the status bar needs to render, decoupled from where it's sourced.
 pub struct StatusBarSnapshot {
     /// Total number of items in the library.
-    pub total_count: usize,
+    pub total_count:      usize,
     /// Total size of all library items, in megabytes.
-    pub total_mb: f64,
+    pub total_mb:         f64,
     /// Title of the currently active tab (catalog section name, or an open
     /// detail tab's item title).
     pub active_tab_label: String,
@@ -47,16 +47,16 @@ pub struct StatusBarSnapshot {
     /// detail tab: always 1).
     pub active_tab_count: usize,
     /// Currently active theme.
-    pub theme_key: ThemeKey,
+    pub theme_key:        ThemeKey,
 }
 
 /// Activity and alert history state needed to render the status bar's
 /// activity/notification buttons and their anchored panels.
 pub struct ActivityBarData<'a> {
     /// Controller entity, used to toggle the panels and act on their contents.
-    pub entity: Entity<ActivityController>,
+    pub entity:     Entity<ActivityController>,
     /// Activity panel snapshot for the current render pass.
-    pub snap: &'a ActivitySnapshot,
+    pub snap:       &'a ActivitySnapshot,
     /// Alert history panel snapshot for the current render pass.
     pub alert_snap: &'a AlertHistorySnapshot,
 }
@@ -79,81 +79,68 @@ fn status_bar_tooltip(title: &str, body: &str) -> String {
 }
 
 /// Renders the status bar row below the main content area.
-pub fn render_status_bar(
-    snap: StatusBarSnapshot,
-    entity: Entity<LibraryController>,
-    activity_data: ActivityBarData<'_>,
-    colors: &ColorTokens,
-) -> impl IntoElement + 'static {
+pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryController>,
+                         activity_data: ActivityBarData<'_>, colors: &ColorTokens)
+                         -> impl IntoElement + 'static {
     let total_size_str = size_format(snap.total_mb);
 
-    let library_summary = div()
-        .text_xs()
-        .text_color(colors.text_secondary)
-        .child(format!(
-            "{} \u{2022} {total_size_str}",
-            pluralize(snap.total_count, "count.total_item", "count.total_items")
-        ));
+    let library_summary =
+        div().text_xs()
+             .text_color(colors.text_secondary)
+             .child(format!("{} \u{2022} {total_size_str}",
+                            pluralize(snap.total_count, "count.total_item", "count.total_items")));
 
-    let active_tab_summary = div()
-        .text_xs()
-        .text_color(colors.text_secondary)
-        .child(format!(
-            "{} \u{2022} {}",
-            snap.active_tab_label,
-            pluralize(snap.active_tab_count, "count.item", "count.items")
-        ));
+    let active_tab_summary =
+        div().text_xs()
+             .text_color(colors.text_secondary)
+             .child(format!("{} \u{2022} {}",
+                            snap.active_tab_label,
+                            pluralize(snap.active_tab_count, "count.item", "count.items")));
 
-    let theme_picker = Button::new("status-bar-theme")
-        .ghost()
-        .compact()
-        .label(theme_label(snap.theme_key))
-        .tooltip(
-            t!(
-                "status_bar.theme_tooltip",
-                theme = theme_label(snap.theme_key)
-            )
-            .to_string(),
-        )
-        .dropdown_menu(move |menu, _, _| {
-            let mut m = menu;
-            for key in [
-                ThemeKey::Parchment,
-                ThemeKey::Slate,
-                ThemeKey::Sage,
-                ThemeKey::Ink,
-            ] {
-                let e = entity.clone();
-                m = m.item(
+    let theme_picker =
+        Button::new("status-bar-theme").ghost()
+                                       .compact()
+                                       .label(theme_label(snap.theme_key))
+                                       .tooltip(t!("status_bar.theme_tooltip",
+                                                   theme = theme_label(snap.theme_key)).to_string())
+                                       .dropdown_menu(move |menu, _, _| {
+                                           let mut m = menu;
+                                           for key in [ThemeKey::Parchment,
+                                                       ThemeKey::Slate,
+                                                       ThemeKey::Sage,
+                                                       ThemeKey::Ink]
+                                           {
+                                               let e = entity.clone();
+                                               m = m.item(
                     PopupMenuItem::new(theme_label(key))
                         .checked(key == snap.theme_key)
                         .on_click(move |_, _, cx| {
                             e.update(cx, |ctrl, cx| ctrl.set_theme(key, cx));
                         }),
                 );
-            }
-            m
-        });
+                                           }
+                                           m
+                                       });
 
-    let ActivityBarData {
-        entity: activity,
-        snap: activity_snap,
-        alert_snap,
-    } = activity_data;
+    let ActivityBarData { entity: activity,
+                          snap: activity_snap,
+                          alert_snap, } = activity_data;
 
     let activity_total = activity_snap.in_progress_count + activity_snap.recent_count;
     let activity_glyph = if activity_snap.in_progress_count > 0 {
         "\u{21bb}"
-    } else if activity_snap.recent_count > 0 {
+    }
+    else if activity_snap.recent_count > 0 {
         "\u{25cf}"
-    } else {
+    }
+    else {
         "\u{25cb}"
     };
-    let mut activity_indicator = Button::new("status-bar-activity")
-        .ghost()
-        .compact()
-        .label(format!("{activity_glyph} {activity_total}"))
-        .tooltip(status_bar_tooltip(
+    let mut activity_indicator =
+        Button::new("status-bar-activity").ghost()
+                                          .compact()
+                                          .label(format!("{activity_glyph} {activity_total}"))
+                                          .tooltip(status_bar_tooltip(
             &t!("activity.title"),
             &t!(
                 "status_bar.activity_tooltip",
@@ -163,12 +150,12 @@ pub fn render_status_bar(
         ));
     if activity_snap.in_progress_count > 0 {
         let progress_circle = match activity_snap.aggregate_progress {
-            Some(fraction) => ProgressCircle::new("status-bar-activity-progress")
-                .with_size(Size::Small)
-                .value(fraction * 100.0),
-            None => ProgressCircle::new("status-bar-activity-progress")
-                .with_size(Size::Small)
-                .loading(true),
+            Some(fraction) => {
+                ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
+                                                                   .value(fraction * 100.0)
+            }
+            None => ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
+                                                                       .loading(true),
         };
         activity_indicator = activity_indicator.child(progress_circle);
     }
@@ -188,22 +175,21 @@ pub fn render_status_bar(
         ));
 
     let has_errors = activity_snap.recent_error_count > 0;
-    let notification_button = Button::new("status-bar-notifications")
-        .ghost()
-        .compact()
-        .icon(IconName::Bell)
-        .tooltip(status_bar_tooltip(
-            &t!("status_bar.notifications_tooltip_title"),
-            &t!(
-                "status_bar.notifications_tooltip",
-                n = activity_snap.recent_error_count
-            ),
-        ));
+    let notification_button = Button::new("status-bar-notifications").ghost()
+                                                                     .compact()
+                                                                     .icon(IconName::Bell)
+                                                                     .tooltip(status_bar_tooltip(
+        &t!("status_bar.notifications_tooltip_title"),
+        &t!(
+            "status_bar.notifications_tooltip",
+            n = activity_snap.recent_error_count
+        ),
+    ));
 
     let alert_for_open_change = activity.clone();
-    // `Popover::trigger` requires `Selectable`, which `Badge` doesn't implement, so the
-    // unread-error dot is layered on as a sibling of the popover rather than wrapping the
-    // trigger in a `Badge`.
+    // `Popover::trigger` requires `Selectable`, which `Badge` doesn't implement, so
+    // the unread-error dot is layered on as a sibling of the popover rather
+    // than wrapping the trigger in a `Badge`.
     let notification_panel = div()
         .relative()
         .child(
@@ -228,11 +214,10 @@ pub fn render_status_bar(
             )
         });
 
-    StatusBar::new()
-        .left(library_summary)
-        .left(Separator::vertical())
-        .left(active_tab_summary)
-        .right(theme_picker)
-        .right(activity_panel)
-        .right(notification_panel)
+    StatusBar::new().left(library_summary)
+                    .left(Separator::vertical())
+                    .left(active_tab_summary)
+                    .right(theme_picker)
+                    .right(activity_panel)
+                    .right(notification_panel)
 }

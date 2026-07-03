@@ -5,17 +5,13 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 // App-level actions
-actions!(
-    libri,
-    [
-        Quit,
-        HideApplication,
-        HideOthers,
-        ShowAll,
-        ShowSettings,
-        About,
-    ]
-);
+actions!(libri,
+         [Quit,
+          HideApplication,
+          HideOthers,
+          ShowAll,
+          ShowSettings,
+          About,]);
 
 // Window-level actions
 actions!(libri, [Minimize, Zoom, ToggleFullscreen]);
@@ -43,19 +39,15 @@ actions!(libri, [ShowActivity, ShowAlertHistory]);
 actions!(libri, [Undo, Redo, Cut, Copy, Paste, SelectAll]);
 
 // View menu actions: catalog presentation mode, sort, and search focus.
-actions!(
-    libri,
-    [
-        ViewAsList,
-        ViewAsThumbs,
-        ViewAsGrid,
-        SortByTitle,
-        SortByPublisher,
-        SortByDateAdded,
-        SortByPages,
-        SortAscending,
-        SortDescending,
-        ToggleGroupByPublisher,
-        FocusSearch,
-    ]
-);
+actions!(libri,
+         [ViewAsList,
+          ViewAsThumbs,
+          ViewAsGrid,
+          SortByTitle,
+          SortByPublisher,
+          SortByDateAdded,
+          SortByPages,
+          SortAscending,
+          SortDescending,
+          ToggleGroupByPublisher,
+          FocusSearch,]);

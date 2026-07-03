@@ -1,24 +1,24 @@
 //! SDK-backed implementation of [`LoginService`].
 
-use tokio::runtime::{Builder, Runtime};
-
 use dtrpg_sdk::{auth_client, config::Config};
-
 use dtrpg_ui::services::{LoginError, LoginService, LoginTokens};
+use tokio::runtime::{Builder, Runtime};
 
 use crate::constants::API_BASE_URL_ENV;
 
-/// [`LoginService`] implementation backed by the DriveThruRPG SDK auth endpoint.
+/// [`LoginService`] implementation backed by the DriveThruRPG SDK auth
+/// endpoint.
 pub struct SdkLoginService {
-    config: Config,
+    config:  Config,
     runtime: Runtime,
 }
 
 impl SdkLoginService {
     /// Creates a new `SdkLoginService`.
     ///
-    /// The API key in `config` is used only for the base URL and version; the per-request
-    /// API key is supplied at [`authenticate`][SdkLoginService::authenticate] call time.
+    /// The API key in `config` is used only for the base URL and version; the
+    /// per-request API key is supplied at
+    /// [`authenticate`][SdkLoginService::authenticate] call time.
     ///
     /// # Errors
     ///
@@ -42,11 +42,9 @@ impl LoginService for SdkLoginService {
         let key = api_key.to_string();
         self.runtime
             .block_on(auth_client::authenticate(&key, &config))
-            .map(|r| LoginTokens {
-                access_token: r.token,
-                refresh_token: r.refresh_token,
-                refresh_token_ttl: r.refresh_token_ttl,
-            })
+            .map(|r| LoginTokens { access_token:      r.token,
+                                   refresh_token:     r.refresh_token,
+                                   refresh_token_ttl: r.refresh_token_ttl, })
             .map_err(|e| LoginError(format!("Authentication failed: {e}")))
     }
 }

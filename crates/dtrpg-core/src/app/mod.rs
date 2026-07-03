@@ -1,10 +1,10 @@
 //! Application shell modules for the Rust desktop frontend.
 
+use dtrpg_ui::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, setup};
 use gpui::*;
 
-use dtrpg_ui::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, setup};
-
-/// Boots the GPUI application with keyring-backed library and collections services.
+/// Boots the GPUI application with keyring-backed library and collections
+/// services.
 pub fn run() {
     gpui_platform::application()
         .with_assets(gpui_component_assets::Assets)

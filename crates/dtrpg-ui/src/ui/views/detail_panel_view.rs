@@ -15,6 +15,7 @@ use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::tooltip::Tooltip;
+use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::enums::ItemStatus;
@@ -23,7 +24,6 @@ use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::render_generative_cover;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
-use rust_i18n::t;
 
 /// Renders the expanded detail tab's content: a large cover, title,
 /// description, actions, and metadata, filling the tab's content area.
@@ -35,13 +35,10 @@ use rust_i18n::t;
 /// Does not render a file list for multi-item entries: that requires a
 /// per-item file list data model this crate does not yet have (tracked as a
 /// known gap in the `add-rust-main-window-structure` change).
-pub fn render_detail_tab_content(
-    item: &LibraryItem,
-    storage_root_path: PathBuf,
-    entity: Entity<LibraryController>,
-    colors: &ColorTokens,
-    cover_image: Option<Arc<Image>>,
-) -> AnyElement {
+pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
+                                 entity: Entity<LibraryController>, colors: &ColorTokens,
+                                 cover_image: Option<Arc<Image>>)
+                                 -> AnyElement {
     let surface = colors.surface;
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -57,12 +54,12 @@ pub fn render_detail_tab_content(
     let cover_w = crate::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
     let cover_h = cover_w * 10.0 / 7.0;
     let cover: AnyElement = if let Some(image) = cover_image {
-        img(image)
-            .w(px(cover_w))
-            .h(px(cover_h))
-            .object_fit(ObjectFit::Cover)
-            .into_any_element()
-    } else {
+        img(image).w(px(cover_w))
+                  .h(px(cover_h))
+                  .object_fit(ObjectFit::Cover)
+                  .into_any_element()
+    }
+    else {
         render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
     };
     let cover_url = item.cover_url.clone();
@@ -267,38 +264,38 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     return t!("detail.show_in_files");
 }
 
-/// Renders a small status icon next to the item title: a checkmark when downloaded,
-/// a cloud glyph otherwise. Replaces the old text-only "Status" row in the metadata
-/// table.
+/// Renders a small status icon next to the item title: a checkmark when
+/// downloaded, a cloud glyph otherwise. Replaces the old text-only "Status" row
+/// in the metadata table.
 fn render_status_icon(is_downloaded: bool, color: gpui::Hsla) -> impl IntoElement + 'static {
     let (glyph, tooltip_text) = if is_downloaded {
         ("\u{2713}", t!("detail.status_on_device").to_string())
-    } else {
+    }
+    else {
         ("\u{2601}", t!("detail.status_in_cloud").to_string())
     };
 
-    div()
-        .id("detail-status-icon")
-        .text_sm()
-        .text_color(color)
-        .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
-        .child(glyph)
+    div().id("detail-status-icon")
+         .text_sm()
+         .text_color(color)
+         .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+         .child(glyph)
 }
 
-/// Renders a metadata value, falling back to an em dash when the underlying data is
-/// empty (e.g. the API did not report a game system/line for this item).
+/// Renders a metadata value, falling back to an em dash when the underlying
+/// data is empty (e.g. the API did not report a game system/line for this
+/// item).
 fn value_or_dash(value: &str) -> String {
     if value.trim().is_empty() {
         "\u{2014}".to_string()
-    } else {
+    }
+    else {
         value.to_string()
     }
 }
 
-fn render_metadata_table(
-    item: &LibraryItem,
-    _colors: &ColorTokens,
-) -> impl IntoElement + 'static + use<> {
+fn render_metadata_table(item: &LibraryItem, _colors: &ColorTokens)
+                         -> impl IntoElement + 'static + use<> {
     let mut list = DescriptionList::vertical()
         .columns(1)
         .bordered(false)
@@ -323,8 +320,8 @@ fn render_metadata_table(
                 .value(item.year.to_string()),
         );
 
-    // The DriveThruRPG order-product API does not always report a page count; omit the
-    // row entirely rather than showing a misleading "0".
+    // The DriveThruRPG order-product API does not always report a page count; omit
+    // the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
         list = list.child(
             DescriptionItem::new(t!("detail.field_pages").to_string())
@@ -336,11 +333,11 @@ fn render_metadata_table(
         let relative = format_relative(ts);
         let absolute = format_absolute(ts);
         let id = SharedString::from(format!("detail-added-{}", item.id));
-        let value = div()
-            .id(id)
-            .child(relative)
-            .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
-            .into_any_element();
+        let value =
+            div().id(id)
+                 .child(relative)
+                 .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
+                 .into_any_element();
         list = list.child(DescriptionItem::new(t!("detail.field_added").to_string()).value(value));
     }
 

@@ -12,46 +12,52 @@ use crate::ui::views::root_view::LibraryRootView;
 use crate::util::init::init_globals;
 use crate::util::sort::{SortDirection, SortMethod};
 
-/// Snapshot of catalog view state needed to render checkmarks in the native menu bar's
-/// View menu (presentation mode, sort field/direction, and grouping).
+/// Snapshot of catalog view state needed to render checkmarks in the native
+/// menu bar's View menu (presentation mode, sort field/direction, and
+/// grouping).
 ///
-/// Rebuilt and passed to [`build_menus`] every time the catalog view state changes, so
-/// the OS menu's checkmarks stay in sync with the toolbar/keyboard-driven selection.
+/// Rebuilt and passed to [`build_menus`] every time the catalog view state
+/// changes, so the OS menu's checkmarks stay in sync with the
+/// toolbar/keyboard-driven selection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ViewMenuState {
-    pub presentation: CatalogPresentation,
-    pub sort: SortMethod,
+    pub presentation:   CatalogPresentation,
+    pub sort:           SortMethod,
     pub sort_direction: SortDirection,
-    pub grouped: bool,
+    pub grouped:        bool,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
 ///
-/// `None` tokens mean the user is not authenticated; the factory should return a
-/// service that reflects the unauthenticated state without crashing.
+/// `None` tokens mean the user is not authenticated; the factory should return
+/// a service that reflects the unauthenticated state without crashing.
 ///
 /// Set this global before calling [`setup`].
-pub struct ServiceFactory(
-    pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService> + Send + Sync + 'static>,
-);
+pub struct ServiceFactory(pub  Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService>
+                                       + Send
+                                       + Sync
+                                       + 'static>);
 
 impl Global for ServiceFactory {}
 
 /// Holds the factory closure used to create a [`CollectionsService`] on demand.
 ///
-/// `None` tokens mean the user is not authenticated; the factory should return a
-/// service that reflects the unauthenticated state without crashing.
+/// `None` tokens mean the user is not authenticated; the factory should return
+/// a service that reflects the unauthenticated state without crashing.
 ///
 /// Set this global before calling [`setup`].
-pub struct CollectionsServiceFactory(
-    pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn CollectionsService> + Send + Sync + 'static>,
-);
+pub struct CollectionsServiceFactory(pub  Box<dyn Fn(Option<LoginTokens>)
+                                                     -> Box<dyn CollectionsService>
+                                                  + Send
+                                                  + Sync
+                                                  + 'static>);
 
 impl Global for CollectionsServiceFactory {}
 
 /// Holds the factory closure used to create a [`LoginService`] on demand.
 ///
-/// Used by [`SettingsController`] to authenticate the user from the Account tab.
+/// Used by [`SettingsController`] to authenticate the user from the Account
+/// tab.
 pub struct LoginServiceFactory(pub Box<dyn Fn() -> Box<dyn LoginService> + Send + Sync + 'static>);
 
 impl Global for LoginServiceFactory {}
@@ -59,11 +65,13 @@ impl Global for LoginServiceFactory {}
 /// Opens the library window in the unauthenticated state.
 ///
 /// The window opens immediately. If `startup_api_key` is `Some`, the root view
-/// kicks off a background re-authentication and transitions to authenticated on success.
+/// kicks off a background re-authentication and transitions to authenticated on
+/// success.
 ///
 /// # Panics
 ///
-/// Panics if the window cannot be opened or if `ServiceFactory` has not been set.
+/// Panics if the window cannot be opened or if `ServiceFactory` has not been
+/// set.
 #[allow(clippy::expect_used)]
 pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(None);
@@ -89,13 +97,13 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 
 /// Initializes the GPUI application and routes to the login or library window.
 ///
-/// Checks the platform keyring for a stored API key. Opens the library window when
-/// credentials are found; falls back to the login window otherwise.
+/// Checks the platform keyring for a stored API key. Opens the library window
+/// when credentials are found; falls back to the login window otherwise.
 pub fn setup(cx: &mut App) {
     init(cx);
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-        theme.font_family = "Hoefler Text".into();
-    });
+          theme.font_family = "Hoefler Text".into();
+      });
     init_globals(cx);
 
     // Sync gpui-component's table colors (DataTable/Table) with the active Libri
@@ -103,42 +111,40 @@ pub fn setup(cx: &mut App) {
     // light table colors regardless of which Libri theme is active.
     let initial_colors = cx.global::<crate::data::theme::LibriTheme>().colors.clone();
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-        crate::data::theme::apply_table_colors(theme, &initial_colors);
-    });
+          crate::data::theme::apply_table_colors(theme, &initial_colors);
+      });
 
     // Key bindings
-    cx.bind_keys([
-        KeyBinding::new("cmd-q", Quit, None),
-        KeyBinding::new("cmd-,", ShowSettings, None),
-        KeyBinding::new("cmd-h", HideApplication, None),
-        KeyBinding::new("alt-cmd-h", HideOthers, None),
-        KeyBinding::new("cmd-m", Minimize, None),
-        KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
-    ]);
+    cx.bind_keys([KeyBinding::new("cmd-q", Quit, None),
+                  KeyBinding::new("cmd-,", ShowSettings, None),
+                  KeyBinding::new("cmd-h", HideApplication, None),
+                  KeyBinding::new("alt-cmd-h", HideOthers, None),
+                  KeyBinding::new("cmd-m", Minimize, None),
+                  KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None)]);
 
     // App-level action handlers
     cx.on_action::<Quit>(|_, cx| cx.quit());
     cx.on_action::<HideApplication>(|_, cx| cx.hide());
     cx.on_action::<HideOthers>(|_, cx| cx.hide_other_apps());
-    // The real handler lives on `LibraryRootView` (opens the About dialog). This is a
-    // harmless fallback in case the action fires before any window has focus.
+    // The real handler lives on `LibraryRootView` (opens the About dialog). This is
+    // a harmless fallback in case the action fires before any window has focus.
     cx.on_action::<About>(|_, _cx| {});
     cx.on_action::<Minimize>(|_, cx| {
-        if let Some(win) = cx.active_window() {
-            win.update(cx, |_, window, _| window.minimize_window()).ok();
-        }
-    });
+          if let Some(win) = cx.active_window() {
+              win.update(cx, |_, window, _| window.minimize_window()).ok();
+          }
+      });
     cx.on_action::<Zoom>(|_, cx| {
-        if let Some(win) = cx.active_window() {
-            win.update(cx, |_, window, _| window.zoom_window()).ok();
-        }
-    });
+          if let Some(win) = cx.active_window() {
+              win.update(cx, |_, window, _| window.zoom_window()).ok();
+          }
+      });
     cx.on_action::<ToggleFullscreen>(|_, cx| {
-        if let Some(win) = cx.active_window() {
-            win.update(cx, |_, window, _| window.toggle_fullscreen())
-                .ok();
-        }
-    });
+          if let Some(win) = cx.active_window() {
+              win.update(cx, |_, window, _| window.toggle_fullscreen())
+                 .ok();
+          }
+      });
 
     // Menu bar
     cx.set_menus(build_menus(&ViewMenuState::default()));
@@ -161,18 +167,16 @@ pub fn setup(cx: &mut App) {
 /// Presentation and Sort submenus (and the Group toggle) based on `state`.
 ///
 /// `cx.set_menus` replaces the entire menu bar on every call, so this must
-/// reconstruct the whole bar rather than just the affected submenus. Called once at
-/// startup with the default state, and again by `LibraryRootView` whenever the
-/// catalog's presentation/sort/grouping changes, so the OS menu's checkmarks track
-/// the toolbar's current selection.
+/// reconstruct the whole bar rather than just the affected submenus. Called
+/// once at startup with the default state, and again by `LibraryRootView`
+/// whenever the catalog's presentation/sort/grouping changes, so the OS menu's
+/// checkmarks track the toolbar's current selection.
 pub fn build_menus(state: &ViewMenuState) -> Vec<Menu> {
     // Column-header clicks produce `SortMethod::Custom { col_key }` rather than the
     // named variants the menu offers; map each back to the menu item it corresponds
     // to so the checkmark still tracks column-driven sorts.
     let normalized_sort = match state.sort {
-        SortMethod::Custom {
-            col_key: "publisher",
-        } => Some(SortMethod::Publisher),
+        SortMethod::Custom { col_key: "publisher", } => Some(SortMethod::Publisher),
         SortMethod::Custom { col_key: "added" } => Some(SortMethod::DateAdded),
         SortMethod::Custom { col_key: "pages" } => Some(SortMethod::PageCount),
         SortMethod::Custom { .. } => None,

@@ -1,5 +1,10 @@
 //! Library UI state and interaction controller.
 
+use std::collections::{HashSet, VecDeque};
+use std::sync::Arc;
+
+use gpui::{BorrowAppContext, Context, Entity};
+
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_cache_metadata, load_catalog_cache, save_catalog_cache};
 use crate::data::collection::CollectionEntry;
@@ -20,203 +25,206 @@ use crate::util::matching::*;
 use crate::util::publisher::*;
 use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
-use gpui::{BorrowAppContext, Context, Entity};
-use std::collections::{HashSet, VecDeque};
-use std::sync::Arc;
 
-// ── LibraryController ─────────────────────────────────────────────────────────
+// ── LibraryController
+// ─────────────────────────────────────────────────────────
 
 /// Snapshot of all data needed by the root view for a single render pass.
 pub struct LibrarySnapshot {
-    pub filter: SidebarFilter,
-    pub counts: SectionCounts,
-    pub publishers: Vec<PublisherEntry>,
-    pub collections: Vec<CollectionEntry>,
+    pub filter:                  SidebarFilter,
+    pub counts:                  SectionCounts,
+    pub publishers:              Vec<PublisherEntry>,
+    pub collections:             Vec<CollectionEntry>,
     /// True once the initial collections fetch for the current session has
     /// completed; the sidebar shows "?" for the collection count until then.
-    pub collections_loaded: bool,
-    /// All numeric product IDs in the full catalog; used by the sidebar to compute
-    /// per-collection resolved item counts.
-    pub catalog_ids: HashSet<u64>,
+    pub collections_loaded:      bool,
+    /// All numeric product IDs in the full catalog; used by the sidebar to
+    /// compute per-collection resolved item counts.
+    pub catalog_ids:             HashSet<u64>,
     /// Total items in the full catalog (no filter, no search).
-    pub total_count: usize,
-    pub total_mb: f64,
+    pub total_count:             usize,
+    pub total_mb:                f64,
     /// Items matching the active sidebar filter but ignoring the search query.
-    pub filter_count: usize,
+    pub filter_count:            usize,
     /// Items matching both the active sidebar filter and the search query.
-    pub matched_count: usize,
-    pub search_query: String,
-    pub sort: SortMethod,
-    pub sort_direction: SortDirection,
-    pub grouped: bool,
-    pub presentation: CatalogPresentation,
-    pub selected_item: Option<LibraryItem>,
-    pub items: Vec<LibraryItem>,
-    pub catalog_loading: bool,
-    pub current_page: usize,
-    pub page_size: usize,
-    pub total_pages: usize,
+    pub matched_count:           usize,
+    pub search_query:            String,
+    pub sort:                    SortMethod,
+    pub sort_direction:          SortDirection,
+    pub grouped:                 bool,
+    pub presentation:            CatalogPresentation,
+    pub selected_item:           Option<LibraryItem>,
+    pub items:                   Vec<LibraryItem>,
+    pub catalog_loading:         bool,
+    pub current_page:            usize,
+    pub page_size:               usize,
+    pub total_pages:             usize,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
-    pub publisher_search_open: bool,
+    pub publisher_search_open:   bool,
     /// Publishers section search filter text. Session-only; never persisted.
-    pub publisher_search_query: String,
+    pub publisher_search_query:  String,
     /// Whether the collections section's inline search bar is expanded.
     /// Session-only; never persisted.
-    pub collection_search_open: bool,
+    pub collection_search_open:  bool,
     /// Collections section search filter text. Session-only; never persisted.
     pub collection_search_query: String,
     /// Current width of the detail panel, in pixels.
-    pub detail_panel_width: f32,
+    pub detail_panel_width:      f32,
 }
 
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
-    vm: LibraryViewModel,
+    vm:                      LibraryViewModel,
     /// Keeps the `ActivityController` entity alive so the weak reference in
-    /// background task closures remains valid for the lifetime of this controller.
+    /// background task closures remains valid for the lifetime of this
+    /// controller.
     #[allow(dead_code)]
-    activity: Entity<ActivityController>,
+    activity:                Entity<ActivityController>,
     /// Full catalog — never filtered.
-    catalog: Vec<LibraryItem>,
+    catalog:                 Vec<LibraryItem>,
     /// Active sidebar filter.
-    pub filter: SidebarFilter,
+    pub filter:              SidebarFilter,
     /// Text search query.
-    pub search_query: String,
+    pub search_query:        String,
     /// Current sort method.
-    pub sort: SortMethod,
+    pub sort:                SortMethod,
     /// Current sort direction.
-    pub sort_direction: SortDirection,
+    pub sort_direction:      SortDirection,
     /// Whether the catalog is grouped by publisher.
-    pub grouped: bool,
+    pub grouped:             bool,
     /// Active catalog presentation mode.
-    pub presentation: CatalogPresentation,
+    pub presentation:        CatalogPresentation,
     /// The currently selected item id (for the detail panel).
-    pub selection: Selection,
+    pub selection:           Selection,
     /// Smart section counts derived from the full catalog.
-    pub section_counts: SectionCounts,
+    pub section_counts:      SectionCounts,
     /// Publisher list derived from the full catalog (count desc, name asc).
-    pub publishers: Vec<PublisherEntry>,
+    pub publishers:          Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
-    pub collections: Vec<CollectionEntry>,
-    /// True once the first `apply_collections` call has completed for the current
-    /// session. Used by the sidebar to show a "?" placeholder for the collection
-    /// count instead of a misleading `0` while the initial fetch is still in flight.
-    collections_loaded: bool,
-    /// Backing service for collections; stored so it can be replaced on sign-in.
-    collections_service: Arc<dyn CollectionsService>,
+    pub collections:         Vec<CollectionEntry>,
+    /// True once the first `apply_collections` call has completed for the
+    /// current session. Used by the sidebar to show a "?" placeholder for
+    /// the collection count instead of a misleading `0` while the initial
+    /// fetch is still in flight.
+    collections_loaded:      bool,
+    /// Backing service for collections; stored so it can be replaced on
+    /// sign-in.
+    collections_service:     Arc<dyn CollectionsService>,
     /// Set of numeric product IDs belonging to the active collection filter.
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
-    pub collection_members: HashSet<u64>,
+    pub collection_members:  HashSet<u64>,
     /// Queue of `(item_id, cover_url, force_network)` triples pending thumbnail
-    /// fetches. `force_network` skips the disk cache and always re-fetches — set for
-    /// manual "Load Thumbnail"/"Refresh Thumbnails" actions, which exist specifically
-    /// to bypass a stale cached image; left `false` for automatic background loads.
-    thumbnail_queue: VecDeque<(Arc<str>, Arc<str>, bool)>,
+    /// fetches. `force_network` skips the disk cache and always re-fetches —
+    /// set for manual "Load Thumbnail"/"Refresh Thumbnails" actions, which
+    /// exist specifically to bypass a stale cached image; left `false` for
+    /// automatic background loads.
+    thumbnail_queue:         VecDeque<(Arc<str>, Arc<str>, bool)>,
     /// Whether a thumbnail fetch is currently in flight.
-    thumbnail_loading: bool,
+    thumbnail_loading:       bool,
     /// Activity id for the aggregated thumbnail loading entry.
-    thumbnail_activity_id: Option<u64>,
-    /// Number of thumbnails processed (successes and failures both count) in the
-    /// current batch. Reset to `0` whenever a new aggregated activity item starts.
-    /// Together with the live queue length this gives a real, monotonically
-    /// advancing progress fraction — `processed / (processed + queue.len())` —
-    /// instead of an indeterminate placeholder.
-    thumbnail_processed: usize,
+    thumbnail_activity_id:   Option<u64>,
+    /// Number of thumbnails processed (successes and failures both count) in
+    /// the current batch. Reset to `0` whenever a new aggregated activity
+    /// item starts. Together with the live queue length this gives a real,
+    /// monotonically advancing progress fraction — `processed / (processed
+    /// + queue.len())` — instead of an indeterminate placeholder.
+    thumbnail_processed:     usize,
     /// True from startup until the first `set_catalog` call completes.
-    catalog_loading: bool,
-    /// Incremented each time [`start_load_inner`](Self::start_load_inner) starts a new
-    /// load attempt. Background tasks from a superseded load compare their captured
-    /// generation against the current value before writing catalog state, so a load
-    /// started before a `clear_and_reload` cannot clobber it after the fact.
-    load_generation: u64,
+    catalog_loading:         bool,
+    /// Incremented each time [`start_load_inner`](Self::start_load_inner)
+    /// starts a new load attempt. Background tasks from a superseded load
+    /// compare their captured generation against the current value before
+    /// writing catalog state, so a load started before a `clear_and_reload`
+    /// cannot clobber it after the fact.
+    load_generation:         u64,
     /// 1-based current page index.
-    pub current_page: usize,
+    pub current_page:        usize,
     /// Number of items per page. One of: 10, 25, 50, 100, 200.
-    pub page_size: usize,
+    pub page_size:           usize,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
-    items_cache: Option<Vec<LibraryItem>>,
+    items_cache:             Option<Vec<LibraryItem>>,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
-    publisher_search_open: bool,
+    publisher_search_open:   bool,
     /// Publishers section search filter text. Session-only; never persisted.
-    publisher_search_query: String,
+    publisher_search_query:  String,
     /// Whether the collections section's inline search bar is expanded.
     /// Session-only; never persisted.
-    collection_search_open: bool,
+    collection_search_open:  bool,
     /// Collections section search filter text. Session-only; never persisted.
     collection_search_query: String,
-    /// Current width of the detail panel, in pixels. Session-only; never persisted to disk.
-    detail_panel_width: f32,
+    /// Current width of the detail panel, in pixels. Session-only; never
+    /// persisted to disk.
+    detail_panel_width:      f32,
 }
 
 impl LibraryController {
-    /// Creates a controller and immediately schedules catalog loading on a background thread.
+    /// Creates a controller and immediately schedules catalog loading on a
+    /// background thread.
     ///
-    /// The controller starts in the `Loading` pane state with an empty catalog. When the
-    /// background fetch completes, [`apply_load_result`] is called and [`LibraryChanged`] emitted.
+    /// The controller starts in the `Loading` pane state with an empty catalog.
+    /// When the background fetch completes, [`apply_load_result`] is called
+    /// and [`LibraryChanged`] emitted.
     ///
     /// # Panics
     ///
     /// Does not panic; service errors are reflected in [`pane_state`].
-    pub fn new(
-        service: Box<dyn LibraryService>,
-        collections_service: Box<dyn CollectionsService>,
-        activity: Entity<ActivityController>,
-        cx: &mut Context<Self>,
-    ) -> Self {
+    pub fn new(service: Box<dyn LibraryService>,
+               collections_service: Box<dyn CollectionsService>,
+               activity: Entity<ActivityController>, cx: &mut Context<Self>)
+               -> Self {
         let vm = LibraryViewModel::new(service);
 
-        let mut ctrl = Self {
-            vm,
-            activity,
-            catalog: Vec::new(),
-            filter: SidebarFilter::default(),
-            search_query: String::new(),
-            sort: SortMethod::default(),
-            sort_direction: SortDirection::default(),
-            grouped: false,
-            presentation: CatalogPresentation::default(),
-            selection: Selection::default(),
-            section_counts: SectionCounts::default(),
-            publishers: Vec::new(),
-            collections: Vec::new(),
-            collections_loaded: false,
-            collections_service: Arc::from(collections_service),
-            collection_members: HashSet::new(),
-            thumbnail_queue: VecDeque::new(),
-            thumbnail_loading: false,
-            thumbnail_activity_id: None,
-            thumbnail_processed: 0,
-            catalog_loading: true,
-            load_generation: 0,
-            current_page: 1,
-            page_size: crate::data::ui_prefs::UiPrefs::load()
-                .page_size()
-                .unwrap_or(25),
-            items_cache: None,
-            publisher_search_open: false,
-            publisher_search_query: String::new(),
-            collection_search_open: false,
-            collection_search_query: String::new(),
-            detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-        };
+        let mut ctrl = Self { vm,
+                              activity,
+                              catalog: Vec::new(),
+                              filter: SidebarFilter::default(),
+                              search_query: String::new(),
+                              sort: SortMethod::default(),
+                              sort_direction: SortDirection::default(),
+                              grouped: false,
+                              presentation: CatalogPresentation::default(),
+                              selection: Selection::default(),
+                              section_counts: SectionCounts::default(),
+                              publishers: Vec::new(),
+                              collections: Vec::new(),
+                              collections_loaded: false,
+                              collections_service: Arc::from(collections_service),
+                              collection_members: HashSet::new(),
+                              thumbnail_queue: VecDeque::new(),
+                              thumbnail_loading: false,
+                              thumbnail_activity_id: None,
+                              thumbnail_processed: 0,
+                              catalog_loading: true,
+                              load_generation: 0,
+                              current_page: 1,
+                              page_size: crate::data::ui_prefs::UiPrefs::load().page_size()
+                                                                               .unwrap_or(25),
+                              items_cache: None,
+                              publisher_search_open: false,
+                              publisher_search_query: String::new(),
+                              collection_search_open: false,
+                              collection_search_query: String::new(),
+                              detail_panel_width:
+                                  crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH };
         ctrl.start_load(cx);
         ctrl
     }
 
-    /// Spawns a background task to load the catalog from cache then optionally from the live API.
+    /// Spawns a background task to load the catalog from cache then optionally
+    /// from the live API.
     ///
-    /// When `force_reload` is true the auto-load policy is bypassed and a full live
-    /// fetch always runs. When false, the fetch is skipped if the cache is non-empty
-    /// and was written within the last 7 days.
+    /// When `force_reload` is true the auto-load policy is bypassed and a full
+    /// live fetch always runs. When false, the fetch is skipped if the
+    /// cache is non-empty and was written within the last 7 days.
     ///
-    /// Pages are delivered via an mpsc channel so each page triggers a UI update
-    /// before the next page arrives.
+    /// Pages are delivered via an mpsc channel so each page triggers a UI
+    /// update before the next page arrives.
     fn start_load(&mut self, cx: &mut Context<Self>) {
         self.start_load_inner(cx, false);
     }
@@ -487,10 +495,11 @@ impl LibraryController {
         .detach();
     }
 
-    /// Atomically replaces the catalog with a complete dataset and recomputes derived state.
+    /// Atomically replaces the catalog with a complete dataset and recomputes
+    /// derived state.
     ///
-    /// Used after all live SDK pages have been collected so the UI transitions from
-    /// cached data to the full live set in one render pass.
+    /// Used after all live SDK pages have been collected so the UI transitions
+    /// from cached data to the full live set in one render pass.
     fn set_catalog(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog = items;
@@ -501,9 +510,11 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    /// Appends a page of items received incrementally from the background load task.
+    /// Appends a page of items received incrementally from the background load
+    /// task.
     ///
-    /// Used only for the initial disk-cache pre-population, not for live SDK pages.
+    /// Used only for the initial disk-cache pre-population, not for live SDK
+    /// pages.
     fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog.extend(items);
@@ -513,14 +524,14 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    /// Spawns a background task to fetch product lists from the API and apply them.
+    /// Spawns a background task to fetch product lists from the API and apply
+    /// them.
     pub fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
         let cache_root = cache_dir();
         let weak_activity = self.activity.downgrade();
-        let activity_id = self
-            .activity
-            .update(cx, |a, cx| a.start("Loading collections\u{2026}", None, cx));
+        let activity_id = self.activity
+                              .update(cx, |a, cx| a.start("Loading collections\u{2026}", None, cx));
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
             let result = async_cx
@@ -582,12 +593,11 @@ impl LibraryController {
         // in case the filter was set before the collections loaded.
         if let SidebarFilter::Collection(id, _) = &self.filter {
             let id = *id;
-            self.collection_members = self
-                .collections
-                .iter()
-                .find(|c| c.id == id)
-                .map(|c| c.member_ids.iter().copied().collect())
-                .unwrap_or_default();
+            self.collection_members = self.collections
+                                          .iter()
+                                          .find(|c| c.id == id)
+                                          .map(|c| c.member_ids.iter().copied().collect())
+                                          .unwrap_or_default();
         }
         cx.emit(LibraryChanged);
     }
@@ -597,16 +607,14 @@ impl LibraryController {
         self.vm.pane_state()
     }
 
-    /// Replaces the backing services and triggers a fresh catalog and collections load.
+    /// Replaces the backing services and triggers a fresh catalog and
+    /// collections load.
     ///
     /// Clears the activity panel so stale error messages from the previous
     /// (unauthenticated) service do not persist after sign-in.
-    pub fn replace_service(
-        &mut self,
-        service: Box<dyn LibraryService>,
-        collections_service: Box<dyn CollectionsService>,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn replace_service(&mut self, service: Box<dyn LibraryService>,
+                           collections_service: Box<dyn CollectionsService>,
+                           cx: &mut Context<Self>) {
         tracing::debug!("replace_service: installing authenticated services");
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
@@ -628,44 +636,43 @@ impl LibraryController {
 
     /// Starts a background task to create a new collection with the given name.
     ///
-    /// Tracks progress in the activity panel. On success the new entry is appended
-    /// and [`LibraryChanged`] is emitted. On failure [`CollectionCreateFailed`] is
-    /// emitted so the window can push an error notification.
+    /// Tracks progress in the activity panel. On success the new entry is
+    /// appended and [`LibraryChanged`] is emitted. On failure
+    /// [`CollectionCreateFailed`] is emitted so the window can push an
+    /// error notification.
     pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
         let label = format!("Creating collection '{name}'...");
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.create_collection(&name) })
-                .await;
+              let result =
+                  async_cx.background_executor()
+                          .spawn(async move { collections_service.create_collection(&name) })
+                          .await;
 
-            match result {
-                Ok(entry) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.collections.push(entry);
-                        ctrl.activity
-                            .update(cx, |a, cx| a.complete(activity_id, cx));
-                        cx.emit(LibraryChanged);
-                    })
-                    .ok();
-                }
-                Err(e) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.activity.update(cx, |a, cx| {
-                            a.error(activity_id, e.to_string(), cx);
-                        });
-                        cx.emit(CollectionCreateFailed {
-                            message: e.message.clone(),
-                        });
-                    })
-                    .ok();
-                }
-            }
-        })
-        .detach();
+              match result {
+                  Ok(entry) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.collections.push(entry);
+                              ctrl.activity
+                                  .update(cx, |a, cx| a.complete(activity_id, cx));
+                              cx.emit(LibraryChanged);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.activity.update(cx, |a, cx| {
+                                               a.error(activity_id, e.to_string(), cx);
+                                           });
+                              cx.emit(CollectionCreateFailed { message: e.message.clone(), });
+                          })
+                          .ok();
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Forces a full live catalog fetch, bypassing the auto-load policy.
@@ -677,18 +684,20 @@ impl LibraryController {
         self.start_load_inner(cx, true);
     }
 
-    /// Drops the in-memory catalog and collections, then forces a full live fetch.
+    /// Drops the in-memory catalog and collections, then forces a full live
+    /// fetch.
     ///
     /// Used after the on-disk app cache has been cleared, so stale content
     /// disappears from the UI immediately instead of lingering until an
     /// unrelated reload repopulates it from what is now a missing cache file.
     ///
-    /// Any catalog load already in flight is superseded: `start_load_inner` bumps
-    /// `load_generation`, so the older task's completion is discarded rather than
-    /// clobbering the fresh reload triggered here. Queued-but-not-yet-started
-    /// thumbnail fetches are dropped too; a fetch already in flight still completes
-    /// and populates `CoverCache`, which is harmless since it only caches an image
-    /// for a URL that may no longer be visible.
+    /// Any catalog load already in flight is superseded: `start_load_inner`
+    /// bumps `load_generation`, so the older task's completion is discarded
+    /// rather than clobbering the fresh reload triggered here.
+    /// Queued-but-not-yet-started thumbnail fetches are dropped too; a
+    /// fetch already in flight still completes and populates `CoverCache`,
+    /// which is harmless since it only caches an image for a URL that may
+    /// no longer be visible.
     pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
         self.catalog.clear();
         self.collections.clear();
@@ -703,7 +712,7 @@ impl LibraryController {
         // `drain_thumbnail_queue`'s empty-queue completion branch — without this, the
         // aggregated activity item would be left showing "in progress" indefinitely.
         if !self.thumbnail_loading
-            && let Some(id) = self.thumbnail_activity_id.take()
+           && let Some(id) = self.thumbnail_activity_id.take()
         {
             self.thumbnail_processed = 0;
             self.activity.update(cx, |a, cx| a.complete(id, cx));
@@ -711,52 +720,55 @@ impl LibraryController {
         self.reload_catalog(cx);
     }
 
-    /// Emits `LibraryChanged` to trigger a UI re-render without modifying state.
+    /// Emits `LibraryChanged` to trigger a UI re-render without modifying
+    /// state.
     ///
-    /// Used by sidebar section headers to force a re-render after persisting UI prefs.
+    /// Used by sidebar section headers to force a re-render after persisting UI
+    /// prefs.
     pub fn notify_ui_change(&mut self, cx: &mut Context<Self>) {
         cx.emit(LibraryChanged);
     }
 
-    /// Deletes the collection with the given id via the service, then removes it locally.
+    /// Deletes the collection with the given id via the service, then removes
+    /// it locally.
     ///
-    /// Logs failures to the activity panel and leaves the collection in place on error.
+    /// Logs failures to the activity panel and leaves the collection in place
+    /// on error.
     pub fn delete_collection(&mut self, id: u64, cx: &mut Context<Self>) {
         let label = "Deleting collection\u{2026}".to_string();
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.delete_collection(id) })
-                .await;
-            match result {
-                Ok(()) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.collections.retain(|c| c.id != id);
-                        if let SidebarFilter::Collection(cid, _) = &ctrl.filter
-                            && *cid == id
-                        {
-                            ctrl.filter = SidebarFilter::default();
-                            ctrl.collection_members.clear();
-                        }
-                        ctrl.activity
-                            .update(cx, |a, cx| a.complete(activity_id, cx));
-                        cx.emit(LibraryChanged);
-                    })
-                    .ok();
-                }
-                Err(e) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.activity.update(cx, |a, cx| {
-                            a.error(activity_id, e.to_string(), cx);
-                        });
-                    })
-                    .ok();
-                }
-            }
-        })
-        .detach();
+              let result = async_cx.background_executor()
+                                   .spawn(async move { collections_service.delete_collection(id) })
+                                   .await;
+              match result {
+                  Ok(()) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.collections.retain(|c| c.id != id);
+                              if let SidebarFilter::Collection(cid, _) = &ctrl.filter
+                                 && *cid == id
+                              {
+                                  ctrl.filter = SidebarFilter::default();
+                                  ctrl.collection_members.clear();
+                              }
+                              ctrl.activity
+                                  .update(cx, |a, cx| a.complete(activity_id, cx));
+                              cx.emit(LibraryChanged);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.activity.update(cx, |a, cx| {
+                                               a.error(activity_id, e.to_string(), cx);
+                                           });
+                          })
+                          .ok();
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Reloads catalog from the service and resets selection.
@@ -778,18 +790,18 @@ impl LibraryController {
     fn enqueue_thumbnails(&mut self, items: &[LibraryItem], cx: &mut Context<Self>) {
         let to_enqueue: Vec<(Arc<str>, Arc<str>)> = {
             let cache = cx.global::<CoverCache>();
-            items
-                .iter()
-                .filter_map(|item| {
-                    let url = item.cover_url.as_ref()?;
-                    let id = Arc::clone(&item.id);
-                    if cache.get(&id).is_none() && !cache.is_in_flight(&id) {
-                        Some((id, Arc::clone(url)))
-                    } else {
-                        None
-                    }
-                })
-                .collect()
+            items.iter()
+                 .filter_map(|item| {
+                     let url = item.cover_url.as_ref()?;
+                     let id = Arc::clone(&item.id);
+                     if cache.get(&id).is_none() && !cache.is_in_flight(&id) {
+                         Some((id, Arc::clone(url)))
+                     }
+                     else {
+                         None
+                     }
+                 })
+                 .collect()
         };
         for (id, url) in &to_enqueue {
             cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(id));
@@ -804,7 +816,8 @@ impl LibraryController {
         if self.thumbnail_loading || self.thumbnail_queue.is_empty() {
             return;
         }
-        let Some((item_id, url, force_network)) = self.thumbnail_queue.pop_front() else {
+        let Some((item_id, url, force_network)) = self.thumbnail_queue.pop_front()
+        else {
             return;
         };
 
@@ -812,10 +825,10 @@ impl LibraryController {
 
         let activity_id = if let Some(id) = self.thumbnail_activity_id {
             id
-        } else {
-            let id = self
-                .activity
-                .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", None, cx));
+        }
+        else {
+            let id = self.activity
+                         .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", None, cx));
             self.thumbnail_activity_id = Some(id);
             self.thumbnail_processed = 0;
             id
@@ -825,140 +838,145 @@ impl LibraryController {
         let url_str = url.to_string();
 
         cx.spawn(async move |this, async_cx| {
-            // gpui's executors are not a Tokio runtime, and `dtrpg-ui` does not depend on
-            // `tokio` directly, so the async `reqwest::get(...).await` used here previously
-            // had no reactor to run on and always failed. `reqwest::blocking` manages its
-            // own internal runtime per call and works from a plain OS thread, matching the
-            // pattern the SDK gateway already uses (`tokio::runtime::Runtime::block_on`) to
-            // run network calls from these same background-executor threads.
-            //
-            // Disk-cache-first: the in-memory `CoverCache` is always empty at startup, so
-            // without a persistent disk cache every launch would re-download every cover
-            // from the network. Check disk before hitting the network, and persist a fresh
-            // network fetch to disk so the next launch is a cache hit.
-            let fetch_url = url_str.clone();
-            let disk_key = Arc::clone(&item_id);
-            let result: Result<Vec<u8>, String> = async_cx
-                .background_executor()
-                .spawn(async move {
-                    let covers_root = covers_dir();
-                    if !force_network
-                        && let Some(bytes) = load_cached_cover(&covers_root, &disk_key)
-                    {
-                        return Ok(bytes);
-                    }
-                    let resp = reqwest::blocking::get(&fetch_url).map_err(|e| e.to_string())?;
-                    let bytes = resp.bytes().map_err(|e| e.to_string())?.to_vec();
-                    save_cached_cover(&covers_root, &disk_key, &bytes);
-                    Ok(bytes)
-                })
-                .await;
+              // gpui's executors are not a Tokio runtime, and `dtrpg-ui` does not depend on
+              // `tokio` directly, so the async `reqwest::get(...).await` used here previously
+              // had no reactor to run on and always failed. `reqwest::blocking` manages its
+              // own internal runtime per call and works from a plain OS thread, matching the
+              // pattern the SDK gateway already uses (`tokio::runtime::Runtime::block_on`) to
+              // run network calls from these same background-executor threads.
+              //
+              // Disk-cache-first: the in-memory `CoverCache` is always empty at startup, so
+              // without a persistent disk cache every launch would re-download every cover
+              // from the network. Check disk before hitting the network, and persist a fresh
+              // network fetch to disk so the next launch is a cache hit.
+              let fetch_url = url_str.clone();
+              let disk_key = Arc::clone(&item_id);
+              let result: Result<Vec<u8>, String> =
+                  async_cx.background_executor()
+                          .spawn(async move {
+                              let covers_root = covers_dir();
+                              if !force_network
+                                 && let Some(bytes) = load_cached_cover(&covers_root, &disk_key)
+                              {
+                                  return Ok(bytes);
+                              }
+                              let resp =
+                                  reqwest::blocking::get(&fetch_url).map_err(|e| e.to_string())?;
+                              let bytes = resp.bytes().map_err(|e| e.to_string())?.to_vec();
+                              save_cached_cover(&covers_root, &disk_key, &bytes);
+                              Ok(bytes)
+                          })
+                          .await;
 
-            match result {
-                Ok(bytes) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        cx.global_mut::<CoverCache>()
-                            .insert(Arc::clone(&item_id), bytes);
-                        if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
-                            item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
-                        }
-                        ctrl.invalidate_cache();
-                        ctrl.thumbnail_loading = false;
-                        cx.emit(LibraryChanged);
-                        ctrl.drain_thumbnail_queue(cx);
-                    })
-                    .ok();
-                }
-                Err(e) => {
-                    tracing::warn!(url = %url_str, error = %e, "thumbnail fetch failed");
-                    this.update(async_cx, |ctrl, cx| {
-                        cx.global_mut::<CoverCache>().in_flight.remove(&item_id);
-                        if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id) {
-                            item.thumbnail_last_attempted = Some(std::time::SystemTime::now());
-                        }
-                        ctrl.invalidate_cache();
-                        ctrl.thumbnail_loading = false;
-                        ctrl.drain_thumbnail_queue(cx);
-                    })
-                    .ok();
-                }
-            }
+              match result {
+                  Ok(bytes) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              cx.global_mut::<CoverCache>()
+                                .insert(Arc::clone(&item_id), bytes);
+                              if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id)
+                              {
+                                  item.thumbnail_last_attempted =
+                                      Some(std::time::SystemTime::now());
+                              }
+                              ctrl.invalidate_cache();
+                              ctrl.thumbnail_loading = false;
+                              cx.emit(LibraryChanged);
+                              ctrl.drain_thumbnail_queue(cx);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
+                      tracing::warn!(url = %url_str, error = %e, "thumbnail fetch failed");
+                      this.update(async_cx, |ctrl, cx| {
+                              cx.global_mut::<CoverCache>().in_flight.remove(&item_id);
+                              if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id)
+                              {
+                                  item.thumbnail_last_attempted =
+                                      Some(std::time::SystemTime::now());
+                              }
+                              ctrl.invalidate_cache();
+                              ctrl.thumbnail_loading = false;
+                              ctrl.drain_thumbnail_queue(cx);
+                          })
+                          .ok();
+                  }
+              }
 
-            // Count this attempt (success or failure) toward the batch total so the
-            // progress bar reflects real throughput instead of sitting indeterminate.
-            let (processed, remaining) = this
-                .update(async_cx, |ctrl, _cx| {
-                    ctrl.thumbnail_processed += 1;
-                    (ctrl.thumbnail_processed, ctrl.thumbnail_queue.len())
-                })
-                .unwrap_or((0, 0));
+              // Count this attempt (success or failure) toward the batch total so the
+              // progress bar reflects real throughput instead of sitting indeterminate.
+              let (processed, remaining) = this.update(async_cx, |ctrl, _cx| {
+                                                   ctrl.thumbnail_processed += 1;
+                                                   (ctrl.thumbnail_processed,
+                                                    ctrl.thumbnail_queue.len())
+                                               })
+                                               .unwrap_or((0, 0));
 
-            if remaining == 0 {
-                weak_activity
-                    .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                    .ok();
-                this.update(async_cx, |ctrl, _cx| {
-                    ctrl.thumbnail_activity_id = None;
-                    ctrl.thumbnail_processed = 0;
-                })
-                .ok();
-            } else {
-                let label = format!("Loading thumbnails\u{2026} ({remaining} remaining)");
-                let total = (processed + remaining) as f32;
-                let progress = if total > 0.0 {
-                    processed as f32 / total
-                } else {
-                    0.0
-                };
-                weak_activity
-                    .update(async_cx, |a, cx| {
-                        a.update_label(activity_id, label, cx);
-                        a.update_progress(activity_id, progress, cx);
-                    })
-                    .ok();
-            }
-        })
-        .detach();
+              if remaining == 0 {
+                  weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                               .ok();
+                  this.update(async_cx, |ctrl, _cx| {
+                          ctrl.thumbnail_activity_id = None;
+                          ctrl.thumbnail_processed = 0;
+                      })
+                      .ok();
+              }
+              else {
+                  let label = format!("Loading thumbnails\u{2026} ({remaining} remaining)");
+                  let total = (processed + remaining) as f32;
+                  let progress = if total > 0.0 {
+                      processed as f32 / total
+                  }
+                  else {
+                      0.0
+                  };
+                  weak_activity.update(async_cx, |a, cx| {
+                                   a.update_label(activity_id, label, cx);
+                                   a.update_progress(activity_id, progress, cx);
+                               })
+                               .ok();
+              }
+          })
+          .detach();
     }
 
-    /// Enqueues a single cover URL at the front of the thumbnail queue and starts
-    /// the drain loop.  Used by the per-item "Load Thumbnail" context menu action.
+    /// Enqueues a single cover URL at the front of the thumbnail queue and
+    /// starts the drain loop.  Used by the per-item "Load Thumbnail"
+    /// context menu action.
     ///
-    /// Forces a network re-fetch bypassing both the in-memory and on-disk caches —
-    /// this action exists specifically to retry or refresh a cover, not to redundantly
-    /// reload whatever is already cached.
+    /// Forces a network re-fetch bypassing both the in-memory and on-disk
+    /// caches — this action exists specifically to retry or refresh a
+    /// cover, not to redundantly reload whatever is already cached.
     pub fn load_thumbnail(&mut self, cover_url: Arc<str>, cx: &mut Context<Self>) {
-        let item_id = self
-            .catalog
-            .iter()
-            .find(|i| i.cover_url.as_deref() == Some(&*cover_url))
-            .map(|i| Arc::clone(&i.id));
+        let item_id = self.catalog
+                          .iter()
+                          .find(|i| i.cover_url.as_deref() == Some(&*cover_url))
+                          .map(|i| Arc::clone(&i.id));
 
         if let Some(id) = item_id {
             self.thumbnail_queue.retain(|(i, _, _)| i != &id);
             cx.global_mut::<CoverCache>()
-                .mark_in_flight(Arc::clone(&id));
+              .mark_in_flight(Arc::clone(&id));
             self.thumbnail_queue.push_front((id, cover_url, true));
             self.drain_thumbnail_queue(cx);
         }
     }
 
-    /// Re-fetches thumbnails for every catalog item with a `cover_url`, overwriting
-    /// any cached image (in-memory, and on disk). Used by the "Refresh Thumbnails"
-    /// catalog menu action.
+    /// Re-fetches thumbnails for every catalog item with a `cover_url`,
+    /// overwriting any cached image (in-memory, and on disk). Used by the
+    /// "Refresh Thumbnails" catalog menu action.
     ///
-    /// Unlike [`enqueue_thumbnails`](Self::enqueue_thumbnails), this does not skip
-    /// items already present in the cache — every eligible item is re-queued with a
-    /// forced network re-fetch.
+    /// Unlike [`enqueue_thumbnails`](Self::enqueue_thumbnails), this does not
+    /// skip items already present in the cache — every eligible item is
+    /// re-queued with a forced network re-fetch.
     pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
-        let to_enqueue: Vec<(Arc<str>, Arc<str>, bool)> = self
-            .catalog
-            .iter()
-            .filter_map(|item| {
-                let url = item.cover_url.as_ref()?;
-                Some((Arc::clone(&item.id), Arc::clone(url), true))
-            })
-            .collect();
+        let to_enqueue: Vec<(Arc<str>, Arc<str>, bool)> =
+            self.catalog
+                .iter()
+                .filter_map(|item| {
+                    let url = item.cover_url.as_ref()?;
+                    Some((Arc::clone(&item.id), Arc::clone(url), true))
+                })
+                .collect();
 
         if to_enqueue.is_empty() {
             return;
@@ -981,69 +999,66 @@ impl LibraryController {
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
-        let filter_count = self
-            .catalog
-            .iter()
-            .filter(|i| item_matches_filter(i, &self.filter, &self.collection_members))
-            .count();
+        let filter_count =
+            self.catalog
+                .iter()
+                .filter(|i| item_matches_filter(i, &self.filter, &self.collection_members))
+                .count();
         let all_items = self.visible_items();
         let matched_count = all_items.len();
         let total_pages = matched_count.div_ceil(self.page_size).max(1);
         let page_start = (self.current_page - 1) * self.page_size;
-        let items: Vec<LibraryItem> = all_items
-            .into_iter()
-            .skip(page_start)
-            .take(self.page_size)
-            .collect();
+        let items: Vec<LibraryItem> = all_items.into_iter()
+                                               .skip(page_start)
+                                               .take(self.page_size)
+                                               .collect();
         let selected_item = self.selected_item().cloned();
         // Build a set of all IDs that can match collection member_ids.
         // Include both order_product_id and product_id since the product list items
         // API returns productId (not orderProductId) in its response.
-        let catalog_ids: HashSet<u64> = self
-            .catalog
-            .iter()
-            .flat_map(|i| {
-                let mut ids = Vec::with_capacity(2);
-                if i.order_product_id > 0 {
-                    ids.push(i.order_product_id);
-                }
-                if i.product_id > 0 {
-                    ids.push(i.product_id);
-                }
-                ids
-            })
-            .collect();
-        LibrarySnapshot {
-            filter: self.filter.clone(),
-            counts: self.section_counts,
-            publishers: self.publishers.clone(),
-            collections: self.collections.clone(),
-            collections_loaded: self.collections_loaded,
-            catalog_ids,
-            total_count: self.section_counts.all,
-            total_mb: self.total_size_mb(),
-            filter_count,
-            matched_count,
-            search_query: self.search_query.clone(),
-            sort: self.sort,
-            sort_direction: self.sort_direction,
-            grouped: self.grouped,
-            presentation: self.presentation,
-            selected_item,
-            items,
-            catalog_loading: self.catalog_loading,
-            current_page: self.current_page,
-            page_size: self.page_size,
-            total_pages,
-            publisher_search_open: self.publisher_search_open,
-            publisher_search_query: self.publisher_search_query.clone(),
-            collection_search_open: self.collection_search_open,
-            collection_search_query: self.collection_search_query.clone(),
-            detail_panel_width: self.detail_panel_width,
-        }
+        let catalog_ids: HashSet<u64> = self.catalog
+                                            .iter()
+                                            .flat_map(|i| {
+                                                let mut ids = Vec::with_capacity(2);
+                                                if i.order_product_id > 0 {
+                                                    ids.push(i.order_product_id);
+                                                }
+                                                if i.product_id > 0 {
+                                                    ids.push(i.product_id);
+                                                }
+                                                ids
+                                            })
+                                            .collect();
+        LibrarySnapshot { filter: self.filter.clone(),
+                          counts: self.section_counts,
+                          publishers: self.publishers.clone(),
+                          collections: self.collections.clone(),
+                          collections_loaded: self.collections_loaded,
+                          catalog_ids,
+                          total_count: self.section_counts.all,
+                          total_mb: self.total_size_mb(),
+                          filter_count,
+                          matched_count,
+                          search_query: self.search_query.clone(),
+                          sort: self.sort,
+                          sort_direction: self.sort_direction,
+                          grouped: self.grouped,
+                          presentation: self.presentation,
+                          selected_item,
+                          items,
+                          catalog_loading: self.catalog_loading,
+                          current_page: self.current_page,
+                          page_size: self.page_size,
+                          total_pages,
+                          publisher_search_open: self.publisher_search_open,
+                          publisher_search_query: self.publisher_search_query.clone(),
+                          collection_search_open: self.collection_search_open,
+                          collection_search_query: self.collection_search_query.clone(),
+                          detail_panel_width: self.detail_panel_width }
     }
 
-    /// Returns true while the initial catalog fetch is still in flight and no items have arrived.
+    /// Returns true while the initial catalog fetch is still in flight and no
+    /// items have arrived.
     pub fn is_loading(&self) -> bool {
         self.catalog_loading && self.catalog.is_empty()
     }
@@ -1090,15 +1105,15 @@ impl LibraryController {
     /// Called eagerly at every mutation site that changes any of those inputs
     /// so render-path accessors never re-scan the catalog.
     fn invalidate_cache(&mut self) {
-        let mut items: Vec<LibraryItem> = self
-            .catalog
-            .iter()
-            .filter(|i| {
-                item_matches_filter(i, &self.filter, &self.collection_members)
+        let mut items: Vec<LibraryItem> =
+            self.catalog
+                .iter()
+                .filter(|i| {
+                    item_matches_filter(i, &self.filter, &self.collection_members)
                     && item_matches_query(i, &self.search_query)
-            })
-            .cloned()
-            .collect();
+                })
+                .cloned()
+                .collect();
         sort_items(&mut items, self.sort, self.sort_direction);
         self.items_cache = Some(items);
     }
@@ -1130,10 +1145,9 @@ impl LibraryController {
         let items = self.visible_items();
         let abs_start = page_start + range.start;
         let abs_end = page_start + range.end;
-        items
-            .get(abs_start..abs_end)
-            .map(|s| s.to_vec())
-            .unwrap_or_default()
+        items.get(abs_start..abs_end)
+             .map(|s| s.to_vec())
+             .unwrap_or_default()
     }
 
     /// Returns all items on the current page.
@@ -1141,28 +1155,28 @@ impl LibraryController {
     pub fn visible_page_items(&self) -> Vec<LibraryItem> {
         let page_start = (self.current_page - 1) * self.page_size;
         let items = self.visible_items();
-        items
-            .into_iter()
-            .skip(page_start)
-            .take(self.page_size)
-            .collect()
+        items.into_iter()
+             .skip(page_start)
+             .take(self.page_size)
+             .collect()
     }
 
     // ── Sidebar filter mutations ──────────────────────────────────────────────
 
     /// Sets the active sidebar filter.
     ///
-    /// When the new filter is `Collection(id, _)`, `collection_members` is populated from the
-    /// matching entry's `member_ids`. For all other filters, `collection_members` is cleared.
+    /// When the new filter is `Collection(id, _)`, `collection_members` is
+    /// populated from the matching entry's `member_ids`. For all other
+    /// filters, `collection_members` is cleared.
     pub fn set_filter(&mut self, filter: SidebarFilter, cx: &mut Context<Self>) {
         if let SidebarFilter::Collection(id, _) = &filter {
-            self.collection_members = self
-                .collections
-                .iter()
-                .find(|c| c.id == *id)
-                .map(|c| c.member_ids.iter().copied().collect())
-                .unwrap_or_default();
-        } else {
+            self.collection_members = self.collections
+                                          .iter()
+                                          .find(|c| c.id == *id)
+                                          .map(|c| c.member_ids.iter().copied().collect())
+                                          .unwrap_or_default();
+        }
+        else {
             self.collection_members.clear();
         }
         self.filter = filter;
@@ -1195,7 +1209,8 @@ impl LibraryController {
     // touch the catalog cache and are intentionally session-only: closing a
     // section's search bar clears its query so reopening it always starts fresh.
 
-    /// Toggles the publishers section's inline search bar, clearing its query on close.
+    /// Toggles the publishers section's inline search bar, clearing its query
+    /// on close.
     pub fn toggle_publisher_search(&mut self, cx: &mut Context<Self>) {
         self.publisher_search_open = !self.publisher_search_open;
         if !self.publisher_search_open {
@@ -1210,7 +1225,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    /// Toggles the collections section's inline search bar, clearing its query on close.
+    /// Toggles the collections section's inline search bar, clearing its query
+    /// on close.
     pub fn toggle_collection_search(&mut self, cx: &mut Context<Self>) {
         self.collection_search_open = !self.collection_search_open;
         if !self.collection_search_open {
@@ -1272,7 +1288,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    /// Looks up a catalog item by id, independent of the current popover selection.
+    /// Looks up a catalog item by id, independent of the current popover
+    /// selection.
     ///
     /// Used to resolve the full item for an open expanded detail tab, which
     /// tracks only the item id, not a full `LibraryItem` snapshot.
@@ -1294,10 +1311,8 @@ impl LibraryController {
     ///
     /// Emits [`LibraryChanged`].
     pub fn set_detail_panel_width(&mut self, width: f32, cx: &mut Context<Self>) {
-        self.detail_panel_width = width.clamp(
-            crate::data::constants::DETAIL_PANEL_MIN_WIDTH,
-            crate::data::constants::DETAIL_PANEL_MAX_WIDTH,
-        );
+        self.detail_panel_width = width.clamp(crate::data::constants::DETAIL_PANEL_MIN_WIDTH,
+                                              crate::data::constants::DETAIL_PANEL_MAX_WIDTH);
         cx.emit(LibraryChanged);
     }
 
@@ -1331,8 +1346,8 @@ impl LibraryController {
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-            apply_table_colors(theme, &colors);
-        });
+              apply_table_colors(theme, &colors);
+          });
         cx.notify();
     }
 
@@ -1362,10 +1377,12 @@ impl LibraryController {
     }
 }
 
-/// Captures a backtrace and returns only the frames from app crates (`dtrpg_*`).
+/// Captures a backtrace and returns only the frames from app crates
+/// (`dtrpg_*`).
 ///
-/// Each retained frame is one symbol line followed by its `at file:line:col` line.
-/// Returns a hint string when `RUST_BACKTRACE` is not set or no app frames are found.
+/// Each retained frame is one symbol line followed by its `at file:line:col`
+/// line. Returns a hint string when `RUST_BACKTRACE` is not set or no app
+/// frames are found.
 fn app_backtrace() -> String {
     let bt = std::backtrace::Backtrace::capture();
     if bt.status() != std::backtrace::BacktraceStatus::Captured {
@@ -1380,31 +1397,34 @@ fn app_backtrace() -> String {
                 out.push(line);
                 take_location = false;
             }
-        } else if line.contains("dtrpg_") {
+        }
+        else if line.contains("dtrpg_") {
             out.push(line);
             take_location = true;
-        } else {
+        }
+        else {
             take_location = false;
         }
     }
     if out.is_empty() {
         "<no app frames found in backtrace>".to_string()
-    } else {
+    }
+    else {
         out.join("\n")
     }
 }
 
 // //! Library UI state and interaction controller.
 
-// use crate::app::shell::{AppCommand, AppShell, AppShellState, SessionPresentationState};
-// use crate::services::LibraryItem;
+// use crate::app::shell::{AppCommand, AppShell, AppShellState,
+// SessionPresentationState}; use crate::services::LibraryItem;
 // use crate::services::sdk::RustSdkLibraryService;
 // use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 // use crate::ui::library::model::library_data::{
-//     FilterScope, LibraryViewMode, MatchPresentation, SortMethod, TreeNode, filter_presets,
-//     grouped_items, item_matches, mode_is_grid, mode_label, next_sort, root_matches, sort_label,
-//     sorted_flat_items,
+//     FilterScope, LibraryViewMode, MatchPresentation, SortMethod, TreeNode,
+// filter_presets,     grouped_items, item_matches, mode_is_grid, mode_label,
+// next_sort, root_matches, sort_label,     sorted_flat_items,
 // };
 
 // #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1529,11 +1549,12 @@ fn app_backtrace() -> String {
 //     pub fn cycle_view_mode(&mut self) {
 //         self.view_mode = match self.view_mode {
 //             LibraryViewMode::FlatList => LibraryViewMode::TreeByPublisher,
-//             LibraryViewMode::TreeByPublisher => LibraryViewMode::TreeByProductType,
-//             LibraryViewMode::TreeByProductType => LibraryViewMode::GridByPublisher,
-//             LibraryViewMode::GridByPublisher => LibraryViewMode::GridByProductType,
-//             LibraryViewMode::GridByProductType => LibraryViewMode::FlatList,
-//         };
+//             LibraryViewMode::TreeByPublisher =>
+// LibraryViewMode::TreeByProductType,             
+// LibraryViewMode::TreeByProductType => LibraryViewMode::GridByPublisher,
+//             LibraryViewMode::GridByPublisher =>
+// LibraryViewMode::GridByProductType,             
+// LibraryViewMode::GridByProductType => LibraryViewMode::FlatList,         };
 //         self.selection = None;
 //         self.shell.dispatch(AppCommand::ClearSelection);
 //     }
@@ -1564,8 +1585,9 @@ fn app_backtrace() -> String {
 
 //     pub fn toggle_match_presentation(&mut self) {
 //         self.match_presentation = match self.match_presentation {
-//             MatchPresentation::HideNonMatching => MatchPresentation::HighlightMatching,
-//             MatchPresentation::HighlightMatching => MatchPresentation::HideNonMatching,
+//             MatchPresentation::HideNonMatching =>
+// MatchPresentation::HighlightMatching,             
+// MatchPresentation::HighlightMatching => MatchPresentation::HideNonMatching,
 //         };
 //     }
 
@@ -1617,19 +1639,19 @@ fn app_backtrace() -> String {
 
 //     pub fn mark_token_set_action(&mut self) {
 //         self.account.token_configured = true;
-//         self.account.connection_status = "Access token action selected".to_string();
-//         self.account.menu_open = false;
+//         self.account.connection_status = "Access token action
+// selected".to_string();         self.account.menu_open = false;
 //     }
 
 //     pub fn mark_token_reset_action(&mut self) {
 //         self.account.token_configured = false;
-//         self.account.connection_status = "Access token reset requested".to_string();
-//         self.account.menu_open = false;
+//         self.account.connection_status = "Access token reset
+// requested".to_string();         self.account.menu_open = false;
 //     }
 
 //     pub fn open_settings_action(&mut self) {
-//         self.account.connection_status = "Settings action selected".to_string();
-//         self.account.menu_open = false;
+//         self.account.connection_status = "Settings action
+// selected".to_string();         self.account.menu_open = false;
 //     }
 
 //     pub fn cycle_filter_query(&mut self) {
@@ -1668,9 +1690,9 @@ fn app_backtrace() -> String {
 //         self.filter_query.clear();
 //     }
 
-//     pub fn handle_global_key(&mut self, key: &str, modifiers: &gpui::Modifiers) {
-//         if modifiers.secondary() && key.eq_ignore_ascii_case("f") {
-//             self.begin_search_editing();
+//     pub fn handle_global_key(&mut self, key: &str, modifiers:
+// &gpui::Modifiers) {         if modifiers.secondary() &&
+// key.eq_ignore_ascii_case("f") {             self.begin_search_editing();
 //             return;
 //         }
 
@@ -1768,8 +1790,8 @@ fn app_backtrace() -> String {
 
 //     pub fn active_sort_summary(&self) -> String {
 //         match self.view_mode {
-//             LibraryViewMode::FlatList => format!("sort: {}", self.flat_sort_label()),
-//             _ => format!(
+//             LibraryViewMode::FlatList => format!("sort: {}",
+// self.flat_sort_label()),             _ => format!(
 //                 "outer: {}, inner: {}",
 //                 self.outer_sort_label(),
 //                 self.inner_sort_label()
@@ -1815,9 +1837,9 @@ fn app_backtrace() -> String {
 
 //     pub fn match_presentation_label(&self) -> &'static str {
 //         match self.match_presentation {
-//             MatchPresentation::HideNonMatching => "Search mode: hide non-matching",
-//             MatchPresentation::HighlightMatching => "Search mode: highlight matches",
-//         }
+//             MatchPresentation::HideNonMatching => "Search mode: hide
+// non-matching",             MatchPresentation::HighlightMatching => "Search
+// mode: highlight matches",         }
 //     }
 
 //     pub fn active_query_label(&self) -> String {
@@ -1829,11 +1851,12 @@ fn app_backtrace() -> String {
 //     }
 
 //     pub fn flat_items(&self) -> Vec<LibraryItem> {
-//         let mut items = sorted_flat_items(self.shell.items(), self.flat_sort);
+//         let mut items = sorted_flat_items(self.shell.items(),
+// self.flat_sort);
 
-//         if matches!(self.match_presentation, MatchPresentation::HideNonMatching)
-//             && !self.filter_query.is_empty()
-//         {
+//         if matches!(self.match_presentation,
+// MatchPresentation::HideNonMatching)             &&
+// !self.filter_query.is_empty()         {
 //             items.retain(|item| item_matches(item, &self.filter_query));
 //         }
 
@@ -1870,8 +1893,8 @@ fn app_backtrace() -> String {
 //                 }
 //                 FilterScope::RootAndChild => {
 //                     node.children
-//                         .retain(|item| root_hit || item_matches(item, &query));
-//                 }
+//                         .retain(|item| root_hit || item_matches(item,
+// &query));                 }
 //                 FilterScope::RootOnly => {
 //                     if !root_hit {
 //                         node.children.clear();
@@ -1922,8 +1945,8 @@ fn app_backtrace() -> String {
 //     pub fn detail_lines(&self) -> Vec<String> {
 //         match &self.selection {
 //             Some(Selection::Item(item_id)) => {
-//                 if let Some(item) = self.shell.items().iter().find(|item| item.id == *item_id) {
-//                     return vec![
+//                 if let Some(item) = self.shell.items().iter().find(|item|
+// item.id == *item_id) {                     return vec![
 //                         "Catalog item detail".to_string(),
 //                         format!("Title: {}", item.title),
 //                         format!("Publisher: {}", item.publisher),
@@ -1948,8 +1971,8 @@ fn app_backtrace() -> String {
 //                     "Publisher detail".to_string(),
 //                     format!("Publisher: {}", publisher),
 //                     format!("Items in library: {}", count),
-//                     "Publisher metadata is derived from SDK library responses.".to_string(),
-//                 ]
+//                     "Publisher metadata is derived from SDK library
+// responses.".to_string(),                 ]
 //             }
 //             Some(Selection::ProductType(product_type)) => {
 //                 let count = self
@@ -1963,11 +1986,11 @@ fn app_backtrace() -> String {
 //                     "Product type detail".to_string(),
 //                     format!("Type: {}", product_type),
 //                     format!("Items in library: {}", count),
-//                     "Suggested arrangement enabled: tree grouped by product type.".to_string(),
-//                 ]
+//                     "Suggested arrangement enabled: tree grouped by product
+// type.".to_string(),                 ]
 //             }
-//             None => vec!["Select a publisher or catalog item to view details.".to_string()],
-//         }
+//             None => vec!["Select a publisher or catalog item to view
+// details.".to_string()],         }
 //     }
 // }
 
@@ -1977,7 +2000,8 @@ fn app_backtrace() -> String {
 //     use crate::services::stub::{StubLibraryService, StubMode};
 
 //     fn make_controller() -> LibraryController {
-//         let library = LibraryViewModel::new(Box::new(StubLibraryService::new(StubMode::Seeded)));
+//         let library =
+// LibraryViewModel::new(Box::new(StubLibraryService::new(StubMode::Seeded)));
 //         let mut shell = AppShell::new(
 //             AppShellState {
 //                 session: SessionPresentationState::SignedIn,
@@ -2048,12 +2072,13 @@ fn app_backtrace() -> String {
 //         controller.mark_token_set_action();
 //         assert!(controller.account.token_configured);
 //         assert!(!controller.account.menu_open);
-//         assert!(!controller.account_summary().contains("DTRPG_ACCESS_TOKEN"));
+//         assert!(!controller.account_summary().contains("DTRPG_ACCESS_TOKEN"
+// ));
 
 //         controller.mark_token_reset_action();
 //         assert!(!controller.account.token_configured);
-//         assert!(!controller.account_summary().contains("DTRPG_ACCESS_TOKEN"));
-//     }
+//         assert!(!controller.account_summary().contains("DTRPG_ACCESS_TOKEN"
+// ));     }
 
 //     #[test]
 //     fn refresh_updates_sync_status_without_changing_browsing_state() {

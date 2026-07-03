@@ -1,4 +1,5 @@
-//! Collections cache: read and write the collection list to/from a JSON file on disk.
+//! Collections cache: read and write the collection list to/from a JSON file on
+//! disk.
 
 use std::fs;
 use std::path::Path;
@@ -9,7 +10,8 @@ use tracing::warn;
 use crate::data::collection::CollectionEntry;
 use crate::data::constants::{COLLECTIONS_CACHE_FILE, COLLECTIONS_CACHE_TMP};
 
-// ── CollectionsCacheError ─────────────────────────────────────────────────────
+// ── CollectionsCacheError
+// ─────────────────────────────────────────────────────
 
 /// Errors that can occur when writing the collections cache.
 #[derive(Debug, Error)]
@@ -22,7 +24,8 @@ pub enum CollectionsCacheError {
     Json(#[from] serde_json::Error),
 }
 
-// ── load_collections_cache ────────────────────────────────────────────────────
+// ── load_collections_cache
+// ────────────────────────────────────────────────────
 
 /// Reads the collections cache from `{root}/collections_cache.json`.
 ///
@@ -38,19 +41,19 @@ pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
         .ok()
 }
 
-// ── save_collections_cache ────────────────────────────────────────────────────
+// ── save_collections_cache
+// ────────────────────────────────────────────────────
 
-/// Writes `entries` to `{root}/collections_cache.json` atomically via a `.tmp` rename.
+/// Writes `entries` to `{root}/collections_cache.json` atomically via a `.tmp`
+/// rename.
 ///
 /// # Errors
 ///
-/// Returns [`CollectionsCacheError::Io`] if the directory cannot be created or the
-/// file cannot be written or renamed. Returns [`CollectionsCacheError::Json`] if
-/// serialization fails.
-pub fn save_collections_cache(
-    root: &Path,
-    entries: &[CollectionEntry],
-) -> Result<(), CollectionsCacheError> {
+/// Returns [`CollectionsCacheError::Io`] if the directory cannot be created or
+/// the file cannot be written or renamed. Returns
+/// [`CollectionsCacheError::Json`] if serialization fails.
+pub fn save_collections_cache(root: &Path, entries: &[CollectionEntry])
+                              -> Result<(), CollectionsCacheError> {
     fs::create_dir_all(root)?;
     let tmp = root.join(COLLECTIONS_CACHE_TMP);
     let json = serde_json::to_string(entries)?;
@@ -64,19 +67,18 @@ pub fn save_collections_cache(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use super::*;
     use std::sync::Arc;
+
+    use super::*;
 
     fn test_dir(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!("dtrpg_collections_cache_test_{name}"))
     }
 
     fn make_entry(id: u64, name: &str) -> CollectionEntry {
-        CollectionEntry {
-            id,
-            name: Arc::from(name),
-            member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
-        }
+        CollectionEntry { id,
+                          name: Arc::from(name),
+                          member_ids: Arc::from(vec![1u64, 2u64].as_slice()) }
     }
 
     #[test]

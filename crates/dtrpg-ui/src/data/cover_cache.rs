@@ -1,20 +1,23 @@
 //! Disk-backed cache for downloaded cover thumbnail image bytes.
 //!
-//! Without this, every launch re-downloads every catalog item's cover thumbnail from
-//! the network, since [`crate::ui::library::cover::CoverCache`] (the in-memory decoded
-//! image cache) always starts empty. This module persists the raw fetched bytes to
-//! disk so a warm cache is available on the very first thumbnail request of a new
-//! session, before any network round trip.
+//! Without this, every launch re-downloads every catalog item's cover thumbnail
+//! from the network, since [`crate::ui::library::cover::CoverCache`] (the
+//! in-memory decoded image cache) always starts empty. This module persists the
+//! raw fetched bytes to disk so a warm cache is available on the very first
+//! thumbnail request of a new session, before any network round trip.
 //!
-//! Each cached image is stored as a single file under [`crate::data::paths::covers_dir`],
-//! named by a stable hash of the owning `LibraryItem` id — the id is a URL path (e.g.
-//! `/api/vBeta/order_products/12345`) and unsafe to use directly as a filename. The
-//! image format is not encoded in the filename; callers sniff it from the leading bytes
-//! the same way the in-memory cache does (see `ui::library::cover::sniff_image_format`).
+//! Each cached image is stored as a single file under
+//! [`crate::data::paths::covers_dir`], named by a stable hash of the owning
+//! `LibraryItem` id — the id is a URL path (e.g. `/api/vBeta/order_products/
+//! 12345`) and unsafe to use directly as a filename. The image format is not
+//! encoded in the filename; callers sniff it from the leading bytes
+//! the same way the in-memory cache does (see
+//! `ui::library::cover::sniff_image_format`).
 //!
-//! Unlike [`crate::data::catalog_cache`], writes are not atomic (no `.tmp`-then-rename):
-//! a torn write here only means that one cover re-downloads on the next launch, not a
-//! corrupted multi-item dataset, so the extra write complexity isn't warranted.
+//! Unlike [`crate::data::catalog_cache`], writes are not atomic (no
+//! `.tmp`-then-rename): a torn write here only means that one cover
+//! re-downloads on the next launch, not a corrupted multi-item dataset, so the
+//! extra write complexity isn't warranted.
 
 use std::fs;
 use std::path::Path;
@@ -28,8 +31,8 @@ fn cover_filename(item_id: &str) -> String {
 
 /// Reads the cached cover image bytes for `item_id` from `{root}/{hash}.cover`.
 ///
-/// Returns `None` on any error (missing file, unreadable, empty) so callers fall
-/// through to a live fetch without surfacing errors to the user.
+/// Returns `None` on any error (missing file, unreadable, empty) so callers
+/// fall through to a live fetch without surfacing errors to the user.
 pub fn load_cached_cover(root: &Path, item_id: &str) -> Option<Vec<u8>> {
     let path = root.join(cover_filename(item_id));
     let bytes = fs::read(&path).ok()?;
@@ -38,9 +41,10 @@ pub fn load_cached_cover(root: &Path, item_id: &str) -> Option<Vec<u8>> {
 
 /// Writes `bytes` to `{root}/{hash}.cover`, creating `root` if needed.
 ///
-/// Failures are not surfaced as an error type — a failed cache write only costs a
-/// repeat network fetch next launch, not correctness, so callers log a warning and
-/// continue rather than threading a `Result` through the thumbnail-fetch path.
+/// Failures are not surfaced as an error type — a failed cache write only costs
+/// a repeat network fetch next launch, not correctness, so callers log a
+/// warning and continue rather than threading a `Result` through the
+/// thumbnail-fetch path.
 pub fn save_cached_cover(root: &Path, item_id: &str, bytes: &[u8]) {
     if let Err(e) = fs::create_dir_all(root) {
         tracing::warn!(path = %root.display(), error = %e, "cover cache: failed to create dir");

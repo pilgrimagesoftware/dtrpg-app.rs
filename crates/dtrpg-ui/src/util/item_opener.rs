@@ -1,6 +1,8 @@
-//! Service for opening downloaded catalog items in the system's default application.
+//! Service for opening downloaded catalog items in the system's default
+//! application.
 
 use std::path::Path;
+
 use thiserror::Error;
 
 /// Errors that can occur when attempting to open an item.
@@ -43,25 +45,27 @@ impl ItemOpener {
 
         // Attempt to open the file with the system's default application
         open::that(path).map_err(|e| {
-            let error_msg = e.to_string();
+                            let error_msg = e.to_string();
 
-            // Try to classify the error
-            if error_msg.contains("no default application")
-                || error_msg.contains("no associated application")
-            {
-                OpenError::NoDefaultApp
-            } else {
-                OpenError::OsFailed(error_msg)
-            }
-        })
+                            // Try to classify the error
+                            if error_msg.contains("no default application")
+                               || error_msg.contains("no associated application")
+                            {
+                                OpenError::NoDefaultApp
+                            }
+                            else {
+                                OpenError::OsFailed(error_msg)
+                            }
+                        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::File;
     use std::io::Write;
+
+    use super::*;
 
     #[test]
     fn test_open_nonexistent_file() {
@@ -75,7 +79,8 @@ mod tests {
     fn test_open_existing_file() {
         // Create a temporary file
         let temp_path = std::env::temp_dir().join("dtrpg_test_file.txt");
-        let Ok(mut file) = File::create(&temp_path) else {
+        let Ok(mut file) = File::create(&temp_path)
+        else {
             // Skip test if we can't create the temp file
             return;
         };
@@ -95,10 +100,8 @@ mod tests {
 
         // The result should either be Ok or an error other than FileNotFound
         if let Err(e) = result {
-            assert!(
-                !matches!(e, OpenError::FileNotFound(_)),
-                "Should not return FileNotFound for existing file"
-            );
+            assert!(!matches!(e, OpenError::FileNotFound(_)),
+                    "Should not return FileNotFound for existing file");
         }
     }
 

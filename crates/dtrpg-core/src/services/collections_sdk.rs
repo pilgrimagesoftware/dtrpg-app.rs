@@ -6,12 +6,6 @@ use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
     PageParams, ProductListCollectionResponse, ProductListItem, ProductListItemsResponse, SdkError,
 };
-use tokio::runtime::{Builder, Runtime};
-
-use crate::constants::{
-    ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, REFRESH_TOKEN_ENV,
-    REFRESH_TOKEN_TTL_ENV,
-};
 use dtrpg_ui::{
     credentials::{CredentialStore, KeyringCredentialStore},
     data::collection::CollectionEntry,
@@ -21,8 +15,15 @@ use dtrpg_ui::{
         collections::{CollectionsService, CollectionsServiceError, CollectionsServiceErrorKind},
     },
 };
+use tokio::runtime::{Builder, Runtime};
 
-// ── Gateway trait ─────────────────────────────────────────────────────────────
+use crate::constants::{
+    ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, REFRESH_TOKEN_ENV,
+    REFRESH_TOKEN_TTL_ENV,
+};
+
+// ── Gateway trait
+// ─────────────────────────────────────────────────────────────
 
 /// SDK operation boundary used by the Rust collections service adapter.
 pub trait SdkCollectionsGateway: Send + Sync {
@@ -31,21 +32,17 @@ pub trait SdkCollectionsGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures.
-    fn list_product_lists(
-        &self,
-        page: u32,
-    ) -> Result<ProductListCollectionResponse, CollectionsServiceError>;
+    fn list_product_lists(&self, page: u32)
+                          -> Result<ProductListCollectionResponse, CollectionsServiceError>;
 
-    /// Lists the items within a specific product list, paginating through all pages.
+    /// Lists the items within a specific product list, paginating through all
+    /// pages.
     ///
     /// # Errors
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures.
-    fn list_product_list_items(
-        &self,
-        product_list_id: u64,
-        page: u32,
-    ) -> Result<ProductListItemsResponse, CollectionsServiceError>;
+    fn list_product_list_items(&self, product_list_id: u64, page: u32)
+                               -> Result<ProductListItemsResponse, CollectionsServiceError>;
 
     /// Creates a new product list with the given name and returns it.
     ///
@@ -62,7 +59,8 @@ pub trait SdkCollectionsGateway: Send + Sync {
     fn delete_product_list(&self, id: u64) -> Result<(), CollectionsServiceError>;
 }
 
-// ── Service implementation ────────────────────────────────────────────────────
+// ── Service implementation
+// ────────────────────────────────────────────────────
 
 /// Collections service adapter backed by the Rust SDK.
 pub struct RustSdkCollectionsService {
@@ -75,7 +73,8 @@ impl RustSdkCollectionsService {
         Self { gateway }
     }
 
-    /// Creates an unauthenticated service that returns a session error on all calls.
+    /// Creates an unauthenticated service that returns a session error on all
+    /// calls.
     pub fn unauthenticated() -> Self {
         Self::new(Box::new(UnavailableCollectionsGateway::new(
             CollectionsServiceError::new(
@@ -85,7 +84,8 @@ impl RustSdkCollectionsService {
         )))
     }
 
-    /// Creates the service using in-memory `tokens` obtained at startup or login.
+    /// Creates the service using in-memory `tokens` obtained at startup or
+    /// login.
     ///
     /// Reads only the API key from the platform keyring. Falls back to
     /// [`UnavailableCollectionsGateway`] when the API key cannot be found.
@@ -136,23 +136,23 @@ impl CollectionsService for RustSdkCollectionsService {
                     // Try orderProductId first (flat or JSON:API-style), then productId.
                     // The product_list_items endpoint returns productId in attributes;
                     // both IDs are stored so the sidebar filter can match either.
-                    let extracted = item
-                        .get("orderProductId")
-                        .and_then(|v| v.as_u64())
-                        .or_else(|| {
-                            item.get("attributes")
-                                .and_then(|a| a.get("orderProductId"))
-                                .and_then(|v| v.as_u64())
-                        })
-                        .or_else(|| {
-                            item.get("attributes")
-                                .and_then(|a| a.get("productId"))
-                                .and_then(|v| v.as_u64())
-                        });
+                    let extracted = item.get("orderProductId")
+                                        .and_then(|v| v.as_u64())
+                                        .or_else(|| {
+                                            item.get("attributes")
+                                                .and_then(|a| a.get("orderProductId"))
+                                                .and_then(|v| v.as_u64())
+                                        })
+                                        .or_else(|| {
+                                            item.get("attributes")
+                                                .and_then(|a| a.get("productId"))
+                                                .and_then(|v| v.as_u64())
+                                        });
 
                     if let Some(id_value) = extracted {
                         member_ids.push(id_value);
-                    } else {
+                    }
+                    else {
                         tracing::warn!(
                             collection_id = id,
                             item = ?item,
@@ -167,11 +167,9 @@ impl CollectionsService for RustSdkCollectionsService {
                 items_page += 1;
             }
 
-            entries.push(CollectionEntry {
-                id,
-                name,
-                member_ids: Arc::from(member_ids.as_slice()),
-            });
+            entries.push(CollectionEntry { id,
+                                           name,
+                                           member_ids: Arc::from(member_ids.as_slice()) });
         }
 
         Ok(entries)
@@ -179,11 +177,9 @@ impl CollectionsService for RustSdkCollectionsService {
 
     fn create_collection(&self, name: &str) -> Result<CollectionEntry, CollectionsServiceError> {
         let item = self.gateway.create_product_list(name.trim())?;
-        Ok(CollectionEntry {
-            id: item.attributes.product_list_id,
-            name: Arc::from(item.attributes.name.as_str()),
-            member_ids: Arc::from(&[][..]),
-        })
+        Ok(CollectionEntry { id:         item.attributes.product_list_id,
+                             name:       Arc::from(item.attributes.name.as_str()),
+                             member_ids: Arc::from(&[][..]), })
     }
 
     fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError> {
@@ -191,10 +187,11 @@ impl CollectionsService for RustSdkCollectionsService {
     }
 }
 
-// ── HTTP gateway ──────────────────────────────────────────────────────────────
+// ── HTTP gateway
+// ──────────────────────────────────────────────────────────────
 
 struct HttpSdkCollectionsGateway {
-    client: SdkLibraryClient,
+    client:  SdkLibraryClient,
     runtime: Runtime,
 }
 
@@ -213,102 +210,82 @@ impl HttpSdkCollectionsGateway {
                 )
             })?;
 
-        Self::build(
-            application_key,
-            tokens.access_token,
-            tokens.refresh_token,
-            tokens.refresh_token_ttl,
-        )
+        Self::build(application_key,
+                    tokens.access_token,
+                    tokens.refresh_token,
+                    tokens.refresh_token_ttl)
     }
 
     #[allow(dead_code)]
     fn from_environment() -> Result<Self, CollectionsServiceError> {
         let application_key = std::env::var(APPLICATION_KEY_ENV).map_err(|_| {
-            CollectionsServiceError::new(
+                                                                    CollectionsServiceError::new(
                 CollectionsServiceErrorKind::Network,
                 format!("{APPLICATION_KEY_ENV} is required to load SDK-backed collections data."),
             )
-        })?;
+                                                                })?;
         let access_token = std::env::var(ACCESS_TOKEN_ENV).map_err(|_| {
-            CollectionsServiceError::new(
+                                                              CollectionsServiceError::new(
                 CollectionsServiceErrorKind::Session,
                 format!("{ACCESS_TOKEN_ENV} is required to load SDK-backed collections data."),
             )
-        })?;
+                                                          })?;
         let refresh_token = std::env::var(REFRESH_TOKEN_ENV).unwrap_or_default();
-        let refresh_token_ttl = std::env::var(REFRESH_TOKEN_TTL_ENV)
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(u64::MAX);
+        let refresh_token_ttl =
+            std::env::var(REFRESH_TOKEN_TTL_ENV).ok()
+                                                .and_then(|v| v.parse::<u64>().ok())
+                                                .unwrap_or(u64::MAX);
 
-        Self::build(
-            application_key,
-            access_token,
-            refresh_token,
-            refresh_token_ttl,
-        )
+        Self::build(application_key,
+                    access_token,
+                    refresh_token,
+                    refresh_token_ttl)
     }
 
-    fn build(
-        application_key: String,
-        access_token: String,
-        refresh_token: String,
-        refresh_token_ttl: u64,
-    ) -> Result<Self, CollectionsServiceError> {
+    fn build(application_key: String, access_token: String, refresh_token: String,
+             refresh_token_ttl: u64)
+             -> Result<Self, CollectionsServiceError> {
         let config = match std::env::var(API_BASE_URL_ENV) {
             Ok(base_url) => Config::with_base_url(application_key, base_url),
             Err(_) => Config::new(application_key),
         };
 
         let mut sdk = DriveThruRpgSdk::with_config(config);
-        sdk.apply_auth_response(AuthTokenResponse::new(
-            access_token,
-            refresh_token,
-            refresh_token_ttl,
-        ))
-        .map_err(map_sdk_error)?;
+        sdk.apply_auth_response(AuthTokenResponse::new(access_token,
+                                                       refresh_token,
+                                                       refresh_token_ttl))
+           .map_err(map_sdk_error)?;
 
         let client = sdk.library_client().map_err(map_sdk_error)?;
-        let runtime = Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| {
-                CollectionsServiceError::new(
+        let runtime = Builder::new_multi_thread().enable_all()
+                                                 .build()
+                                                 .map_err(|e| {
+                                                     CollectionsServiceError::new(
                     CollectionsServiceErrorKind::Network,
                     format!("Unable to start Rust SDK runtime: {e}"),
                 )
-            })?;
+                                                 })?;
 
         Ok(Self { client, runtime })
     }
 }
 
 impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
-    fn list_product_lists(
-        &self,
-        page: u32,
-    ) -> Result<ProductListCollectionResponse, CollectionsServiceError> {
+    fn list_product_lists(&self, page: u32)
+                          -> Result<ProductListCollectionResponse, CollectionsServiceError> {
         self.runtime
-            .block_on(self.client.list_product_lists(PageParams {
-                page: Some(page),
-                page_size: None,
-            }))
+            .block_on(self.client
+                          .list_product_lists(PageParams { page:      Some(page),
+                                                           page_size: None, }))
             .map_err(map_client_error)
     }
 
-    fn list_product_list_items(
-        &self,
-        product_list_id: u64,
-        page: u32,
-    ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+    fn list_product_list_items(&self, product_list_id: u64, page: u32)
+                               -> Result<ProductListItemsResponse, CollectionsServiceError> {
         self.runtime
-            .block_on(self.client.list_product_list_items(
-                product_list_id,
-                PageParams {
-                    page: Some(page),
-                    page_size: None,
-                },
-            ))
+            .block_on(self.client.list_product_list_items(product_list_id,
+                                                          PageParams { page:      Some(page),
+                                                                       page_size: None, }))
             .map_err(map_client_error)
     }
 
@@ -325,7 +302,8 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
     }
 }
 
-// ── Unavailable gateway ───────────────────────────────────────────────────────
+// ── Unavailable gateway
+// ───────────────────────────────────────────────────────
 
 /// A gateway that returns a stored error on every call.
 ///
@@ -343,18 +321,13 @@ impl UnavailableCollectionsGateway {
 }
 
 impl SdkCollectionsGateway for UnavailableCollectionsGateway {
-    fn list_product_lists(
-        &self,
-        _page: u32,
-    ) -> Result<ProductListCollectionResponse, CollectionsServiceError> {
+    fn list_product_lists(&self, _page: u32)
+                          -> Result<ProductListCollectionResponse, CollectionsServiceError> {
         Err(self.error.clone())
     }
 
-    fn list_product_list_items(
-        &self,
-        _product_list_id: u64,
-        _page: u32,
-    ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+    fn list_product_list_items(&self, _product_list_id: u64, _page: u32)
+                               -> Result<ProductListItemsResponse, CollectionsServiceError> {
         Err(self.error.clone())
     }
 
@@ -367,22 +340,19 @@ impl SdkCollectionsGateway for UnavailableCollectionsGateway {
     }
 }
 
-// ── Error mapping ─────────────────────────────────────────────────────────────
+// ── Error mapping
+// ─────────────────────────────────────────────────────────────
 
 fn map_client_error(error: ClientError) -> CollectionsServiceError {
     match error {
         ClientError::Sdk(e) => map_sdk_error(e),
-        ClientError::DecodeFailed {
-            url, status, cause, ..
-        } => {
+        ClientError::DecodeFailed { url, status, cause, .. } => {
             let kind = match status {
                 401 | 403 => CollectionsServiceErrorKind::Session,
                 _ => CollectionsServiceErrorKind::Network,
             };
-            CollectionsServiceError::new(
-                kind,
-                format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"),
-            )
+            CollectionsServiceError::new(kind,
+                                         format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"))
         }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());
@@ -424,95 +394,77 @@ mod tests {
     use super::*;
 
     fn pagination_links(next: Option<&str>) -> PaginationLinks {
-        PaginationLinks {
-            self_: "self".to_string(),
-            first: None,
-            last: None,
-            prev: None,
-            next: next.map(String::from),
-        }
+        PaginationLinks { self_: "self".to_string(),
+                          first: None,
+                          last:  None,
+                          prev:  None,
+                          next:  next.map(String::from), }
     }
 
     fn product_list_item(id: u64, name: &str) -> ProductListItem {
-        ProductListItem {
-            id: id.to_string(),
-            resource_type: "product_list".to_string(),
-            attributes: ProductListAttributes {
-                customer_id: 100,
-                name: name.to_string(),
-                date_created: "2026-01-01".to_string(),
-                product_list_id: id,
-                slug: name.to_lowercase().replace(' ', "-"),
-                item_count: 2,
-            },
-        }
+        ProductListItem { id:            id.to_string(),
+                          resource_type: "product_list".to_string(),
+                          attributes:    ProductListAttributes { customer_id:     100,
+                                                                 name:            name.to_string(),
+                                                                 date_created:
+                                                                     "2026-01-01".to_string(),
+                                                                 product_list_id: id,
+                                                                 slug:
+                                                                     name.to_lowercase()
+                                                                         .replace(' ', "-"),
+                                                                 item_count:      2, }, }
     }
 
     struct FakeCollectionsGateway {
-        lists: Result<Vec<ProductListItem>, CollectionsServiceError>,
-        items: Result<Vec<serde_json::Value>, CollectionsServiceError>,
+        lists:         Result<Vec<ProductListItem>, CollectionsServiceError>,
+        items:         Result<Vec<serde_json::Value>, CollectionsServiceError>,
         create_result: Result<ProductListItem, CollectionsServiceError>,
     }
 
     impl FakeCollectionsGateway {
         fn seeded() -> Self {
-            Self {
-                lists: Ok(vec![product_list_item(7, "Favorites")]),
-                items: Ok(vec![
-                    json!({ "orderProductId": 42 }),
-                    json!({ "orderProductId": 99 }),
-                ]),
-                create_result: Ok(product_list_item(8, "New List")),
-            }
+            Self { lists:         Ok(vec![product_list_item(7, "Favorites")]),
+                   items:         Ok(vec![json!({ "orderProductId": 42 }),
+                                          json!({ "orderProductId": 99 }),]),
+                   create_result: Ok(product_list_item(8, "New List")), }
         }
 
         fn session_error() -> Self {
-            let err = CollectionsServiceError::new(
-                CollectionsServiceErrorKind::Session,
-                "fake session error",
-            );
-            Self {
-                lists: Err(err.clone()),
-                items: Err(err.clone()),
-                create_result: Err(err),
-            }
+            let err = CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                   "fake session error");
+            Self { lists:         Err(err.clone()),
+                   items:         Err(err.clone()),
+                   create_result: Err(err), }
         }
 
         fn items_with_missing_field() -> Self {
-            Self {
-                lists: Ok(vec![product_list_item(7, "Favorites")]),
-                items: Ok(vec![
-                    json!({ "orderProductId": 42 }),
-                    json!({ "someOtherField": "abc" }),
-                    json!({ "orderProductId": 99 }),
-                ]),
-                create_result: Ok(product_list_item(8, "New List")),
-            }
+            Self { lists:         Ok(vec![product_list_item(7, "Favorites")]),
+                   items:         Ok(vec![json!({ "orderProductId": 42 }),
+                                          json!({ "someOtherField": "abc" }),
+                                          json!({ "orderProductId": 99 }),]),
+                   create_result: Ok(product_list_item(8, "New List")), }
         }
     }
 
     impl SdkCollectionsGateway for FakeCollectionsGateway {
-        fn list_product_lists(
-            &self,
-            _page: u32,
-        ) -> Result<ProductListCollectionResponse, CollectionsServiceError> {
-            self.lists
-                .clone()
-                .map(|data| ProductListCollectionResponse {
+        fn list_product_lists(&self, _page: u32)
+                              -> Result<ProductListCollectionResponse, CollectionsServiceError>
+        {
+            self.lists.clone().map(|data| {
+                                  ProductListCollectionResponse {
                     links: pagination_links(None),
                     meta: PaginationMeta {
                         items_per_page: 100,
                         current_page: 1,
                     },
                     data,
-                })
+                }
+                              })
         }
 
-        fn list_product_list_items(
-            &self,
-            _product_list_id: u64,
-            _page: u32,
-        ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+        fn list_product_list_items(&self, _product_list_id: u64, _page: u32)
+                                   -> Result<ProductListItemsResponse, CollectionsServiceError>
+        {
             self.items.clone().map(|data| ProductListItemsResponse {
                 links: pagination_links(None),
                 meta: PaginationMeta {
@@ -523,10 +475,8 @@ mod tests {
             })
         }
 
-        fn create_product_list(
-            &self,
-            _name: &str,
-        ) -> Result<ProductListItem, CollectionsServiceError> {
+        fn create_product_list(&self, _name: &str)
+                               -> Result<ProductListItem, CollectionsServiceError> {
             self.create_result.clone()
         }
 
@@ -569,9 +519,8 @@ mod tests {
     #[test]
     fn create_collection_returns_correct_entry() {
         let service = RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
-        let entry = service
-            .create_collection("New List")
-            .expect("create collection");
+        let entry = service.create_collection("New List")
+                           .expect("create collection");
 
         assert_eq!(entry.id, 8);
         assert_eq!(entry.name.as_ref(), "New List");
@@ -582,9 +531,8 @@ mod tests {
     fn create_collection_propagates_session_error() {
         let service =
             RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
-        let err = service
-            .create_collection("Anything")
-            .expect_err("session error");
+        let err = service.create_collection("Anything")
+                         .expect_err("session error");
         assert_eq!(err.kind, CollectionsServiceErrorKind::Session);
     }
 }

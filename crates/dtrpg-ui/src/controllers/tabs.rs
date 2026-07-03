@@ -26,37 +26,33 @@ pub struct TabsSnapshot {
     /// Open tabs, catalog first, in tab-strip order.
     pub open_tabs: Vec<TabTarget>,
     /// The currently active tab.
-    pub active: TabTarget,
+    pub active:    TabTarget,
     /// Display titles for open detail tabs, keyed by item id.
-    pub titles: HashMap<Arc<str>, String>,
+    pub titles:    HashMap<Arc<str>, String>,
 }
 
 /// Owns the set of open tabs and which one is active.
 pub struct TabsController {
     open_tabs: Vec<TabTarget>,
-    active: TabTarget,
-    titles: HashMap<Arc<str>, String>,
+    active:    TabTarget,
+    titles:    HashMap<Arc<str>, String>,
 }
 
 impl TabsController {
     /// Creates a new controller with only the catalog tab open and active.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            open_tabs: vec![TabTarget::Catalog],
-            active: TabTarget::Catalog,
-            titles: HashMap::new(),
-        }
+        Self { open_tabs: vec![TabTarget::Catalog],
+               active:    TabTarget::Catalog,
+               titles:    HashMap::new(), }
     }
 
     /// Returns a snapshot of the current tab state.
     #[must_use]
     pub fn snapshot(&self) -> TabsSnapshot {
-        TabsSnapshot {
-            open_tabs: self.open_tabs.clone(),
-            active: self.active.clone(),
-            titles: self.titles.clone(),
-        }
+        TabsSnapshot { open_tabs: self.open_tabs.clone(),
+                       active:    self.active.clone(),
+                       titles:    self.titles.clone(), }
     }
 
     /// Opens (or activates, if already open) an expanded detail tab for `id`.
@@ -83,9 +79,9 @@ impl TabsController {
     pub fn close_detail_tab(&mut self, id: &str, cx: &mut Context<Self>) {
         let before = self.open_tabs.len();
         self.open_tabs.retain(|t| match t {
-            TabTarget::Detail(open_id) => open_id.as_ref() != id,
-            TabTarget::Catalog => true,
-        });
+                          TabTarget::Detail(open_id) => open_id.as_ref() != id,
+                          TabTarget::Catalog => true,
+                      });
         if self.open_tabs.len() != before {
             self.titles.remove(id);
             if matches!(&self.active, TabTarget::Detail(active_id) if active_id.as_ref() == id) {

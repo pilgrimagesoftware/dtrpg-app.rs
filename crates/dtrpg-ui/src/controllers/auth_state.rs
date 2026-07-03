@@ -1,4 +1,5 @@
-//! Authentication state controller: owns `AuthState` and the active notice list.
+//! Authentication state controller: owns `AuthState` and the active notice
+//! list.
 
 use gpui::Context;
 
@@ -8,24 +9,23 @@ use crate::data::notification::{Notice, NoticeAction, NoticeKind};
 
 /// Owns the application's authentication state and the derived notice list.
 pub struct AuthStateController {
-    state: AuthState,
-    notices: Vec<Notice>,
+    state:           AuthState,
+    notices:         Vec<Notice>,
     is_auth_pending: bool,
 }
 
 impl AuthStateController {
     /// Creates a new controller with the given `initial_state`.
     ///
-    /// Callers are responsible for providing the correct starting state. In debug
-    /// builds, callers may consult `DTRPG_AUTH_STATE_OVERRIDE` before constructing
-    /// to support testing unauthenticated or expired states without real credentials.
+    /// Callers are responsible for providing the correct starting state. In
+    /// debug builds, callers may consult `DTRPG_AUTH_STATE_OVERRIDE` before
+    /// constructing to support testing unauthenticated or expired states
+    /// without real credentials.
     pub fn new(initial_state: AuthState) -> Self {
         let notices = notices_for(initial_state, false);
-        Self {
-            state: initial_state,
-            notices,
-            is_auth_pending: false,
-        }
+        Self { state: initial_state,
+               notices,
+               is_auth_pending: false }
     }
 
     /// Returns the current authentication state.
@@ -40,16 +40,17 @@ impl AuthStateController {
 
     /// Sets the auth-pending flag and regenerates the notice list.
     ///
-    /// When `pending` is `true`, the `Authenticating` notice is shown instead of
-    /// any `NotSignedIn` notice that would otherwise appear. Emits [`AuthStateChanged`].
+    /// When `pending` is `true`, the `Authenticating` notice is shown instead
+    /// of any `NotSignedIn` notice that would otherwise appear. Emits
+    /// [`AuthStateChanged`].
     pub fn set_auth_pending(&mut self, pending: bool, cx: &mut Context<Self>) {
         self.is_auth_pending = pending;
         self.notices = notices_for(self.state, self.is_auth_pending);
         cx.emit(AuthStateChanged);
     }
 
-    /// Transitions to `state`, clears the auth-pending flag, regenerates the notice
-    /// list, and emits [`AuthStateChanged`].
+    /// Transitions to `state`, clears the auth-pending flag, regenerates the
+    /// notice list, and emits [`AuthStateChanged`].
     pub fn set_state(&mut self, state: AuthState, cx: &mut Context<Self>) {
         self.state = state;
         self.is_auth_pending = false;
@@ -57,7 +58,8 @@ impl AuthStateController {
         cx.emit(AuthStateChanged);
     }
 
-    /// Marks the notice with the given `kind` as dismissed and emits [`AuthStateChanged`].
+    /// Marks the notice with the given `kind` as dismissed and emits
+    /// [`AuthStateChanged`].
     ///
     /// No-op if no matching notice is found.
     pub fn dismiss_notice(&mut self, kind: NoticeKind, cx: &mut Context<Self>) {
@@ -74,7 +76,8 @@ impl AuthStateController {
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers
+// ───────────────────────────────────────────────────────────────────
 
 fn notices_for(state: AuthState, is_auth_pending: bool) -> Vec<Notice> {
     if is_auth_pending {
@@ -84,16 +87,12 @@ fn notices_for(state: AuthState, is_auth_pending: bool) -> Vec<Notice> {
     }
     match state {
         AuthState::Authenticated => vec![],
-        AuthState::Unauthenticated => vec![Notice {
-            kind: NoticeKind::NotSignedIn,
-            dismissed: false,
-            action: NoticeAction::OpenSettings,
-        }],
-        AuthState::SessionExpired => vec![Notice {
-            kind: NoticeKind::SessionExpired,
-            dismissed: false,
-            action: NoticeAction::OpenSettings,
-        }],
+        AuthState::Unauthenticated => vec![Notice { kind:      NoticeKind::NotSignedIn,
+                                                    dismissed: false,
+                                                    action:    NoticeAction::OpenSettings, }],
+        AuthState::SessionExpired => vec![Notice { kind:      NoticeKind::SessionExpired,
+                                                   dismissed: false,
+                                                   action:    NoticeAction::OpenSettings, }],
     }
 }
 
@@ -142,7 +141,8 @@ mod tests {
         let mut ctrl = AuthStateController::new(AuthState::Unauthenticated);
         ctrl.is_auth_pending = true;
         ctrl.notices = notices_for(ctrl.state, ctrl.is_auth_pending);
-        // Banner is suppressed while auth is in-flight; toast notification handles feedback.
+        // Banner is suppressed while auth is in-flight; toast notification handles
+        // feedback.
         assert!(ctrl.active_notices().is_empty());
     }
 

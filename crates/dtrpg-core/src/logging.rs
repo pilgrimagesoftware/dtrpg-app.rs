@@ -29,10 +29,8 @@ pub fn init() -> Option<WorkerGuard> {
     if let Err(e) = std::fs::create_dir_all(&log_dir) {
         // Can't create log dir — set up console-only and continue.
         init_console_only();
-        eprintln!(
-            "warning: could not create log directory {}: {e}",
-            log_dir.display()
-        );
+        eprintln!("warning: could not create log directory {}: {e}",
+                  log_dir.display());
         return None;
     }
 
@@ -41,29 +39,26 @@ pub fn init() -> Option<WorkerGuard> {
 
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt::layer().with_writer(std::io::stderr).compact())
-        .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
-        .init();
+    tracing_subscriber::registry().with(filter)
+                                  .with(fmt::layer().with_writer(std::io::stderr).compact())
+                                  .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
+                                  .init();
 
     Some(guard)
 }
 
 fn init_console_only() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt::layer().with_writer(std::io::stderr).compact())
-        .init();
+    tracing_subscriber::registry().with(filter)
+                                  .with(fmt::layer().with_writer(std::io::stderr).compact())
+                                  .init();
 }
 
 fn platform_log_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
-        dirs::home_dir()
-            .map(|h| h.join("Library/Logs/com.pilgrimagesoftware.dtrpg"))
-            .unwrap_or_else(|| PathBuf::from("/tmp/com.pilgrimagesoftware.dtrpg"))
+        dirs::home_dir().map(|h| h.join("Library/Logs/com.pilgrimagesoftware.dtrpg"))
+                        .unwrap_or_else(|| PathBuf::from("/tmp/com.pilgrimagesoftware.dtrpg"))
     }
     #[cfg(not(target_os = "macos"))]
     {

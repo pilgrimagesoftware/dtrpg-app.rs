@@ -13,22 +13,19 @@ use gpui::{
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
+use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
-use rust_i18n::t;
 
 /// Renders a compact popover anchored at `position`, showing `item`'s title,
 /// publisher, and a few key attributes, plus a close button and an
 /// accessible "open in tab" affordance as an alternative to double-click.
-pub fn render_item_popover(
-    item: &LibraryItem,
-    position: Point<Pixels>,
-    entity: Entity<LibraryController>,
-    colors: &ColorTokens,
-) -> AnyElement {
+pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
+                           entity: Entity<LibraryController>, colors: &ColorTokens)
+                           -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
     let text_primary = colors.text_primary;
@@ -38,7 +35,8 @@ pub fn render_item_popover(
     let publisher = item.publisher.to_string();
     let status_label = if item.status == ItemStatus::Downloaded {
         t!("detail.status_on_device").to_string()
-    } else {
+    }
+    else {
         t!("detail.status_in_cloud").to_string()
     };
 
@@ -113,12 +111,8 @@ pub fn render_item_popover(
                 ),
         );
 
-    deferred(
-        anchored()
-            .snap_to_window_with_margin(px(8.))
-            .position(position)
-            .child(content),
-    )
-    .with_priority(1)
-    .into_any_element()
+    deferred(anchored().snap_to_window_with_margin(px(8.))
+                       .position(position)
+                       .child(content)).with_priority(1)
+                                       .into_any_element()
 }

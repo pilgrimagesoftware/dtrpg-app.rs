@@ -1,21 +1,22 @@
-//! Advanced settings section: destructive/maintenance actions (currently just cache clearing).
+//! Advanced settings section: destructive/maintenance actions (currently just
+//! cache clearing).
 //!
-//! Also renders the About section, which is purely informational (app name, version,
-//! description) and shares no state with Advanced beyond both living in the Settings panel.
+//! Also renders the About section, which is purely informational (app name,
+//! version, description) and shares no state with Advanced beyond both living
+//! in the Settings panel.
 
 use gpui::{Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
+use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use rust_i18n::t;
 
-/// Renders the Advanced settings section: a "Clear cache" action with a confirmation dialog.
-pub fn render_advanced_section(
-    entity: Entity<SettingsController>,
-    colors: &ColorTokens,
-) -> impl IntoElement + 'static + use<> {
+/// Renders the Advanced settings section: a "Clear cache" action with a
+/// confirmation dialog.
+pub fn render_advanced_section(entity: Entity<SettingsController>, colors: &ColorTokens)
+                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
@@ -68,33 +69,24 @@ pub fn render_advanced_section(
         )
 }
 
-/// Renders the About settings section: app name, version, and a short description.
+/// Renders the About settings section: app name, version, and a short
+/// description.
 pub fn render_about_section(colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
 
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(8.0))
-        .p(px(24.0))
-        .child(
-            div()
-                .text_lg()
-                .font_weight(gpui::FontWeight::SEMIBOLD)
-                .text_color(text_primary)
-                .child(t!("sidebar.app_name")),
-        )
-        .child(
-            div()
-                .text_sm()
-                .text_color(text_secondary)
-                .child(t!("about.version", version = env!("CARGO_PKG_VERSION"))),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(text_secondary)
-                .child(t!("about.description")),
-        )
+    div().flex()
+         .flex_col()
+         .gap(px(8.0))
+         .p(px(24.0))
+         .child(div().text_lg()
+                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .text_color(text_primary)
+                     .child(t!("sidebar.app_name")))
+         .child(div().text_sm()
+                     .text_color(text_secondary)
+                     .child(t!("about.version", version = env!("CARGO_PKG_VERSION"))))
+         .child(div().text_xs()
+                     .text_color(text_secondary)
+                     .child(t!("about.description")))
 }

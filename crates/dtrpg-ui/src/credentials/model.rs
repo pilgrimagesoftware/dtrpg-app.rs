@@ -13,16 +13,16 @@ pub struct Credential {
     /// Account sub-key distinguishing credential type, e.g. `api-key`.
     pub account: String,
     /// The secret value to protect.
-    pub secret: String,
+    pub secret:  String,
 }
 
 impl std::fmt::Debug for Credential {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Credential")
-            .field("service", &self.service)
-            .field("account", &self.account)
-            .field("secret", &"[redacted]")
-            .finish()
+         .field("service", &self.service)
+         .field("account", &self.account)
+         .field("secret", &"[redacted]")
+         .finish()
     }
 }
 
@@ -35,7 +35,7 @@ pub enum CredentialError {
         /// The account key that failed.
         account: String,
         /// Underlying error description.
-        reason: String,
+        reason:  String,
     },
     /// The platform keyring could not retrieve the credential.
     #[error("Failed to load credential ({account}): {reason}")]
@@ -43,7 +43,7 @@ pub enum CredentialError {
         /// The account key that failed.
         account: String,
         /// Underlying error description.
-        reason: String,
+        reason:  String,
     },
     /// The platform keyring could not delete the credential.
     #[error("Failed to delete credential ({account}): {reason}")]
@@ -51,9 +51,10 @@ pub enum CredentialError {
         /// The account key that failed.
         account: String,
         /// Underlying error description.
-        reason: String,
+        reason:  String,
     },
-    /// The platform keyring service is not available (e.g. no Secret Service daemon on Linux).
+    /// The platform keyring service is not available (e.g. no Secret Service
+    /// daemon on Linux).
     #[error("Platform keyring unavailable: {0}")]
     Unavailable(String),
 }

@@ -1,4 +1,5 @@
-//! Notification banner view: renders persistent auth-related notices below the toolbar.
+//! Notification banner view: renders persistent auth-related notices below the
+//! toolbar.
 
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::alert::Alert;
@@ -14,33 +15,31 @@ use crate::data::theme::ColorTokens;
 ///
 /// Returns an invisible empty element when `notices` is empty so the caller
 /// does not need to conditionalize the insertion point.
-pub fn render_notification_banner(
-    notices: Vec<Notice>,
-    auth_entity: Entity<AuthStateController>,
-    settings_entity: Entity<SettingsController>,
-    colors: &ColorTokens,
-) -> AnyElement {
+pub fn render_notification_banner(notices: Vec<Notice>,
+                                  auth_entity: Entity<AuthStateController>,
+                                  settings_entity: Entity<SettingsController>,
+                                  colors: &ColorTokens)
+                                  -> AnyElement {
     if notices.is_empty() {
         return div().into_any_element();
     }
 
     let border = colors.border;
 
-    div()
-        .flex_none()
-        .flex()
-        .flex_col()
-        .border_b_1()
-        .border_color(border)
-        .children(notices.into_iter().map(|notice| {
-            let (message, action_label) = notice_strings(&notice);
-            let kind = notice.kind;
+    div().flex_none()
+         .flex()
+         .flex_col()
+         .border_b_1()
+         .border_color(border)
+         .children(notices.into_iter().map(|notice| {
+             let (message, action_label) = notice_strings(&notice);
+             let kind = notice.kind;
 
-            let auth_entity_action = auth_entity.clone();
-            let auth_entity_dismiss = auth_entity.clone();
-            let settings_entity = settings_entity.clone();
+             let auth_entity_action = auth_entity.clone();
+             let auth_entity_dismiss = auth_entity.clone();
+             let settings_entity = settings_entity.clone();
 
-            div()
+             div()
                 .flex()
                 .items_center()
                 .gap(px(8.0))
@@ -66,24 +65,18 @@ pub fn render_notification_banner(
                             });
                         }),
                 )
-        }))
-        .into_any_element()
+         }))
+         .into_any_element()
 }
 
-fn notice_strings(
-    notice: &Notice,
-) -> (
-    std::borrow::Cow<'static, str>,
-    std::borrow::Cow<'static, str>,
-) {
+fn notice_strings(notice: &Notice)
+                  -> (std::borrow::Cow<'static, str>, std::borrow::Cow<'static, str>) {
     match notice.kind {
-        NoticeKind::NotSignedIn => (
-            t!("settings.not_signed_in"),
-            t!("notification.set_up_account"),
-        ),
-        NoticeKind::SessionExpired => (
-            t!("notification.session_expired"),
-            t!("notification.sign_in_again"),
-        ),
+        NoticeKind::NotSignedIn => {
+            (t!("settings.not_signed_in"), t!("notification.set_up_account"))
+        }
+        NoticeKind::SessionExpired => {
+            (t!("notification.session_expired"), t!("notification.sign_in_again"))
+        }
     }
 }

@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-// ── Filtering ─────────────────────────────────────────────────────────────────
+// ── Filtering
+// ─────────────────────────────────────────────────────────────────
 
 /// Active filter applied in the sidebar.
 #[derive(Debug, Clone, Default)]
@@ -13,7 +14,8 @@ pub enum SidebarFilter {
     OnDevice,
     InCloud,
     Publisher(Arc<str>),
-    /// Filter to items belonging to the DTRPG product list with this id and display name.
+    /// Filter to items belonging to the DTRPG product list with this id and
+    /// display name.
     Collection(u64, Arc<str>),
 }
 

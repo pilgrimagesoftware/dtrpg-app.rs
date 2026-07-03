@@ -1,4 +1,5 @@
-//! Downloads settings section: download root path display, folder picker, and reveal action.
+//! Downloads settings section: download root path display, folder picker, and
+//! reveal action.
 
 use std::path::PathBuf;
 
@@ -8,24 +9,21 @@ use gpui::{
 };
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
+use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::storage::validate_writable;
 use crate::data::theme::ColorTokens;
-use rust_i18n::t;
 
 /// Renders the Storage settings section.
 ///
-/// Displays the current `storage_root_path`, inline icon buttons for "Change…" and
-/// "Show in Finder/Explorer/Files", and an optional warning row when `storage_path_exists`
-/// is `false`.
-pub fn render_storage_section(
-    storage_root_path: PathBuf,
-    storage_path_exists: bool,
-    entity: Entity<SettingsController>,
-    colors: &ColorTokens,
-    storage_path_input: Option<Entity<InputState>>,
-) -> impl IntoElement + 'static + use<> {
+/// Displays the current `storage_root_path`, inline icon buttons for "Change…"
+/// and "Show in Finder/Explorer/Files", and an optional warning row when
+/// `storage_path_exists` is `false`.
+pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: bool,
+                              entity: Entity<SettingsController>, colors: &ColorTokens,
+                              storage_path_input: Option<Entity<InputState>>)
+                              -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
@@ -149,38 +147,30 @@ pub fn render_storage_section(
 
     // ── Missing-path warning ──────────────────────────────────────────────
     if !storage_path_exists {
-        section = section.child(
-            div()
-                .rounded(px(6.0))
-                .px(px(10.0))
-                .py(px(6.0))
-                .bg(warning_bg)
-                .flex()
-                .items_center()
-                .gap(px(6.0))
-                .child(div().text_sm().text_color(warning_text).child("⚠"))
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(warning_text)
-                        .child(t!("settings.storage_missing")),
-                ),
-        );
+        section = section.child(div().rounded(px(6.0))
+                                     .px(px(10.0))
+                                     .py(px(6.0))
+                                     .bg(warning_bg)
+                                     .flex()
+                                     .items_center()
+                                     .gap(px(6.0))
+                                     .child(div().text_sm().text_color(warning_text).child("⚠"))
+                                     .child(div().text_xs()
+                                                 .text_color(warning_text)
+                                                 .child(t!("settings.storage_missing"))));
     }
 
     section
-        // ── Divider ───────────────────────────────────────────────────────
-        .child(div().h(px(1.0)).bg(border))
-        // ── Note ─────────────────────────────────────────────────────────
-        .child(
-            div()
-                .text_xs()
-                .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0))
-                .child(format!("\u{26A0} {}", t!("settings.storage_note"))),
-        )
+           // ── Divider ───────────────────────────────────────────────────────
+           .child(div().h(px(1.0)).bg(border))
+           // ── Note ─────────────────────────────────────────────────────────
+           .child(div().text_xs()
+                       .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0))
+                       .child(format!("\u{26A0} {}", t!("settings.storage_note"))))
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers
+// ───────────────────────────────────────────────────────────────────
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     #[cfg(target_os = "macos")]

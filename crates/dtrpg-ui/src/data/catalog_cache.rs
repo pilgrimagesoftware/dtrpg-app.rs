@@ -29,7 +29,8 @@ const STALE_SECS: u64 = 7 * 24 * 60 * 60;
 /// current version and is always treated as stale.
 const CACHE_SCHEMA_VERSION: u32 = 2;
 
-// ── CacheMetadata ─────────────────────────────────────────────────────────────
+// ── CacheMetadata
+// ─────────────────────────────────────────────────────────────
 
 /// Sidecar metadata written alongside the catalog cache file.
 ///
@@ -38,9 +39,9 @@ const CACHE_SCHEMA_VERSION: u32 = 2;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheMetadata {
     /// Unix timestamp (seconds since epoch) when the cache was written.
-    pub saved_at_secs: u64,
+    pub saved_at_secs:  u64,
     /// Number of items in the cache at write time.
-    pub item_count: usize,
+    pub item_count:     usize,
     /// Schema version the cache was written with; see [`CACHE_SCHEMA_VERSION`].
     #[serde(default)]
     pub schema_version: u32,
@@ -54,10 +55,9 @@ impl CacheMetadata {
         if self.schema_version != CACHE_SCHEMA_VERSION {
             return true;
         }
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)
+                                   .unwrap_or(Duration::ZERO)
+                                   .as_secs();
         now.saturating_sub(self.saved_at_secs) > STALE_SECS
     }
 }
@@ -76,23 +76,22 @@ pub fn load_cache_metadata(root: &Path) -> Option<CacheMetadata> {
         .ok()
 }
 
-/// Writes cache metadata for `item_count` items to `{root}/catalog_cache_meta.json`.
+/// Writes cache metadata for `item_count` items to
+/// `{root}/catalog_cache_meta.json`.
 pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), CatalogCacheError> {
-    let saved_at_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_secs();
-    let meta = CacheMetadata {
-        saved_at_secs,
-        item_count,
-        schema_version: CACHE_SCHEMA_VERSION,
-    };
+    let saved_at_secs = SystemTime::now().duration_since(UNIX_EPOCH)
+                                         .unwrap_or(Duration::ZERO)
+                                         .as_secs();
+    let meta = CacheMetadata { saved_at_secs,
+                               item_count,
+                               schema_version: CACHE_SCHEMA_VERSION };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
 }
 
-// ── CatalogCacheError ─────────────────────────────────────────────────────────
+// ── CatalogCacheError
+// ─────────────────────────────────────────────────────────
 
 /// Errors that can occur when writing the catalog cache.
 #[derive(Debug, Error)]
@@ -105,7 +104,8 @@ pub enum CatalogCacheError {
     Json(#[from] serde_json::Error),
 }
 
-// ── load_catalog_cache ────────────────────────────────────────────────────────
+// ── load_catalog_cache
+// ────────────────────────────────────────────────────────
 
 /// Reads the catalog cache from `{root}/catalog_cache.json`.
 ///
@@ -121,9 +121,11 @@ pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
         .ok()
 }
 
-// ── save_catalog_cache ────────────────────────────────────────────────────────
+// ── save_catalog_cache
+// ────────────────────────────────────────────────────────
 
-/// Writes `items` to `{root}/catalog_cache.json` atomically via a `.tmp` rename.
+/// Writes `items` to `{root}/catalog_cache.json` atomically via a `.tmp`
+/// rename.
 ///
 /// # Errors
 ///
@@ -145,32 +147,31 @@ pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), Cata
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use super::*;
     use crate::data::enums::ItemStatus;
     use crate::data::library::LibraryItem;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_dir(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!("dtrpg_cache_test_{name}"))
     }
 
     fn make_item(id: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            "Test Title",
-            "Test Publisher",
-            "",
-            "Core",
-            "PDF",
-            100,
-            10.0,
-            2024,
-            1,
-            ItemStatus::Cloud,
-            "#1C2A44",
-            "Desc.",
-            None,
-        )
+        LibraryItem::new(id,
+                         "Test Title",
+                         "Test Publisher",
+                         "",
+                         "Core",
+                         "PDF",
+                         100,
+                         10.0,
+                         2024,
+                         1,
+                         ItemStatus::Cloud,
+                         "#1C2A44",
+                         "Desc.",
+                         None)
     }
 
     #[test]
@@ -191,24 +192,19 @@ mod tests {
 
     #[test]
     fn fresh_metadata_is_not_stale() {
-        let meta = CacheMetadata {
-            saved_at_secs: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            item_count: 10,
-            schema_version: CACHE_SCHEMA_VERSION,
-        };
+        let meta = CacheMetadata { saved_at_secs:  SystemTime::now().duration_since(UNIX_EPOCH)
+                                                                    .unwrap()
+                                                                    .as_secs(),
+                                   item_count:     10,
+                                   schema_version: CACHE_SCHEMA_VERSION, };
         assert!(!meta.is_stale());
     }
 
     #[test]
     fn old_metadata_is_stale() {
-        let meta = CacheMetadata {
-            saved_at_secs: 0, // epoch — very old
-            item_count: 10,
-            schema_version: CACHE_SCHEMA_VERSION,
-        };
+        let meta = CacheMetadata { saved_at_secs:  0, // epoch — very old
+                                   item_count:     10,
+                                   schema_version: CACHE_SCHEMA_VERSION, };
         assert!(meta.is_stale());
     }
 
@@ -217,14 +213,11 @@ mod tests {
         // Regression: a cache saved before `cover_url` was populated
         // correctly must not be trusted as fresh just because it's recent —
         // it silently disabled thumbnail loading for up to 7 days otherwise.
-        let meta = CacheMetadata {
-            saved_at_secs: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            item_count: 10,
-            schema_version: CACHE_SCHEMA_VERSION - 1,
-        };
+        let meta = CacheMetadata { saved_at_secs:  SystemTime::now().duration_since(UNIX_EPOCH)
+                                                                    .unwrap()
+                                                                    .as_secs(),
+                                   item_count:     10,
+                                   schema_version: CACHE_SCHEMA_VERSION - 1, };
         assert!(meta.is_stale());
     }
 

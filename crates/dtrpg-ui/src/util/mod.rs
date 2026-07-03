@@ -7,7 +7,7 @@ pub mod matching;
 pub mod pluralize;
 pub mod publisher;
 pub mod reveal;
-pub mod sort;
 pub mod size;
+pub mod sort;
 #[cfg(test)]
 pub mod stubs;

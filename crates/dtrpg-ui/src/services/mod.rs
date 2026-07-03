@@ -17,7 +17,8 @@ pub enum LibraryServiceErrorKind {
     ///
     /// # TODO
     ///
-    /// Full token-refresh handling is deferred until `connect-sdk-to-rust-app` lands.
+    /// Full token-refresh handling is deferred until `connect-sdk-to-rust-app`
+    /// lands.
     NeedsReauth,
 }
 
@@ -25,7 +26,7 @@ pub enum LibraryServiceErrorKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LibraryServiceError {
     /// The machine-classified failure kind.
-    pub kind: LibraryServiceErrorKind,
+    pub kind:    LibraryServiceErrorKind,
     /// Human-readable baseline error message.
     pub message: String,
 }
@@ -33,10 +34,8 @@ pub struct LibraryServiceError {
 impl LibraryServiceError {
     /// Creates a new service error.
     pub fn new(kind: LibraryServiceErrorKind, message: impl Into<String>) -> Self {
-        Self {
-            kind,
-            message: message.into(),
-        }
+        Self { kind,
+               message: message.into() }
     }
 
     /// Returns a multi-line string suitable for display in the activity panel,
@@ -67,51 +66,55 @@ impl std::error::Error for LibraryServiceError {}
 /// Service boundary consumed by the library view model.
 ///
 /// Implementations may be SDK-backed HTTP adapters or deterministic test stubs.
-/// The service is responsible for fetching and mapping all data; callers receive
-/// fully-formed [`LibraryItem`] values ready for presentation.
+/// The service is responsible for fetching and mapping all data; callers
+/// receive fully-formed [`LibraryItem`] values ready for presentation.
 pub trait LibraryService: Send + Sync + 'static {
     /// Loads the full library item list.
     ///
     /// # Errors
     ///
-    /// Returns a [`LibraryServiceError`] if the request fails or the session is invalid.
+    /// Returns a [`LibraryServiceError`] if the request fails or the session is
+    /// invalid.
     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError>;
 
-    /// Loads library items page-by-page, invoking `on_page` after each page arrives.
+    /// Loads library items page-by-page, invoking `on_page` after each page
+    /// arrives.
     ///
-    /// The default implementation calls [`list_items`] and delivers all items in a
-    /// single `on_page` call. Implementations that have access to pagination should
-    /// override this to call `on_page` incrementally so callers can update the UI
-    /// without waiting for all pages.
+    /// The default implementation calls [`list_items`] and delivers all items
+    /// in a single `on_page` call. Implementations that have access to
+    /// pagination should override this to call `on_page` incrementally so
+    /// callers can update the UI without waiting for all pages.
     ///
-    /// `on_total` is called at most once, before the first `on_page` delivery, with an
-    /// estimated total item count. Implementations that cannot determine the total pass
-    /// `None` or simply never call `on_total`. The default implementation never calls it.
+    /// `on_total` is called at most once, before the first `on_page` delivery,
+    /// with an estimated total item count. Implementations that cannot
+    /// determine the total pass `None` or simply never call `on_total`. The
+    /// default implementation never calls it.
     ///
     /// # Errors
     ///
-    /// Returns a [`LibraryServiceError`] if any page request fails. Items delivered
-    /// to `on_page` before the failure are not rolled back.
+    /// Returns a [`LibraryServiceError`] if any page request fails. Items
+    /// delivered to `on_page` before the failure are not rolled back.
     ///
     /// [`list_items`]: LibraryService::list_items
-    fn list_items_paged(
-        &self,
-        on_page: &mut dyn FnMut(Vec<LibraryItem>),
-        on_total: Option<&mut dyn FnMut(usize)>,
-    ) -> Result<(), LibraryServiceError> {
+    fn list_items_paged(&self, on_page: &mut dyn FnMut(Vec<LibraryItem>),
+                        on_total: Option<&mut dyn FnMut(usize)>)
+                        -> Result<(), LibraryServiceError> {
         let _ = on_total;
         on_page(self.list_items()?);
         Ok(())
     }
 
-    /// Returns the total number of items in the user's library without fetching their content.
+    /// Returns the total number of items in the user's library without fetching
+    /// their content.
     ///
-    /// Returns `None` when a cheap count is not supported by this implementation; callers
-    /// should treat `None` as "count unknown" and fall back to trusting the local cache.
+    /// Returns `None` when a cheap count is not supported by this
+    /// implementation; callers should treat `None` as "count unknown" and
+    /// fall back to trusting the local cache.
     ///
     /// # Errors
     ///
-    /// Returns [`LibraryServiceError`] if the request fails or the session is invalid.
+    /// Returns [`LibraryServiceError`] if the request fails or the session is
+    /// invalid.
     fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
         None
     }
@@ -120,20 +123,22 @@ pub trait LibraryService: Send + Sync + 'static {
     ///
     /// # Errors
     ///
-    /// Returns [`LibraryServiceError`] with kind [`LibraryServiceErrorKind::NotFound`]
-    /// if the id does not match any item, or a network/session error if the request fails.
+    /// Returns [`LibraryServiceError`] with kind
+    /// [`LibraryServiceErrorKind::NotFound`] if the id does not match any
+    /// item, or a network/session error if the request fails.
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError>;
 }
 
-// ── LoginService ──────────────────────────────────────────────────────────────
+// ── LoginService
+// ──────────────────────────────────────────────────────────────
 
 /// Tokens returned by a successful login.
 #[derive(Clone)]
 pub struct LoginTokens {
     /// Short-lived JWT bearer token for API requests.
-    pub access_token: String,
+    pub access_token:      String,
     /// Long-lived token used to refresh the access token.
-    pub refresh_token: String,
+    pub refresh_token:     String,
     /// Unix timestamp (seconds) at which the refresh token expires.
     pub refresh_token_ttl: u64,
 }
@@ -156,7 +161,8 @@ pub trait LoginService: Send + Sync + 'static {
     ///
     /// # Errors
     ///
-    /// Returns [`LoginError`] if authentication fails (network error, invalid key, etc.).
+    /// Returns [`LoginError`] if authentication fails (network error, invalid
+    /// key, etc.).
     fn authenticate(&self, api_key: &str) -> Result<LoginTokens, LoginError>;
 }
 

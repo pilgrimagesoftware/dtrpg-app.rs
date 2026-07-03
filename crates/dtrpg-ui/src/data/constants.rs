@@ -6,36 +6,34 @@
 //! inline strings to ensure consistent namespacing and enable targeted
 //! deletion on uninstall.
 
-/// The threshold (in `added_order`) below which an item counts as recently added.
+/// The threshold (in `added_order`) below which an item counts as recently
+/// added.
 pub const RECENTLY_ADDED_THRESHOLD: u32 = 90;
 
-pub const MONTH_NAMES: [&str; 12] = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-];
+pub const MONTH_NAMES: [&str; 12] = ["January",
+                                     "February",
+                                     "March",
+                                     "April",
+                                     "May",
+                                     "June",
+                                     "July",
+                                     "August",
+                                     "September",
+                                     "October",
+                                     "November",
+                                     "December"];
 
-pub const MONTH_ABBRS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+pub const MONTH_ABBRS: [&str; 12] =
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 pub const APP_NAME: &str = "dtrpg";
 
 /// Reverse-domain bundle identifier.
 ///
-/// macOS convention names filesystem locations (Application Support, Preferences,
-/// Caches) with the reverse-domain bundle ID rather than the bare app name. Used
-/// by [`crate::data::paths`] for those directories; also reused as the keyring
-/// service namespace via [`KEYRING_SERVICE`].
+/// macOS convention names filesystem locations (Application Support,
+/// Preferences, Caches) with the reverse-domain bundle ID rather than the bare
+/// app name. Used by [`crate::data::paths`] for those directories; also reused
+/// as the keyring service namespace via [`KEYRING_SERVICE`].
 pub const MACOS_BUNDLE_ID: &str = "com.pilgrimagesoftware.dtrpg";
 
 pub const COLLECTIONS_CACHE_FILE: &str = "collections_cache.json";
@@ -60,8 +58,9 @@ pub const ERROR_EXPIRY_SECS: u64 = 120;
 
 /// Maximum number of entries retained in the durable alert history log.
 ///
-/// Unlike the transient activity panel's `recent` list, entries here never expire
-/// on a timer — the oldest entry is evicted only once this cap is reached.
+/// Unlike the transient activity panel's `recent` list, entries here never
+/// expire on a timer — the oldest entry is evicted only once this cap is
+/// reached.
 pub const ALERT_LOG_CAP: usize = 100;
 
 /// Default width of the detail panel, in pixels.

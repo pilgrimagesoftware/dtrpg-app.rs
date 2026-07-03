@@ -1,14 +1,14 @@
 //! Formatting helpers for timestamps in the detail panel.
 
-use crate::data::constants::{MONTH_ABBRS, MONTH_NAMES};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::data::constants::{MONTH_ABBRS, MONTH_NAMES};
 
 /// Returns the current Unix timestamp in seconds.
 fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
+    SystemTime::now().duration_since(UNIX_EPOCH)
+                     .map(|d| d.as_secs() as i64)
+                     .unwrap_or(0)
 }
 
 /// Converts a Unix timestamp (seconds) to `(year, month, day)` using the
@@ -17,7 +17,8 @@ fn epoch_to_ymd(ts: i64) -> (i32, u32, u32) {
     // Days since Unix epoch (1970-01-01).
     let days = if ts >= 0 {
         ts / 86_400
-    } else {
+    }
+    else {
         (ts - 86_399) / 86_400
     };
 
@@ -66,10 +67,10 @@ fn epoch_to_hms(ts: i64) -> (u32, u32, bool) {
 ///
 /// ```
 /// // Returns a relative string for a timestamp 2 hours ago.
-/// let two_hours_ago = std::time::SystemTime::now()
-///     .duration_since(std::time::UNIX_EPOCH)
-///     .unwrap()
-///     .as_secs() as i64 - 7200;
+/// let two_hours_ago = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+///                                                 .unwrap()
+///                                                 .as_secs() as i64
+///                     - 7200;
 /// let label = dtrpg_ui::util::datetime::format_relative(two_hours_ago);
 /// assert!(label.contains("hours ago") || label == "yesterday");
 /// ```
@@ -106,14 +107,16 @@ pub fn format_relative(ts: i64) -> String {
 
     if ts_year == now_year {
         format!("{abbr} {ts_day}")
-    } else {
+    }
+    else {
         format!("{abbr} {ts_day}, {ts_year}")
     }
 }
 
 /// Formats a Unix timestamp as a full absolute date/time string.
 ///
-/// Output format: "Month D, YYYY at H:MM AM/PM" (e.g. "January 5, 2024 at 3:42 PM").
+/// Output format: "Month D, YYYY at H:MM AM/PM" (e.g. "January 5, 2024 at 3:42
+/// PM").
 ///
 /// # Examples
 ///

@@ -8,10 +8,10 @@ use rust_i18n::t;
 
 /// Formats `count` with the correctly localized noun form.
 ///
-/// `singular_key` and `plural_key` are `t!()` translation keys (e.g. `"count.item"` /
-/// `"count.items"`), not literal words. Returns `"{count} {noun}"` where `noun` is the
-/// localized value of `singular_key` when `count == 1`, otherwise the localized value
-/// of `plural_key`.
+/// `singular_key` and `plural_key` are `t!()` translation keys (e.g.
+/// `"count.item"` / `"count.items"`), not literal words. Returns `"{count}
+/// {noun}"` where `noun` is the localized value of `singular_key` when `count
+/// == 1`, otherwise the localized value of `plural_key`.
 ///
 /// # Examples
 ///
@@ -50,23 +50,17 @@ mod tests {
 
     #[test]
     fn irregular_plural_key_pair() {
-        assert_eq!(
-            pluralize(1, "count.publisher_item", "count.publisher_items"),
-            "1 publisher item"
-        );
-        assert_eq!(
-            pluralize(3, "count.publisher_item", "count.publisher_items"),
-            "3 publisher items"
-        );
+        assert_eq!(pluralize(1, "count.publisher_item", "count.publisher_items"),
+                   "1 publisher item");
+        assert_eq!(pluralize(3, "count.publisher_item", "count.publisher_items"),
+                   "3 publisher items");
     }
 
     #[test]
     fn missing_key_falls_back_to_key_string() {
         // No locale entry exists for these keys; `t!()` falls back to returning
         // the key itself when no translation and no literal fallback text apply.
-        assert_eq!(
-            pluralize(1, "count.nonexistent", "count.nonexistent_plural"),
-            "1 count.nonexistent"
-        );
+        assert_eq!(pluralize(1, "count.nonexistent", "count.nonexistent_plural"),
+                   "1 count.nonexistent");
     }
 }

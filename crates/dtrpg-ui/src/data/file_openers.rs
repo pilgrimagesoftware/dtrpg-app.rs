@@ -12,7 +12,7 @@ pub struct FileOpenerEntry {
     /// File extension without a leading dot, lower-cased (e.g. `"pdf"`).
     pub extension: String,
     /// Absolute path to the application used to open files of this type.
-    pub app_path: PathBuf,
+    pub app_path:  PathBuf,
 }
 
 /// Outcome of calling [`FileOpenerConfig::add`].
@@ -34,7 +34,8 @@ pub struct FileOpenerConfig {
     entries: Vec<FileOpenerEntry>,
 }
 
-// ── Wrapper used for TOML round-trips ─────────────────────────────────────────
+// ── Wrapper used for TOML round-trips
+// ─────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Default)]
 struct AppConfigFile {
@@ -42,36 +43,39 @@ struct AppConfigFile {
     file_openers: Vec<FileOpenerEntry>,
 }
 
-// ── FileOpenerConfig impl ─────────────────────────────────────────────────────
+// ── FileOpenerConfig impl
+// ─────────────────────────────────────────────────────
 
 impl FileOpenerConfig {
     // ── Persistence ───────────────────────────────────────────────────────────
 
-    /// Loads the config from disk, returning a default if the file is absent or unparseable.
+    /// Loads the config from disk, returning a default if the file is absent or
+    /// unparseable.
     pub fn load() -> Self {
-        let Some(path) = config_path() else {
+        let Some(path) = config_path()
+        else {
             return Self::default();
         };
-        let Ok(text) = std::fs::read_to_string(&path) else {
+        let Ok(text) = std::fs::read_to_string(&path)
+        else {
             return Self::default();
         };
         let parsed: AppConfigFile = toml::from_str(&text).unwrap_or_default();
-        Self {
-            entries: parsed.file_openers,
-        }
+        Self { entries: parsed.file_openers, }
     }
 
     /// Saves the config to disk, creating parent directories if needed.
     ///
     /// Silently ignores I/O errors.
     pub fn save(&self) {
-        let Some(path) = config_path() else { return };
+        let Some(path) = config_path()
+        else {
+            return;
+        };
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let file = AppConfigFile {
-            file_openers: self.entries.clone(),
-        };
+        let file = AppConfigFile { file_openers: self.entries.clone(), };
         if let Ok(text) = toml::to_string(&file) {
             let _ = std::fs::write(path, text);
         }
@@ -100,14 +104,11 @@ impl FileOpenerConfig {
     /// Adds `entry`, normalizing the extension.  Replaces an existing entry for
     /// the same extension.  Returns whether the entry was new or a replacement.
     pub fn add(&mut self, entry: FileOpenerEntry) -> AddOutcome {
-        let normalized = FileOpenerEntry {
-            extension: normalize_ext(&entry.extension),
-            app_path: entry.app_path,
-        };
-        if let Some(existing) = self
-            .entries
-            .iter_mut()
-            .find(|e| e.extension == normalized.extension)
+        let normalized = FileOpenerEntry { extension: normalize_ext(&entry.extension),
+                                           app_path:  entry.app_path, };
+        if let Some(existing) = self.entries
+                                    .iter_mut()
+                                    .find(|e| e.extension == normalized.extension)
         {
             existing.app_path = normalized.app_path;
             return AddOutcome::Replaced;
@@ -116,13 +117,15 @@ impl FileOpenerConfig {
         AddOutcome::Added
     }
 
-    /// Removes the entry whose extension matches `extension` (case-insensitive, dot-tolerant).
+    /// Removes the entry whose extension matches `extension` (case-insensitive,
+    /// dot-tolerant).
     pub fn remove(&mut self, extension: &str) {
         let normalized = normalize_ext(extension);
         self.entries.retain(|e| e.extension != normalized);
     }
 
-    /// Updates the `app_path` of an existing entry.  No-op if the extension is not found.
+    /// Updates the `app_path` of an existing entry.  No-op if the extension is
+    /// not found.
     pub fn update_app_path(&mut self, extension: &str, new_path: PathBuf) {
         let normalized = normalize_ext(extension);
         if let Some(entry) = self.entries.iter_mut().find(|e| e.extension == normalized) {
@@ -141,9 +144,11 @@ impl FileOpenerConfig {
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers
+// ───────────────────────────────────────────────────────────────────
 
-/// Trims whitespace, strips a leading dot, and lower-cases the extension string.
+/// Trims whitespace, strips a leading dot, and lower-cases the extension
+/// string.
 fn normalize_ext(ext: &str) -> String {
     ext.trim().trim_start_matches('.').to_lowercase()
 }
@@ -154,9 +159,8 @@ fn config_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     let base = std::env::var("APPDATA").ok().map(PathBuf::from)?;
     #[cfg(not(target_os = "windows"))]
-    let base = std::env::var("HOME")
-        .ok()
-        .map(|h| PathBuf::from(h).join(".config"))?;
+    let base = std::env::var("HOME").ok()
+                                    .map(|h| PathBuf::from(h).join(".config"))?;
     Some(base.join("dtrpg").join("app_config.toml"))
 }
 
@@ -167,10 +171,8 @@ mod tests {
     use super::*;
 
     fn entry(ext: &str, path: &str) -> FileOpenerEntry {
-        FileOpenerEntry {
-            extension: ext.to_owned(),
-            app_path: PathBuf::from(path),
-        }
+        FileOpenerEntry { extension: ext.to_owned(),
+                          app_path:  PathBuf::from(path), }
     }
 
     fn config_with(entries: Vec<FileOpenerEntry>) -> FileOpenerConfig {
@@ -182,36 +184,26 @@ mod tests {
     #[test]
     fn find_override_exact_match() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(
-            cfg.find_override("pdf"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
+        assert_eq!(cfg.find_override("pdf"),
+                   Some(Path::new("/Applications/Preview.app")));
     }
 
     #[test]
     fn find_override_case_insensitive() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(
-            cfg.find_override("PDF"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
-        assert_eq!(
-            cfg.find_override("Pdf"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
+        assert_eq!(cfg.find_override("PDF"),
+                   Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(cfg.find_override("Pdf"),
+                   Some(Path::new("/Applications/Preview.app")));
     }
 
     #[test]
     fn find_override_dot_prefixed_input() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(
-            cfg.find_override(".pdf"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
-        assert_eq!(
-            cfg.find_override(".PDF"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
+        assert_eq!(cfg.find_override(".pdf"),
+                   Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(cfg.find_override(".PDF"),
+                   Some(Path::new("/Applications/Preview.app")));
     }
 
     #[test]
@@ -253,20 +245,16 @@ mod tests {
         let result = cfg.add(entry("pdf", "/Applications/Acrobat.app"));
         assert_eq!(result, AddOutcome::Replaced);
         assert_eq!(cfg.entries().len(), 1);
-        assert_eq!(
-            cfg.entries()[0].app_path,
-            PathBuf::from("/Applications/Acrobat.app")
-        );
+        assert_eq!(cfg.entries()[0].app_path,
+                   PathBuf::from("/Applications/Acrobat.app"));
     }
 
     // ── validate_all ──────────────────────────────────────────────────────────
 
     #[test]
     fn validate_all_flags_missing_paths() {
-        let cfg = config_with(vec![
-            entry("pdf", "/nonexistent/Preview.app"),
-            entry("epub", "/nonexistent/Calibre.app"),
-        ]);
+        let cfg = config_with(vec![entry("pdf", "/nonexistent/Preview.app"),
+                                   entry("epub", "/nonexistent/Calibre.app"),]);
         let stale = cfg.validate_all();
         assert_eq!(stale.len(), 2);
     }

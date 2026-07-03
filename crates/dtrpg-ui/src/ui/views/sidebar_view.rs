@@ -19,6 +19,7 @@ use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
 use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _};
+use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::collection::CollectionEntry;
@@ -27,15 +28,15 @@ use crate::data::ui_prefs::UiPrefs;
 use crate::util::filter::SidebarFilter;
 use crate::util::matching::name_matches_query;
 use crate::util::publisher::PublisherEntry;
-use rust_i18n::t;
 
-/// Inline search bar state for a collapsible sidebar section (Publishers or Collections).
+/// Inline search bar state for a collapsible sidebar section (Publishers or
+/// Collections).
 ///
-/// Session-only: the search query is never persisted and is cleared whenever the
-/// section's search bar is collapsed.
+/// Session-only: the search query is never persisted and is cleared whenever
+/// the section's search bar is collapsed.
 pub struct SidebarSectionSearch {
     /// Whether the section's search bar is currently expanded.
-    pub open: bool,
+    pub open:  bool,
     /// Current filter text; empty means no filtering.
     pub query: String,
     /// Backing text input, owned by the root view so its subscription lives
@@ -43,7 +44,8 @@ pub struct SidebarSectionSearch {
     pub input: Entity<InputState>,
 }
 
-/// A sidebar child that is either a [`SidebarMenu`] or a thin horizontal divider.
+/// A sidebar child that is either a [`SidebarMenu`] or a thin horizontal
+/// divider.
 #[derive(Clone)]
 enum SidebarContent {
     Menu(Box<SidebarMenu>),
@@ -67,20 +69,15 @@ impl Collapsible for SidebarContent {
 }
 
 impl SidebarItem for SidebarContent {
-    fn render(
-        self,
-        id: impl Into<ElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> impl IntoElement {
+    fn render(self, id: impl Into<ElementId>, window: &mut Window, cx: &mut App)
+              -> impl IntoElement {
         match self {
             Self::Menu(m) => m.render(id, window, cx).into_any_element(),
-            Self::Separator => div()
-                .h(px(1.))
-                .w_full()
-                .my_1()
-                .bg(cx.theme().sidebar_border)
-                .into_any_element(),
+            Self::Separator => div().h(px(1.))
+                                    .w_full()
+                                    .my_1()
+                                    .bg(cx.theme().sidebar_border)
+                                    .into_any_element(),
         }
     }
 }
@@ -91,71 +88,59 @@ impl SidebarItem for SidebarContent {
 /// sidebar footer, now live in the status bar (see `status_bar_view.rs`),
 /// per `main-window-status-bar`.
 #[allow(clippy::too_many_arguments)]
-pub fn render_sidebar(
-    filter: SidebarFilter,
-    counts: SectionCounts,
-    publishers: Vec<PublisherEntry>,
-    collections: Vec<CollectionEntry>,
-    collections_loaded: bool,
-    catalog_ids: HashSet<u64>,
-    entity: Entity<LibraryController>,
-    collection_name_input: Entity<InputState>,
-    publisher_search: SidebarSectionSearch,
-    collection_search: SidebarSectionSearch,
-) -> impl IntoElement + 'static {
+pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
+                      publishers: Vec<PublisherEntry>, collections: Vec<CollectionEntry>,
+                      collections_loaded: bool, catalog_ids: HashSet<u64>,
+                      entity: Entity<LibraryController>,
+                      collection_name_input: Entity<InputState>,
+                      publisher_search: SidebarSectionSearch,
+                      collection_search: SidebarSectionSearch)
+                      -> impl IntoElement + 'static {
     let active = filter.clone();
     let prefs = UiPrefs::load();
     let publishers_open = prefs.publishers_open();
     let collections_open = prefs.collections_open();
 
     // ── Library smart-filter menu ─────────────────────────────────────────────
-    let lib_menu = SidebarMenu::new()
-        .child(nav_item(
-            &t!("sidebar.all_titles"),
-            counts.all,
-            active == SidebarFilter::AllTitles,
-            SidebarFilter::AllTitles,
-            entity.clone(),
-        ))
-        .child(nav_item(
-            &t!("sidebar.recently_added"),
-            counts.recently_added,
-            active == SidebarFilter::RecentlyAdded,
-            SidebarFilter::RecentlyAdded,
-            entity.clone(),
-        ))
-        .child(nav_item(
-            &t!("sidebar.on_this_device"),
-            counts.on_device,
-            active == SidebarFilter::OnDevice,
-            SidebarFilter::OnDevice,
-            entity.clone(),
-        ))
-        .child(nav_item(
-            &t!("sidebar.in_the_cloud"),
-            counts.in_cloud,
-            active == SidebarFilter::InCloud,
-            SidebarFilter::InCloud,
-            entity.clone(),
-        ));
+    let lib_menu = SidebarMenu::new().child(nav_item(&t!("sidebar.all_titles"),
+                                                     counts.all,
+                                                     active == SidebarFilter::AllTitles,
+                                                     SidebarFilter::AllTitles,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.recently_added"),
+                                                     counts.recently_added,
+                                                     active == SidebarFilter::RecentlyAdded,
+                                                     SidebarFilter::RecentlyAdded,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.on_this_device"),
+                                                     counts.on_device,
+                                                     active == SidebarFilter::OnDevice,
+                                                     SidebarFilter::OnDevice,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.in_the_cloud"),
+                                                     counts.in_cloud,
+                                                     active == SidebarFilter::InCloud,
+                                                     SidebarFilter::InCloud,
+                                                     entity.clone()));
 
     let publishers_count = publishers.len();
 
     // ── Publishers menu ───────────────────────────────────────────────────────
-    let pub_children: Vec<SidebarMenuItem> = publishers
-        .into_iter()
-        .filter(|p| name_matches_query(p.name.as_ref(), &publisher_search.query))
-        .map(|p| {
-            let is_active = active == SidebarFilter::Publisher(Arc::clone(&p.name));
-            let f = SidebarFilter::Publisher(Arc::clone(&p.name));
-            nav_item(p.name.as_ref(), p.count, is_active, f, entity.clone())
-        })
-        .collect();
+    let pub_children: Vec<SidebarMenuItem> =
+        publishers.into_iter()
+                  .filter(|p| name_matches_query(p.name.as_ref(), &publisher_search.query))
+                  .map(|p| {
+                      let is_active = active == SidebarFilter::Publisher(Arc::clone(&p.name));
+                      let f = SidebarFilter::Publisher(Arc::clone(&p.name));
+                      nav_item(p.name.as_ref(), p.count, is_active, f, entity.clone())
+                  })
+                  .collect();
 
     let entity_for_pub = entity.clone();
     let pub_title: SharedString = if publisher_search.open {
         "".into()
-    } else {
+    }
+    else {
         t!("sidebar.publishers").into()
     };
     let pub_menu = SidebarMenu::new().child(
@@ -183,37 +168,37 @@ pub fn render_sidebar(
     // visible sidebar content pinned regardless of the panel's actual dragged
     // width, decoupling what you drag from where the sidebar and catalog
     // actually meet.
-    let sidebar_builder = Sidebar::new("sidebar")
-        .collapsible(SidebarCollapsible::None)
-        .side(Side::Left)
-        .w_full()
-        .child(SidebarContent::Menu(Box::new(lib_menu)))
-        .child(SidebarContent::Separator);
+    let sidebar_builder = Sidebar::new("sidebar").collapsible(SidebarCollapsible::None)
+                                                 .side(Side::Left)
+                                                 .w_full()
+                                                 .child(SidebarContent::Menu(Box::new(lib_menu)))
+                                                 .child(SidebarContent::Separator);
 
     // ── Collections menu (always present) ────────────────────────────────────
     // Show "?" instead of "0" while the initial collections fetch is still in
     // flight, so an empty list doesn't read as a confirmed zero-collections state.
     let collections_count: SharedString = if collections_loaded {
         collections.len().to_string().into()
-    } else {
+    }
+    else {
         "?".into()
     };
 
-    let col_children: Vec<SidebarMenuItem> = collections
-        .into_iter()
-        .filter(|c| name_matches_query(c.name.as_ref(), &collection_search.query))
-        .map(|c| {
-            let is_active = matches!(&active, SidebarFilter::Collection(id, _) if *id == c.id);
-            let f = SidebarFilter::Collection(c.id, Arc::clone(&c.name));
-            let count = c
-                .member_ids
-                .iter()
-                .filter(|id| catalog_ids.contains(id))
-                .count();
-            let col_id = c.id;
-            let entity_reload = entity.clone();
-            let entity_delete = entity.clone();
-            nav_item(c.name.as_ref(), count, is_active, f, entity.clone()).context_menu(
+    let col_children: Vec<SidebarMenuItem> =
+        collections.into_iter()
+                   .filter(|c| name_matches_query(c.name.as_ref(), &collection_search.query))
+                   .map(|c| {
+                       let is_active =
+                           matches!(&active, SidebarFilter::Collection(id, _) if *id == c.id);
+                       let f = SidebarFilter::Collection(c.id, Arc::clone(&c.name));
+                       let count = c.member_ids
+                                    .iter()
+                                    .filter(|id| catalog_ids.contains(id))
+                                    .count();
+                       let col_id = c.id;
+                       let entity_reload = entity.clone();
+                       let entity_delete = entity.clone();
+                       nav_item(c.name.as_ref(), count, is_active, f, entity.clone()).context_menu(
                 move |menu, _, _| {
                     menu.item(PopupMenuItem::new(t!("collections.reload")).on_click({
                         let entity = entity_reload.clone();
@@ -231,13 +216,14 @@ pub fn render_sidebar(
                     )
                 },
             )
-        })
-        .collect();
+                   })
+                   .collect();
 
     let entity_for_col = entity.clone();
     let col_title: SharedString = if collection_search.open {
         "".into()
-    } else {
+    }
+    else {
         t!("sidebar.collections").into()
     };
     let collection_search_open = collection_search.open;
@@ -366,44 +352,42 @@ pub fn render_sidebar(
             .children(col_children),
     );
 
-    sidebar_builder
-        .child(SidebarContent::Menu(Box::new(col_menu)))
-        .child(SidebarContent::Separator)
-        .child(SidebarContent::Menu(Box::new(pub_menu)))
+    sidebar_builder.child(SidebarContent::Menu(Box::new(col_menu)))
+                   .child(SidebarContent::Separator)
+                   .child(SidebarContent::Menu(Box::new(pub_menu)))
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers
+// ───────────────────────────────────────────────────────────────────
 
-fn nav_item(
-    label: &str,
-    count: usize,
-    is_active: bool,
-    filter: SidebarFilter,
-    entity: Entity<LibraryController>,
-) -> SidebarMenuItem {
+fn nav_item(label: &str, count: usize, is_active: bool, filter: SidebarFilter,
+            entity: Entity<LibraryController>)
+            -> SidebarMenuItem {
     let label = label.to_string();
-    SidebarMenuItem::new(label)
-        .active(is_active)
-        .suffix(move |_, _| div().text_xs().child(count.to_string()))
-        .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.set_filter(filter.clone(), cx));
-        })
+    SidebarMenuItem::new(label).active(is_active)
+                               .suffix(move |_, _| div().text_xs().child(count.to_string()))
+                               .on_click(move |_, _, cx| {
+                                   entity.update(cx, |ctrl, cx| {
+                                             ctrl.set_filter(filter.clone(), cx)
+                                         });
+                               })
 }
 
-/// Builds a `SidebarMenuItem` suffix that toggles between a plain item count and a
-/// full-width search input, for sections like Publishers whose header carries no
-/// other actions.
+/// Builds a `SidebarMenuItem` suffix that toggles between a plain item count
+/// and a full-width search input, for sections like Publishers whose header
+/// carries no other actions.
 ///
-/// When `search.open` is `false`, renders the item count plus a magnifying-glass
-/// button. When `true`, renders the search input (backed by `search.input`) plus a
-/// close button that toggles the section closed and clears the input's visible text.
-fn render_section_search_suffix(
-    id_prefix: &'static str,
-    count: usize,
-    search: SidebarSectionSearch,
-    entity: Entity<LibraryController>,
-    toggle: impl Fn(&mut LibraryController, &mut Context<LibraryController>) + Copy + 'static,
-) -> impl Fn(&mut Window, &mut App) -> AnyElement + 'static {
+/// When `search.open` is `false`, renders the item count plus a
+/// magnifying-glass button. When `true`, renders the search input (backed by
+/// `search.input`) plus a close button that toggles the section closed and
+/// clears the input's visible text.
+fn render_section_search_suffix(id_prefix: &'static str, count: usize,
+                                search: SidebarSectionSearch, entity: Entity<LibraryController>,
+                                toggle: impl Fn(&mut LibraryController,
+                                   &mut Context<LibraryController>)
+                                + Copy
+                                + 'static)
+                                -> impl Fn(&mut Window, &mut App) -> AnyElement + 'static {
     move |_window, _cx| {
         if search.open {
             let input = search.input.clone();
@@ -428,7 +412,8 @@ fn render_section_search_suffix(
                         }),
                 )
                 .into_any_element()
-        } else {
+        }
+        else {
             let entity_for_open = entity.clone();
             let input_for_open = search.input.clone();
             div()

@@ -1,13 +1,5 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
-use crate::ui::actions::{
-    About, AddCollection, FocusSearch, RefreshThumbnails, ReloadCatalog, ShowActivity,
-    ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher,
-    SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
-};
-use crate::ui::app::{
-    CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
-};
 use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
     IntoElement, ParentElement, Pixels, Render, Styled, div, px,
@@ -19,7 +11,16 @@ use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHead
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
+use rust_i18n::t;
 
+use crate::ui::actions::{
+    About, AddCollection, FocusSearch, RefreshThumbnails, ReloadCatalog, ShowActivity,
+    ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher,
+    SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
+};
+use crate::ui::app::{
+    CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
+};
 use crate::ui::views::{
     catalog_view::CatalogView,
     detail_panel_view::render_detail_tab_content,
@@ -55,38 +56,37 @@ use crate::{
     services::{LibraryService, collections::CollectionsService},
     util::sort::{SortDirection, SortMethod},
 };
-use rust_i18n::t;
 
 /// Type-tag used to identify the startup-auth toast notification.
 struct AuthPendingNotif;
 
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
-    controller: Entity<LibraryController>,
-    settings: Entity<SettingsController>,
-    activity: Entity<ActivityController>,
-    auth_state: Entity<AuthStateController>,
-    catalog_view: Entity<CatalogView>,
+    controller:                  Entity<LibraryController>,
+    settings:                    Entity<SettingsController>,
+    activity:                    Entity<ActivityController>,
+    auth_state:                  Entity<AuthStateController>,
+    catalog_view:                Entity<CatalogView>,
     /// Open/active tab state for the main-window tab strip.
-    tabs: Entity<TabsController>,
+    tabs:                        Entity<TabsController>,
     /// Resizable state for the two-column main layout (sidebar / catalog).
-    resize_state: Entity<ResizableState>,
+    resize_state:                Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
-    sidebar_width: f32,
+    sidebar_width:               f32,
     /// Default focus handle for the root div, ensuring menu-triggered actions
     /// always have a dispatch path even before any child element grabs focus.
-    root_focus: FocusHandle,
+    root_focus:                  FocusHandle,
     /// Focus handle for the settings overlay; grabbed when the panel opens so
     /// Escape key events route to the backdrop instead of the catalog.
-    settings_focus: FocusHandle,
+    settings_focus:              FocusHandle,
     /// Editable search input wired to the library controller's search query.
-    search_input: Entity<InputState>,
+    search_input:                Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
-    collection_name_input: Entity<InputState>,
+    collection_name_input:       Entity<InputState>,
     /// Inline search input for the sidebar's Publishers section.
-    publisher_search_input: Entity<InputState>,
+    publisher_search_input:      Entity<InputState>,
     /// Inline search input for the sidebar's Collections section.
-    collection_search_input: Entity<InputState>,
+    collection_search_input:     Entity<InputState>,
     /// Draft extension input for the in-progress "add file opener" row in the
     /// File Openers settings list (inline, not a modal — see the subscription
     /// wired up in `new()` for the Enter/Blur commit behavior).
@@ -99,21 +99,19 @@ pub struct LibraryRootView {
     /// load) closes an open menu out from under the user and reads as
     /// flicker. Skip the rebuild when the checkmark-relevant state hasn't
     /// actually changed.
-    last_menu_state: Option<ViewMenuState>,
+    last_menu_state:             Option<ViewMenuState>,
 }
 
 impl LibraryRootView {
     /// Constructs the root view and wires up the controller subscriptions.
     ///
-    /// If `startup_api_key` is `Some`, a background re-authentication is started immediately.
-    /// The window always opens in the unauthenticated state and transitions once auth completes.
-    pub fn new(
-        window: &mut gpui::Window,
-        cx: &mut Context<Self>,
-        service: Box<dyn LibraryService>,
-        collections_service: Box<dyn CollectionsService>,
-        startup_api_key: Option<String>,
-    ) -> Self {
+    /// If `startup_api_key` is `Some`, a background re-authentication is
+    /// started immediately. The window always opens in the unauthenticated
+    /// state and transitions once auth completes.
+    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>,
+               service: Box<dyn LibraryService>,
+               collections_service: Box<dyn CollectionsService>, startup_api_key: Option<String>)
+               -> Self {
         let activity = cx.new(|_| ActivityController::new());
         let tabs = cx.new(|_| TabsController::new());
         let controller =
@@ -125,241 +123,228 @@ impl LibraryRootView {
             InputState::new(window, cx).placeholder(t!("settings.api_key_placeholder").to_string())
         });
         let settings_for_input = settings.clone();
-        cx.subscribe(
-            &api_key_input,
-            move |_this, input_entity, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = input_entity.read(cx).value().to_string();
-                    settings_for_input.update(cx, |ctrl, cx| ctrl.set_api_key_draft(value, cx));
-                }
-            },
-        )
-        .detach();
+        cx.subscribe(&api_key_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             settings_for_input.update(cx, |ctrl, cx| {
+                                                   ctrl.set_api_key_draft(value, cx)
+                                               });
+                         }
+                     })
+          .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_api_key_input(api_key_input));
 
         let email_initial = settings.read(cx).email_draft().to_owned();
         let email_input = cx.new(|cx| {
-            let mut state = InputState::new(window, cx)
+                                let mut state = InputState::new(window, cx)
                 .placeholder(t!("settings.email_placeholder").to_string());
-            if !email_initial.is_empty() {
-                state = state.default_value(&email_initial);
-            }
-            state
-        });
+                                if !email_initial.is_empty() {
+                                    state = state.default_value(&email_initial);
+                                }
+                                state
+                            });
         let settings_for_email = settings.clone();
-        cx.subscribe(
-            &email_input,
-            move |_this, input_entity, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = input_entity.read(cx).value().to_string();
-                    settings_for_email.update(cx, |ctrl, cx| ctrl.set_email_draft(value, cx));
-                }
-            },
-        )
-        .detach();
+        cx.subscribe(&email_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             settings_for_email.update(cx, |ctrl, cx| {
+                                                   ctrl.set_email_draft(value, cx)
+                                               });
+                         }
+                     })
+          .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_email_input(email_input));
 
         let storage_path_placeholder = {
             use crate::data::storage::StorageConfig;
-            StorageConfig::load()
-                .root_path()
-                .to_string_lossy()
-                .into_owned()
+            StorageConfig::load().root_path()
+                                 .to_string_lossy()
+                                 .into_owned()
         };
         let storage_path_input =
             cx.new(|cx| InputState::new(window, cx).default_value(&storage_path_placeholder));
         let settings_for_storage = settings.clone();
-        cx.subscribe(
-            &storage_path_input,
-            move |_this, input_entity, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = input_entity.read(cx).value().to_string();
-                    settings_for_storage
-                        .update(cx, |ctrl, cx| ctrl.set_storage_path_draft(value, cx));
-                }
-            },
-        )
-        .detach();
+        cx.subscribe(&storage_path_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             settings_for_storage.update(cx, |ctrl, cx| {
+                                                     ctrl.set_storage_path_draft(value, cx)
+                                                 });
+                         }
+                     })
+          .detach();
         settings.update(cx, |ctrl, _cx| {
-            ctrl.set_storage_path_input(storage_path_input)
-        });
+                    ctrl.set_storage_path_input(storage_path_input)
+                });
 
         let catalog_view = cx.new(|cx| {
-            CatalogView::new(
-                window,
-                cx,
-                controller.clone(),
-                settings.clone(),
-                tabs.clone(),
-            )
-        });
+                                 CatalogView::new(window,
+                                                  cx,
+                                                  controller.clone(),
+                                                  settings.clone(),
+                                                  tabs.clone())
+                             });
         let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
         let root_focus = cx.focus_handle();
         root_focus.focus(window, cx);
         let settings_focus = cx.focus_handle();
 
-        let search_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t!("search.placeholder").to_string())
-        });
+        let search_input =
+            cx.new(|cx| {
+                  InputState::new(window, cx).placeholder(t!("search.placeholder").to_string())
+              });
 
         let controller_for_search = controller.clone();
-        cx.subscribe(
-            &search_input,
-            move |_this, input_entity, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = input_entity.read(cx).value().to_string();
-                    controller_for_search.update(cx, |ctrl, cx| {
-                        ctrl.set_search_query(value, cx);
-                    });
-                }
-            },
-        )
-        .detach();
+        cx.subscribe(&search_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             controller_for_search.update(cx, |ctrl, cx| {
+                                                      ctrl.set_search_query(value, cx);
+                                                  });
+                         }
+                     })
+          .detach();
 
         let collection_name_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t!("collections.name_placeholder").to_string())
         });
         let file_opener_extension_input = cx.new(|cx| {
-            InputState::new(window, cx)
+                                                InputState::new(window, cx)
                 .placeholder(t!("settings.file_opener_extension_placeholder").to_string())
-        });
+                                            });
 
         let publisher_search_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t!("search.publishers_placeholder").to_string())
         });
         let controller_for_publisher_search = controller.clone();
-        cx.subscribe(
-            &publisher_search_input,
-            move |_this, input_entity, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = input_entity.read(cx).value().to_string();
-                    controller_for_publisher_search.update(cx, |ctrl, cx| {
-                        ctrl.set_publisher_search_query(value, cx);
-                    });
-                }
-            },
-        )
-        .detach();
+        cx.subscribe(&publisher_search_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             controller_for_publisher_search.update(cx, |ctrl, cx| {
+                                 ctrl.set_publisher_search_query(value, cx);
+                             });
+                         }
+                     })
+          .detach();
 
         let collection_search_input = cx.new(|cx| {
-            InputState::new(window, cx)
+                                            InputState::new(window, cx)
                 .placeholder(t!("search.collections_placeholder").to_string())
-        });
+                                        });
         let controller_for_collection_search = controller.clone();
-        cx.subscribe(
-            &collection_search_input,
-            move |_this, input_entity, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Change) {
-                    let value = input_entity.read(cx).value().to_string();
-                    controller_for_collection_search.update(cx, |ctrl, cx| {
-                        ctrl.set_collection_search_query(value, cx);
-                    });
-                }
-            },
-        )
-        .detach();
+        cx.subscribe(&collection_search_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             controller_for_collection_search.update(cx, |ctrl, cx| {
+                                 ctrl.set_collection_search_query(value, cx);
+                             });
+                         }
+                     })
+          .detach();
 
         // Commit the pending "add file opener" row on Enter; on blur, commit if the
         // user typed something, otherwise discard the pending row (matches clicking
         // elsewhere in most inline-add UIs — no separate confirm step needed).
         let settings_for_ext = settings.clone();
-        cx.subscribe(
-            &file_opener_extension_input,
-            move |_this, input_entity, event: &InputEvent, cx| match event {
-                InputEvent::PressEnter { .. } => {
-                    let value = input_entity.read(cx).value().to_string();
-                    settings_for_ext
-                        .update(cx, |ctrl, cx| ctrl.commit_pending_file_opener(&value, cx));
-                }
-                InputEvent::Blur => {
-                    let value = input_entity.read(cx).value().to_string();
-                    settings_for_ext.update(cx, |ctrl, cx| {
-                        if value.trim().is_empty() {
-                            ctrl.cancel_pending_file_opener(cx);
-                        } else {
-                            ctrl.commit_pending_file_opener(&value, cx);
-                        }
-                    });
-                }
-                _ => {}
-            },
-        )
-        .detach();
+        cx.subscribe(&file_opener_extension_input,
+                     move |_this, input_entity, event: &InputEvent, cx| match event {
+                         InputEvent::PressEnter { .. } => {
+                             let value = input_entity.read(cx).value().to_string();
+                             settings_for_ext.update(cx, |ctrl, cx| {
+                                                 ctrl.commit_pending_file_opener(&value, cx)
+                                             });
+                         }
+                         InputEvent::Blur => {
+                             let value = input_entity.read(cx).value().to_string();
+                             settings_for_ext.update(cx, |ctrl, cx| {
+                                                 if value.trim().is_empty() {
+                                                     ctrl.cancel_pending_file_opener(cx);
+                                                 }
+                                                 else {
+                                                     ctrl.commit_pending_file_opener(&value, cx);
+                                                 }
+                                             });
+                         }
+                         _ => {}
+                     })
+          .detach();
 
         cx.subscribe_in(
-            &controller,
-            window,
-            |_this, _ctrl, event: &CollectionCreateFailed, window, cx| {
-                window.push_notification(
+                        &controller,
+                        window,
+                        |_this, _ctrl, event: &CollectionCreateFailed, window, cx| {
+                            window.push_notification(
                     Notification::new()
                         .message(event.message.clone())
                         .with_type(NotificationType::Error)
                         .autohide(false),
                     cx,
                 );
-            },
+                        },
         )
-        .detach();
+          .detach();
 
         cx.subscribe(&controller, |this, ctrl, _event: &LibraryChanged, cx| {
-            // Keep the native View menu's checkmarks (presentation, sort, grouping)
-            // in sync with the toolbar/keyboard-driven selection. `LibraryChanged`
-            // fires far more often than the checkmark-relevant state actually
-            // changes (e.g. once per thumbnail during a catalog load), and
-            // `cx.set_menus` replaces the whole native menu bar — on macOS that
-            // tears down any menu currently tracking a click, which read as the
-            // app menu flickering or closing itself right after opening. Only
-            // rebuild when the state that drives the checkmarks has changed.
-            let ctrl = ctrl.read(cx);
-            let menu_state = ViewMenuState {
-                presentation: ctrl.presentation,
-                sort: ctrl.sort,
-                sort_direction: ctrl.sort_direction,
-                grouped: ctrl.grouped,
-            };
-            if this.last_menu_state != Some(menu_state) {
-                cx.set_menus(build_menus(&menu_state));
-                this.last_menu_state = Some(menu_state);
-            }
-            cx.notify();
-        })
-        .detach();
+              // Keep the native View menu's checkmarks (presentation, sort, grouping)
+              // in sync with the toolbar/keyboard-driven selection. `LibraryChanged`
+              // fires far more often than the checkmark-relevant state actually
+              // changes (e.g. once per thumbnail during a catalog load), and
+              // `cx.set_menus` replaces the whole native menu bar — on macOS that
+              // tears down any menu currently tracking a click, which read as the
+              // app menu flickering or closing itself right after opening. Only
+              // rebuild when the state that drives the checkmarks has changed.
+              let ctrl = ctrl.read(cx);
+              let menu_state = ViewMenuState { presentation:   ctrl.presentation,
+                                               sort:           ctrl.sort,
+                                               sort_direction: ctrl.sort_direction,
+                                               grouped:        ctrl.grouped, };
+              if this.last_menu_state != Some(menu_state) {
+                  cx.set_menus(build_menus(&menu_state));
+                  this.last_menu_state = Some(menu_state);
+              }
+              cx.notify();
+          })
+          .detach();
 
         cx.subscribe(&tabs, |_this, _ctrl, _event: &TabsChanged, cx| {
-            cx.notify();
-        })
-        .detach();
+              cx.notify();
+          })
+          .detach();
 
         cx.subscribe(&activity, |_this, _ctrl, _event: &ActivityChanged, cx| {
-            cx.notify();
-        })
-        .detach();
+              cx.notify();
+          })
+          .detach();
+
+        cx.subscribe_in(&activity,
+                        window,
+                        |_this, _ctrl, event: &DownloadComplete, window, cx| {
+                            let msg = format!("Downloaded: {}", event.title);
+                            window.push_notification(Notification::success(msg), cx);
+                        })
+          .detach();
 
         cx.subscribe_in(
-            &activity,
-            window,
-            |_this, _ctrl, event: &DownloadComplete, window, cx| {
-                let msg = format!("Downloaded: {}", event.title);
-                window.push_notification(Notification::success(msg), cx);
-            },
-        )
-        .detach();
-
-        cx.subscribe_in(
-            &activity,
-            window,
-            |_this, _ctrl, event: &DownloadError, window, cx| {
-                let msg = format!("{}: {}", event.title, event.message);
-                window.push_notification(
+                        &activity,
+                        window,
+                        |_this, _ctrl, event: &DownloadError, window, cx| {
+                            let msg = format!("{}: {}", event.title, event.message);
+                            window.push_notification(
                     Notification::new()
                         .message(msg)
                         .with_type(NotificationType::Error)
                         .autohide(false),
                     cx,
                 );
-            },
+                        },
         )
-        .detach();
+          .detach();
 
         // When the settings overlay closes, its backdrop/input focus handles unmount
         // and become orphaned in the dispatch tree — `Window::focused` still returns
@@ -370,104 +355,104 @@ impl LibraryRootView {
         // so once this happens the native menu bar shows every custom item as
         // permanently disabled. Restore focus to `root_focus` on close to keep the
         // dispatch path anchored inside our tree.
-        cx.subscribe_in(
-            &settings,
-            window,
-            |this, ctrl, _event: &SettingsChanged, window, cx| {
-                if !ctrl.read(cx).is_open() {
-                    window.focus(&this.root_focus, cx);
-                }
-                cx.notify();
-            },
-        )
-        .detach();
+        cx.subscribe_in(&settings,
+                        window,
+                        |this, ctrl, _event: &SettingsChanged, window, cx| {
+                            if !ctrl.read(cx).is_open() {
+                                window.focus(&this.root_focus, cx);
+                            }
+                            cx.notify();
+                        })
+          .detach();
 
-        cx.subscribe(
-            &auth_state,
-            |_this, _ctrl, _event: &AuthStateChanged, cx| {
-                cx.notify();
-            },
-        )
-        .detach();
+        cx.subscribe(&auth_state,
+                     |_this, _ctrl, _event: &AuthStateChanged, cx| {
+                         cx.notify();
+                     })
+          .detach();
 
         // Handle logout: delete the API key and transition to unauthenticated.
         // Tokens are in-memory only and need no explicit deletion.
         let auth_state_for_logout = auth_state.clone();
-        cx.subscribe(
-            &settings,
-            move |_this, _ctrl, _event: &LogoutRequested, cx| {
-                let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
-                if let Err(e) = store.delete() {
-                    tracing::warn!("credential delete (api-key): {e}");
-                }
-                auth_state_for_logout.update(cx, |ctrl, cx| {
-                    ctrl.set_state(AuthState::Unauthenticated, cx)
-                });
-            },
-        )
-        .detach();
+        cx.subscribe(&settings,
+                     move |_this, _ctrl, _event: &LogoutRequested, cx| {
+                         let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
+                         if let Err(e) = store.delete() {
+                             tracing::warn!("credential delete (api-key): {e}");
+                         }
+                         auth_state_for_logout.update(cx, |ctrl, cx| {
+                                                  ctrl.set_state(AuthState::Unauthenticated, cx)
+                                              });
+                     })
+          .detach();
 
-        // Handle sign-in: replace both services, mark authenticated, dismiss any auth toast.
+        // Handle sign-in: replace both services, mark authenticated, dismiss any auth
+        // toast.
         let auth_state_for_signin = auth_state.clone();
         let controller_for_signin = controller.clone();
-        cx.subscribe_in(
-            &settings,
-            window,
-            move |_this, _settings, event: &SignInSucceeded, window, cx| {
-                let tokens = event.0.clone();
-                let service = cx.global::<ServiceFactory>().0.as_ref()(Some(tokens.clone()));
-                let collections_service =
-                    cx.global::<CollectionsServiceFactory>().0.as_ref()(Some(tokens));
-                controller_for_signin.update(cx, |ctrl, cx| {
-                    ctrl.replace_service(service, collections_service, cx);
-                });
-                auth_state_for_signin
-                    .update(cx, |ctrl, cx| ctrl.set_state(AuthState::Authenticated, cx));
-                window.remove_notification::<AuthPendingNotif>(cx);
-            },
-        )
-        .detach();
+        cx.subscribe_in(&settings,
+                        window,
+                        move |_this, _settings, event: &SignInSucceeded, window, cx| {
+                            let tokens = event.0.clone();
+                            let service =
+                                cx.global::<ServiceFactory>().0.as_ref()(Some(tokens.clone()));
+                            let collections_service =
+                                cx.global::<CollectionsServiceFactory>().0.as_ref()(Some(tokens));
+                            controller_for_signin.update(cx, |ctrl, cx| {
+                                                     ctrl.replace_service(service,
+                                                                          collections_service,
+                                                                          cx);
+                                                 });
+                            auth_state_for_signin.update(cx, |ctrl, cx| {
+                                                     ctrl.set_state(AuthState::Authenticated, cx)
+                                                 });
+                            window.remove_notification::<AuthPendingNotif>(cx);
+                        })
+          .detach();
 
-        // Handle startup auth beginning: suppress the "Not signed in" banner and show a toast.
+        // Handle startup auth beginning: suppress the "Not signed in" banner and show a
+        // toast.
         let auth_state_for_begun = auth_state.clone();
         cx.subscribe_in(
-            &settings,
-            window,
-            move |_this, _settings, _event: &StartupAuthBegun, window, cx| {
-                auth_state_for_begun.update(cx, |ctrl, cx| ctrl.set_auth_pending(true, cx));
-                window.push_notification(
+                        &settings,
+                        window,
+                        move |_this, _settings, _event: &StartupAuthBegun, window, cx| {
+                            auth_state_for_begun.update(cx, |ctrl, cx| {
+                                                    ctrl.set_auth_pending(true, cx)
+                                                });
+                            window.push_notification(
                     Notification::new()
                         .message("Signing in to DriveThruRPG...")
                         .autohide(false)
                         .id::<AuthPendingNotif>(),
                     cx,
                 );
-            },
+                        },
         )
-        .detach();
+          .detach();
 
         // Handle startup auth failure: clear pending state and dismiss the toast.
         let auth_state_for_failed = auth_state.clone();
-        cx.subscribe_in(
-            &settings,
-            window,
-            move |_this, _settings, _event: &StartupAuthFailed, window, cx| {
-                auth_state_for_failed.update(cx, |ctrl, cx| ctrl.set_auth_pending(false, cx));
-                window.remove_notification::<AuthPendingNotif>(cx);
-            },
-        )
-        .detach();
+        cx.subscribe_in(&settings,
+                        window,
+                        move |_this, _settings, _event: &StartupAuthFailed, window, cx| {
+                            auth_state_for_failed.update(cx, |ctrl, cx| {
+                                                     ctrl.set_auth_pending(false, cx)
+                                                 });
+                            window.remove_notification::<AuthPendingNotif>(cx);
+                        })
+          .detach();
 
         // Handle cache clear: drop the in-memory catalog/collections and force a live
         // re-fetch, so cleared content disappears immediately instead of lingering.
         let controller_for_cache_cleared = controller.clone();
-        cx.subscribe(
-            &settings,
-            move |_this, _settings, _event: &CacheCleared, cx| {
-                controller_for_cache_cleared.update(cx, |ctrl, cx| ctrl.clear_and_reload(cx));
-            },
-        )
-        .detach();
+        cx.subscribe(&settings,
+                     move |_this, _settings, _event: &CacheCleared, cx| {
+                         controller_for_cache_cleared.update(cx, |ctrl, cx| {
+                                                         ctrl.clear_and_reload(cx)
+                                                     });
+                     })
+          .detach();
 
         // Start background auth after all subscriptions are wired.
         if let Some(key) = startup_api_key {
@@ -479,32 +464,30 @@ impl LibraryRootView {
         let resize_state = cx.new(|_| ResizableState::default());
 
         cx.subscribe(&resize_state, move |_this, state, _event, cx| {
-            let sizes = state.read(cx).sizes().clone();
-            if sizes.len() >= 2 {
-                let sidebar = sizes[0].as_f32();
-                UiPrefs::load().save_sidebar_width(sidebar);
-            }
-        })
-        .detach();
+              let sizes = state.read(cx).sizes().clone();
+              if sizes.len() >= 2 {
+                  let sidebar = sizes[0].as_f32();
+                  UiPrefs::load().save_sidebar_width(sidebar);
+              }
+          })
+          .detach();
 
-        Self {
-            controller,
-            settings,
-            activity,
-            auth_state,
-            catalog_view,
-            tabs,
-            resize_state,
-            sidebar_width,
-            root_focus,
-            settings_focus,
-            search_input,
-            collection_name_input,
-            file_opener_extension_input,
-            publisher_search_input,
-            collection_search_input,
-            last_menu_state: None,
-        }
+        Self { controller,
+               settings,
+               activity,
+               auth_state,
+               catalog_view,
+               tabs,
+               resize_state,
+               sidebar_width,
+               root_focus,
+               settings_focus,
+               search_input,
+               collection_name_input,
+               file_opener_extension_input,
+               publisher_search_input,
+               collection_search_input,
+               last_menu_state: None }
     }
 }
 
@@ -517,9 +500,10 @@ impl Focusable for LibraryRootView {
 impl Render for LibraryRootView {
     fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
         // `Root` (gpui-component) tracks open dialogs/sheets/notifications as state but
-        // does not render them itself — the top-level app view must compose these layers
-        // explicitly, or `window.open_dialog()` / `open_alert_dialog()` / `push_notification()`
-        // calls silently have no visible effect. See gpui-component's `StoryRoot` example.
+        // does not render them itself — the top-level app view must compose these
+        // layers explicitly, or `window.open_dialog()` / `open_alert_dialog()`
+        // / `push_notification()` calls silently have no visible effect. See
+        // gpui-component's `StoryRoot` example.
         let sheet_layer = Root::render_sheet_layer(window, cx);
         let dialog_layer = Root::render_dialog_layer(window, cx);
         let notification_layer = Root::render_notification_layer(window, cx);
@@ -530,85 +514,82 @@ impl Render for LibraryRootView {
         let auth_entity = self.auth_state.clone();
 
         let snap = self.controller.read(cx).snapshot();
-        let (
-            filter,
-            counts,
-            publishers,
-            collections,
-            collections_loaded,
-            catalog_ids,
-            total_count,
-            total_mb,
-            matched_count,
-            sort,
-            sort_direction,
-            grouped,
-            presentation,
-        ) = (
-            snap.filter,
-            snap.counts,
-            snap.publishers,
-            snap.collections,
-            snap.collections_loaded,
-            snap.catalog_ids,
-            snap.total_count,
-            snap.total_mb,
-            snap.matched_count,
-            snap.sort,
-            snap.sort_direction,
-            snap.grouped,
-            snap.presentation,
-        );
+        let (filter,
+             counts,
+             publishers,
+             collections,
+             collections_loaded,
+             catalog_ids,
+             total_count,
+             total_mb,
+             matched_count,
+             sort,
+             sort_direction,
+             grouped,
+             presentation) = (snap.filter,
+                              snap.counts,
+                              snap.publishers,
+                              snap.collections,
+                              snap.collections_loaded,
+                              snap.catalog_ids,
+                              snap.total_count,
+                              snap.total_mb,
+                              snap.matched_count,
+                              snap.sort,
+                              snap.sort_direction,
+                              snap.grouped,
+                              snap.presentation);
 
         let settings_snap = self.settings.read(cx).snapshot();
         let activity_snap = self.activity.read(cx).snapshot();
-        let notices: Vec<_> = self
-            .auth_state
-            .read(cx)
-            .active_notices()
-            .into_iter()
-            .cloned()
-            .collect();
+        let notices: Vec<_> = self.auth_state
+                                  .read(cx)
+                                  .active_notices()
+                                  .into_iter()
+                                  .cloned()
+                                  .collect();
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
 
-        let publisher_search = crate::ui::views::sidebar_view::SidebarSectionSearch {
-            open: snap.publisher_search_open,
-            query: snap.publisher_search_query,
-            input: self.publisher_search_input.clone(),
-        };
-        let collection_search = crate::ui::views::sidebar_view::SidebarSectionSearch {
-            open: snap.collection_search_open,
-            query: snap.collection_search_query,
-            input: self.collection_search_input.clone(),
-        };
-        let sidebar = render_sidebar(
-            filter.clone(),
-            counts,
-            publishers,
-            collections,
-            collections_loaded,
-            catalog_ids,
-            lib_entity.clone(),
-            self.collection_name_input.clone(),
-            publisher_search,
-            collection_search,
-        );
-        let toolbar = render_toolbar(
-            &filter,
-            snap.filter_count,
-            matched_count,
-            total_count,
-            &snap.search_query,
-            self.search_input.clone(),
-            sort,
-            sort_direction,
-            grouped,
-            presentation,
-            lib_entity.clone(),
-            colors,
-        );
+        let publisher_search =
+            crate::ui::views::sidebar_view::SidebarSectionSearch { open:
+                                                                       snap.publisher_search_open,
+                                                                   query:
+                                                                       snap.publisher_search_query,
+                                                                   input:
+                                                                       self.publisher_search_input
+                                                                           .clone(), };
+        let collection_search =
+            crate::ui::views::sidebar_view::SidebarSectionSearch { open:
+                                                                       snap.collection_search_open,
+                                                                   query:
+                                                                       snap.collection_search_query,
+                                                                   input:
+                                                                       self.collection_search_input
+                                                                           .clone(), };
+        let sidebar = render_sidebar(filter.clone(),
+                                     counts,
+                                     publishers,
+                                     collections,
+                                     collections_loaded,
+                                     catalog_ids,
+                                     lib_entity.clone(),
+                                     self.collection_name_input.clone(),
+                                     publisher_search,
+                                     collection_search);
+        let toolbar = render_toolbar(&filter,
+                                     snap.filter_count,
+                                     matched_count,
+                                     total_count,
+                                     &snap.search_query,
+                                     self.search_input.clone(),
+                                     sort,
+                                     sort_direction,
+                                     grouped,
+                                     presentation,
+                                     lib_entity.clone(),
+                                     colors);
         let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
         let tab_strip = render_tab_strip(self.tabs.clone(), cx);
         let banner =
@@ -616,62 +597,50 @@ impl Render for LibraryRootView {
 
         let tabs_snap = self.tabs.read(cx).snapshot();
         let (active_tab_label, active_tab_count) = match &tabs_snap.active {
-            TabTarget::Catalog => (
-                crate::ui::views::toolbar_view::section_title_for(&filter),
-                matched_count,
-            ),
-            TabTarget::Detail(id) => (
-                tabs_snap
-                    .titles
-                    .get(id)
-                    .cloned()
-                    .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string()),
-                1,
-            ),
+            TabTarget::Catalog => {
+                (crate::ui::views::toolbar_view::section_title_for(&filter), matched_count)
+            }
+            TabTarget::Detail(id) => {
+                (tabs_snap.titles
+                          .get(id)
+                          .cloned()
+                          .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string()),
+                 1)
+            }
         };
         let alert_snap = self.activity.read(cx).alert_snapshot();
-        let status_bar = render_status_bar(
-            StatusBarSnapshot {
-                total_count,
-                total_mb,
-                active_tab_label,
-                active_tab_count,
-                theme_key: theme.key,
-            },
-            lib_entity.clone(),
-            ActivityBarData {
-                entity: activity_entity.clone(),
-                snap: &activity_snap,
-                alert_snap: &alert_snap,
-            },
-            colors,
-        );
+        let status_bar = render_status_bar(StatusBarSnapshot { total_count,
+                                                               total_mb,
+                                                               active_tab_label,
+                                                               active_tab_count,
+                                                               theme_key: theme.key },
+                                           lib_entity.clone(),
+                                           ActivityBarData { entity:     activity_entity.clone(),
+                                                             snap:       &activity_snap,
+                                                             alert_snap: &alert_snap, },
+                                           colors);
 
         let active_tab_content: AnyElement = match &tabs_snap.active {
-            TabTarget::Catalog => div()
-                .flex_1()
-                .min_h_0()
-                .flex()
-                .flex_col()
-                .child(toolbar)
-                .child(banner)
-                .child(self.catalog_view.clone())
-                .into_any_element(),
+            TabTarget::Catalog => div().flex_1()
+                                       .min_h_0()
+                                       .flex()
+                                       .flex_col()
+                                       .child(toolbar)
+                                       .child(banner)
+                                       .child(self.catalog_view.clone())
+                                       .into_any_element(),
             TabTarget::Detail(id) => {
                 let controller_ref = self.controller.read(cx);
                 match controller_ref.item_by_id(id) {
                     Some(item) => {
                         let item = item.clone();
-                        let cover_image = cx
-                            .global::<crate::ui::library::cover::CoverCache>()
-                            .get(&item.id);
-                        render_detail_tab_content(
-                            &item,
-                            settings_snap.storage_root_path.clone(),
-                            lib_entity.clone(),
-                            colors,
-                            cover_image,
-                        )
+                        let cover_image = cx.global::<crate::ui::library::cover::CoverCache>()
+                                            .get(&item.id);
+                        render_detail_tab_content(&item,
+                                                  settings_snap.storage_root_path.clone(),
+                                                  lib_entity.clone(),
+                                                  colors,
+                                                  cover_image)
                     }
                     None => div().flex_1().min_h_0().into_any_element(),
                 }
@@ -684,15 +653,14 @@ impl Render for LibraryRootView {
         // Settings overlay is rendered inside the main content area so the
         // sidebar remains visible behind it.
         let main_content = {
-            let mut content = div()
-                .flex_1()
-                .min_w_0()
-                .flex()
-                .flex_col()
-                .relative()
-                .bg(surface)
-                .child(tab_strip)
-                .child(active_tab_content);
+            let mut content = div().flex_1()
+                                   .min_w_0()
+                                   .flex()
+                                   .flex_col()
+                                   .relative()
+                                   .bg(surface)
+                                   .child(tab_strip)
+                                   .child(active_tab_content);
 
             if settings_snap.is_open {
                 // Focus the backdrop on first open so Escape works immediately.
@@ -700,22 +668,20 @@ impl Render for LibraryRootView {
                 if !self.settings_focus.contains_focused(window, cx) {
                     window.focus(&self.settings_focus, cx);
                 }
-                let overlay = render_settings_panel(
-                    &settings_snap.file_openers,
-                    settings_snap.auth,
-                    settings_snap.storage_root_path,
-                    settings_snap.storage_path_exists,
-                    settings_entity,
-                    &self.settings_focus,
-                    colors,
-                    settings_snap.api_key_input,
-                    settings_snap.email_input,
-                    settings_snap.sign_in_in_progress,
-                    settings_snap.sign_in_error,
-                    settings_snap.storage_path_input,
-                    self.file_opener_extension_input.clone(),
-                    settings_snap.pending_file_opener,
-                );
+                let overlay = render_settings_panel(&settings_snap.file_openers,
+                                                    settings_snap.auth,
+                                                    settings_snap.storage_root_path,
+                                                    settings_snap.storage_path_exists,
+                                                    settings_entity,
+                                                    &self.settings_focus,
+                                                    colors,
+                                                    settings_snap.api_key_input,
+                                                    settings_snap.email_input,
+                                                    settings_snap.sign_in_in_progress,
+                                                    settings_snap.sign_in_error,
+                                                    settings_snap.storage_path_input,
+                                                    self.file_opener_extension_input.clone(),
+                                                    settings_snap.pending_file_opener);
                 content = content.child(overlay);
             }
 

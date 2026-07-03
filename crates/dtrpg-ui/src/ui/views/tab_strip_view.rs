@@ -11,34 +11,32 @@ use gpui::{Entity, IntoElement, SharedString, div};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::tab::{Tab, TabBar};
+use rust_i18n::t;
 
 use crate::controllers::tabs::{TabTarget, TabsController};
-use rust_i18n::t;
 
 /// Renders the tab strip: the non-closable catalog tab followed by any open,
 /// closable expanded detail tabs.
-pub fn render_tab_strip(
-    tabs: Entity<TabsController>,
-    cx: &gpui::App,
-) -> impl IntoElement + 'static {
+pub fn render_tab_strip(tabs: Entity<TabsController>, cx: &gpui::App)
+                        -> impl IntoElement + 'static {
     let snap = tabs.read(cx).snapshot();
-    let selected_index = snap
-        .open_tabs
-        .iter()
-        .position(|t| *t == snap.active)
-        .unwrap_or(0);
+    let selected_index = snap.open_tabs
+                             .iter()
+                             .position(|t| *t == snap.active)
+                             .unwrap_or(0);
 
     let mut bar = TabBar::new("main-tab-strip").segmented().menu(true);
 
     for target in &snap.open_tabs {
         let label: SharedString = match target {
             TabTarget::Catalog => t!("tabs.catalog_tab").to_string().into(),
-            TabTarget::Detail(id) => snap
-                .titles
-                .get(id)
-                .cloned()
-                .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string())
-                .into(),
+            TabTarget::Detail(id) => {
+                snap.titles
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string())
+                    .into()
+            }
         };
 
         let mut tab = Tab::new().label(label);
@@ -60,14 +58,13 @@ pub fn render_tab_strip(
 
     let tabs_for_click = tabs.clone();
     let open_tabs = snap.open_tabs.clone();
-    bar = bar
-        .selected_index(selected_index)
-        .on_click(move |ix, _, cx| {
-            if let Some(target) = open_tabs.get(*ix) {
-                let target = target.clone();
-                tabs_for_click.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-            }
-        });
+    bar = bar.selected_index(selected_index)
+             .on_click(move |ix, _, cx| {
+                 if let Some(target) = open_tabs.get(*ix) {
+                     let target = target.clone();
+                     tabs_for_click.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                 }
+             });
 
     div().flex_none().child(bar)
 }

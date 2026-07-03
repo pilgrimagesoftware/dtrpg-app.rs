@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-// ── Selection ─────────────────────────────────────────────────────────────────
+// ── Selection
+// ─────────────────────────────────────────────────────────────────
 
 /// What is currently selected in the catalog.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
