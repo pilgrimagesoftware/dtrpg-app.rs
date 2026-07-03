@@ -449,7 +449,10 @@ impl LibraryController {
             //   above, but still required to guarantee the final state is exactly the live
             //   dataset (e.g. if a page arrived out of order or a duplicate id was
             //   deduped differently) — then save to disk and dismiss the loading indicator.
-            // On error: leave the cached catalog unchanged in memory.
+            // On error: leave the cached catalog unchanged in memory, but still clear
+            //   `catalog_loading` — otherwise a failed fetch with nothing cached leaves the
+            //   catalog view's spinner (`catalog_loading && item_count == 0`) spinning
+            //   forever instead of falling through to the empty state.
             match fetch.await {
                 Ok(()) => {
                     let is_current = this
@@ -489,6 +492,14 @@ impl LibraryController {
                         let detail = e.panel_detail();
                         weak_activity.update(async_cx, |a, cx| a.error(activity_id, detail, cx)).ok();
                     }
+                    this.update(async_cx, |ctrl, cx| {
+                        if ctrl.load_generation != generation {
+                            return; // superseded by a newer load
+                        }
+                        ctrl.catalog_loading = false;
+                        cx.emit(LibraryChanged);
+                    })
+                    .ok();
                 }
             }
         })
@@ -1550,10 +1561,10 @@ fn app_backtrace() -> String {
 //         self.view_mode = match self.view_mode {
 //             LibraryViewMode::FlatList => LibraryViewMode::TreeByPublisher,
 //             LibraryViewMode::TreeByPublisher =>
-// LibraryViewMode::TreeByProductType,             
+// LibraryViewMode::TreeByProductType,
 // LibraryViewMode::TreeByProductType => LibraryViewMode::GridByPublisher,
 //             LibraryViewMode::GridByPublisher =>
-// LibraryViewMode::GridByProductType,             
+// LibraryViewMode::GridByProductType,
 // LibraryViewMode::GridByProductType => LibraryViewMode::FlatList,         };
 //         self.selection = None;
 //         self.shell.dispatch(AppCommand::ClearSelection);
@@ -1586,7 +1597,7 @@ fn app_backtrace() -> String {
 //     pub fn toggle_match_presentation(&mut self) {
 //         self.match_presentation = match self.match_presentation {
 //             MatchPresentation::HideNonMatching =>
-// MatchPresentation::HighlightMatching,             
+// MatchPresentation::HighlightMatching,
 // MatchPresentation::HighlightMatching => MatchPresentation::HideNonMatching,
 //         };
 //     }

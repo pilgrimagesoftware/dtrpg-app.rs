@@ -64,8 +64,7 @@ pub fn render_activity_panel(snap: &ActivitySnapshot, entity: Entity<ActivityCon
                          .max_h(px(400.0))
                          .overflow_y_scrollbar()
                          .children(snap.items.iter().map(|item| {
-                                                        let is_in_progress =
-                                                            matches!(item.status,
+                                                        let is_in_progress = matches!(item.status,
                                                                      ActivityStatus::InProgress);
                                                         render_item_row(item.id,
                                                                         item.label.as_ref(),

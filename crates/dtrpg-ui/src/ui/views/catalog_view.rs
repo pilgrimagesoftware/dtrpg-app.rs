@@ -747,46 +747,48 @@ impl Render for CatalogView {
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
                 root.px(pad_side)
-                    .child(
-                           uniform_list(
-                    "catalog-grid",
-                    row_count,
-                    move |row_range, _window, cx| {
-                        let range_start = row_range.start;
-                        let item_start = range_start * items_per_row;
-                        let item_end = (row_range.end * items_per_row).min(item_count);
-                        let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
-                        let covers: Vec<Option<Arc<Image>>> = {
-                            let cache = cx.global::<CoverCache>();
-                            items.iter().map(|item| cache.get(&item.id)).collect()
-                        };
-                        row_range.map(|row| {
-                                     let offset = (row - range_start) * items_per_row;
-                                     let row_end = (offset + items_per_row).min(items.len());
-                                     let row_items = &items[offset..row_end];
-                                     let row_covers = &covers[offset..row_end];
-                                     div().flex()
-                                          .gap(d.card_gap_x)
-                                          .mb(d.card_gap_y)
-                                          .children(row_items.iter()
-                                                             .zip(row_covers.iter())
-                                                             .map(|(item, cover)| {
-                                                                 render_grid_card(item,
+                    .child(uniform_list("catalog-grid",
+                                        row_count,
+                                        move |row_range, _window, cx| {
+                                            let range_start = row_range.start;
+                                            let item_start = range_start * items_per_row;
+                                            let item_end =
+                                                (row_range.end * items_per_row).min(item_count);
+                                            let items =
+                                                ctrl.read(cx)
+                                                    .visible_items_slice(item_start..item_end);
+                                            let covers: Vec<Option<Arc<Image>>> = {
+                                                let cache = cx.global::<CoverCache>();
+                                                items.iter()
+                                                     .map(|item| cache.get(&item.id))
+                                                     .collect()
+                                            };
+                                            row_range.map(|row| {
+                                                let offset = (row - range_start) * items_per_row;
+                                                let row_end =
+                                                    (offset + items_per_row).min(items.len());
+                                                let row_items = &items[offset..row_end];
+                                                let row_covers = &covers[offset..row_end];
+                                                div().flex()
+                                                     .gap(d.card_gap_x)
+                                                     .mb(d.card_gap_y)
+                                                     .children(row_items.iter()
+                                                                        .zip(row_covers.iter())
+                                                                        .map(|(item, cover)| {
+                                                                            render_grid_card(item,
                                                                                   cover.clone(),
                                                                                   &c,
                                                                                   d.card_min_width,
                                                                                   ctrl.clone(),
                                                                                   t.clone(),
                                                                                   s.clone())
-                                                             }))
-                                          .into_any_element()
-                                 })
-                                 .collect()
-                    },
-                ).track_scroll(&scroll_handle)
-                           .flex_1()
-                           .min_h_0(),
-                )
+                                                                        }))
+                                                     .into_any_element()
+                                            })
+                                            .collect()
+                                        }).track_scroll(&scroll_handle)
+                                          .flex_1()
+                                          .min_h_0())
                     .into_any_element()
             }
 
