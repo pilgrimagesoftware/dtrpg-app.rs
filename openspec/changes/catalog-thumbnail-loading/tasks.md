@@ -59,3 +59,32 @@
       issue) but never wired into the actual call site until now.
 - [ ] 8.3 Manually launch the app, sign in, and confirm thumbnails now actually appear on
       catalog items (not just that the queue drains without visible progress)
+
+## 9. Bug fix: stale pre-existing disk cache silently disables thumbnail loading
+
+- [x] 9.1 Root-caused a second, independent failure reported after 8.1/8.2 landed: on a
+      machine with a catalog cache already on disk from before `cover_url` was populated
+      correctly, every cached `LibraryItem` has `cover_url: null` (confirmed: 1890/1890 items
+      in the reporter's local cache). `enqueue_thumbnails` correctly finds zero items with a
+      `cover_url` to queue, so no fetch ever starts — this is not a bug in the queue/fetch code,
+      it never receives data to act on. Compounding it: the auto-load policy in
+      `start_load_inner` (`dtrpg-ui/src/controllers/library.rs`) skips the live API refetch
+      whenever the cache is fresh (<7 days, see `catalog-auto-load-policy`) and the remote item
+      count matches, so a fresh-but-schema-stale cache is served indefinitely with no live
+      refetch to ever pick up `cover_url` — and thus no visible error, activity entry, or any
+      other sign that thumbnails should be loading at all.
+- [x] 9.2 Fixed by adding `schema_version: u32` to `CacheMetadata`
+      (`dtrpg-ui/src/data/catalog_cache.rs`), bumped to `2`, and folding a version check into
+      `is_stale()`. Caches written before this field existed deserialize `schema_version` as `0`
+      via `#[serde(default)]`, which never matches the current version and is always treated as
+      stale — forcing a live refetch on next launch regardless of age or item-count match. Added
+      regression tests: a fresh cache with a stale schema version must report `is_stale() ==
+      true`, and JSON without a `schema_version` key must default to `0` and be stale.
+- [x] 9.3 Deleted the reporter's stale local cache
+      (`~/Library/Caches/com.pilgrimagesoftware.dtrpg/metadata/catalog_cache*.json`) so their
+      next launch does a live refetch under the new schema version — this was a one-time local
+      fix; 9.2 prevents recurrence for this and any other existing install.
+- [ ] 9.4 Manually launch the app and confirm: (a) with the reporter's now-deleted cache, a live
+      refetch happens and thumbnails begin loading; (b) with a freshly-saved cache from this
+      build, a second launch within 7 days correctly skips the live refetch (schema version now
+      matches, so the auto-load optimization still works for genuinely current caches)

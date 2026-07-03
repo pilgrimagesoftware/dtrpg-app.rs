@@ -14,6 +14,21 @@ use crate::data::library::LibraryItem;
 /// 7 days in seconds — caches older than this are considered stale.
 const STALE_SECS: u64 = 7 * 24 * 60 * 60;
 
+/// Bump whenever a change to `LibraryItem`'s cached fields means existing
+/// on-disk caches must be treated as stale (forcing a live refetch) rather
+/// than silently missing newly populated data.
+///
+/// Version 2: `cover_url` mapping was fixed after caches already existed in
+/// the wild with `cover_url: null` for every item (the field itself has
+/// always round-tripped via `#[serde(default)]`, so old caches load without
+/// error — they just carry no cover data). Without this version bump, a
+/// fresh-looking cache with a matching remote item count silently skips the
+/// live fetch for up to 7 days, disabling thumbnail loading with no visible
+/// error. Caches written before this field existed deserialize
+/// `schema_version` as `0` via `#[serde(default)]`, which never matches the
+/// current version and is always treated as stale.
+const CACHE_SCHEMA_VERSION: u32 = 2;
+
 // ── CacheMetadata ─────────────────────────────────────────────────────────────
 
 /// Sidecar metadata written alongside the catalog cache file.
@@ -26,11 +41,19 @@ pub struct CacheMetadata {
     pub saved_at_secs: u64,
     /// Number of items in the cache at write time.
     pub item_count: usize,
+    /// Schema version the cache was written with; see [`CACHE_SCHEMA_VERSION`].
+    #[serde(default)]
+    pub schema_version: u32,
 }
 
 impl CacheMetadata {
-    /// Returns true if the cache is older than 7 days.
+    /// Returns true if the cache is older than 7 days or was written by an
+    /// older schema version whose data may be missing fields the current
+    /// app expects to be populated.
     pub fn is_stale(&self) -> bool {
+        if self.schema_version != CACHE_SCHEMA_VERSION {
+            return true;
+        }
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::ZERO)
@@ -62,6 +85,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
     let meta = CacheMetadata {
         saved_at_secs,
         item_count,
+        schema_version: CACHE_SCHEMA_VERSION,
     };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
@@ -173,6 +197,7 @@ mod tests {
                 .unwrap()
                 .as_secs(),
             item_count: 10,
+            schema_version: CACHE_SCHEMA_VERSION,
         };
         assert!(!meta.is_stale());
     }
@@ -182,7 +207,35 @@ mod tests {
         let meta = CacheMetadata {
             saved_at_secs: 0, // epoch — very old
             item_count: 10,
+            schema_version: CACHE_SCHEMA_VERSION,
         };
+        assert!(meta.is_stale());
+    }
+
+    #[test]
+    fn fresh_metadata_with_stale_schema_version_is_stale() {
+        // Regression: a cache saved before `cover_url` was populated
+        // correctly must not be trusted as fresh just because it's recent —
+        // it silently disabled thumbnail loading for up to 7 days otherwise.
+        let meta = CacheMetadata {
+            saved_at_secs: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            item_count: 10,
+            schema_version: CACHE_SCHEMA_VERSION - 1,
+        };
+        assert!(meta.is_stale());
+    }
+
+    #[test]
+    fn metadata_without_schema_version_field_defaults_to_stale() {
+        // Regression: metadata JSON written before `schema_version` existed
+        // has no such key; `#[serde(default)]` must decode it as `0`, which
+        // never matches `CACHE_SCHEMA_VERSION` and is always stale.
+        let json = r#"{"saved_at_secs": 9999999999, "item_count": 10}"#;
+        let meta: CacheMetadata = serde_json::from_str(json).unwrap();
+        assert_eq!(meta.schema_version, 0);
         assert!(meta.is_stale());
     }
 
