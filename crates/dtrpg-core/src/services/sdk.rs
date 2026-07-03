@@ -375,7 +375,11 @@ fn publisher_lookup(included: &[IncludedItem]) -> HashMap<u64, String> {
 fn product_lookup(included: &[IncludedItem]) -> HashMap<String, OrderProductInfo> {
     included
         .iter()
-        .filter_map(|entry| entry.as_product().map(|product| (entry.id.clone(), product)))
+        .filter_map(|entry| {
+            entry
+                .as_product()
+                .map(|product| (entry.id.clone(), product))
+        })
         .collect()
 }
 

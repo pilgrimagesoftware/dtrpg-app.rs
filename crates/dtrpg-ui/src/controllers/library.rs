@@ -323,9 +323,18 @@ impl LibraryController {
                 tracing::debug!(estimated_total = total, "catalog load: seeded total from cache");
             }
 
-            // Accumulate all live SDK pages into a local buffer so the cached catalog
-            // remains visible in the UI throughout the fetch. The swap happens once,
-            // after the channel closes, so there is no intermediate partially-loaded state.
+            // Accumulate all live SDK pages into a local buffer so a *populated* cache
+            // remains visible in the UI throughout the fetch instead of flashing down to
+            // a single page (see `catalog-live-merge`). When there is nothing cached to
+            // protect — first launch, or right after `clear_and_reload` — there is no
+            // flash risk, so each page is appended to the visible catalog (and its
+            // thumbnails enqueued) as it arrives instead of waiting for the entire fetch
+            // to finish. This is what makes thumbnail loading observable/testable without
+            // waiting through a full multi-page fetch.
+            let catalog_was_empty = this
+                .update(async_cx, |ctrl, _cx| ctrl.catalog.is_empty())
+                .unwrap_or(false);
+
             let mut rx = Some(rx);
             let mut total_rx = Some(total_rx);
             let mut live_items: Vec<LibraryItem> = Vec::new();
@@ -361,6 +370,15 @@ impl LibraryController {
 
                 match msg {
                     Ok(items) => {
+                        if catalog_was_empty {
+                            let page = items.clone();
+                            this.update(async_cx, |ctrl, cx| {
+                                if ctrl.load_generation == generation {
+                                    ctrl.append_catalog_page(page, cx);
+                                }
+                            })
+                            .ok();
+                        }
                         live_items.extend(items);
                         // Update progress after each page if we have an estimate.
                         if let Some(total) = estimated_total.filter(|&t| t > 0) {
@@ -376,8 +394,11 @@ impl LibraryController {
             }
 
             // Wait for the fetch task to complete and surface any error.
-            // On success: swap the catalog atomically with the full live dataset,
-            //   then save to disk and dismiss the loading indicator.
+            // On success: swap the catalog atomically with the full live dataset — a no-op
+            //   diff when `catalog_was_empty` already appended every page incrementally
+            //   above, but still required to guarantee the final state is exactly the live
+            //   dataset (e.g. if a page arrived out of order or a duplicate id was
+            //   deduped differently) — then save to disk and dismiss the loading indicator.
             // On error: leave the cached catalog unchanged in memory.
             match fetch.await {
                 Ok(()) => {
