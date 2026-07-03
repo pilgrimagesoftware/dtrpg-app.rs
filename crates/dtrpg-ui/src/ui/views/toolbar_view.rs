@@ -1,27 +1,24 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout switcher.
 
-use std::sync::Arc;
-
 use gpui::prelude::*;
-use gpui::{
-    AnyElement, App, Entity, Image, ImageFormat, ImageSource, IntoElement, MouseButton, ObjectFit,
-    ParentElement, Styled, div, img, px,
-};
+use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
 use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tab::{Tab, TabBar};
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
+use crate::controllers::settings::SettingsController;
 use crate::data::{enums::CatalogPresentation, theme::ColorTokens};
 use crate::util::filter::*;
 use crate::util::pluralize::pluralize;
 use crate::util::sort::*;
 use rust_i18n::t;
 
-fn section_title_for(filter: &SidebarFilter) -> String {
+/// Human-readable title for a sidebar filter, used by both the catalog tab
+/// header and the status bar's active-tab summary.
+pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
     match filter {
         SidebarFilter::AllTitles => t!("sidebar.all_titles").to_string(),
         SidebarFilter::RecentlyAdded => t!("sidebar.recently_added").to_string(),
@@ -96,9 +93,7 @@ pub fn render_toolbar(
     presentation: CatalogPresentation,
     entity: Entity<LibraryController>,
     settings: Entity<SettingsController>,
-    auth: &AuthStateSnapshot,
     colors: &ColorTokens,
-    cx: &App,
 ) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
@@ -166,8 +161,7 @@ pub fn render_toolbar(
                     entity.clone(),
                 ))
                 .child(render_layout_switcher(presentation, entity))
-                .child(render_settings_button(settings.clone()))
-                .child(render_avatar_button(auth, settings, colors, cx)),
+                .child(render_settings_button(settings)),
         )
 }
 
@@ -305,131 +299,6 @@ fn render_settings_button(settings: Entity<SettingsController>) -> impl IntoElem
         .on_click(move |_, _, cx| {
             settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
         })
-}
-
-// ── Avatar button ─────────────────────────────────────────────────────────────
-
-fn detect_image_format(bytes: &[u8]) -> ImageFormat {
-    if bytes.starts_with(b"\x89PNG") {
-        ImageFormat::Png
-    } else {
-        ImageFormat::Jpeg
-    }
-}
-
-fn render_avatar_button(
-    auth: &AuthStateSnapshot,
-    settings: Entity<SettingsController>,
-    colors: &ColorTokens,
-    cx: &App,
-) -> AnyElement {
-    if !auth.is_logged_in {
-        let surface_alt = colors.surface_alt;
-        let border_strong = colors.border_strong;
-        let text_tertiary = colors.text_tertiary;
-        let unauthenticated_variant = ButtonCustomVariant::new(cx)
-            .color(surface_alt)
-            .foreground(text_tertiary)
-            .hover(gpui::Hsla {
-                l: (surface_alt.l * 0.9).min(1.0),
-                ..surface_alt
-            })
-            .active(gpui::Hsla {
-                l: (surface_alt.l * 0.8).min(1.0),
-                ..surface_alt
-            });
-        let inner = div()
-            .flex()
-            .items_center()
-            .justify_center()
-            .size_full()
-            .text_xs()
-            .text_color(text_tertiary)
-            .child("👤")
-            .into_any_element();
-        return Button::new("avatar-btn")
-            .custom(unauthenticated_variant)
-            .tooltip(t!("toolbar.tooltip_not_signed_in").to_string())
-            .rounded_full()
-            .w(px(30.0))
-            .h(px(30.0))
-            .border_1()
-            .border_color(border_strong)
-            .child(inner)
-            .dropdown_menu(move |menu, _, _| {
-                let s = settings.clone();
-                menu.item(
-                    PopupMenuItem::new(t!("toolbar.sign_in")).on_click(move |_, _, cx| {
-                        s.update(cx, |ctrl, cx| ctrl.open(cx));
-                    }),
-                )
-            })
-            .into_any_element();
-    }
-
-    let initial_text = auth
-        .display_initial
-        .map(|c| c.to_string())
-        .unwrap_or_else(|| "D".to_string());
-
-    let accent = colors.accent;
-    let avatar_variant = ButtonCustomVariant::new(cx)
-        .color(accent)
-        .foreground(gpui::white())
-        .hover(gpui::Hsla {
-            l: (accent.l * 0.85).min(1.0),
-            ..accent
-        })
-        .active(gpui::Hsla {
-            l: (accent.l * 0.75).min(1.0),
-            ..accent
-        });
-
-    let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
-        let format = detect_image_format(bytes);
-        let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        img(ImageSource::Image(image))
-            .w(px(30.0))
-            .h(px(30.0))
-            .rounded_full()
-            .object_fit(ObjectFit::Cover)
-            .into_any_element()
-    } else {
-        div()
-            .flex()
-            .items_center()
-            .justify_center()
-            .size_full()
-            .text_xs()
-            .text_color(gpui::white())
-            .child(initial_text)
-            .into_any_element()
-    };
-
-    let menu_email = auth
-        .email
-        .clone()
-        .or_else(|| auth.api_key_hint.clone())
-        .unwrap_or_else(|| t!("settings.default_account_name").to_string());
-
-    Button::new("avatar-btn")
-        .custom(avatar_variant)
-        .tooltip(t!("toolbar.tooltip_account").to_string())
-        .rounded_full()
-        .w(px(30.0))
-        .h(px(30.0))
-        .child(inner)
-        .dropdown_menu(move |menu, _, _| {
-            let s = settings.clone();
-            menu.item(PopupMenuItem::label(menu_email.clone()))
-                .item(PopupMenuItem::separator())
-                .item(
-                    PopupMenuItem::new(t!("toolbar.log_out")).on_click(move |_, _, cx| {
-                        s.update(cx, |ctrl, cx| ctrl.logout(cx));
-                    }),
-                )
-        })
-        .into_any_element()
 }
 
 #[cfg(test)]

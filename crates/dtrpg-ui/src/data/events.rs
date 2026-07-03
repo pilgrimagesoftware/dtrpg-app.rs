@@ -4,6 +4,7 @@ use crate::controllers::activity::ActivityController;
 use crate::controllers::auth_state::AuthStateController;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
+use crate::controllers::tabs::TabsController;
 use crate::services::LoginTokens;
 use gpui::EventEmitter;
 
@@ -111,3 +112,10 @@ impl EventEmitter<StartupAuthFailed> for SettingsController {}
 pub struct CacheCleared;
 
 impl EventEmitter<CacheCleared> for SettingsController {}
+
+// ── TabsChanged ───────────────────────────────────────────────────────────────
+
+/// Emitted when the open tab list or the active tab changes.
+pub struct TabsChanged;
+
+impl EventEmitter<TabsChanged> for TabsController {}

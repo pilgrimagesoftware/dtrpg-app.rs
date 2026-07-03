@@ -82,6 +82,7 @@ detail:
   field_file_size: "Dateigröße"
   field_released: "Veröffentlicht"
   field_added: "Hinzugefügt"
+  field_status: "Status"
   status_on_device: "Auf diesem Gerät"
   status_in_cloud: "In der Cloud"
 
@@ -191,3 +192,15 @@ menu:
   window_show_activity: "Aktivität anzeigen"
   window_show_alert_history: "Warnungsverlauf anzeigen"
   help_title: "Hilfe"
+
+title_bar:
+  sign_out: "Abmelden"
+
+tabs:
+  catalog_tab: "Katalog"
+  detail_tab_fallback: "Detail"
+
+status_bar:
+  theme_tooltip: "Thema: %{theme}"
+  activity_tooltip: "%{in_progress} in Bearbeitung, %{completed} abgeschlossen"
+  notifications_tooltip: "%{n} ungelesen"

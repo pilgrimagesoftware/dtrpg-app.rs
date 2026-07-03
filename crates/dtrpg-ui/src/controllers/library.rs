@@ -1122,16 +1122,28 @@ impl LibraryController {
 
     // ── Selection mutations ───────────────────────────────────────────────────
 
-    /// Selects an item by id (opens the detail panel).
+    /// Opens the single-click item popover for `id` (see `main-window-tabs`).
+    ///
+    /// Distinct from opening an expanded detail tab, which is a separate,
+    /// double-click action handled by `TabsController::open_detail_tab`.
     pub fn select_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
         self.selection = Selection::Item(id);
         cx.emit(LibraryChanged);
     }
 
-    /// Clears the selection (closes the detail panel).
+    /// Closes the item popover, if one is open.
     pub fn clear_selection(&mut self, cx: &mut Context<Self>) {
         self.selection = Selection::None;
         cx.emit(LibraryChanged);
+    }
+
+    /// Looks up a catalog item by id, independent of the current popover selection.
+    ///
+    /// Used to resolve the full item for an open expanded detail tab, which
+    /// tracks only the item id, not a full `LibraryItem` snapshot.
+    #[must_use]
+    pub fn item_by_id(&self, id: &str) -> Option<&LibraryItem> {
+        self.catalog.iter().find(|i| i.id.as_ref() == id)
     }
 
     // ── Detail panel width ────────────────────────────────────────────────────

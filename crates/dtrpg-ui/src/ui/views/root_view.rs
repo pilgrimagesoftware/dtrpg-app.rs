@@ -9,8 +9,8 @@ use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
 };
 use gpui::{
-    AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    ParentElement, Pixels, Render, Styled, div, px,
+    AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
+    IntoElement, ParentElement, Pixels, Render, Styled, div, px,
 };
 use gpui_component::Root;
 use gpui_component::WindowExt as _;
@@ -21,15 +21,25 @@ use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 
 use crate::ui::views::{
-    activity_panel_view::render_activity_panel, alert_history_view::render_alert_history_panel,
-    catalog_view::CatalogView, detail_panel_view::render_detail_panel,
-    notification_banner_view::render_notification_banner, settings_view::render_settings_panel,
-    sidebar_view::render_sidebar, toolbar_view::render_toolbar,
+    activity_panel_view::render_activity_panel,
+    alert_history_view::render_alert_history_panel,
+    catalog_view::CatalogView,
+    detail_panel_view::render_detail_tab_content,
+    notification_banner_view::render_notification_banner,
+    settings_view::render_settings_panel,
+    sidebar_view::render_sidebar,
+    status_bar_view::{StatusBarSnapshot, render_status_bar},
+    tab_strip_view::render_tab_strip,
+    title_bar_view::render_title_bar,
+    toolbar_view::render_toolbar,
 };
 use crate::{
     controllers::{
-        activity::ActivityController, auth_state::AuthStateController, library::LibraryController,
+        activity::ActivityController,
+        auth_state::AuthStateController,
+        library::LibraryController,
         settings::SettingsController,
+        tabs::{TabTarget, TabsController},
     },
     credentials::{CredentialStore, KeyringCredentialStore},
     data::{
@@ -39,7 +49,7 @@ use crate::{
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             DownloadComplete, DownloadError, LibraryChanged, LogoutRequested, SettingsChanged,
-            SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
+            SignInSucceeded, StartupAuthBegun, StartupAuthFailed, TabsChanged,
         },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
@@ -59,6 +69,8 @@ pub struct LibraryRootView {
     activity: Entity<ActivityController>,
     auth_state: Entity<AuthStateController>,
     catalog_view: Entity<CatalogView>,
+    /// Open/active tab state for the main-window tab strip.
+    tabs: Entity<TabsController>,
     /// Resizable state for the two-column main layout (sidebar / catalog).
     resize_state: Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
@@ -96,6 +108,7 @@ impl LibraryRootView {
         startup_api_key: Option<String>,
     ) -> Self {
         let activity = cx.new(|_| ActivityController::new());
+        let tabs = cx.new(|_| TabsController::new());
         let controller =
             cx.new(|cx| LibraryController::new(service, collections_service, activity.clone(), cx));
         let login_service = cx.global::<LoginServiceFactory>().0();
@@ -164,8 +177,15 @@ impl LibraryRootView {
             ctrl.set_storage_path_input(storage_path_input)
         });
 
-        let catalog_view =
-            cx.new(|cx| CatalogView::new(window, cx, controller.clone(), settings.clone()));
+        let catalog_view = cx.new(|cx| {
+            CatalogView::new(
+                window,
+                cx,
+                controller.clone(),
+                settings.clone(),
+                tabs.clone(),
+            )
+        });
         let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
         let root_focus = cx.focus_handle();
         root_focus.focus(window, cx);
@@ -285,6 +305,11 @@ impl LibraryRootView {
                 sort_direction: ctrl.sort_direction,
                 grouped: ctrl.grouped,
             }));
+            cx.notify();
+        })
+        .detach();
+
+        cx.subscribe(&tabs, |_this, _ctrl, _event: &TabsChanged, cx| {
             cx.notify();
         })
         .detach();
@@ -436,6 +461,7 @@ impl LibraryRootView {
             activity,
             auth_state,
             catalog_view,
+            tabs,
             resize_state,
             sidebar_width,
             root_focus,
@@ -484,7 +510,6 @@ impl Render for LibraryRootView {
             sort_direction,
             grouped,
             presentation,
-            selected_item,
         ) = (
             snap.filter,
             snap.counts,
@@ -498,7 +523,6 @@ impl Render for LibraryRootView {
             snap.sort_direction,
             snap.grouped,
             snap.presentation,
-            snap.selected_item,
         );
 
         let settings_snap = self.settings.read(cx).snapshot();
@@ -530,13 +554,7 @@ impl Render for LibraryRootView {
             publishers,
             collections,
             catalog_ids,
-            total_count,
-            total_mb,
             lib_entity.clone(),
-            activity_entity.clone(),
-            activity_snap.in_progress_count,
-            activity_snap.recent_count,
-            activity_snap.recent_error_count,
             self.collection_name_input.clone(),
             publisher_search,
             collection_search,
@@ -554,30 +572,80 @@ impl Render for LibraryRootView {
             presentation,
             lib_entity.clone(),
             settings_entity.clone(),
-            &settings_snap.auth,
             colors,
-            cx,
         );
+        let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
+        let tab_strip = render_tab_strip(self.tabs.clone(), cx);
         let banner =
             render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
-        let cover_image = selected_item.as_ref().and_then(|item| {
-            cx.global::<crate::ui::library::cover::CoverCache>()
-                .get(&item.id)
-        });
-        let panel = render_detail_panel(
-            selected_item.as_ref(),
-            settings_snap.storage_root_path.clone(),
-            lib_entity,
+
+        let tabs_snap = self.tabs.read(cx).snapshot();
+        let (active_tab_label, active_tab_count) = match &tabs_snap.active {
+            TabTarget::Catalog => (
+                crate::ui::views::toolbar_view::section_title_for(&filter),
+                matched_count,
+            ),
+            TabTarget::Detail(id) => (
+                tabs_snap
+                    .titles
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string()),
+                1,
+            ),
+        };
+        let status_bar = render_status_bar(
+            StatusBarSnapshot {
+                total_count,
+                total_mb,
+                active_tab_label,
+                active_tab_count,
+                theme_key: theme.key,
+                activity_in_progress: activity_snap.in_progress_count,
+                activity_recent_count: activity_snap.recent_count,
+                activity_recent_error_count: activity_snap.recent_error_count,
+            },
+            lib_entity.clone(),
+            activity_entity.clone(),
             colors,
-            cover_image,
-            snap.detail_panel_width,
         );
+
+        let active_tab_content: AnyElement = match &tabs_snap.active {
+            TabTarget::Catalog => div()
+                .flex_1()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .child(toolbar)
+                .child(banner)
+                .child(self.catalog_view.clone())
+                .into_any_element(),
+            TabTarget::Detail(id) => {
+                let controller_ref = self.controller.read(cx);
+                match controller_ref.item_by_id(id) {
+                    Some(item) => {
+                        let item = item.clone();
+                        let cover_image = cx
+                            .global::<crate::ui::library::cover::CoverCache>()
+                            .get(&item.id);
+                        render_detail_tab_content(
+                            &item,
+                            settings_snap.storage_root_path.clone(),
+                            lib_entity.clone(),
+                            colors,
+                            cover_image,
+                        )
+                    }
+                    None => div().flex_1().min_h_0().into_any_element(),
+                }
+            }
+        };
 
         let surface = colors.surface;
         let text_primary = colors.text_primary;
 
-        // Settings overlay and detail panel are rendered inside the main content area
-        // so the sidebar remains visible behind them.
+        // Settings overlay is rendered inside the main content area so the
+        // sidebar remains visible behind it.
         let main_content = {
             let mut content = div()
                 .flex_1()
@@ -586,10 +654,8 @@ impl Render for LibraryRootView {
                 .flex_col()
                 .relative()
                 .bg(surface)
-                .child(toolbar)
-                .child(banner)
-                .child(self.catalog_view.clone())
-                .child(panel);
+                .child(tab_strip)
+                .child(active_tab_content);
 
             if settings_snap.is_open {
                 // Focus the backdrop on first open so Escape works immediately.
@@ -831,19 +897,29 @@ impl Render for LibraryRootView {
                 activity_for_alert_history.update(cx, |a, cx| a.toggle_alert_panel(cx));
             })
             .child(
-                h_resizable("main-layout")
-                    .with_state(&self.resize_state)
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .child(title_bar)
                     .child(
-                        resizable_panel()
-                            .size(px(sidebar_initial))
-                            .size_range(px(180.)..px(361.))
-                            .child(sidebar_col),
+                        div().flex_1().min_h_0().child(
+                            h_resizable("main-layout")
+                                .with_state(&self.resize_state)
+                                .child(
+                                    resizable_panel()
+                                        .size(px(sidebar_initial))
+                                        .size_range(px(180.)..px(361.))
+                                        .child(sidebar_col),
+                                )
+                                .child(
+                                    resizable_panel()
+                                        .size_range(px(280.)..Pixels::MAX)
+                                        .child(main_content),
+                                ),
+                        ),
                     )
-                    .child(
-                        resizable_panel()
-                            .size_range(px(280.)..Pixels::MAX)
-                            .child(main_content),
-                    ),
+                    .child(status_bar),
             )
             .children(activity_overlay)
             .children(alert_history_overlay)

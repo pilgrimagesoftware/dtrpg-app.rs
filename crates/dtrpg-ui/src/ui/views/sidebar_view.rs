@@ -1,4 +1,4 @@
-//! Sidebar view: wordmark, smart nav, publisher nav, collections nav, storage footer.
+//! Sidebar view: wordmark, smart nav, publisher nav, collections nav.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -13,19 +13,16 @@ use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitl
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::PopupMenuItem;
 use gpui_component::sidebar::{
-    Sidebar, SidebarCollapsible, SidebarFooter, SidebarHeader, SidebarItem, SidebarMenu,
-    SidebarMenuItem,
+    Sidebar, SidebarCollapsible, SidebarHeader, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
 use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _};
 
-use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
 use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
 use crate::data::ui_prefs::UiPrefs;
 use crate::util::filter::SidebarFilter;
 use crate::util::matching::name_matches_query;
-use crate::util::pluralize::pluralize;
 use crate::util::publisher::PublisherEntry;
 use rust_i18n::t;
 
@@ -86,6 +83,10 @@ impl SidebarItem for SidebarContent {
 }
 
 /// Renders the full sidebar column using gpui-component `Sidebar`.
+///
+/// Library totals and the activity indicator, previously shown in the
+/// sidebar footer, now live in the status bar (see `status_bar_view.rs`),
+/// per `main-window-status-bar`.
 #[allow(clippy::too_many_arguments)]
 pub fn render_sidebar(
     filter: SidebarFilter,
@@ -93,13 +94,7 @@ pub fn render_sidebar(
     publishers: Vec<PublisherEntry>,
     collections: Vec<CollectionEntry>,
     catalog_ids: HashSet<u64>,
-    total_count: usize,
-    total_mb: f64,
     entity: Entity<LibraryController>,
-    activity_entity: Entity<ActivityController>,
-    activity_in_progress: usize,
-    activity_recent_count: usize,
-    activity_recent_error_count: usize,
     collection_name_input: Entity<InputState>,
     publisher_search: SidebarSectionSearch,
     collection_search: SidebarSectionSearch,
@@ -184,7 +179,7 @@ pub fn render_sidebar(
     // visible sidebar content pinned regardless of the panel's actual dragged
     // width, decoupling what you drag from where the sidebar and catalog
     // actually meet.
-    let mut sidebar_builder = Sidebar::new("sidebar")
+    let sidebar_builder = Sidebar::new("sidebar")
         .collapsible(SidebarCollapsible::None)
         .side(Side::Left)
         .w_full()
@@ -362,19 +357,10 @@ pub fn render_sidebar(
             .children(col_children),
     );
 
-    sidebar_builder = sidebar_builder
+    sidebar_builder
         .child(SidebarContent::Menu(Box::new(col_menu)))
         .child(SidebarContent::Separator)
-        .child(SidebarContent::Menu(Box::new(pub_menu)));
-
-    sidebar_builder.footer(build_footer(
-        total_count,
-        total_mb,
-        activity_entity,
-        activity_in_progress,
-        activity_recent_count,
-        activity_recent_error_count,
-    ))
+        .child(SidebarContent::Menu(Box::new(pub_menu)))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -387,57 +373,6 @@ fn build_header() -> SidebarHeader {
             .text_xl()
             .font_weight(gpui::FontWeight::SEMIBOLD)
             .child(t!("sidebar.app_name")),
-    )
-}
-
-fn build_footer(
-    total_count: usize,
-    total_mb: f64,
-    activity_entity: Entity<ActivityController>,
-    activity_in_progress: usize,
-    activity_recent_count: usize,
-    activity_recent_error_count: usize,
-) -> SidebarFooter {
-    let total_size_str = if total_mb >= 1024.0 {
-        format!("{:.1} GB", total_mb / 1024.0)
-    } else {
-        format!("{:.0} MB", total_mb)
-    };
-
-    let total = activity_in_progress + activity_recent_count;
-    let activity_label = if activity_in_progress > 0 {
-        format!("\u{21bb} ({total})")
-    } else if activity_recent_count > 0 {
-        format!("\u{25cf} ({total})")
-    } else {
-        "\u{25cb}".to_string()
-    };
-    let has_errors = activity_recent_error_count > 0;
-
-    SidebarFooter::new().child(
-        div()
-            .w_full()
-            .flex()
-            .flex_col()
-            .child(
-                div()
-                    .flex()
-                    .justify_between()
-                    .text_xs()
-                    .child(pluralize(total_count, "count.title", "count.titles"))
-                    .child(total_size_str),
-            )
-            .child(
-                div()
-                    .id("activity-button")
-                    .text_2xl()
-                    .cursor_pointer()
-                    .when(has_errors, |el| el.text_color(gpui::red()))
-                    .child(activity_label)
-                    .on_click(move |_, _, cx| {
-                        activity_entity.update(cx, |a, cx| a.toggle_panel(cx));
-                    }),
-            ),
     )
 }
 

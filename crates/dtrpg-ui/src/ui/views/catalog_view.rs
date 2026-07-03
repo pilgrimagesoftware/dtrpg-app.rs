@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Entity, Image, IntoElement, ObjectFit, ParentElement, Render, Styled,
-    StyledImage, UniformListScrollHandle, Window, div, img, px, uniform_list,
+    AnyElement, App, ClickEvent, Context, Entity, Image, IntoElement, ObjectFit, ParentElement,
+    Pixels, Point, Render, Styled, StyledImage, UniformListScrollHandle, Window, div, img, px,
+    uniform_list,
 };
 use gpui_component::badge::Badge;
 use gpui_component::pagination::Pagination;
@@ -21,12 +22,14 @@ use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuIte
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
+use crate::controllers::tabs::TabsController;
 use crate::data::enums::CatalogPresentation;
 use crate::data::enums::*;
 use crate::data::events::LibraryChanged;
 use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
+use crate::ui::views::item_popover_view::render_item_popover;
 use crate::util::publisher::{PublisherGroup, group_by_publisher};
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::sort::{SortDirection, SortMethod};
@@ -36,6 +39,28 @@ use rust_i18n::t;
 enum EmptyReason {
     LibraryEmpty,
     NoMatches,
+}
+
+/// Builds a catalog item's `on_click` handler: a single click opens the item
+/// popover; a double click additionally opens (or activates) an expanded
+/// detail tab and dismisses the popover. Mirrors the click-count escalation
+/// pattern `gpui-component`'s own `TableState::on_row_left_click` uses.
+fn item_click_handler(
+    id: Arc<str>,
+    title: String,
+    entity: Entity<LibraryController>,
+    tabs: Entity<TabsController>,
+) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
+    move |event, _window, cx| {
+        let count = event.click_count();
+        entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
+        if count >= 2 {
+            tabs.update(cx, |t, cx| {
+                t.open_detail_tab(Arc::clone(&id), title.clone(), cx);
+            });
+            entity.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+        }
+    }
 }
 
 // ── Shared column definitions ─────────────────────────────────────────────────
@@ -108,7 +133,7 @@ struct CatalogListDelegate {
     columns: Vec<Column>,
     /// User-adjusted column widths captured from `TableEvent::ColumnWidthsChanged`.
     /// `None` means use the static default from `list_columns()`.
-    user_widths: Vec<Option<gpui::Pixels>>,
+    user_widths: Vec<Option<Pixels>>,
 }
 
 impl TableDelegate for CatalogListDelegate {
@@ -454,6 +479,7 @@ impl TableDelegate for CatalogListDelegate {
 pub struct CatalogView {
     controller: Entity<LibraryController>,
     settings: Entity<SettingsController>,
+    tabs: Entity<TabsController>,
     scroll_handle: UniformListScrollHandle,
     catalog_list_table: Entity<TableState<CatalogListDelegate>>,
     /// Cached items-per-row for the grid layout; updated each render from
@@ -464,6 +490,9 @@ pub struct CatalogView {
     /// during `render()` so grouped presentation modes avoid re-grouping on
     /// every hover-triggered re-render.
     grouped_cache: Option<Vec<PublisherGroup>>,
+    /// Last observed cursor position within the catalog area, used to anchor
+    /// the single-click item popover (see `render_item_popover`).
+    last_mouse_pos: Point<Pixels>,
 }
 
 impl CatalogView {
@@ -473,6 +502,7 @@ impl CatalogView {
         cx: &mut Context<Self>,
         controller: Entity<LibraryController>,
         settings: Entity<SettingsController>,
+        tabs: Entity<TabsController>,
     ) -> Self {
         let storage_root = settings.read(cx).snapshot().storage_root_path;
         let cols = list_columns();
@@ -516,6 +546,21 @@ impl CatalogView {
                             .update(cx, |ctrl, cx| ctrl.select_item(id, cx));
                     }
                 }
+                TableEvent::DoubleClickedRow(row_ix) => {
+                    let row_ix = *row_ix;
+                    let items = this
+                        .controller
+                        .read(cx)
+                        .visible_items_slice(row_ix..row_ix + 1);
+                    if let Some(item) = items.first() {
+                        let id = Arc::clone(&item.id);
+                        let title = item.title.to_string();
+                        this.tabs
+                            .update(cx, |t, cx| t.open_detail_tab(id, title, cx));
+                        this.controller
+                            .update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+                    }
+                }
                 TableEvent::ColumnWidthsChanged(widths) => {
                     let widths = widths.clone();
                     table.update(cx, |state, _cx| {
@@ -535,10 +580,12 @@ impl CatalogView {
         Self {
             controller,
             settings,
+            tabs,
             scroll_handle: UniformListScrollHandle::default(),
             catalog_list_table,
             items_per_row: 4,
             grouped_cache: None,
+            last_mouse_pos: Point::default(),
         }
     }
 
@@ -584,6 +631,7 @@ impl Render for CatalogView {
         let items_per_row = self.items_per_row;
         let scroll_handle = self.scroll_handle.clone();
         let ctrl = self.controller.clone();
+        let tabs_entity = self.tabs.clone();
 
         let outer = div().flex_1().min_h_0().flex().flex_col();
 
@@ -650,6 +698,7 @@ impl Render for CatalogView {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
+                        let t = self.tabs.clone();
                         let s = storage_root.clone();
                         let header_cols = cols.clone();
                         let row_cols = cols.clone();
@@ -662,6 +711,7 @@ impl Render for CatalogView {
                                     &c,
                                     &d,
                                     e.clone(),
+                                    t.clone(),
                                     s.clone(),
                                     &row_cols,
                                 )
@@ -675,6 +725,7 @@ impl Render for CatalogView {
                 let c = colors.clone();
                 let d = density.clone();
                 let s = storage_root.clone();
+                let t = tabs_entity.clone();
                 root.px(pad_side)
                     .child(
                         uniform_list("catalog-thumbs", item_count, move |range, _window, cx| {
@@ -687,8 +738,16 @@ impl Render for CatalogView {
                                 .iter()
                                 .zip(covers)
                                 .map(|(item, cover)| {
-                                    render_thumb_row(item, cover, &c, &d, ctrl.clone(), s.clone())
-                                        .into_any_element()
+                                    render_thumb_row(
+                                        item,
+                                        cover,
+                                        &c,
+                                        &d,
+                                        ctrl.clone(),
+                                        t.clone(),
+                                        s.clone(),
+                                    )
+                                    .into_any_element()
                                 })
                                 .collect()
                         })
@@ -711,13 +770,22 @@ impl Render for CatalogView {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
+                        let t = tabs_entity.clone();
                         let s = storage_root.clone();
                         let cc = cover_cache.clone();
                         div()
                             .child(render_group_header(&g.publisher, g.items.len(), &c))
                             .children(g.items.into_iter().map(move |item| {
                                 let cover = cc.get(&item.id).cloned();
-                                render_thumb_row(&item, cover, &c, &d, e.clone(), s.clone())
+                                render_thumb_row(
+                                    &item,
+                                    cover,
+                                    &c,
+                                    &d,
+                                    e.clone(),
+                                    t.clone(),
+                                    s.clone(),
+                                )
                             }))
                     }))
                     .into_any_element()
@@ -729,6 +797,7 @@ impl Render for CatalogView {
                 let c = colors.clone();
                 let d = density.clone();
                 let s = storage_root.clone();
+                let t = tabs_entity.clone();
                 root.px(pad_side)
                     .child(
                         uniform_list("catalog-grid", row_count, move |row_range, _window, cx| {
@@ -758,6 +827,7 @@ impl Render for CatalogView {
                                                     &c,
                                                     d.card_min_width,
                                                     ctrl.clone(),
+                                                    t.clone(),
                                                     s.clone(),
                                                 )
                                             },
@@ -785,17 +855,34 @@ impl Render for CatalogView {
                         let c = colors.clone();
                         let d = density.clone();
                         let e = self.controller.clone();
+                        let t = tabs_entity.clone();
                         let s = storage_root.clone();
                         let cc = cover_cache.clone();
                         div()
                             .child(render_group_header(&g.publisher, g.items.len(), &c))
-                            .child(render_grid(g.items, cc, c, d, e, s))
+                            .child(render_grid(g.items, cc, c, d, e, t, s))
                     }))
                     .into_any_element()
             }
         };
 
-        let mut result = outer.child(content);
+        let mut result = outer
+            .relative()
+            .on_mouse_move(
+                cx.listener(|this, event: &gpui::MouseMoveEvent, _window, _cx| {
+                    this.last_mouse_pos = event.position;
+                }),
+            )
+            .child(content);
+
+        if let Some(item) = snap.selected_item.as_ref() {
+            result = result.child(render_item_popover(
+                item,
+                self.last_mouse_pos,
+                self.controller.clone(),
+                &colors,
+            ));
+        }
 
         if item_count > 0 {
             let mut bar = div()
@@ -1053,6 +1140,7 @@ fn render_grouped_list_row(
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
+    tabs: Entity<TabsController>,
     storage_root_path: PathBuf,
     cols: &[Column],
 ) -> impl IntoElement + 'static + use<> {
@@ -1107,7 +1195,7 @@ fn render_grouped_list_row(
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
     let ctx_path = storage_root_path.join("items").join(&*id);
-    let entity_click = entity.clone();
+    let click_title = title.clone();
     div()
         .id(Arc::clone(&id))
         .flex()
@@ -1116,9 +1204,12 @@ fn render_grouped_list_row(
         .border_b_1()
         .border_color(colors.border)
         .cursor_pointer()
-        .on_click(move |_, _, cx| {
-            entity_click.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
-        })
+        .on_click(item_click_handler(
+            Arc::clone(&id),
+            click_title,
+            entity.clone(),
+            tabs.clone(),
+        ))
         .child(
             div()
                 .flex_1()
@@ -1298,6 +1389,7 @@ fn render_thumb_row(
     colors: &ColorTokens,
     density: &DensityConstants,
     entity: Entity<LibraryController>,
+    tabs: Entity<TabsController>,
     storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
@@ -1355,9 +1447,12 @@ fn render_thumb_row(
         .border_b_1()
         .border_color(colors.border)
         .cursor_pointer()
-        .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
-        })
+        .on_click(item_click_handler(
+            Arc::clone(&id),
+            title.clone(),
+            entity,
+            tabs,
+        ))
         .child(cover_cell)
         .child(
             div()
@@ -1476,6 +1571,7 @@ fn render_grid(
     colors: ColorTokens,
     density: DensityConstants,
     entity: Entity<LibraryController>,
+    tabs: Entity<TabsController>,
     storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
@@ -1495,6 +1591,7 @@ fn render_grid(
                 &colors,
                 min_w,
                 entity.clone(),
+                tabs.clone(),
                 storage_root_path.clone(),
             )
         }))
@@ -1506,6 +1603,7 @@ fn render_grid_card(
     colors: &ColorTokens,
     card_w: f32,
     entity: Entity<LibraryController>,
+    tabs: Entity<TabsController>,
     storage_root_path: PathBuf,
 ) -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
@@ -1581,9 +1679,12 @@ fn render_grid_card(
         .rounded(px(6.0))
         .overflow_hidden()
         .cursor_pointer()
-        .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
-        })
+        .on_click(item_click_handler(
+            Arc::clone(&id),
+            title.clone(),
+            entity,
+            tabs,
+        ))
         .child(cover_cell)
         .child(
             div()

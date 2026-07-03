@@ -1,13 +1,13 @@
-//! Detail panel: slide-over showing full item metadata and actions.
+//! Expanded detail tab content: full item metadata and actions, filling a
+//! tab's content area (opened by double-clicking a catalog item).
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, AppContext as _, Context, DragMoveEvent, Empty, Entity, Image, InteractiveElement,
-    IntoElement, ObjectFit, ParentElement, Render, SharedString, StatefulInteractiveElement,
-    Styled, StyledImage, Window, div, img, px,
+    AnyElement, Entity, Image, InteractiveElement, IntoElement, ObjectFit, ParentElement,
+    SharedString, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 };
 use gpui_component::Disableable;
 use gpui_component::IconName;
@@ -25,125 +25,73 @@ use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
 use rust_i18n::t;
 
-/// Drag-payload marker identifying an in-progress detail panel resize drag.
+/// Renders the expanded detail tab's content: a large cover, title,
+/// description, actions, and metadata, filling the tab's content area.
 ///
-/// Carries no state — the new width is computed on each drag-move event from
-/// the live cursor position and the panel's own bounds, so no drag-start
-/// offset needs to be captured here.
-struct DetailPanelResizeDrag;
-
-impl Render for DetailPanelResizeDrag {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        Empty
-    }
-}
-
-/// Renders the detail panel overlay if `selected_item` is `Some`; otherwise an empty div.
+/// Has no absolute positioning, resize handle, or close button of its own —
+/// it's opened as a full tab (double-click on a catalog item, see
+/// `main-window-tabs`) and closed via the tab strip.
 ///
-/// `cover_image`, when `Some`, is rendered in place of the generative cover —
-/// callers should look it up from `CoverCache` for the selected item.
-pub fn render_detail_panel(
-    selected_item: Option<&LibraryItem>,
+/// Does not render a file list for multi-item entries: that requires a
+/// per-item file list data model this crate does not yet have (tracked as a
+/// known gap in the `add-rust-main-window-structure` change).
+pub fn render_detail_tab_content(
+    item: &LibraryItem,
     storage_root_path: PathBuf,
     entity: Entity<LibraryController>,
     colors: &ColorTokens,
     cover_image: Option<Arc<Image>>,
-    width: f32,
 ) -> AnyElement {
-    let Some(item) = selected_item else {
-        return div().into_any_element();
-    };
-
     let surface = colors.surface;
-    let border = colors.border;
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
-    let text_tertiary = colors.text_tertiary;
-    let scrim = colors.scrim;
-    let accent_on = colors.accent_on;
 
     let item = item.clone();
-    let entity_close = entity.clone();
     let entity_download = entity.clone();
-    let entity_resize = entity.clone();
-    let entity_refresh_thumbnail = entity.clone();
+    let entity_refresh_thumbnail = entity;
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
     let read_item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
 
+    let cover_w = crate::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
+    let cover_h = cover_w * 10.0 / 7.0;
+    let cover: AnyElement = if let Some(image) = cover_image {
+        img(image)
+            .w(px(cover_w))
+            .h(px(cover_h))
+            .object_fit(ObjectFit::Cover)
+            .into_any_element()
+    } else {
+        render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
+    };
+    let cover_url = item.cover_url.clone();
+
     div()
-        .id("detail-panel")
-        .occlude()
-        .absolute()
-        .right_0()
-        .top_0()
-        .bottom_0()
-        .w(px(width))
-        .bg(surface)
-        .border_l_1()
-        .border_color(border)
+        .id("detail-tab-content")
+        .flex_1()
+        .min_h_0()
         .flex()
         .flex_col()
-        .on_drag_move::<DetailPanelResizeDrag>(
-            move |event: &DragMoveEvent<DetailPanelResizeDrag>, _window, cx| {
-                let new_width = f32::from(event.bounds.right() - event.event.position.x);
-                entity_resize.update(cx, |ctrl, cx| ctrl.set_detail_panel_width(new_width, cx));
-            },
-        )
-        // Resize handle (left edge)
-        .child(
-            div()
-                .id("detail-panel-resize-handle")
-                .occlude()
-                .absolute()
-                .left_0()
-                .top_0()
-                .bottom_0()
-                .w(px(6.0))
-                .cursor_col_resize()
-                .hover(|s| s.bg(border))
-                .on_drag(DetailPanelResizeDrag, move |_value, _point, _window, cx| {
-                    cx.new(|_| DetailPanelResizeDrag)
-                }),
-        )
-        // Cover — capped at `DETAIL_PANEL_COVER_MAX_WIDTH` and re-centered
-        // horizontally (staying top-aligned) as the panel is resized wider.
+        .bg(surface)
         .child({
-            let cover_w = width.min(crate::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH);
-            let cover_h = cover_w * 10.0 / 7.0;
-            let cover: AnyElement = if let Some(image) = cover_image {
-                img(image)
-                    .w(px(cover_w))
-                    .h(px(cover_h))
-                    .object_fit(ObjectFit::Cover)
-                    .into_any_element()
-            } else {
-                render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
-            };
-            let cover_url = item.cover_url.clone();
-            let mut cover_box = div()
-                .relative()
-                .w(px(cover_w))
-                .h(px(cover_h))
-                .flex_none()
-                .child(cover);
+            let mut cover_box = div().relative().w(px(cover_w)).flex_none().child(cover);
             if let Some(cover_url) = cover_url {
                 cover_box = cover_box.child(
                     div()
-                        .id("detail-refresh-thumbnail")
+                        .id("detail-tab-refresh-thumbnail")
                         .absolute()
                         .top(px(8.0))
                         .left(px(8.0))
                         .size(px(24.0))
                         .rounded_full()
-                        .bg(scrim)
+                        .bg(colors.scrim)
                         .flex()
                         .items_center()
                         .justify_center()
                         .cursor_pointer()
                         .text_sm()
-                        .text_color(accent_on)
+                        .text_color(colors.accent_on)
                         .tooltip(|window, cx| {
                             Tooltip::new(t!("detail.refresh_thumbnail_tooltip").to_string())
                                 .build(window, cx)
@@ -160,15 +108,9 @@ pub fn render_detail_panel(
                 .flex()
                 .flex_none()
                 .justify_center()
+                .py(px(16.0))
                 .child(cover_box)
         })
-        // Scrollable body
-        //
-        // `overflow_y_scrollbar()` wraps this div in a `Scrollable` element whose outer
-        // wrapper only inherits explicit width/height from the wrapped element's style,
-        // not `flex_1`/`min_h_0`. Without an outer flex_1/min_h_0 wrapper the scroll
-        // area sizes to its content instead of the panel's remaining height, so it never
-        // scrolls. See `catalog_view.rs` for the same pattern.
         .child(
             div().flex_1().min_h_0().flex().flex_col().child(
                 div()
@@ -177,7 +119,6 @@ pub fn render_detail_panel(
                     .flex()
                     .flex_col()
                     .gap(px(16.0))
-                    // Publisher + title + line
                     .child(
                         div()
                             .flex()
@@ -186,7 +127,7 @@ pub fn render_detail_panel(
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(text_tertiary)
+                                    .text_color(colors.text_tertiary)
                                     .child(item.publisher.to_string()),
                             )
                             .child(
@@ -210,15 +151,12 @@ pub fn render_detail_panel(
                                     .child(item.line.to_string()),
                             ),
                     )
-                    // Description
                     .child(
                         div()
                             .text_sm()
                             .text_color(text_secondary)
                             .child(item.desc.to_string()),
                     )
-                    // Actions — icon buttons with tooltips instead of full-width
-                    // labeled buttons, so the row stays compact regardless of panel width.
                     .child(
                         div()
                             .flex()
@@ -227,7 +165,7 @@ pub fn render_detail_panel(
                             .child({
                                 let read_path =
                                     storage_root_path.join("items").join(read_item_id.as_ref());
-                                Button::new("detail-read")
+                                Button::new("detail-tab-read")
                                     .primary()
                                     .icon(IconName::BookOpen)
                                     .disabled(!is_downloaded)
@@ -235,42 +173,47 @@ pub fn render_detail_panel(
                                         b.tooltip(t!("detail.tooltip_download_first"))
                                     })
                                     .when(is_downloaded, |b| {
-                                        b.tooltip(t!("detail.read_button"))
-                                        .on_click(move |_, _, _| {
-                                        use crate::util::item_opener::{ItemOpener, OpenError};
+                                        b.tooltip(t!("detail.read_button")).on_click(
+                                            move |_, _, _| {
+                                                use crate::util::item_opener::{
+                                                    ItemOpener, OpenError,
+                                                };
 
-                                        if !read_path.exists() {
-                                            tracing::warn!(
-                                                path = %read_path.display(),
-                                                "open: file not found — item may need re-download"
-                                            );
-                                            return;
-                                        }
-                                        if let Err(e) = ItemOpener::open(&read_path) {
-                                            match e {
-                                                OpenError::FileNotFound(path) => {
-                                                    tracing::warn!("open: file not found: {path}");
-                                                }
-                                                OpenError::NoDefaultApp => {
+                                                if !read_path.exists() {
                                                     tracing::warn!(
-                                                        "open: no default application configured"
+                                                        path = %read_path.display(),
+                                                        "open: file not found — item may need re-download"
                                                     );
+                                                    return;
                                                 }
-                                                OpenError::OsFailed(msg) => {
-                                                    tracing::warn!("open: OS failed: {msg}");
+                                                if let Err(e) = ItemOpener::open(&read_path) {
+                                                    match e {
+                                                        OpenError::FileNotFound(path) => {
+                                                            tracing::warn!(
+                                                                "open: file not found: {path}"
+                                                            );
+                                                        }
+                                                        OpenError::NoDefaultApp => {
+                                                            tracing::warn!(
+                                                                "open: no default application configured"
+                                                            );
+                                                        }
+                                                        OpenError::OsFailed(msg) => {
+                                                            tracing::warn!("open: OS failed: {msg}");
+                                                        }
+                                                        OpenError::MultipleFilesRequireSelection => {
+                                                            tracing::warn!(
+                                                                "open: multiple files require selection"
+                                                            );
+                                                        }
+                                                    }
                                                 }
-                                                OpenError::MultipleFilesRequireSelection => {
-                                                    tracing::warn!(
-                                                        "open: multiple files require selection"
-                                                    );
-                                                }
-                                            }
-                                        }
-                                    })
+                                            },
+                                        )
                                     })
                             })
                             .child(
-                                Button::new("detail-download")
+                                Button::new("detail-tab-download")
                                     .ghost()
                                     .outline()
                                     .icon(if is_downloaded {
@@ -291,57 +234,33 @@ pub fn render_detail_panel(
                                     }),
                             )
                             .when(is_downloaded, |row| {
-                                let item_path = storage_root_path
-                                    .join("items")
-                                    .join(reveal_item_id.as_ref());
+                                let item_path =
+                                    storage_root_path.join("items").join(reveal_item_id.as_ref());
                                 row.child(
-                                Button::new("detail-reveal")
-                                    .ghost()
-                                    .outline()
-                                    .icon(IconName::FolderOpen)
-                                    .tooltip(platform_reveal_label().into_owned())
-                                    .on_click(move |_, _, _cx| {
-                                        if !item_path.exists() {
-                                            tracing::warn!(
-                                                path = %item_path.display(),
-                                                "reveal: file not found — item may need re-download"
-                                            );
-                                            return;
-                                        }
-                                        if let Err(e) = reveal_in_file_manager(&item_path) {
-                                            tracing::warn!("reveal_in_file_manager failed: {e}");
-                                        }
-                                    }),
-                            )
+                                    Button::new("detail-tab-reveal")
+                                        .ghost()
+                                        .outline()
+                                        .icon(IconName::FolderOpen)
+                                        .tooltip(platform_reveal_label().into_owned())
+                                        .on_click(move |_, _, _cx| {
+                                            if !item_path.exists() {
+                                                tracing::warn!(
+                                                    path = %item_path.display(),
+                                                    "reveal: file not found — item may need re-download"
+                                                );
+                                                return;
+                                            }
+                                            if let Err(e) = reveal_in_file_manager(&item_path) {
+                                                tracing::warn!(
+                                                    "reveal_in_file_manager failed: {e}"
+                                                );
+                                            }
+                                        }),
+                                )
                             }),
                     )
-                    // Metadata table
                     .child(render_metadata_table(&item, colors)),
             ),
-        )
-        // Close button — rendered last so it paints on top of the cover image and
-        // scroll body; GPUI stacks sibling children in child-list order regardless
-        // of `absolute()` positioning, so an earlier position in the chain would
-        // have the cover painted over it.
-        .child(
-            div()
-                .absolute()
-                .top(px(12.0))
-                .right(px(12.0))
-                .id("detail-close")
-                .size(px(24.0))
-                .rounded_full()
-                .bg(scrim)
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .text_sm()
-                .text_color(accent_on)
-                .on_click(move |_, _, cx| {
-                    entity_close.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
-                })
-                .child("✕"),
         )
         .into_any_element()
 }
