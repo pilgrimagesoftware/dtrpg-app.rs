@@ -10,6 +10,8 @@ This is the repository for the DriveThruRPG frontend application implemented in 
 
 The UI is implemented using the `gpui` framework from the [Zed](https://zed.dev) project, along with the `gpui-component` crate from [Longbridge](https://github.com/longbridge/gpui-component).
 
+A short term goal is to move from `gpui` to `gpui-ce` (https://github.com/gpui-ce/gpui-ce).
+
 ## Architecture and Code Organization
 
 Use a modular architecture. Do not place substantial UI, state, and data logic in a single file.
