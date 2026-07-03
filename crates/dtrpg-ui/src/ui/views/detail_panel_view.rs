@@ -160,7 +160,9 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     .icon(IconName::BookOpen)
                                     .disabled(!is_downloaded)
                                     .when(!is_downloaded, |b| {
-                                        b.tooltip(t!("detail.tooltip_download_first"))
+                                        b.tooltip(format!("{}\n{}",
+                                            t!("detail.read_button"),
+                                            t!("detail.tooltip_download_first")))
                                     })
                                     .when(is_downloaded, |b| {
                                         b.tooltip(t!("detail.read_button")).on_click(

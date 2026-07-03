@@ -73,7 +73,7 @@ detail:
   show_in_finder: "Im Finder anzeigen"
   show_in_explorer: "Im Explorer anzeigen"
   show_in_files: "In Dateien anzeigen"
-  tooltip_download_first: "Laden Sie diesen Titel zuerst herunter"
+  tooltip_download_first: "(Laden Sie diesen Titel zuerst herunter)"
   refresh_thumbnail_tooltip: "Miniaturansicht aktualisieren"
   field_system: "System"
   field_category: "Kategorie"

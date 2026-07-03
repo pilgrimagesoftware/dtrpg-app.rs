@@ -73,7 +73,7 @@ detail:
   show_in_finder: "Afficher dans le Finder"
   show_in_explorer: "Afficher dans l'Explorateur"
   show_in_files: "Afficher dans Fichiers"
-  tooltip_download_first: "Téléchargez d'abord cet élément"
+  tooltip_download_first: "(Téléchargez d'abord cet élément)"
   refresh_thumbnail_tooltip: "Actualiser la vignette"
   field_system: "Système"
   field_category: "Catégorie"

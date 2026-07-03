@@ -74,7 +74,7 @@ detail:
   show_in_finder: "Show in Finder"
   show_in_explorer: "Show in Explorer"
   show_in_files: "Show in Files"
-  tooltip_download_first: "Download this item first"
+  tooltip_download_first: "(Download this item first)"
   refresh_thumbnail_tooltip: "Refresh thumbnail"
   field_system: "System"
   field_category: "Category"
