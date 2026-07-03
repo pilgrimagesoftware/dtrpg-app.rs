@@ -17,7 +17,7 @@ use crate::util::sort::{SortDirection, SortMethod};
 ///
 /// Rebuilt and passed to [`build_menus`] every time the catalog view state changes, so
 /// the OS menu's checkmarks stay in sync with the toolbar/keyboard-driven selection.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ViewMenuState {
     pub presentation: CatalogPresentation,
     pub sort: SortMethod,

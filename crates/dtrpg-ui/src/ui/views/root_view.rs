@@ -93,6 +93,15 @@ pub struct LibraryRootView {
     /// File Openers settings list (inline, not a modal — see the subscription
     /// wired up in `new()` for the Enter/Blur commit behavior).
     file_opener_extension_input: Entity<InputState>,
+    /// Last `ViewMenuState` passed to `cx.set_menus`.
+    ///
+    /// `cx.set_menus` replaces the whole native menu bar and, on macOS, tears
+    /// down any menu currently tracking a click — rebuilding it on every
+    /// `LibraryChanged` (which also fires per-thumbnail during a catalog
+    /// load) closes an open menu out from under the user and reads as
+    /// flicker. Skip the rebuild when the checkmark-relevant state hasn't
+    /// actually changed.
+    last_menu_state: Option<ViewMenuState>,
 }
 
 impl LibraryRootView {
@@ -294,17 +303,26 @@ impl LibraryRootView {
         )
         .detach();
 
-        cx.subscribe(&controller, |_this, ctrl, _event: &LibraryChanged, cx| {
+        cx.subscribe(&controller, |this, ctrl, _event: &LibraryChanged, cx| {
             // Keep the native View menu's checkmarks (presentation, sort, grouping)
-            // in sync with the toolbar/keyboard-driven selection. `cx.set_menus`
-            // replaces the whole bar, so it's rebuilt from the current state each time.
+            // in sync with the toolbar/keyboard-driven selection. `LibraryChanged`
+            // fires far more often than the checkmark-relevant state actually
+            // changes (e.g. once per thumbnail during a catalog load), and
+            // `cx.set_menus` replaces the whole native menu bar — on macOS that
+            // tears down any menu currently tracking a click, which read as the
+            // app menu flickering or closing itself right after opening. Only
+            // rebuild when the state that drives the checkmarks has changed.
             let ctrl = ctrl.read(cx);
-            cx.set_menus(build_menus(&ViewMenuState {
+            let menu_state = ViewMenuState {
                 presentation: ctrl.presentation,
                 sort: ctrl.sort,
                 sort_direction: ctrl.sort_direction,
                 grouped: ctrl.grouped,
-            }));
+            };
+            if this.last_menu_state != Some(menu_state) {
+                cx.set_menus(build_menus(&menu_state));
+                this.last_menu_state = Some(menu_state);
+            }
             cx.notify();
         })
         .detach();
@@ -471,6 +489,7 @@ impl LibraryRootView {
             file_opener_extension_input,
             publisher_search_input,
             collection_search_input,
+            last_menu_state: None,
         }
     }
 }
