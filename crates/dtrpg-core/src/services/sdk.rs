@@ -4,9 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error as StdError;
 
 use dtrpg_sdk::{
-    AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
-    LibraryItemsParams, OrderProductItem, OrderProductItemResponse, OrderProductListResponse,
-    PaginationLinks, PublisherItem, SdkError,
+    AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, IncludedItem,
+    LibraryClient as SdkLibraryClient, LibraryItemsParams, OrderProductInfo, OrderProductItem,
+    OrderProductItemResponse, OrderProductListResponse, PaginationLinks, SdkError,
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -99,7 +99,7 @@ impl LibraryService for RustSdkLibraryService {
         on_page: &mut dyn FnMut(Vec<LibraryItem>),
         mut on_total: Option<&mut dyn FnMut(usize)>,
     ) -> Result<(), LibraryServiceError> {
-        let mut all_included: Vec<PublisherItem> = Vec::new();
+        let mut all_included: Vec<IncludedItem> = Vec::new();
         let mut page: u32 = 1;
         let mut global_index: u32 = 0;
         let mut total_reported = false;
@@ -130,11 +130,21 @@ impl LibraryService for RustSdkLibraryService {
                 total_reported = true;
             }
 
-            if let Some(included) = response.included {
-                for publisher in included {
-                    let id = publisher.attributes.publisher_id;
-                    if !all_included.iter().any(|p| p.attributes.publisher_id == id) {
-                        all_included.push(publisher);
+            // `Product` resources are only needed to resolve this page's items — rebuilt
+            // fresh per page rather than accumulated, since each ordered product's
+            // relationship points at its own distinct `Product` resource.
+            let products = response
+                .included
+                .as_deref()
+                .map(product_lookup)
+                .unwrap_or_default();
+
+            if let Some(included) = &response.included {
+                for entry in included {
+                    if entry.resource_type == "Publisher"
+                        && !all_included.iter().any(|p| p.id == entry.id)
+                    {
+                        all_included.push(entry.clone());
                     }
                 }
             }
@@ -145,7 +155,9 @@ impl LibraryService for RustSdkLibraryService {
                 .data
                 .iter()
                 .enumerate()
-                .map(|(i, item)| map_order_product(item, &publishers, global_index + i as u32))
+                .map(|(i, item)| {
+                    map_order_product(item, &publishers, &products, global_index + i as u32)
+                })
                 .collect();
 
             global_index += page_items.len() as u32;
@@ -162,7 +174,14 @@ impl LibraryService for RustSdkLibraryService {
 
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {
         let response = self.gateway.get_order_product(id)?;
-        Ok(map_order_product(&response.data, &HashMap::new(), 0))
+        // The single-item detail endpoint has no `included` sideload array to resolve
+        // `relationships` against; falls back to `attributes.product` if ever embedded.
+        Ok(map_order_product(
+            &response.data,
+            &HashMap::new(),
+            &HashMap::new(),
+            0,
+        ))
     }
 
     fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
@@ -338,16 +357,25 @@ fn last_page_from_links(links: &PaginationLinks) -> Option<u32> {
     digits.parse::<u32>().ok().filter(|&n| n > 0)
 }
 
-fn publisher_lookup(included: &[PublisherItem]) -> HashMap<u64, String> {
+fn publisher_lookup(included: &[IncludedItem]) -> HashMap<u64, String> {
     included
         .iter()
-        .filter(|item| item.attributes.publisher_id > 0)
-        .map(|publisher| {
-            (
-                publisher.attributes.publisher_id,
-                publisher.attributes.name.clone(),
-            )
-        })
+        .filter_map(IncludedItem::as_publisher)
+        .filter(|publisher| publisher.publisher_id > 0)
+        .map(|publisher| (publisher.publisher_id, publisher.name))
+        .collect()
+}
+
+/// Builds a lookup from JSON:API resource id (e.g. `"/api/vBeta/products/187766"`) to
+/// `Product` resource attributes, from one page's `included` array.
+///
+/// The live API sideloads `Product` (and `Publisher`/`Order`) resources in `included`
+/// rather than embedding them on `OrderProductAttributes` directly; each ordered product's
+/// `relationships.product.data.id` is the key into this map.
+fn product_lookup(included: &[IncludedItem]) -> HashMap<String, OrderProductInfo> {
+    included
+        .iter()
+        .filter_map(|entry| entry.as_product().map(|product| (entry.id.clone(), product)))
         .collect()
 }
 
@@ -363,6 +391,7 @@ fn file_extension_label(filename: &str) -> Option<String> {
 fn map_order_product(
     item: &OrderProductItem,
     publishers: &HashMap<u64, String>,
+    products: &HashMap<String, OrderProductInfo>,
     order: u32,
 ) -> LibraryItem {
     let attributes = &item.attributes;
@@ -381,9 +410,21 @@ fn map_order_product(
         .or_else(|| publishers.get(&attributes.royalty_publisher_id).cloned())
         .unwrap_or_else(|| format!("Publisher {}", attributes.royalty_publisher_id));
 
+    // The live API resolves `Product` metadata (cover images) via `relationships.product`
+    // against the response's sideloaded `included` array rather than embedding it directly
+    // on `attributes` — fall back to the embedded field in case a future/legacy response
+    // shape does embed it inline.
+    let product_info = item
+        .relationships
+        .as_ref()
+        .and_then(|r| r.product.as_ref())
+        .and_then(|r| r.data.as_ref())
+        .and_then(|d| products.get(&d.id))
+        .or(attributes.product.as_ref());
+
     // Prefer the smallest thumbnail available for catalog rendering, falling back to
     // progressively larger images if a thumbnail wasn't generated for this product.
-    let cover_url = attributes.product.as_ref().and_then(|p| {
+    let cover_url = product_info.and_then(|p| {
         p.thumbnail
             .as_deref()
             .or(p.thumbnail_100.as_deref())
@@ -522,8 +563,8 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use dtrpg_sdk::{
-        FileChecksum, OrderProductAttributes, OrderProductFile, PaginationLinks, PaginationMeta,
-        PublisherAttributes,
+        FileChecksum, OrderProductAttributes, OrderProductFile, OrderProductRelationships,
+        PaginationLinks, PaginationMeta, RelationshipData, RelationshipRef,
     };
 
     use super::*;
@@ -544,14 +585,14 @@ mod tests {
                         current_page: 1,
                     },
                     data: vec![item.clone()],
-                    included: Some(vec![PublisherItem {
-                        id: "7".to_string(),
-                        resource_type: "publisher".to_string(),
-                        attributes: PublisherAttributes {
-                            name: "Lantern Press".to_string(),
-                            publisher_id: 7,
-                            slug: "lantern-press".to_string(),
-                        },
+                    included: Some(vec![IncludedItem {
+                        id: "/api/vBeta/publishers/7".to_string(),
+                        resource_type: "Publisher".to_string(),
+                        attributes: serde_json::json!({
+                            "name": "Lantern Press",
+                            "publisherId": 7,
+                            "slug": "lantern-press",
+                        }),
                     }]),
                 }),
                 detail_result: Ok(OrderProductItemResponse { data: item }),
@@ -567,14 +608,14 @@ mod tests {
                         current_page: 1,
                     },
                     data: vec![item.clone()],
-                    included: Some(vec![PublisherItem {
-                        id: "7".to_string(),
-                        resource_type: "publisher".to_string(),
-                        attributes: PublisherAttributes {
-                            name: "Lantern Press".to_string(),
-                            publisher_id: 7,
-                            slug: "lantern-press".to_string(),
-                        },
+                    included: Some(vec![IncludedItem {
+                        id: "/api/vBeta/publishers/7".to_string(),
+                        resource_type: "Publisher".to_string(),
+                        attributes: serde_json::json!({
+                            "name": "Lantern Press",
+                            "publisherId": 7,
+                            "slug": "lantern-press",
+                        }),
                     }]),
                 }),
                 detail_result: Ok(OrderProductItemResponse { data: item }),
@@ -721,7 +762,56 @@ mod tests {
     }
 
     #[test]
-    fn map_order_product_builds_cover_url_from_embedded_thumbnail() {
+    fn map_order_product_builds_cover_url_from_sideloaded_product_relationship() {
+        // Matches the live API's actual shape: `product` metadata is *not* embedded on
+        // `attributes` — it's referenced via `relationships.product.data.id` and resolved
+        // against the response's `included` array.
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.royalty_publisher_id = 4952;
+        item.relationships = Some(OrderProductRelationships {
+            publisher: None,
+            product: Some(RelationshipRef {
+                data: Some(RelationshipData {
+                    resource_type: "Product".to_string(),
+                    id: "/api/vBeta/products/515276".to_string(),
+                }),
+            }),
+            order: None,
+        });
+
+        let mut products = HashMap::new();
+        products.insert(
+            "/api/vBeta/products/515276".to_string(),
+            OrderProductInfo {
+                image: Some("4952/515276.jpg".to_string()),
+                web_image: Some("4952/515276.webp".to_string()),
+                thumbnail: Some("4952/515276-thumb140.jpg".to_string()),
+                thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+                bundle_id: 0,
+                date_created: Some("2025-03-13T16:07:01-05:00".to_string()),
+                product_id: 515_276,
+                description: None,
+                filesize: Some(24.13),
+            },
+        );
+
+        let mut publishers = HashMap::new();
+        publishers.insert(4952, "Monte Cook Games".to_string());
+
+        let mapped = map_order_product(&item, &publishers, &products, 0);
+
+        assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
+        assert_eq!(
+            mapped.cover_url.as_deref(),
+            Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg")
+        );
+    }
+
+    #[test]
+    fn map_order_product_builds_cover_url_from_embedded_thumbnail_fallback() {
+        // Defensive fallback path: if `product` were ever embedded directly on `attributes`
+        // (e.g. a future/legacy response shape), it should still resolve without a
+        // `relationships`/`included` sideload.
         let mut item = order_product_item(515_276, "The Wellspring");
         item.attributes.royalty_publisher_id = 4952;
         item.attributes.publisher = Some(dtrpg_sdk::OrderProductPublisher {
@@ -729,7 +819,7 @@ mod tests {
             publisher_id: 4952,
             slug: "monte-cook-games".to_string(),
         });
-        item.attributes.product = Some(dtrpg_sdk::OrderProductInfo {
+        item.attributes.product = Some(OrderProductInfo {
             image: Some("4952/515276.jpg".to_string()),
             web_image: Some("4952/515276.webp".to_string()),
             thumbnail: Some("4952/515276-thumb140.jpg".to_string()),
@@ -741,7 +831,7 @@ mod tests {
             filesize: Some(24.13),
         });
 
-        let mapped = map_order_product(&item, &HashMap::new(), 0);
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
         assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
         assert_eq!(
@@ -756,7 +846,7 @@ mod tests {
         let mut publishers = HashMap::new();
         publishers.insert(7, "Lantern Press".to_string());
 
-        let mapped = map_order_product(&item, &publishers, 0);
+        let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
 
         assert_eq!(mapped.publisher.as_ref(), "Lantern Press");
         assert!(mapped.cover_url.is_none());
@@ -864,6 +954,7 @@ mod tests {
                 product: None,
                 order: None,
             },
+            relationships: None,
         }
     }
 
