@@ -798,19 +798,29 @@ impl LibraryController {
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
     /// cached or in flight.  Must be called before items are added to `catalog`
     /// so the in-flight marker is set before any render pass can check it.
+    ///
+    /// Disk-cached covers are loaded synchronously into [`CoverCache`] here,
+    /// before this function returns, so the very first render pass after a
+    /// catalog load already has the real thumbnail available and never shows
+    /// the generative placeholder for items that were already downloaded in a
+    /// prior session. Only items with no disk-cached bytes fall through to the
+    /// async network queue.
     fn enqueue_thumbnails(&mut self, items: &[LibraryItem], cx: &mut Context<Self>) {
+        let covers_root = covers_dir();
         let to_enqueue: Vec<(Arc<str>, Arc<str>)> = {
-            let cache = cx.global::<CoverCache>();
+            let cache = cx.global_mut::<CoverCache>();
             items.iter()
                  .filter_map(|item| {
                      let url = item.cover_url.as_ref()?;
                      let id = Arc::clone(&item.id);
-                     if cache.get(&id).is_none() && !cache.is_in_flight(&id) {
-                         Some((id, Arc::clone(url)))
+                     if cache.get(&id).is_some() || cache.is_in_flight(&id) {
+                         return None;
                      }
-                     else {
-                         None
+                     if let Some(bytes) = load_cached_cover(&covers_root, &id) {
+                         cache.insert(Arc::clone(&id), bytes);
+                         return None;
                      }
+                     Some((id, Arc::clone(url)))
                  })
                  .collect()
         };

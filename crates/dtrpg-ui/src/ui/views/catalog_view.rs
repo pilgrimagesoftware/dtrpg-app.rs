@@ -764,12 +764,13 @@ impl Render for CatalogView {
                                                      .collect()
                                             };
                                             row_range.map(|row| {
-                                                let offset = (row - range_start) * items_per_row;
-                                                let row_end =
+                                                         let offset =
+                                                             (row - range_start) * items_per_row;
+                                                         let row_end =
                                                     (offset + items_per_row).min(items.len());
-                                                let row_items = &items[offset..row_end];
-                                                let row_covers = &covers[offset..row_end];
-                                                div().flex()
+                                                         let row_items = &items[offset..row_end];
+                                                         let row_covers = &covers[offset..row_end];
+                                                         div().flex()
                                                      .gap(d.card_gap_x)
                                                      .mb(d.card_gap_y)
                                                      .children(row_items.iter()
@@ -784,8 +785,8 @@ impl Render for CatalogView {
                                                                                   s.clone())
                                                                         }))
                                                      .into_any_element()
-                                            })
-                                            .collect()
+                                                     })
+                                                     .collect()
                                         }).track_scroll(&scroll_handle)
                                           .flex_1()
                                           .min_h_0())

@@ -203,6 +203,7 @@ tabs:
 status_bar:
   theme_tooltip: "Thème : %{theme}"
   activity_tooltip: "%{in_progress} en cours, %{completed} terminées"
+  activity_tooltip_in_progress_only: "%{in_progress} en cours"
   notifications_tooltip_title: "Notifications"
   notifications_tooltip: "%{n} non lues"
 

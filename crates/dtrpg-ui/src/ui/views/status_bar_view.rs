@@ -136,18 +136,23 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
     else {
         "\u{25cb}"
     };
+    // Only mention completed items in the tooltip when there are any this
+    // session — otherwise it always reads "0 completed", which is noise.
+    let activity_tooltip_body = if activity_snap.recent_count > 0 {
+        t!("status_bar.activity_tooltip",
+           in_progress = activity_snap.in_progress_count,
+           completed = activity_snap.recent_count)
+    }
+    else {
+        t!("status_bar.activity_tooltip_in_progress_only",
+           in_progress = activity_snap.in_progress_count)
+    };
     let mut activity_indicator =
         Button::new("status-bar-activity").ghost()
                                           .compact()
                                           .label(format!("{activity_glyph} {activity_total}"))
-                                          .tooltip(status_bar_tooltip(
-            &t!("activity.title"),
-            &t!(
-                "status_bar.activity_tooltip",
-                in_progress = activity_snap.in_progress_count,
-                completed = activity_snap.recent_count
-            ),
-        ));
+                                          .tooltip(status_bar_tooltip(&t!("activity.title"),
+                                                                      &activity_tooltip_body));
     if activity_snap.in_progress_count > 0 {
         let progress_circle = match activity_snap.aggregate_progress {
             Some(fraction) => {
