@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Entity, Image, IntoElement, ObjectFit, ParentElement,
-    Pixels, Point, Render, Styled, StyledImage, UniformListScrollHandle, Window, div, img, px,
-    uniform_list,
+    AnyElement, App, ClickEvent, Context, Entity, Image, IntoElement, MouseButton, MouseDownEvent,
+    ObjectFit, ParentElement, Pixels, Point, Render, Styled, StyledImage, UniformListScrollHandle,
+    Window, div, img, px, uniform_list,
 };
 use gpui_component::badge::Badge;
 use gpui_component::pagination::Pagination;
@@ -490,8 +490,11 @@ pub struct CatalogView {
     /// during `render()` so grouped presentation modes avoid re-grouping on
     /// every hover-triggered re-render.
     grouped_cache: Option<Vec<PublisherGroup>>,
-    /// Last observed cursor position within the catalog area, used to anchor
-    /// the single-click item popover (see `render_item_popover`).
+    /// Cursor position captured at the most recent mouse-down within the
+    /// catalog area, used to anchor the single-click item popover (see
+    /// `render_item_popover`). Captured on mouse-down rather than tracked
+    /// continuously on mouse-move so the popover stays put while the pointer
+    /// wanders after opening it, instead of following the cursor.
     last_mouse_pos: Point<Pixels>,
 }
 
@@ -868,8 +871,9 @@ impl Render for CatalogView {
 
         let mut result = outer
             .relative()
-            .on_mouse_move(
-                cx.listener(|this, event: &gpui::MouseMoveEvent, _window, _cx| {
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, event: &MouseDownEvent, _window, _cx| {
                     this.last_mouse_pos = event.position;
                 }),
             )

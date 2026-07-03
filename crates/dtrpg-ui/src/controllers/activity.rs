@@ -199,10 +199,32 @@ impl ActivityController {
         cx.emit(ActivityChanged);
     }
 
+    /// Sets the activity panel overlay's open state directly.
+    ///
+    /// Used by the status bar's anchored `Popover`, which reports its own resolved
+    /// open state on each toggle rather than expecting the caller to flip a bool.
+    pub fn set_panel_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        if self.panel_open != open {
+            self.panel_open = open;
+            cx.emit(ActivityChanged);
+        }
+    }
+
     /// Toggles the alert history panel overlay open or closed.
     pub fn toggle_alert_panel(&mut self, cx: &mut Context<Self>) {
         self.alert_panel_open = !self.alert_panel_open;
         cx.emit(ActivityChanged);
+    }
+
+    /// Sets the alert history panel overlay's open state directly.
+    ///
+    /// Used by the status bar's anchored `Popover`, which reports its own resolved
+    /// open state on each toggle rather than expecting the caller to flip a bool.
+    pub fn set_alert_panel_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        if self.alert_panel_open != open {
+            self.alert_panel_open = open;
+            cx.emit(ActivityChanged);
+        }
     }
 
     /// Removes all entries from the durable alert history log.

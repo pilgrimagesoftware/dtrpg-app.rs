@@ -21,14 +21,12 @@ use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 
 use crate::ui::views::{
-    activity_panel_view::render_activity_panel,
-    alert_history_view::render_alert_history_panel,
     catalog_view::CatalogView,
     detail_panel_view::render_detail_tab_content,
     notification_banner_view::render_notification_banner,
     settings_view::render_settings_panel,
     sidebar_view::render_sidebar,
-    status_bar_view::{StatusBarSnapshot, render_status_bar},
+    status_bar_view::{ActivityBarData, StatusBarSnapshot, render_status_bar},
     tab_strip_view::render_tab_strip,
     title_bar_view::render_title_bar,
     toolbar_view::render_toolbar,
@@ -363,9 +361,25 @@ impl LibraryRootView {
         )
         .detach();
 
-        cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
-            cx.notify();
-        })
+        // When the settings overlay closes, its backdrop/input focus handles unmount
+        // and become orphaned in the dispatch tree — `Window::focused` still returns
+        // the stale handle (it stays alive via `self.settings_focus`), but the tree
+        // can no longer resolve its node, so action availability falls back to the
+        // dispatch tree's absolute root instead of our root div. That root div is
+        // where every app-level `.on_action` handler (menu items, shortcuts) lives,
+        // so once this happens the native menu bar shows every custom item as
+        // permanently disabled. Restore focus to `root_focus` on close to keep the
+        // dispatch path anchored inside our tree.
+        cx.subscribe_in(
+            &settings,
+            window,
+            |this, ctrl, _event: &SettingsChanged, window, cx| {
+                if !ctrl.read(cx).is_open() {
+                    window.focus(&this.root_focus, cx);
+                }
+                cx.notify();
+            },
+        )
         .detach();
 
         cx.subscribe(
@@ -590,7 +604,6 @@ impl Render for LibraryRootView {
             grouped,
             presentation,
             lib_entity.clone(),
-            settings_entity.clone(),
             colors,
         );
         let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
@@ -613,6 +626,7 @@ impl Render for LibraryRootView {
                 1,
             ),
         };
+        let alert_snap = self.activity.read(cx).alert_snapshot();
         let status_bar = render_status_bar(
             StatusBarSnapshot {
                 total_count,
@@ -620,13 +634,13 @@ impl Render for LibraryRootView {
                 active_tab_label,
                 active_tab_count,
                 theme_key: theme.key,
-                activity_in_progress: activity_snap.in_progress_count,
-                activity_recent_count: activity_snap.recent_count,
-                activity_recent_error_count: activity_snap.recent_error_count,
-                activity_aggregate_progress: activity_snap.aggregate_progress,
             },
             lib_entity.clone(),
-            activity_entity.clone(),
+            ActivityBarData {
+                entity: activity_entity.clone(),
+                snap: &activity_snap,
+                alert_snap: &alert_snap,
+            },
             colors,
         );
 
@@ -706,23 +720,6 @@ impl Render for LibraryRootView {
         };
 
         let sidebar_col = div().size_full().relative().child(sidebar);
-
-        // The activity panel overlay is rendered at the root level (below), not
-        // nested inside `sidebar_col`. Both `sidebar_col` and `main_content` are
-        // siblings inside the resizable layout, painted in DOM order — an
-        // absolute-positioned child of `sidebar_col` that visually extends past
-        // the sidebar's width would be painted *under* `main_content`'s opaque
-        // background and appear clipped by the catalog area. Rendering it as a
-        // root-level sibling after the resizable layout guarantees it paints on
-        // top of everything.
-        let activity_overlay = activity_snap
-            .panel_open
-            .then(|| render_activity_panel(&activity_snap, activity_entity.clone(), colors));
-
-        let alert_snap = self.activity.read(cx).alert_snapshot();
-        let alert_history_overlay = alert_snap
-            .open
-            .then(|| render_alert_history_panel(&alert_snap, activity_entity, colors));
 
         let settings_for_action = self.settings.clone();
         let controller_for_reload = self.controller.clone();
@@ -941,8 +938,6 @@ impl Render for LibraryRootView {
                     )
                     .child(status_bar),
             )
-            .children(activity_overlay)
-            .children(alert_history_overlay)
             .children(sheet_layer)
             .children(dialog_layer)
             .children(notification_layer)

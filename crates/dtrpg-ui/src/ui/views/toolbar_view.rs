@@ -2,14 +2,12 @@
 
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
-use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tab::{Tab, TabBar};
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::SettingsController;
 use crate::data::{enums::CatalogPresentation, theme::ColorTokens};
 use crate::util::filter::*;
 use crate::util::pluralize::pluralize;
@@ -92,7 +90,6 @@ pub fn render_toolbar(
     grouped: bool,
     presentation: CatalogPresentation,
     entity: Entity<LibraryController>,
-    settings: Entity<SettingsController>,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
@@ -160,8 +157,7 @@ pub fn render_toolbar(
                     grouped,
                     entity.clone(),
                 ))
-                .child(render_layout_switcher(presentation, entity))
-                .child(render_settings_button(settings)),
+                .child(render_layout_switcher(presentation, entity)),
         )
 }
 
@@ -286,18 +282,6 @@ fn render_layout_switcher(
                 _ => CatalogPresentation::Grid,
             };
             entity.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
-        })
-}
-
-// ── Settings gear button ──────────────────────────────────────────────────────
-
-fn render_settings_button(settings: Entity<SettingsController>) -> impl IntoElement + 'static {
-    Button::new("settings-gear")
-        .ghost()
-        .icon(IconName::Settings)
-        .tooltip(t!("toolbar.tooltip_settings").to_string())
-        .on_click(move |_, _, cx| {
-            settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
         })
 }
 

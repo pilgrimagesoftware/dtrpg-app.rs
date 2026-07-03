@@ -7,13 +7,18 @@
 //! crate's existing alert history panel — there is no separate
 //! notification-inbox capability in this app yet, so this relocates and
 //! reuses that entry point rather than introducing a new one.
+//!
+//! The activity and alert history panels are rendered as `Popover`s anchored
+//! to their trigger buttons here (rather than as root-level, hand-positioned
+//! overlays) so they always appear next to the button that opens them,
+//! regardless of window width or future status bar layout changes.
 
 use gpui::prelude::*;
-use gpui::{Entity, IntoElement, Styled, div};
+use gpui::{Anchor, Entity, IntoElement, Styled, div};
 use gpui_component::IconName;
-use gpui_component::badge::Badge;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_component::popover::Popover;
 use gpui_component::progress::ProgressCircle;
 use gpui_component::separator::Separator;
 use gpui_component::status_bar::StatusBar;
@@ -21,7 +26,10 @@ use gpui_component::{Sizable as _, Size};
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
+use crate::data::activity::{ActivitySnapshot, AlertHistorySnapshot};
 use crate::data::theme::{ColorTokens, ThemeKey};
+use crate::ui::views::activity_panel_view::render_activity_panel;
+use crate::ui::views::alert_history_view::render_alert_history_panel;
 use crate::util::pluralize::pluralize;
 use rust_i18n::t;
 
@@ -39,18 +47,17 @@ pub struct StatusBarSnapshot {
     pub active_tab_count: usize,
     /// Currently active theme.
     pub theme_key: ThemeKey,
-    /// Count of in-progress background operations.
-    pub activity_in_progress: usize,
-    /// Count of recently completed background operations.
-    pub activity_recent_count: usize,
-    /// Count of recent error-status operations, used as the notification
-    /// indicator's unread badge.
-    pub activity_recent_error_count: usize,
-    /// Mean of known `progress` values among in-progress activity items.
-    ///
-    /// `None` renders the activity button's progress circle in indeterminate mode
-    /// whenever `activity_in_progress > 0`.
-    pub activity_aggregate_progress: Option<f32>,
+}
+
+/// Activity and alert history state needed to render the status bar's
+/// activity/notification buttons and their anchored panels.
+pub struct ActivityBarData<'a> {
+    /// Controller entity, used to toggle the panels and act on their contents.
+    pub entity: Entity<ActivityController>,
+    /// Activity panel snapshot for the current render pass.
+    pub snap: &'a ActivitySnapshot,
+    /// Alert history panel snapshot for the current render pass.
+    pub alert_snap: &'a AlertHistorySnapshot,
 }
 
 fn theme_label(key: ThemeKey) -> &'static str {
@@ -66,7 +73,7 @@ fn theme_label(key: ThemeKey) -> &'static str {
 pub fn render_status_bar(
     snap: StatusBarSnapshot,
     entity: Entity<LibraryController>,
-    activity: Entity<ActivityController>,
+    activity_data: ActivityBarData<'_>,
     colors: &ColorTokens,
 ) -> impl IntoElement + 'static {
     let total_size_str = if snap.total_mb >= 1024.0 {
@@ -123,15 +130,20 @@ pub fn render_status_bar(
             m
         });
 
-    let activity_total = snap.activity_in_progress + snap.activity_recent_count;
-    let activity_glyph = if snap.activity_in_progress > 0 {
+    let ActivityBarData {
+        entity: activity,
+        snap: activity_snap,
+        alert_snap,
+    } = activity_data;
+
+    let activity_total = activity_snap.in_progress_count + activity_snap.recent_count;
+    let activity_glyph = if activity_snap.in_progress_count > 0 {
         "\u{21bb}"
-    } else if snap.activity_recent_count > 0 {
+    } else if activity_snap.recent_count > 0 {
         "\u{25cf}"
     } else {
         "\u{25cb}"
     };
-    let activity_for_click = activity.clone();
     let mut activity_indicator = Button::new("status-bar-activity")
         .ghost()
         .compact()
@@ -139,16 +151,13 @@ pub fn render_status_bar(
         .tooltip(
             t!(
                 "status_bar.activity_tooltip",
-                in_progress = snap.activity_in_progress,
-                completed = snap.activity_recent_count
+                in_progress = activity_snap.in_progress_count,
+                completed = activity_snap.recent_count
             )
             .to_string(),
-        )
-        .on_click(move |_, _, cx| {
-            activity_for_click.update(cx, |a, cx| a.toggle_panel(cx));
-        });
-    if snap.activity_in_progress > 0 {
-        let progress_circle = match snap.activity_aggregate_progress {
+        );
+    if activity_snap.in_progress_count > 0 {
+        let progress_circle = match activity_snap.aggregate_progress {
             Some(fraction) => ProgressCircle::new("status-bar-activity-progress")
                 .with_size(Size::Small)
                 .value(fraction * 100.0),
@@ -159,7 +168,21 @@ pub fn render_status_bar(
         activity_indicator = activity_indicator.child(progress_circle);
     }
 
-    let has_errors = snap.activity_recent_error_count > 0;
+    let activity_for_open_change = activity.clone();
+    let activity_panel = Popover::new("status-bar-activity-popover")
+        .anchor(Anchor::BottomLeft)
+        .trigger(activity_indicator)
+        .open(activity_snap.panel_open)
+        .on_open_change(move |open, _window, cx| {
+            activity_for_open_change.update(cx, |a, cx| a.set_panel_open(*open, cx));
+        })
+        .child(render_activity_panel(
+            activity_snap,
+            activity.clone(),
+            colors,
+        ));
+
+    let has_errors = activity_snap.recent_error_count > 0;
     let notification_button = Button::new("status-bar-notifications")
         .ghost()
         .compact()
@@ -167,28 +190,44 @@ pub fn render_status_bar(
         .tooltip(
             t!(
                 "status_bar.notifications_tooltip",
-                n = snap.activity_recent_error_count
+                n = activity_snap.recent_error_count
             )
             .to_string(),
+        );
+
+    let alert_for_open_change = activity.clone();
+    // `Popover::trigger` requires `Selectable`, which `Badge` doesn't implement, so the
+    // unread-error dot is layered on as a sibling of the popover rather than wrapping the
+    // trigger in a `Badge`.
+    let notification_panel = div()
+        .relative()
+        .child(
+            Popover::new("status-bar-notifications-popover")
+                .anchor(Anchor::BottomRight)
+                .trigger(notification_button)
+                .open(alert_snap.open)
+                .on_open_change(move |open, _window, cx| {
+                    alert_for_open_change.update(cx, |a, cx| a.set_alert_panel_open(*open, cx));
+                })
+                .child(render_alert_history_panel(alert_snap, activity, colors)),
         )
-        .on_click(move |_, _, cx| {
-            activity.update(cx, |a, cx| a.toggle_alert_panel(cx));
+        .when(has_errors, |this| {
+            this.child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .size(gpui::px(6.0))
+                    .rounded_full()
+                    .bg(gpui::red()),
+            )
         });
-    let notification_indicator = if has_errors {
-        Badge::new()
-            .dot()
-            .color(gpui::red())
-            .child(notification_button)
-            .into_any_element()
-    } else {
-        notification_button.into_any_element()
-    };
 
     StatusBar::new()
         .left(library_summary)
         .left(Separator::vertical())
         .left(active_tab_summary)
         .right(theme_picker)
-        .right(activity_indicator)
-        .right(notification_indicator)
+        .right(activity_panel)
+        .right(notification_panel)
 }

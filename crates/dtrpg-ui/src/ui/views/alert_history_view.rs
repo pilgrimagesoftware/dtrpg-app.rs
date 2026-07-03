@@ -18,8 +18,9 @@ use crate::data::theme::ColorTokens;
 use crate::util::datetime::{format_absolute, format_relative};
 use rust_i18n::t;
 
-/// Renders the alert history panel overlay anchored at the bottom of the sidebar column,
-/// offset to the right of the activity panel so both can be open simultaneously.
+/// Renders the alert history panel's content. The caller (the status bar's `Popover`
+/// wrapping the notification button) is responsible for anchoring and positioning
+/// this content relative to the trigger button.
 pub fn render_alert_history_panel(
     snap: &AlertHistorySnapshot,
     entity: Entity<ActivityController>,
@@ -36,15 +37,13 @@ pub fn render_alert_history_panel(
     let has_entries = !snap.entries.is_empty();
 
     div()
-        .absolute()
         .occlude()
-        .bottom(px(44.0))
-        .left(px(360.0))
         .w(px(340.0))
         .bg(surface_alt)
         .border_1()
         .border_color(border)
-        .rounded_t(px(8.0))
+        .rounded(px(8.0))
+        .shadow_lg()
         .flex()
         .flex_col()
         // ── Header ────────────────────────────────────────────────────────

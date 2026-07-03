@@ -12,7 +12,9 @@ use crate::data::activity::{ActivitySnapshot, ActivityStatus};
 use crate::data::theme::ColorTokens;
 use rust_i18n::t;
 
-/// Renders the activity panel overlay anchored at the bottom of the sidebar column.
+/// Renders the activity panel's content. The caller (the status bar's `Popover`
+/// wrapping the activity button) is responsible for anchoring and positioning
+/// this content relative to the trigger button.
 pub fn render_activity_panel(
     snap: &ActivitySnapshot,
     entity: Entity<ActivityController>,
@@ -29,14 +31,12 @@ pub fn render_activity_panel(
     let selected_id = snap.selected_id;
 
     div()
-        .absolute()
-        .bottom(px(56.0))
-        .left(px(8.0))
         .w(px(340.0))
         .bg(surface_alt)
         .border_1()
         .border_color(border)
-        .rounded_t(px(8.0))
+        .rounded(px(8.0))
+        .shadow_lg()
         .flex()
         .flex_col()
         // ── Header ────────────────────────────────────────────────────────
