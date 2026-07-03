@@ -10,6 +10,7 @@ use gpui::{
     SharedString, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 };
 use gpui_component::Disableable;
+use gpui_component::Icon;
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
@@ -68,6 +69,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
         .id("detail-tab-content")
         .flex_1()
         .min_h_0()
+        .min_w_0()
         .flex()
         .bg(surface)
         .child({
@@ -296,18 +298,25 @@ fn value_or_dash(value: &str) -> String {
     }
 }
 
-fn render_metadata_table(item: &LibraryItem, _colors: &ColorTokens)
+fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens)
                          -> impl IntoElement + 'static + use<> {
+    let category_label = div().flex()
+                              .items_center()
+                              .gap(px(4.0))
+                              .child(Icon::new(IconName::Folder).text_color(colors.text_secondary))
+                              .child(t!("detail.field_category").to_string())
+                              .into_any_element();
+
     let mut list = DescriptionList::vertical()
-        .columns(1)
+        .columns(2)
         .bordered(false)
         .child(
             DescriptionItem::new(t!("detail.field_system").to_string())
                 .value(value_or_dash(&item.line)),
         )
         .child(
-            DescriptionItem::new(t!("detail.field_category").to_string())
-                .value(item.kind.to_string()),
+            DescriptionItem::new(t!("detail.field_released").to_string())
+                .value(item.year.to_string()),
         )
         .child(
             DescriptionItem::new(t!("detail.field_format").to_string())
@@ -317,17 +326,15 @@ fn render_metadata_table(item: &LibraryItem, _colors: &ColorTokens)
             DescriptionItem::new(t!("detail.field_file_size").to_string())
                 .value(format!("{:.0} MB", item.size_mb)),
         )
-        .child(
-            DescriptionItem::new(t!("detail.field_released").to_string())
-                .value(item.year.to_string()),
-        );
+        .child(DescriptionItem::new(category_label).value(item.kind.to_string()).span(2));
 
     // The DriveThruRPG order-product API does not always report a page count; omit
     // the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
         list = list.child(
             DescriptionItem::new(t!("detail.field_pages").to_string())
-                .value(item.pages.to_string()),
+                .value(item.pages.to_string())
+                .span(2),
         );
     }
 
@@ -340,7 +347,8 @@ fn render_metadata_table(item: &LibraryItem, _colors: &ColorTokens)
                  .child(relative)
                  .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
                  .into_any_element();
-        list = list.child(DescriptionItem::new(t!("detail.field_added").to_string()).value(value));
+        list = list.child(DescriptionItem::new(t!("detail.field_added").to_string()).value(value)
+                                                                                    .span(2));
     }
 
     list
