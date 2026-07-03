@@ -6,6 +6,7 @@ use std::sync::Arc;
 use gpui::{Hsla, Image, ImageFormat, IntoElement, ParentElement, Styled, div, px, rgb};
 
 use crate::data::library::LibraryItem;
+use crate::util::hash::fnv1a_32;
 
 // ── CoverCache ────────────────────────────────────────────────────────────────
 
@@ -109,16 +110,6 @@ pub struct CoverStyle {
     pub foreground_22: Hsla,
     pub foreground_12: Hsla,
     pub motif: Motif,
-}
-
-/// FNV-1a 32-bit hash of `s`.
-fn fnv1a_32(s: &str) -> u32 {
-    let mut h: u32 = 2_166_136_261;
-    for byte in s.bytes() {
-        h ^= u32::from(byte);
-        h = h.wrapping_mul(16_777_619);
-    }
-    h
 }
 
 /// ITU-R 601 luminance check: returns `true` when the hex color is perceptually light.

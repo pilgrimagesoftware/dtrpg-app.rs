@@ -5,6 +5,7 @@ pub mod catalog_cache;
 pub mod collection;
 pub mod collections_cache;
 pub mod constants;
+pub mod cover_cache;
 pub mod enums;
 pub mod events;
 pub mod file_openers;

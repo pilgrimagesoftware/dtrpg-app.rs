@@ -90,6 +90,16 @@ pub fn cache_dir() -> PathBuf {
     app_cache_dir().join("metadata")
 }
 
+/// Returns the directory used for cached cover thumbnail image bytes.
+///
+/// Always lives under [`app_cache_dir`] — cover thumbnails are regenerable content
+/// fetched from the DriveThruRPG image CDN, not user-downloaded catalog files, so
+/// they belong alongside the catalog/collections metadata cache rather than in the
+/// user's chosen download location.
+pub fn covers_dir() -> PathBuf {
+    app_cache_dir().join("covers")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,6 +127,11 @@ mod tests {
     #[test]
     fn cache_dir_is_under_app_cache_dir() {
         assert_eq!(cache_dir(), app_cache_dir().join("metadata"));
+    }
+
+    #[test]
+    fn covers_dir_is_under_app_cache_dir() {
+        assert_eq!(covers_dir(), app_cache_dir().join("covers"));
     }
 
     #[cfg(target_os = "macos")]

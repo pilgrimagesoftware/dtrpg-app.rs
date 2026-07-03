@@ -4,10 +4,11 @@ use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{load_cache_metadata, load_catalog_cache, save_catalog_cache};
 use crate::data::collection::CollectionEntry;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
+use crate::data::cover_cache::{load_cached_cover, save_cached_cover};
 use crate::data::enums::*;
 use crate::data::events::*;
 use crate::data::library::*;
-use crate::data::paths::cache_dir;
+use crate::data::paths::{cache_dir, covers_dir};
 use crate::data::selection::Selection;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
@@ -102,8 +103,11 @@ pub struct LibraryController {
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
     pub collection_members: HashSet<u64>,
-    /// Queue of `(item_id, cover_url)` pairs pending thumbnail fetches.
-    thumbnail_queue: VecDeque<(Arc<str>, Arc<str>)>,
+    /// Queue of `(item_id, cover_url, force_network)` triples pending thumbnail
+    /// fetches. `force_network` skips the disk cache and always re-fetches — set for
+    /// manual "Load Thumbnail"/"Refresh Thumbnails" actions, which exist specifically
+    /// to bypass a stale cached image; left `false` for automatic background loads.
+    thumbnail_queue: VecDeque<(Arc<str>, Arc<str>, bool)>,
     /// Whether a thumbnail fetch is currently in flight.
     thumbnail_loading: bool,
     /// Activity id for the aggregated thumbnail loading entry.
@@ -650,7 +654,7 @@ impl LibraryController {
         self.section_counts = SectionCounts::default();
         self.publishers.clear();
         self.invalidate_cache();
-        for (id, _url) in self.thumbnail_queue.drain(..) {
+        for (id, _url, _force) in self.thumbnail_queue.drain(..) {
             cx.global_mut::<CoverCache>().in_flight.remove(&id);
         }
         // If nothing is currently in flight, no pending fetch completion will ever run
@@ -748,7 +752,7 @@ impl LibraryController {
         for (id, url) in &to_enqueue {
             cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(id));
             self.thumbnail_queue
-                .push_back((Arc::clone(id), Arc::clone(url)));
+                .push_back((Arc::clone(id), Arc::clone(url), false));
         }
         self.drain_thumbnail_queue(cx);
     }
@@ -758,7 +762,7 @@ impl LibraryController {
         if self.thumbnail_loading || self.thumbnail_queue.is_empty() {
             return;
         }
-        let Some((item_id, url)) = self.thumbnail_queue.pop_front() else {
+        let Some((item_id, url, force_network)) = self.thumbnail_queue.pop_front() else {
             return;
         };
 
@@ -785,13 +789,26 @@ impl LibraryController {
             // own internal runtime per call and works from a plain OS thread, matching the
             // pattern the SDK gateway already uses (`tokio::runtime::Runtime::block_on`) to
             // run network calls from these same background-executor threads.
+            //
+            // Disk-cache-first: the in-memory `CoverCache` is always empty at startup, so
+            // without a persistent disk cache every launch would re-download every cover
+            // from the network. Check disk before hitting the network, and persist a fresh
+            // network fetch to disk so the next launch is a cache hit.
             let fetch_url = url_str.clone();
+            let disk_key = Arc::clone(&item_id);
             let result: Result<Vec<u8>, String> = async_cx
                 .background_executor()
                 .spawn(async move {
+                    let covers_root = covers_dir();
+                    if !force_network
+                        && let Some(bytes) = load_cached_cover(&covers_root, &disk_key)
+                    {
+                        return Ok(bytes);
+                    }
                     let resp = reqwest::blocking::get(&fetch_url).map_err(|e| e.to_string())?;
-                    let bytes = resp.bytes().map_err(|e| e.to_string())?;
-                    Ok(bytes.to_vec())
+                    let bytes = resp.bytes().map_err(|e| e.to_string())?.to_vec();
+                    save_cached_cover(&covers_root, &disk_key, &bytes);
+                    Ok(bytes)
                 })
                 .await;
 
@@ -864,6 +881,10 @@ impl LibraryController {
 
     /// Enqueues a single cover URL at the front of the thumbnail queue and starts
     /// the drain loop.  Used by the per-item "Load Thumbnail" context menu action.
+    ///
+    /// Forces a network re-fetch bypassing both the in-memory and on-disk caches —
+    /// this action exists specifically to retry or refresh a cover, not to redundantly
+    /// reload whatever is already cached.
     pub fn load_thumbnail(&mut self, cover_url: Arc<str>, cx: &mut Context<Self>) {
         let item_id = self
             .catalog
@@ -872,26 +893,28 @@ impl LibraryController {
             .map(|i| Arc::clone(&i.id));
 
         if let Some(id) = item_id {
-            self.thumbnail_queue.retain(|(i, _)| i != &id);
+            self.thumbnail_queue.retain(|(i, _, _)| i != &id);
             cx.global_mut::<CoverCache>()
                 .mark_in_flight(Arc::clone(&id));
-            self.thumbnail_queue.push_front((id, cover_url));
+            self.thumbnail_queue.push_front((id, cover_url, true));
             self.drain_thumbnail_queue(cx);
         }
     }
 
     /// Re-fetches thumbnails for every catalog item with a `cover_url`, overwriting
-    /// any cached image. Used by the "Refresh Thumbnails" catalog menu action.
+    /// any cached image (in-memory, and on disk). Used by the "Refresh Thumbnails"
+    /// catalog menu action.
     ///
     /// Unlike [`enqueue_thumbnails`](Self::enqueue_thumbnails), this does not skip
-    /// items already present in the cache — every eligible item is re-queued.
+    /// items already present in the cache — every eligible item is re-queued with a
+    /// forced network re-fetch.
     pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
-        let to_enqueue: Vec<(Arc<str>, Arc<str>)> = self
+        let to_enqueue: Vec<(Arc<str>, Arc<str>, bool)> = self
             .catalog
             .iter()
             .filter_map(|item| {
                 let url = item.cover_url.as_ref()?;
-                Some((Arc::clone(&item.id), Arc::clone(url)))
+                Some((Arc::clone(&item.id), Arc::clone(url), true))
             })
             .collect();
 
@@ -905,7 +928,7 @@ impl LibraryController {
         // had already completed before this action was invoked.
         self.thumbnail_processed = 0;
         let cache = cx.global_mut::<CoverCache>();
-        for (id, _) in &to_enqueue {
+        for (id, _, _) in &to_enqueue {
             cache.mark_in_flight(Arc::clone(id));
         }
         self.thumbnail_queue.extend(to_enqueue);
