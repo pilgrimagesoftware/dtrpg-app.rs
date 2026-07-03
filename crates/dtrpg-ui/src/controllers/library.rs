@@ -32,6 +32,9 @@ pub struct LibrarySnapshot {
     pub counts: SectionCounts,
     pub publishers: Vec<PublisherEntry>,
     pub collections: Vec<CollectionEntry>,
+    /// True once the initial collections fetch for the current session has
+    /// completed; the sidebar shows "?" for the collection count until then.
+    pub collections_loaded: bool,
     /// All numeric product IDs in the full catalog; used by the sidebar to compute
     /// per-collection resolved item counts.
     pub catalog_ids: HashSet<u64>,
@@ -97,6 +100,10 @@ pub struct LibraryController {
     pub publishers: Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
     pub collections: Vec<CollectionEntry>,
+    /// True once the first `apply_collections` call has completed for the current
+    /// session. Used by the sidebar to show a "?" placeholder for the collection
+    /// count instead of a misleading `0` while the initial fetch is still in flight.
+    collections_loaded: bool,
     /// Backing service for collections; stored so it can be replaced on sign-in.
     collections_service: Arc<dyn CollectionsService>,
     /// Set of numeric product IDs belonging to the active collection filter.
@@ -178,6 +185,7 @@ impl LibraryController {
             section_counts: SectionCounts::default(),
             publishers: Vec::new(),
             collections: Vec::new(),
+            collections_loaded: false,
             collections_service: Arc::from(collections_service),
             collection_members: HashSet::new(),
             thumbnail_queue: VecDeque::new(),
@@ -269,12 +277,23 @@ impl LibraryController {
                         let is_fresh = meta.as_ref().is_some_and(|m| !m.is_stale());
 
                         if is_fresh {
-                            // Check remote count if the service supports it cheaply.
+                            // Check remote count if the service supports it cheaply. Surface
+                            // this as its own activity item — it is usually fast, but on a
+                            // slow connection it is otherwise indistinguishable from the app
+                            // being stuck doing nothing.
+                            let count_activity_id = weak_activity
+                                .update(async_cx, |a, cx| {
+                                    a.start("Getting count of items\u{2026}", None, cx)
+                                })
+                                .unwrap_or(0);
                             let svc = service_arc.clone();
                             let remote_count = async_cx
                                 .background_executor()
                                 .spawn(async move { svc.count_items() })
                                 .await;
+                            weak_activity
+                                .update(async_cx, |a, cx| a.complete(count_activity_id, cx))
+                                .ok();
                             let count_matches = match remote_count {
                                 Some(Ok(n)) => n == items.len(),
                                 Some(Err(_)) => false, // count fetch failed; do live fetch
@@ -300,7 +319,7 @@ impl LibraryController {
 
             // ── Fetch live catalog from API ───────────────────────────────────
             let activity_id = weak_activity
-                .update(async_cx, |a, cx| a.start("Loading catalog\u{2026}", None, cx))
+                .update(async_cx, |a, cx| a.start("Loading library\u{2026}", None, cx))
                 .unwrap_or(0);
 
             // Two channels: one for page batches, one for the API-reported total, if any.
@@ -405,7 +424,7 @@ impl LibraryController {
                                 .ok();
                         } else {
                             let label =
-                                format!("Loading catalog\u{2026} ({} items)", live_items.len());
+                                format!("Loading library\u{2026} ({} items)", live_items.len());
                             weak_activity
                                 .update(async_cx, |a, cx| a.update_label(activity_id, label, cx))
                                 .ok();
@@ -498,6 +517,10 @@ impl LibraryController {
     pub fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
         let cache_root = cache_dir();
+        let weak_activity = self.activity.downgrade();
+        let activity_id = self
+            .activity
+            .update(cx, |a, cx| a.start("Loading collections\u{2026}", None, cx));
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
             let result = async_cx
@@ -525,9 +548,26 @@ impl LibraryController {
                         ctrl.apply_collections(entries, cx);
                     })
                     .ok();
+                    weak_activity
+                        .update(async_cx, |a, cx| a.complete(activity_id, cx))
+                        .ok();
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "collections load failed");
+                    // Session errors are expected when starting before auth completes
+                    // (see `start_load_inner`'s matching treatment for the catalog
+                    // fetch); quietly complete rather than surfacing a user-facing error.
+                    if e.kind == crate::services::collections::CollectionsServiceErrorKind::Session
+                    {
+                        tracing::debug!(error = %e, "collections load skipped: no authenticated session");
+                        weak_activity
+                            .update(async_cx, |a, cx| a.complete(activity_id, cx))
+                            .ok();
+                    } else {
+                        tracing::warn!(error = %e, "collections load failed");
+                        weak_activity
+                            .update(async_cx, |a, cx| a.error(activity_id, e.to_string(), cx))
+                            .ok();
+                    }
                 }
             }
         })
@@ -537,6 +577,7 @@ impl LibraryController {
     /// Stores the fetched collections and emits a change event.
     fn apply_collections(&mut self, collections: Vec<CollectionEntry>, cx: &mut Context<Self>) {
         self.collections = collections;
+        self.collections_loaded = true;
         // Refresh collection_members if the current filter is a Collection filter,
         // in case the filter was set before the collections loaded.
         if let SidebarFilter::Collection(id, _) = &self.filter {
@@ -573,6 +614,7 @@ impl LibraryController {
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
         self.collections.clear();
+        self.collections_loaded = false;
         self.collection_members.clear();
         self.selection = Selection::default();
         self.invalidate_cache();
@@ -976,6 +1018,7 @@ impl LibraryController {
             counts: self.section_counts,
             publishers: self.publishers.clone(),
             collections: self.collections.clone(),
+            collections_loaded: self.collections_loaded,
             catalog_ids,
             total_count: self.section_counts.all,
             total_mb: self.total_size_mb(),

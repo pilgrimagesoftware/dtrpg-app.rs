@@ -96,6 +96,7 @@ pub fn render_sidebar(
     counts: SectionCounts,
     publishers: Vec<PublisherEntry>,
     collections: Vec<CollectionEntry>,
+    collections_loaded: bool,
     catalog_ids: HashSet<u64>,
     entity: Entity<LibraryController>,
     collection_name_input: Entity<InputState>,
@@ -190,7 +191,13 @@ pub fn render_sidebar(
         .child(SidebarContent::Separator);
 
     // ── Collections menu (always present) ────────────────────────────────────
-    let collections_count = collections.len();
+    // Show "?" instead of "0" while the initial collections fetch is still in
+    // flight, so an empty list doesn't read as a confirmed zero-collections state.
+    let collections_count: SharedString = if collections_loaded {
+        collections.len().to_string().into()
+    } else {
+        "?".into()
+    };
 
     let col_children: Vec<SidebarMenuItem> = collections
         .into_iter()
@@ -288,7 +295,7 @@ pub fn render_sidebar(
                         .flex()
                         .items_center()
                         .gap(px(4.))
-                        .child(div().text_xs().child(collections_count.to_string()))
+                        .child(div().text_xs().child(collections_count.clone()))
                         .child(
                             Button::new("collections-search-open")
                                 .ghost()
