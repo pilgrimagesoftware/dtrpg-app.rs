@@ -108,6 +108,12 @@ pub struct LibraryController {
     thumbnail_loading: bool,
     /// Activity id for the aggregated thumbnail loading entry.
     thumbnail_activity_id: Option<u64>,
+    /// Number of thumbnails processed (successes and failures both count) in the
+    /// current batch. Reset to `0` whenever a new aggregated activity item starts.
+    /// Together with the live queue length this gives a real, monotonically
+    /// advancing progress fraction — `processed / (processed + queue.len())` —
+    /// instead of an indeterminate placeholder.
+    thumbnail_processed: usize,
     /// True from startup until the first `set_catalog` call completes.
     catalog_loading: bool,
     /// Incremented each time [`start_load_inner`](Self::start_load_inner) starts a new
@@ -173,6 +179,7 @@ impl LibraryController {
             thumbnail_queue: VecDeque::new(),
             thumbnail_loading: false,
             thumbnail_activity_id: None,
+            thumbnail_processed: 0,
             catalog_loading: true,
             load_generation: 0,
             current_page: 1,
@@ -380,11 +387,23 @@ impl LibraryController {
                             .ok();
                         }
                         live_items.extend(items);
-                        // Update progress after each page if we have an estimate.
+                        // Update progress after each page if we have an estimate; the
+                        // real DriveThruRPG API never reports `links.last`, so in
+                        // practice this only fires when a local cache seeded a total
+                        // above. Without a total there is no way to compute a real
+                        // percentage — fall back to a growing item-count label instead
+                        // of leaving the activity item looking frozen (its progress bar
+                        // renders indeterminate, see `activity_panel_view`).
                         if let Some(total) = estimated_total.filter(|&t| t > 0) {
                             let progress = (live_items.len() as f32 / total as f32).min(1.0);
                             weak_activity
                                 .update(async_cx, |a, cx| a.update_progress(activity_id, progress, cx))
+                                .ok();
+                        } else {
+                            let label =
+                                format!("Loading catalog\u{2026} ({} items)", live_items.len());
+                            weak_activity
+                                .update(async_cx, |a, cx| a.update_label(activity_id, label, cx))
                                 .ok();
                         }
                         rx = Some(returned_rx);
@@ -634,6 +653,15 @@ impl LibraryController {
         for (id, _url) in self.thumbnail_queue.drain(..) {
             cx.global_mut::<CoverCache>().in_flight.remove(&id);
         }
+        // If nothing is currently in flight, no pending fetch completion will ever run
+        // `drain_thumbnail_queue`'s empty-queue completion branch — without this, the
+        // aggregated activity item would be left showing "in progress" indefinitely.
+        if !self.thumbnail_loading
+            && let Some(id) = self.thumbnail_activity_id.take()
+        {
+            self.thumbnail_processed = 0;
+            self.activity.update(cx, |a, cx| a.complete(id, cx));
+        }
         self.reload_catalog(cx);
     }
 
@@ -737,15 +765,13 @@ impl LibraryController {
         self.thumbnail_loading = true;
 
         let activity_id = if let Some(id) = self.thumbnail_activity_id {
-            self.activity.update(cx, |a, cx| {
-                a.update_label(id, "Loading thumbnails\u{2026}", cx)
-            });
             id
         } else {
             let id = self
                 .activity
                 .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", None, cx));
             self.thumbnail_activity_id = Some(id);
+            self.thumbnail_processed = 0;
             id
         };
 
@@ -799,19 +825,37 @@ impl LibraryController {
                 }
             }
 
-            let remaining = this
-                .update(async_cx, |ctrl, _cx| ctrl.thumbnail_queue.len())
-                .unwrap_or(0);
+            // Count this attempt (success or failure) toward the batch total so the
+            // progress bar reflects real throughput instead of sitting indeterminate.
+            let (processed, remaining) = this
+                .update(async_cx, |ctrl, _cx| {
+                    ctrl.thumbnail_processed += 1;
+                    (ctrl.thumbnail_processed, ctrl.thumbnail_queue.len())
+                })
+                .unwrap_or((0, 0));
+
             if remaining == 0 {
                 weak_activity
                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                     .ok();
-                this.update(async_cx, |ctrl, _cx| ctrl.thumbnail_activity_id = None)
-                    .ok();
+                this.update(async_cx, |ctrl, _cx| {
+                    ctrl.thumbnail_activity_id = None;
+                    ctrl.thumbnail_processed = 0;
+                })
+                .ok();
             } else {
                 let label = format!("Loading thumbnails\u{2026} ({remaining} remaining)");
+                let total = (processed + remaining) as f32;
+                let progress = if total > 0.0 {
+                    processed as f32 / total
+                } else {
+                    0.0
+                };
                 weak_activity
-                    .update(async_cx, |a, cx| a.update_label(activity_id, label, cx))
+                    .update(async_cx, |a, cx| {
+                        a.update_label(activity_id, label, cx);
+                        a.update_progress(activity_id, progress, cx);
+                    })
                     .ok();
             }
         })
@@ -856,6 +900,10 @@ impl LibraryController {
         }
 
         self.thumbnail_queue.clear();
+        // This forces a fresh full re-fetch batch — reset the processed counter so the
+        // progress bar denominator isn't skewed by whatever fraction of a prior batch
+        // had already completed before this action was invoked.
+        self.thumbnail_processed = 0;
         let cache = cx.global_mut::<CoverCache>();
         for (id, _) in &to_enqueue {
             cache.mark_in_flight(Arc::clone(id));

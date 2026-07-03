@@ -258,14 +258,23 @@ fn render_item_row(
                 })),
         )
         // ── Progress bar (in-progress items only) ─────────────────────────
+        //
+        // `progress: None` means the total is genuinely unknown (e.g. the DriveThruRPG
+        // API never reports a total item count) — render the empty track only, rather
+        // than a fixed partial fill that looks identical whether the operation just
+        // started or has been stalled for minutes. Real progress (label text showing a
+        // growing item count, or a percentage once a total is known) is what actually
+        // signals liveness in that case; see the callers of `update_label`.
         .children(is_in_progress.then(|| {
-            let fill = progress.unwrap_or(0.3);
             div()
                 .w_full()
                 .h(px(3.0))
                 .mt(px(4.0))
                 .bg(border)
                 .rounded(px(1.5))
-                .child(div().h_full().w(relative(fill)).bg(accent).rounded(px(1.5)))
+                .children(
+                    progress
+                        .map(|fill| div().h_full().w(relative(fill)).bg(accent).rounded(px(1.5))),
+                )
         }))
 }
