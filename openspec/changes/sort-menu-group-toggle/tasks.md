@@ -18,7 +18,7 @@
 - [x] 3.1 Run `cargo check --all-targets` — no compile errors
 - [x] 3.2 No new clippy warnings introduced
 - [x] 3.3 Run `cargo test --all-features --workspace` — all 57 tests pass
-- [ ] 3.4 Launch the app; confirm the sort button shows the current sort label with a chevron indicator
-- [ ] 3.5 Open the sort menu; confirm sort items appear, followed by a separator, followed by "Group by Publisher" with a checkmark reflecting current state
-- [ ] 3.6 Toggle "Group by Publisher" from the menu; confirm the catalog groups/ungroups correctly
-- [ ] 3.7 Confirm no standalone "Group" button appears in the toolbar
+- [x] 3.4 Launch the app; confirm the sort button shows the current sort label with a chevron indicator
+- [x] 3.5 Open the sort menu; confirm sort items appear, followed by a separator, followed by "Group by Publisher" with a checkmark reflecting current state
+- [x] 3.6 Toggle "Group by Publisher" from the menu; confirm the catalog groups/ungroups correctly
+- [x] 3.7 Confirm no standalone "Group" button appears in the toolbar

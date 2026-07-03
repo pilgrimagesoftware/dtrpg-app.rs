@@ -18,7 +18,7 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 A thin horizontal line is visible between the smart-filter items and the Publishers section
-- [ ] 4.2 A thin horizontal line is visible between the Publishers section and the Collections section
-- [ ] 4.3 The lines use the sidebar border color (matches the vertical sidebar edge color)
-- [ ] 4.4 No layout shift or height change in either the smart-filter group, publishers, or collections sections
+- [x] 4.1 A thin horizontal line is visible between the smart-filter items and the Publishers section
+- [x] 4.2 A thin horizontal line is visible between the Publishers section and the Collections section
+- [x] 4.3 The lines use the sidebar border color (matches the vertical sidebar edge color)
+- [x] 4.4 No layout shift or height change in either the smart-filter group, publishers, or collections sections

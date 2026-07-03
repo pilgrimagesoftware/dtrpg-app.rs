@@ -19,5 +19,5 @@
 ## 4. Verify
 
 - [x] 4.1 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 4.2 Manually launch the app with a valid API key in the keyring and confirm the library window opens (no login prompt)
-- [ ] 4.3 Manually launch the app with an invalid/expired API key in the keyring and confirm the login window opens with the key pre-filled
+- [x] 4.2 Manually launch the app with a valid API key in the keyring and confirm the library window opens (no login prompt)
+- [x] 4.3 Manually launch the app with an invalid/expired API key in the keyring and confirm the login window opens with the key pre-filled

@@ -26,6 +26,6 @@
 - [x] 4.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 4.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings
 - [x] 4.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 4.4 Launch the app; click the search field and type — confirm the catalog filters to matching titles
-- [ ] 4.5 Confirm the "✕" button appears when text is present; clicking it clears the field and restores the full catalog
-- [ ] 4.6 Confirm the placeholder "Search…" appears when the field is empty
+- [x] 4.4 Launch the app; click the search field and type — confirm the catalog filters to matching titles
+- [x] 4.5 Confirm the "✕" button appears when text is present; clicking it clears the field and restores the full catalog
+- [x] 4.6 Confirm the placeholder "Search…" appears when the field is empty

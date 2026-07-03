@@ -27,7 +27,7 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Build and run the app; sign in with a known API key; open Settings → Account
-- [ ] 5.2 Confirm the key hint row appears below the email (or "DriveThruRPG Account"), showing the correct masked format
-- [ ] 5.3 Confirm the hint persists after the Gravatar avatar loads
-- [ ] 5.4 Log out; confirm no hint is shown on the unauthenticated screen
+- [x] 5.1 Build and run the app; sign in with a known API key; open Settings → Account
+- [x] 5.2 Confirm the key hint row appears below the email (or "DriveThruRPG Account"), showing the correct masked format
+- [x] 5.3 Confirm the hint persists after the Gravatar avatar loads
+- [x] 5.4 Log out; confirm no hint is shown on the unauthenticated screen

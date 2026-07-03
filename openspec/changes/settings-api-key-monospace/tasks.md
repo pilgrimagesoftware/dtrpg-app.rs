@@ -5,5 +5,5 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Build and run the app; sign in; open Settings → Account; confirm the API key hint row renders in a visually distinct monospaced font
-- [ ] 2.2 Confirm the "Account" label and email address above the hint remain in the proportional application font
+- [x] 2.1 Build and run the app; sign in; open Settings → Account; confirm the API key hint row renders in a visually distinct monospaced font
+- [x] 2.2 Confirm the "Account" label and email address above the hint remain in the proportional application font

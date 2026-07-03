@@ -28,13 +28,13 @@
 
 ## 5. Manual Verification
 
-- [ ] 5.1 Sidebar renders with "Libri" wordmark header
-- [ ] 5.2 All four smart-filter items are visible with correct counts
-- [ ] 5.3 Clicking each smart-filter item changes the active highlight and updates the catalog
-- [ ] 5.4 Publishers section header is present and clicking it expands/collapses the publisher list
-- [ ] 5.5 Clicking a publisher item filters the catalog to that publisher
-- [ ] 5.6 Collections section header is present and clicking it expands/collapses the collection list
-- [ ] 5.7 Clicking a collection item filters the catalog to that collection
-- [ ] 5.8 Footer shows total count and storage size
-- [ ] 5.9 Activity button shows correct state and clicking it toggles the activity panel
-- [ ] 5.10 App startup does not produce any new panics or warnings in the console
+- [x] 5.1 Sidebar renders with "Libri" wordmark header
+- [x] 5.2 All four smart-filter items are visible with correct counts
+- [x] 5.3 Clicking each smart-filter item changes the active highlight and updates the catalog
+- [x] 5.4 Publishers section header is present and clicking it expands/collapses the publisher list
+- [x] 5.5 Clicking a publisher item filters the catalog to that publisher
+- [x] 5.6 Collections section header is present and clicking it expands/collapses the collection list
+- [x] 5.7 Clicking a collection item filters the catalog to that collection
+- [x] 5.8 Footer shows total count and storage size
+- [x] 5.9 Activity button shows correct state and clicking it toggles the activity panel
+- [x] 5.10 App startup does not produce any new panics or warnings in the console
