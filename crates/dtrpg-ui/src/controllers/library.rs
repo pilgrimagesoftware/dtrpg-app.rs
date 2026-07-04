@@ -27,6 +27,16 @@ use crate::util::publisher::*;
 use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
+/// Flips a per-key boolean flag in `map`, treating a missing entry as `false`.
+///
+/// Used by per-entry ephemeral UI toggles (e.g. the "Advanced details"
+/// disclosure) that default to a collapsed/off state until first toggled.
+fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, bool>, key: K) -> bool {
+    let flag = map.entry(key).or_insert(false);
+    *flag = !*flag;
+    *flag
+}
+
 // ── LibraryController
 // ─────────────────────────────────────────────────────────
 
@@ -173,6 +183,11 @@ pub struct LibraryController {
     /// cleared whenever the entry's detail tab is closed or reopened (see
     /// `catalog-entry-detail-view`).
     selected_item_file:      HashMap<Arc<str>, Arc<str>>,
+    /// Whether the "Advanced details" disclosure section is expanded in a
+    /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
+    /// never persisted, and defaults to collapsed for entries with no entry
+    /// here (see `catalog-entry-detail-advanced-disclosure`).
+    advanced_details_open:   HashMap<Arc<str>, bool>,
 }
 
 impl LibraryController {
@@ -222,7 +237,8 @@ impl LibraryController {
                               detail_panel_width:
                                   crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
                               entry_bounds: HashMap::new(),
-                              selected_item_file: HashMap::new() };
+                              selected_item_file: HashMap::new(),
+                              advanced_details_open: HashMap::new() };
         ctrl.start_load(cx);
         ctrl
     }
@@ -1396,6 +1412,30 @@ impl LibraryController {
         }
     }
 
+    // ── Advanced details disclosure ──────────────────────────────────────────
+
+    /// Returns whether `entry_id`'s "Advanced details" section is expanded.
+    ///
+    /// Defaults to `false` (collapsed) for any entry id not yet toggled, per
+    /// `catalog-entry-detail-advanced-disclosure`.
+    #[must_use]
+    pub fn is_advanced_details_open(&self, entry_id: &str) -> bool {
+        self.advanced_details_open
+            .get(entry_id)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    /// Flips `entry_id`'s "Advanced details" open/collapsed state.
+    ///
+    /// Ephemeral — never persisted, and independent per entry id.
+    ///
+    /// Emits [`LibraryChanged`].
+    pub fn toggle_advanced_details(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
+        toggle_bool_flag(&mut self.advanced_details_open, entry_id);
+        cx.emit(LibraryChanged);
+    }
+
     // ── Detail panel width ────────────────────────────────────────────────────
 
     /// Returns the current detail panel width, in pixels.
@@ -2198,3 +2238,35 @@ fn app_backtrace() -> String {
 //         );
 //     }
 // }
+
+#[cfg(test)]
+mod advanced_details_tests {
+    use std::collections::HashMap;
+
+    use super::toggle_bool_flag;
+
+    #[test]
+    fn missing_entry_defaults_to_false() {
+        let map: HashMap<&str, bool> = HashMap::new();
+        assert!(!map.get("entry-a").copied().unwrap_or(false));
+    }
+
+    #[test]
+    fn toggle_flips_repeatedly_for_same_key() {
+        let mut map: HashMap<&str, bool> = HashMap::new();
+
+        assert!(toggle_bool_flag(&mut map, "entry-a"));
+        assert!(!toggle_bool_flag(&mut map, "entry-a"));
+        assert!(toggle_bool_flag(&mut map, "entry-a"));
+    }
+
+    #[test]
+    fn toggle_does_not_affect_other_keys() {
+        let mut map: HashMap<&str, bool> = HashMap::new();
+
+        toggle_bool_flag(&mut map, "entry-a");
+
+        assert!(map.get("entry-a").copied().unwrap_or(false));
+        assert!(!map.get("entry-b").copied().unwrap_or(false));
+    }
+}

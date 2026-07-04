@@ -13,6 +13,7 @@ use gpui_component::Disableable;
 use gpui_component::Icon;
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::collapsible::Collapsible;
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::table::{Table, TableBody, TableCell, TableHeader, TableRow};
@@ -23,7 +24,7 @@ use crate::controllers::library::LibraryController;
 use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::theme::ColorTokens;
-use crate::ui::library::cover::render_generative_cover;
+use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::reveal::reveal_in_file_manager;
 
@@ -49,6 +50,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let item = item.clone();
     let entity_download = entity.clone();
     let entity_refresh_thumbnail = entity.clone();
+    let entity_advanced_details = entity.clone();
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
@@ -257,7 +259,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             .into_any_element()
                     } else {
                         render_metadata_table(&item, colors).into_any_element()
-                    }),
+                    })
+                    .child(render_advanced_details(&item, entity_advanced_details, colors, cx)),
             ),
         )
         .into_any_element()
@@ -390,6 +393,73 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile) -> impl Into
                        t!("detail.status_in_cloud").to_string()
                    })
                    .span(2))
+}
+
+/// Renders the "Advanced details" disclosure section: a clickable header that
+/// toggles a collapsed-by-default panel of fields not already shown in the
+/// primary metadata table or item tier (stable id, numeric id, order product
+/// id, product id, added-order value, and the generative cover color).
+///
+/// See `catalog-entry-detail-advanced-disclosure`.
+fn render_advanced_details(item: &LibraryItem, entity: Entity<LibraryController>,
+                           colors: &ColorTokens, cx: &App)
+                           -> impl IntoElement + 'static {
+    let entry_id = Arc::clone(&item.id);
+    let open = entity.read(cx).is_advanced_details_open(&entry_id);
+
+    let toggle_entity = entity;
+    let toggle_entry_id = Arc::clone(&entry_id);
+
+    let header = div().id("advanced-details-header")
+                      .flex()
+                      .items_center()
+                      .gap(px(6.0))
+                      .cursor_pointer()
+                      .text_sm()
+                      .font_weight(gpui::FontWeight::SEMIBOLD)
+                      .text_color(colors.text_primary)
+                      .on_click(move |_, _, cx| {
+                          toggle_entity.update(cx, |ctrl, cx| {
+                              ctrl.toggle_advanced_details(Arc::clone(&toggle_entry_id), cx);
+                          });
+                      })
+                      .child(Icon::new(if open {
+                                           IconName::ChevronUp
+                                       }
+                                       else {
+                                           IconName::ChevronDown
+                                       }).text_color(colors.text_secondary))
+                      .child(t!("detail.advanced_details_heading").to_string());
+
+    let swatch_color = cover_style(item).background;
+    let content = DescriptionList::vertical()
+        .columns(2)
+        .bordered(false)
+        .child(DescriptionItem::new(t!("detail.field_stable_id").to_string())
+                   .value(item.id.to_string()))
+        .child(DescriptionItem::new(t!("detail.field_numeric_id").to_string())
+                   .value(item.numeric_id.to_string()))
+        .child(DescriptionItem::new(t!("detail.field_order_product_id").to_string())
+                   .value(item.order_product_id.to_string()))
+        .child(DescriptionItem::new(t!("detail.field_product_id").to_string())
+                   .value(item.product_id.to_string()))
+        .child(DescriptionItem::new(t!("detail.field_added_order").to_string())
+                   .value(item.added_order.to_string()))
+        .child(DescriptionItem::new(t!("detail.field_cover_color").to_string())
+                   .value(
+                       div().flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
+                            .child(item.color.to_string())
+                            .into_any_element(),
+                   )
+                   .span(2));
+
+    Collapsible::new().gap(px(8.0))
+                      .open(open)
+                      .child(header)
+                      .content(content)
 }
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
