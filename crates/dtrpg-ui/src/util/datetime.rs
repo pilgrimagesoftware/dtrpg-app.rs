@@ -2,7 +2,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::data::constants::{MONTH_ABBRS, MONTH_NAMES};
+use crate::data::constants::MONTH_NAMES;
 
 /// Returns the current Unix timestamp in seconds.
 fn now_secs() -> i64 {
@@ -51,6 +51,25 @@ fn epoch_to_hms(ts: i64) -> (u32, u32, bool) {
     (hour_12, minute, is_pm)
 }
 
+/// Returns `"s"` for anything other than exactly `1`, else `""`.
+fn plural_suffix(n: i64) -> &'static str {
+    if n == 1 { "" } else { "s" }
+}
+
+/// Returns the whole number of calendar months between `ts` (earlier) and
+/// `now` (later), based on year/month/day components rather than a fixed
+/// day-count division — so "5 months ago" lines up with the calendar month
+/// a user would expect, not `elapsed / (30 * 86_400)`.
+fn months_between(ts: i64, now: i64) -> i64 {
+    let (y1, m1, d1) = epoch_to_ymd(ts);
+    let (y2, m2, d2) = epoch_to_ymd(now);
+    let mut months = (i64::from(y2) - i64::from(y1)) * 12 + (i64::from(m2) - i64::from(m1));
+    if d2 < d1 {
+        months -= 1;
+    }
+    months.max(0)
+}
+
 /// Formats a Unix timestamp as a human-readable relative string.
 ///
 /// Buckets:
@@ -60,8 +79,8 @@ fn epoch_to_hms(ts: i64) -> (u32, u32, bool) {
 /// - 24–47 h     → "yesterday"
 /// - 2–6 days    → "N days ago"
 /// - 7–29 days   → "N weeks ago"
-/// - same year   → "Mon D" (e.g. "Jan 5")
-/// - older       → "Mon D, YYYY" (e.g. "Jan 5, 2023")
+/// - 1–11 months → "N months ago"
+/// - 12+ months  → "N years ago"
 ///
 /// # Examples
 ///
@@ -83,11 +102,11 @@ pub fn format_relative(ts: i64) -> String {
     }
     if elapsed < 3_600 {
         let mins = elapsed / 60;
-        return format!("{mins} minute{} ago", if mins == 1 { "" } else { "s" });
+        return format!("{mins} minute{} ago", plural_suffix(mins));
     }
     if elapsed < 86_400 {
         let hrs = elapsed / 3_600;
-        return format!("{hrs} hour{} ago", if hrs == 1 { "" } else { "s" });
+        return format!("{hrs} hour{} ago", plural_suffix(hrs));
     }
     if elapsed < 2 * 86_400 {
         return "yesterday".to_string();
@@ -98,19 +117,19 @@ pub fn format_relative(ts: i64) -> String {
     }
     if elapsed < 30 * 86_400 {
         let weeks = elapsed / (7 * 86_400);
-        return format!("{weeks} week{} ago", if weeks == 1 { "" } else { "s" });
+        return format!("{weeks} week{} ago", plural_suffix(weeks));
     }
 
-    let (ts_year, ts_month, ts_day) = epoch_to_ymd(ts);
-    let (now_year, _, _) = epoch_to_ymd(now);
-    let abbr = MONTH_ABBRS[(ts_month as usize).saturating_sub(1).min(11)];
+    // Guaranteed >= 1 by the 30-day threshold above in all but rare
+    // short-month edge cases (e.g. 30 days from Jan 31 can still land in
+    // February); floor at 1 so we never fall through to "0 months ago".
+    let months = months_between(ts, now).max(1);
+    if months < 12 {
+        return format!("{months} month{} ago", plural_suffix(months));
+    }
 
-    if ts_year == now_year {
-        format!("{abbr} {ts_day}")
-    }
-    else {
-        format!("{abbr} {ts_day}, {ts_year}")
-    }
+    let years = months / 12;
+    format!("{years} year{} ago", plural_suffix(years))
 }
 
 /// Converts a proleptic Gregorian civil date to days since the Unix epoch.
@@ -269,6 +288,50 @@ mod tests {
     #[test]
     fn weeks_at_29d() {
         assert_eq!(format_relative(now() - 29 * 86_400), "4 weeks ago");
+    }
+
+    #[test]
+    fn months_at_1_month() {
+        let ts = months_ago_anchored(1);
+        assert_eq!(format_relative(ts), "1 month ago");
+    }
+
+    #[test]
+    fn months_at_roughly_5_months() {
+        // 5 calendar months ago, anchored on day-of-month to avoid drifting
+        // across a short month (e.g. February).
+        let ts = months_ago_anchored(5);
+        assert_eq!(format_relative(ts), "5 months ago");
+    }
+
+    #[test]
+    fn months_at_11_months() {
+        let ts = months_ago_anchored(11);
+        assert_eq!(format_relative(ts), "11 months ago");
+    }
+
+    #[test]
+    fn years_at_12_months() {
+        let ts = months_ago_anchored(12);
+        assert_eq!(format_relative(ts), "1 year ago");
+    }
+
+    #[test]
+    fn years_at_25_months() {
+        let ts = months_ago_anchored(25);
+        assert_eq!(format_relative(ts), "2 years ago");
+    }
+
+    /// Returns a timestamp `n` whole calendar months before now, clamping the
+    /// day-of-month so the subtraction never overflows into a different
+    /// month than intended (e.g. subtracting from the 31st into a 30-day
+    /// month).
+    fn months_ago_anchored(n: u32) -> i64 {
+        let (y, m, _) = epoch_to_ymd(now());
+        let total = (y as i64) * 12 + i64::from(m) - 1 - i64::from(n);
+        let target_year = (total.div_euclid(12)) as i32;
+        let target_month = (total.rem_euclid(12)) as u32 + 1;
+        civil_to_days(target_year, target_month, 1) * 86_400 + 43_200
     }
 
     #[test]

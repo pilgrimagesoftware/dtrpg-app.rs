@@ -472,19 +472,34 @@ fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens)
     }
 
     if let Some(ts) = item.date_added {
-        let relative = format_relative(ts);
-        let absolute = format_absolute(ts);
-        let id = SharedString::from(format!("detail-added-{}", item.id));
-        let value =
-            div().id(id)
-                 .child(relative)
-                 .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
-                 .into_any_element();
+        let value = render_relative_date_value(&item.id, "added", ts);
         list = list.child(DescriptionItem::new(t!("detail.field_added").to_string()).value(value)
                                                                                     .span(2));
     }
 
+    if let Some(ts) = item.date_updated {
+        let value = render_relative_date_value(&item.id, "updated", ts);
+        list =
+            list.child(DescriptionItem::new(t!("detail.field_updated").to_string()).value(value)
+                                                                                   .span(2));
+    }
+
     list
+}
+
+/// Renders a stateful div showing a relative date label, with a tooltip that
+/// reveals the absolute human-readable date/time on hover.
+///
+/// `slot` disambiguates the element id (e.g. `"added"`, `"updated"`) so
+/// multiple date rows on the same item don't collide.
+fn render_relative_date_value(item_id: &str, slot: &str, ts: i64) -> AnyElement {
+    let relative = format_relative(ts);
+    let absolute = format_absolute(ts);
+    let id = SharedString::from(format!("detail-{slot}-{item_id}"));
+    div().id(id)
+         .child(relative)
+         .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
+         .into_any_element()
 }
 
 #[cfg(test)]

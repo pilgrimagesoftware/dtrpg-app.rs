@@ -81,6 +81,7 @@ detail:
   field_file_size: "File size"
   field_released: "Released"
   field_added: "Added"
+  field_updated: "Updated"
   field_status: "Status"
   field_file_count: "Files"
   status_on_device: "On this device"

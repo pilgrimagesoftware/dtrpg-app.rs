@@ -116,9 +116,16 @@ pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
     let text = fs::read_to_string(&path)
         .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache not readable"))
         .ok()?;
-    serde_json::from_str(&text)
+    let mut items: Vec<LibraryItem> = serde_json::from_str(&text)
         .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache malformed"))
-        .ok()
+        .ok()?;
+    // Cache written before file records were deduplicated by id (see
+    // `LibraryItem::dedupe_files`) may still have entries repeated verbatim —
+    // clean them up on load rather than requiring a full cache wipe.
+    for item in &mut items {
+        item.dedupe_files();
+    }
+    Some(items)
 }
 
 // ── save_catalog_cache
@@ -267,5 +274,38 @@ mod tests {
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded[0].id.as_ref(), "a1");
         assert_eq!(loaded[1].id.as_ref(), "a2");
+    }
+
+    #[test]
+    fn load_dedupes_stale_repeated_file_records() {
+        // Regression: a cache written before file records were deduplicated
+        // by id (see `LibraryItem::dedupe_files`) can have the same file
+        // repeated in `files`; loading it must clean this up rather than
+        // making the detail tab's item list select every row at once.
+        use crate::data::library::LibraryItemFile;
+
+        let dir = test_dir("dedupe_on_load");
+        fs::create_dir_all(&dir).unwrap();
+        let mut item = make_item("b1");
+        item.files = vec![LibraryItemFile { id:      "1234".into(),
+                                            name:    "Moria Rulebook".into(),
+                                            format:  "PDF".into(),
+                                            size_mb: 1.0, },
+                          LibraryItemFile { id:      "1234".into(),
+                                            name:    "Moria Rulebook".into(),
+                                            format:  "PDF".into(),
+                                            size_mb: 1.0, },];
+        // Bypass `save_catalog_cache` (which would go through the current,
+        // already-deduped write path) to simulate JSON written by an older
+        // build that had not yet deduplicated file records.
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![item]).unwrap()).unwrap();
+
+        let loaded = load_catalog_cache(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded[0].files.len(), 1);
+        assert!(!loaded[0].is_multi_item());
     }
 }

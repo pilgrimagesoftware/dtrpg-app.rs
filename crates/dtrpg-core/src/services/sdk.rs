@@ -16,7 +16,7 @@ use dtrpg_ui::{
         library::{LibraryItem, LibraryItemFile},
     },
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
-    util::datetime::{format_absolute, parse_rfc3339_to_epoch},
+    util::datetime::parse_rfc3339_to_epoch,
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -476,26 +476,16 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                          .unwrap_or(0);
 
     // The API reports `datePurchased`/`fileLastModified` as raw RFC 3339 strings
-    // (e.g. "2024-07-16T10:45:52-05:00") — parse them so the UI can render
-    // human-readable text instead of leaking the machine format into the
-    // description shown in the detail panel.
+    // (e.g. "2024-07-16T10:45:52-05:00"). Parse them into `date_added` /
+    // `date_updated` rather than embedding the machine format as text — the
+    // detail panel renders these as relative labels with a human-readable
+    // absolute-date tooltip (see `render_relative_date_value`).
     let date_purchased_epoch = attributes.date_purchased
                                          .as_deref()
                                          .and_then(parse_rfc3339_to_epoch);
     let file_last_modified_epoch = attributes.file_last_modified
                                              .as_deref()
                                              .and_then(parse_rfc3339_to_epoch);
-
-    let desc = {
-        let mut parts = Vec::new();
-        if let Some(ts) = date_purchased_epoch {
-            parts.push(format!("Purchased {}", format_absolute(ts)));
-        }
-        if let Some(ts) = file_last_modified_epoch {
-            parts.push(format!("Updated {}", format_absolute(ts)));
-        }
-        parts.join(". ")
-    };
 
     LibraryItem { id: item.id.as_str().into(),
                   numeric_id,
@@ -512,9 +502,10 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                   added_order: order,
                   status: ItemStatus::Cloud,
                   color: DEFAULT_COLOR.into(),
-                  desc: desc.as_str().into(),
+                  desc: "".into(),
                   cover_url: cover_url.map(Into::into),
                   date_added: date_purchased_epoch,
+                  date_updated: file_last_modified_epoch,
                   thumbnail_last_attempted: None,
                   files }
 }
@@ -702,20 +693,28 @@ mod tests {
     }
 
     #[test]
-    fn map_order_product_desc_is_human_readable_not_raw_rfc3339() {
+    fn map_order_product_parses_file_last_modified_into_date_updated() {
         let item = order_product_item(515_276, "The Wellspring");
 
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
+        // "2026-01-02T08:30:00Z"
+        assert_eq!(mapped.date_updated, Some(1_767_342_600));
+    }
+
+    #[test]
+    fn map_order_product_desc_never_leaks_raw_rfc3339_timestamps() {
+        let item = order_product_item(515_276, "The Wellspring");
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        // Dates are surfaced as structured `date_added`/`date_updated` fields
+        // and rendered by the detail panel as relative labels with an
+        // absolute-date tooltip — never as raw text in `desc`.
         assert!(!mapped.desc.contains('T'),
                 "desc leaked a raw RFC3339 timestamp: {}",
                 mapped.desc);
-        assert!(mapped.desc.contains("Purchased January 1, 2026"),
-                "desc: {}",
-                mapped.desc);
-        assert!(mapped.desc.contains("Updated January 2, 2026"),
-                "desc: {}",
-                mapped.desc);
+        assert!(!mapped.desc.contains("2026-01"), "desc: {}", mapped.desc);
     }
 
     #[test]

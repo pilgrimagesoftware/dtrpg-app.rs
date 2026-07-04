@@ -31,3 +31,53 @@
 - [ ] 5.4 Open the detail panel for an item; confirm the "Added" row shows a relative label
 - [ ] 5.5 Hover the "Added" value; confirm a tooltip appears with the full date and time
 - [ ] 5.6 Confirm items with `added_order` values in each time bucket show the correct label format
+
+## 6. Fix: real SDK data leaked raw RFC 3339 timestamps into `desc`
+
+The Rust SDK adapter (`services::sdk::map_order_product`) built `LibraryItem.desc` by
+interpolating the API's raw `datePurchased`/`fileLastModified` RFC 3339 strings directly
+(e.g. `"Purchased 2024-07-16T10:45:52-05:00"`), and always set `date_added: None` — so real
+(non-stub) items never used the relative/tooltip formatting built in section 4, and the
+description text shown in the detail panel leaked the machine-readable format.
+
+- [x] 6.1 Add `pub fn parse_rfc3339_to_epoch(input: &str) -> Option<i64>` to `util/datetime.rs`
+      (own `civil_to_days` inverse of `epoch_to_ymd`; handles `Z` and `±HH:MM` offsets; no new
+      crate dependency), with unit tests for offset math, `Z` suffix, malformed input, and a
+      round trip against `epoch_to_ymd`
+- [x] 6.2 In `map_order_product`, parse `date_purchased`/`file_last_modified` with
+      `parse_rfc3339_to_epoch` and set `LibraryItem.date_added` / `LibraryItem.date_updated`
+      from the results; stop building `desc` from the raw date strings
+- [x] 6.3 Add `pub date_updated: Option<i64>` to `LibraryItem` (mirrors `date_added`); `new()`
+      sets it to `None` (stub data has no "last modified by publisher" concept — only real SDK
+      data populates it)
+- [x] 6.4 Add unit tests in `services::sdk` asserting `date_added`/`date_updated` are parsed
+      correctly and that `desc` never contains a raw timestamp
+
+## 7. Fix: `format_relative` had no month/year buckets
+
+`format_relative` jumped straight from "N weeks ago" (max 29 days) to calendar-day formatting
+("Jan 5" / "Jan 5, 2023") for anything 30+ days old — so an item updated 5 months ago showed a
+bare date instead of "5 months ago".
+
+- [x] 7.1 Add `months_between(ts, now) -> i64` using calendar year/month/day arithmetic (not a
+      fixed day-count division, which drifts against short months)
+- [x] 7.2 Replace the "Mon D" / "Mon D, YYYY" buckets in `format_relative` with "N months ago"
+      (1-11 months) and "N years ago" (12+ months)
+- [x] 7.3 Add unit tests for 1, 5, 11, 12, and 25 month boundaries using a
+      calendar-anchored helper (`months_ago_anchored`) so tests don't depend on which day of the
+      month they happen to run
+
+## 8. Detail panel — "Updated" row
+
+- [x] 8.1 Extract the "Added" row's div-plus-tooltip construction into a shared
+      `render_relative_date_value(item_id, slot, ts) -> AnyElement` helper
+- [x] 8.2 Add an "Updated" row using `item.date_updated`, mirroring "Added" (omitted when `None`)
+- [x] 8.3 Add `detail.field_updated` = "Updated" to `i18n/en.yaml` (and mirror in `de.yaml` /
+      `fr.yaml` if those are kept in sync as part of this change)
+
+## 9. Re-verification
+
+- [x] 9.1 `cargo test --all-features --workspace` — all unit + doc tests pass
+- [x] 9.2 `cargo check --all-targets` — no compile errors
+- [x] 9.3 `cargo clippy --all-targets --all-features -- -D warnings` — no new warnings
+- [x] 9.4 `cargo +nightly fmt --all -- --check` — no formatting diffs

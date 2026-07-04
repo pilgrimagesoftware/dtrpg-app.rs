@@ -50,6 +50,10 @@ pub struct LibraryItem {
     /// library.
     #[serde(default)]
     pub date_added:               Option<i64>,
+    /// Unix timestamp (seconds since epoch) when the item's files were last
+    /// updated by the publisher, if known.
+    #[serde(default)]
+    pub date_updated:             Option<i64>,
     /// Last time a thumbnail fetch was attempted for this item; not persisted
     /// to cache.
     #[serde(skip)]
@@ -87,6 +91,7 @@ impl LibraryItem {
                desc: desc.into(),
                cover_url: None,
                date_added,
+               date_updated: None,
                thumbnail_last_attempted: None,
                files: Vec::new() }
     }
@@ -97,6 +102,22 @@ impl LibraryItem {
     #[must_use]
     pub fn is_multi_item(&self) -> bool {
         self.files.len() > 1
+    }
+
+    /// Removes duplicate entries from `files`, keeping the first occurrence
+    /// of each unique `id`.
+    ///
+    /// The DriveThruRPG API has been observed to repeat a download record
+    /// (identical `id`) across `files`; the SDK mapping layer
+    /// (`map_order_product`) already dedupes on ingest, but catalog data
+    /// cached to disk before that fix still has the duplicates. Without this,
+    /// every row in the detail tab's item list compares equal by `id`, so
+    /// selecting one row highlights all of them and further clicks appear to
+    /// do nothing. Call this on any `LibraryItem` loaded from a source this
+    /// crate does not fully control (e.g. the on-disk catalog cache).
+    pub fn dedupe_files(&mut self) {
+        let mut seen_ids = std::collections::HashSet::new();
+        self.files.retain(|f| seen_ids.insert(Arc::clone(&f.id)));
     }
 }
 
@@ -176,5 +197,67 @@ pub fn format_total_size(items: &[LibraryItem]) -> String {
     }
     else {
         format!("{:.0} MB", total_mb)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(id: &str, name: &str) -> LibraryItemFile {
+        LibraryItemFile { id:      id.into(),
+                          name:    name.into(),
+                          format:  "PDF".into(),
+                          size_mb: 1.0, }
+    }
+
+    #[test]
+    fn dedupe_files_removes_repeated_ids() {
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.files = vec![file("1234", "Moria Rulebook"),
+                          file("1234", "Moria Rulebook")];
+
+        item.dedupe_files();
+
+        assert_eq!(item.files.len(), 1);
+        assert!(!item.is_multi_item());
+    }
+
+    #[test]
+    fn dedupe_files_keeps_distinct_ids() {
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.files = vec![file("1234", "Moria Rulebook"),
+                          file("1235", "Moria Map Sheet")];
+
+        item.dedupe_files();
+
+        assert_eq!(item.files.len(), 2);
+        assert!(item.is_multi_item());
     }
 }

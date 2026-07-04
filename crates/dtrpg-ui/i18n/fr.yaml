@@ -80,6 +80,7 @@ detail:
   field_file_size: "Taille du fichier"
   field_released: "Date de sortie"
   field_added: "Ajouté"
+  field_updated: "Mis à jour"
   field_status: "Statut"
   field_file_count: "Files"
   status_on_device: "Sur cet appareil"
