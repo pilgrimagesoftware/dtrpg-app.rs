@@ -20,13 +20,20 @@ visibly jump around as the mouse moves after opening.
   the right of the entry's own on-screen bounds; if there isn't room to the right of the
   window, it anchors to the left of the entry instead. It is always top-aligned with the
   entry, so it never covers it.
-- Grid cards and Thumbs rows report their precise bounds (`Bounds<Pixels>`) once painted
-  after selection, via `LibraryController::popover_anchor_bounds`, so the anchor is
-  computed against the real entry rectangle rather than the click point. List/grouped-List
+- Every visible Grid card and Thumbs row continuously reports its precise bounds
+  (`Bounds<Pixels>`), via `LibraryController::entry_bounds`, keyed by item id — not just
+  the selected entry — so the anchor is computed against the real entry rectangle rather
+  than the click point. Reporting bounds for every visible entry (instead of only the
+  selected one) means the bounds for whichever entry gets clicked are already known at
+  click time: the entry was necessarily visible, and therefore already painted, before the
+  click could happen. An earlier version of this fix reported bounds only for the selected
+  entry, which meant the very first paint after selection still used the click-position
+  fallback and the popover visibly jumped once the entry's real bounds arrived a frame
+  later; this is why bounds are tracked for every visible entry instead. List/grouped-List
   rows (rendered by the third-party `DataTable` component, whose per-row bounds aren't
-  reachable from `CatalogView`) fall back to the click position; because those rows span
-  nearly the full catalog width, "beside the entry" isn't achievable there regardless of
-  bounds precision.
+  reachable from `CatalogView`) still fall back to the click position; because those rows
+  span nearly the full catalog width, "beside the entry" isn't achievable there regardless
+  of bounds precision.
 
 ## Capabilities
 
@@ -47,12 +54,13 @@ _(none)_
   `popover_anchor_pos: Option<Point<Pixels>>` field, set from the click event that selects
   an item and cleared when the popover is dismissed; a new `popover_anchor_point` helper
   computes the final right-then-left anchor point from the entry's bounds and the window
-  width; `render_grid_card`/`render_thumb_row`/`render_grid` gain an `is_selected` flag
-  used to report the selected entry's bounds via `on_prepaint`.
+  width; `render_grid_card` and `render_thumb_row` unconditionally report their own bounds
+  via `on_prepaint` on every paint (not gated on selection).
 - `crates/dtrpg-ui/src/controllers/library.rs`: `LibraryController` gains
-  `popover_anchor_bounds: Option<Bounds<Pixels>>`, reset on every `select_item`/
-  `clear_selection`, with a `set_popover_anchor_bounds` setter that only re-emits
-  `LibraryChanged` when the bounds actually changed (avoids a render feedback loop).
+  `entry_bounds: HashMap<Arc<str>, Bounds<Pixels>>`, populated continuously by every
+  visible Grid card / Thumbs row via `set_entry_bounds`, which only re-emits
+  `LibraryChanged` when an entry's bounds actually changed (avoids a render feedback loop);
+  `entry_bounds(id)` looks up the bounds for the selected item at popover-render time.
 - `crates/dtrpg-ui/src/ui/views/item_popover_view.rs`: reads the popover width/margin from
   new `ITEM_POPOVER_WIDTH`/`ITEM_POPOVER_MARGIN` constants instead of inline literals.
 - `crates/dtrpg-ui/src/data/constants.rs`: adds `ITEM_POPOVER_WIDTH`/`ITEM_POPOVER_MARGIN`.

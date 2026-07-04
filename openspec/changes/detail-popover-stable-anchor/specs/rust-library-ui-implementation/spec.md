@@ -21,7 +21,8 @@ open.
 
 The single-click item popover SHALL anchor to the right of the catalog entry that opened
 it, and SHALL anchor to the left of the entry instead when there is not enough room to its
-right within the window. In either case the popover SHALL NOT cover the entry.
+right within the window. In either case the popover SHALL NOT cover the entry, and it
+SHALL appear beside the entry immediately — not at the click point first, then move.
 
 #### Scenario: Popover opens to the right of the entry
 
@@ -36,3 +37,10 @@ right within the window. In either case the popover SHALL NOT cover the entry.
   window for the popover to fit on the right
 - **THEN** the popover opens immediately to the left of the entry instead, without
   covering it
+
+#### Scenario: Popover does not flash at the click point before settling beside the entry
+
+- **WHEN** the user single-clicks a Grid card or Thumbs row
+- **THEN** the popover appears beside the entry (right or left, per the above) on the
+  very first frame it is shown, with no visible jump from an initial click-point position
+  to its final anchored position

@@ -29,25 +29,31 @@
 
 - [x] 5.1 Add `ITEM_POPOVER_WIDTH`/`ITEM_POPOVER_MARGIN` constants and use them in
       `item_popover_view.rs` in place of inline literals
-- [x] 5.2 Add `LibraryController::popover_anchor_bounds: Option<Bounds<Pixels>>`, reset on
-      `select_item`/`clear_selection`, with a `set_popover_anchor_bounds` setter that only
-      re-emits `LibraryChanged` when the bounds changed
-- [x] 5.3 Report the selected Grid card's/Thumbs row's precise bounds via `on_prepaint`,
-      gated on a new `is_selected` parameter threaded through `render_grid_card` /
-      `render_thumb_row` / `render_grid`
+- [x] 5.2 Add `LibraryController::entry_bounds: HashMap<Arc<str>, Bounds<Pixels>>`, with a
+      `set_entry_bounds` setter that only re-emits `LibraryChanged` when an entry's bounds
+      actually changed, and an `entry_bounds(id)` lookup
+- [x] 5.3 Report every visible Grid card's/Thumbs row's precise bounds via `on_prepaint`,
+      unconditionally (not gated on selection) — see task 5.7 for why
 - [x] 5.4 Add `popover_anchor_point` in `catalog_view.rs`: prefers the entry's right edge,
       falls back to its left edge when the popover wouldn't fit within the window on the
       right, and is always top-aligned with the entry
-- [x] 5.5 `render()`'s popover call site uses `popover_anchor_bounds()` when set, falling
-      back to the existing click-position (`popover_anchor_pos`) as a zero-size rectangle
-      otherwise — this remains the only anchor for List/grouped-List rows, whose bounds
-      aren't reachable from the third-party `DataTable` component
+- [x] 5.5 `render()`'s popover call site looks up `entry_bounds(&item.id)` for the selected
+      item, falling back to the existing click-position (`popover_anchor_pos`) as a
+      zero-size rectangle when unset — this remains the only anchor for List/grouped-List
+      rows, whose bounds aren't reachable from the third-party `DataTable` component
 - [x] 5.6 `cargo check --workspace` / `cargo clippy --all-targets --all-features -- -D
       warnings` / `cargo test --workspace` / `cargo +nightly fmt --all -- --check`
+- [x] 5.7 Fix: reporting bounds only for the selected entry (first cut of 5.2/5.3) caused
+      the popover to flash at the click position, then jump to the entry's bounds once
+      `on_prepaint` fired a frame later. Changed to report bounds for *every* visible Grid
+      card/Thumbs row continuously, keyed by item id, so the clicked entry's bounds are
+      already known at click time (it was necessarily visible, and therefore already
+      painted, before it could be clicked) — eliminating the flash
 
 ## 6. Manual Verification — Anchor Side
 
 - [ ] 6.1 Single-click a Grid card or Thumbs row with room to its right; confirm the
-      popover opens beside it (not over it), top-aligned with the entry
+      popover opens beside it (not over it), top-aligned with the entry, immediately —
+      with no flash at the click point first
 - [ ] 6.2 Single-click an entry near the right edge of the window; confirm the popover
       falls back to opening on the entry's left instead of being clipped or covering it

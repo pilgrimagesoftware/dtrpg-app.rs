@@ -946,11 +946,6 @@ impl Render for CatalogView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let snap = self.controller.read(cx).snapshot();
         let item_count = self.controller.read(cx).visible_items_count();
-        // Computed once here (rather than re-reading the controller per row) so
-        // every Grid/Thumbs entry closure below can cheaply check whether it is
-        // the one entry that needs to report its bounds for popover anchoring.
-        let selected_id: Option<Arc<str>> =
-            snap.selected_item.as_ref().map(|item| Arc::clone(&item.id));
         let theme = cx.global::<LibriTheme>().clone();
         let colors = theme.colors;
         let density = theme.density_constants;
@@ -1055,7 +1050,6 @@ impl Render for CatalogView {
                 let d = density.clone();
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
-                let sel = selected_id.clone();
                 root.px(pad_side)
                     .child(div().relative()
                                 .flex_1()
@@ -1074,9 +1068,6 @@ impl Render for CatalogView {
                                                         items.iter()
                                                              .zip(covers)
                                                              .map(|(item, cover)| {
-                                                                 let is_selected =
-                                                                     sel.as_deref()
-                                                                     == Some(item.id.as_ref());
                                                                  render_thumb_row(item,
                                                                   cover,
                                                                   &c,
@@ -1084,8 +1075,7 @@ impl Render for CatalogView {
                                                                   ctrl.clone(),
                                                                   t.clone(),
                                                                   s.clone(),
-                                                                  window,
-                                                                  is_selected).into_any_element()
+                                                                  window).into_any_element()
                                                              })
                                                              .collect()
                                                     }).track_scroll(&scroll_handle)
@@ -1110,7 +1100,6 @@ impl Render for CatalogView {
                                                     let t = tabs_entity.clone();
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
-                                                    let sel = selected_id.clone();
                                                     // Reborrow as `&Window` (Copy) so the nested
                                                     // `move` closure can capture it on every
                                                     // outer iteration without moving `window`.
@@ -1124,10 +1113,6 @@ impl Render for CatalogView {
                                                                         let cover =
                                                                             cc.get(&item.id)
                                                                               .cloned();
-                                                                        let is_selected =
-                                                                            sel.as_deref()
-                                                                            == Some(item.id
-                                                                                       .as_ref());
                                                                         render_thumb_row(&item,
                                                                                          cover,
                                                                                          &c,
@@ -1135,8 +1120,7 @@ impl Render for CatalogView {
                                                                                          e.clone(),
                                                                                          t.clone(),
                                                                                          s.clone(),
-                                                                                         window,
-                                                                                         is_selected)
+                                                                                         window)
                                                                     }))
                                                 }))
                     .into_any_element()
@@ -1149,7 +1133,6 @@ impl Render for CatalogView {
                 let d = density.clone();
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
-                let sel = selected_id.clone();
                 root.px(pad_side)
                     .child(
                            div().relative()
@@ -1176,9 +1159,6 @@ impl Render for CatalogView {
                                           .children(row_items.iter()
                                                              .zip(row_covers.iter())
                                                              .map(|(item, cover)| {
-                                                                 let is_selected =
-                                                                     sel.as_deref()
-                                                                     == Some(item.id.as_ref());
                                                                  render_grid_card(item,
                                                                                   cover.clone(),
                                                                                   &c,
@@ -1186,8 +1166,7 @@ impl Render for CatalogView {
                                                                                   ctrl.clone(),
                                                                                   t.clone(),
                                                                                   s.clone(),
-                                                                                  window,
-                                                                                  is_selected)
+                                                                                  window)
                                                              }))
                                           .into_any_element()
                                  })
@@ -1216,12 +1195,11 @@ impl Render for CatalogView {
                                                     let t = tabs_entity.clone();
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
-                                                    let sel = selected_id.clone();
                                                     div().child(render_group_header(&g.publisher,
                                                                                     g.items.len(),
                                                                                     &c))
                                                          .child(render_grid(g.items, cc, c, d, e,
-                                                                            t, s, &*window, sel))
+                                                                            t, s, &*window))
                                                 }))
                     .into_any_element()
             }
@@ -1238,7 +1216,7 @@ impl Render for CatalogView {
         if let Some(item) = snap.selected_item.as_ref() {
             let entry_bounds = self.controller
                                    .read(cx)
-                                   .popover_anchor_bounds()
+                                   .entry_bounds(&item.id)
                                    .unwrap_or(Bounds { origin: self.popover_anchor_pos
                                                                    .unwrap_or_default(),
                                                        size:   gpui::Size::default(), });
@@ -1382,8 +1360,7 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 #[allow(clippy::too_many_arguments)]
 fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     density: &DensityConstants, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
-                    is_selected: bool)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1402,6 +1379,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
     let bounds_entity = entity.clone();
+    let bounds_id = Arc::clone(&id);
     // Approximation: the title column fills the remaining row width after the cover
     // and gap, which depends on the actual panel layout (sidebar/detail panel
     // state) that isn't known synchronously here. `window.viewport_size()`
@@ -1452,12 +1430,14 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
          .border_b_1()
          .border_color(colors.border)
          .cursor_pointer()
-         // Only the selected row needs to report its bounds — it's the one
-         // the item popover anchors beside (see `popover_anchor_point`).
-         .when(is_selected, |el| {
-             el.on_prepaint(move |bounds, _window, cx| {
-                   bounds_entity.update(cx, |ctrl, cx| ctrl.set_popover_anchor_bounds(bounds, cx));
-               })
+         // Reported continuously (not just while selected) so that if this
+         // row is the one the user clicks, its bounds are already known — it
+         // was necessarily visible, and therefore already painted, before
+         // the click could happen. See `LibraryController::entry_bounds`.
+         .on_prepaint(move |bounds, _window, cx| {
+             bounds_entity.update(cx, |ctrl, cx| {
+                              ctrl.set_entry_bounds(bounds_id.clone(), bounds, cx)
+                          });
          })
          .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
          .child(cover_cell)
@@ -1577,7 +1557,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
 fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image>>,
                colors: ColorTokens, density: DensityConstants,
                entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-               storage_root_path: PathBuf, window: &Window, selected_id: Option<Arc<str>>)
+               storage_root_path: PathBuf, window: &Window)
                -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -1589,8 +1569,6 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
          .mb(gap_y)
          .children(items.into_iter().map(|item| {
                                         let cover = cover_cache.get(&item.id).cloned();
-                                        let is_selected =
-                                            selected_id.as_deref() == Some(item.id.as_ref());
                                         render_grid_card(&item,
                                                          cover,
                                                          &colors,
@@ -1598,8 +1576,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
                                                          entity.clone(),
                                                          tabs.clone(),
                                                          storage_root_path.clone(),
-                                                         window,
-                                                         is_selected)
+                                                         window)
                                     }))
 }
 
@@ -1608,8 +1585,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
 #[allow(clippy::too_many_arguments)]
 fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     card_w: f32, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
-                    is_selected: bool)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1639,6 +1615,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
     let bounds_entity = entity.clone();
+    let bounds_id = Arc::clone(&id);
     let ctx_path = storage_root_path.join("items").join(&*id);
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
@@ -1702,12 +1679,14 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
          .rounded(px(6.0))
          .overflow_hidden()
          .cursor_pointer()
-         // Only the selected card needs to report its bounds — it's the one
-         // the item popover anchors beside (see `popover_anchor_point`).
-         .when(is_selected, |el| {
-             el.on_prepaint(move |bounds, _window, cx| {
-                   bounds_entity.update(cx, |ctrl, cx| ctrl.set_popover_anchor_bounds(bounds, cx));
-               })
+         // Reported continuously (not just while selected) so that if this
+         // card is the one the user clicks, its bounds are already known —
+         // it was necessarily visible, and therefore already painted, before
+         // the click could happen. See `LibraryController::entry_bounds`.
+         .on_prepaint(move |bounds, _window, cx| {
+             bounds_entity.update(cx, |ctrl, cx| {
+                              ctrl.set_entry_bounds(bounds_id.clone(), bounds, cx)
+                          });
          })
          .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
          .child(cover_cell)

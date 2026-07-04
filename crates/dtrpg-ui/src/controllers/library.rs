@@ -1,6 +1,6 @@
 //! Library UI state and interaction controller.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels};
@@ -155,13 +155,19 @@ pub struct LibraryController {
     /// Current width of the detail panel, in pixels. Session-only; never
     /// persisted to disk.
     detail_panel_width:      f32,
-    /// Precise on-screen bounds of the catalog entry the open item popover is
-    /// anchored beside, captured by that entry's own render pass (see
-    /// `catalog_view::render_grid_card` / `render_thumb_row`). `None` until
-    /// the first paint after selection — the catalog view falls back to the
-    /// click position for that one frame — and reset whenever the selection
-    /// changes so a stale rectangle from the previous item is never reused.
-    popover_anchor_bounds:   Option<Bounds<Pixels>>,
+    /// On-screen bounds of every currently visible Grid card / Thumbs row,
+    /// keyed by item id, continuously refreshed by each entry's own render
+    /// pass (see `catalog_view::render_grid_card` / `render_thumb_row`).
+    ///
+    /// Used to anchor the single-click item popover beside the entry that
+    /// opened it. Kept for *every* visible entry (not just the selected one)
+    /// so the bounds for whichever entry gets clicked are already known —
+    /// the entry was necessarily visible, and therefore already painted,
+    /// before the click could happen — avoiding a one-frame flash at a
+    /// fallback position before the popover settles into place. Entries
+    /// scrolled out of view keep their last-known bounds; this is harmless
+    /// since a stale entry can't be clicked again until it repaints.
+    entry_bounds:            HashMap<Arc<str>, Bounds<Pixels>>,
 }
 
 impl LibraryController {
@@ -210,7 +216,7 @@ impl LibraryController {
                               collection_search_query: String::new(),
                               detail_panel_width:
                                   crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-                              popover_anchor_bounds: None };
+                              entry_bounds: HashMap::new() };
         ctrl.start_load(cx);
         ctrl
     }
@@ -1301,37 +1307,39 @@ impl LibraryController {
     /// double-click action handled by `TabsController::open_detail_tab`.
     pub fn select_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
         self.selection = Selection::Item(id);
-        // Discard the previous entry's anchor rectangle; the newly selected
-        // entry's own render pass (if visible) will supply a fresh one, and
-        // the catalog view falls back to the click position until it does.
-        self.popover_anchor_bounds = None;
         cx.emit(LibraryChanged);
     }
 
     /// Closes the item popover, if one is open.
     pub fn clear_selection(&mut self, cx: &mut Context<Self>) {
         self.selection = Selection::None;
-        self.popover_anchor_bounds = None;
         cx.emit(LibraryChanged);
     }
 
-    /// Precise bounds of the catalog entry the open item popover should
-    /// anchor beside, if the entry has painted at least once since it was
-    /// selected. `None` before that first paint, or once the popover closes.
-    pub fn popover_anchor_bounds(&self) -> Option<Bounds<Pixels>> {
-        self.popover_anchor_bounds
+    /// Precise on-screen bounds of catalog entry `id`, if it has painted at
+    /// least once. Used to anchor the single-click item popover beside the
+    /// entry that opened it — see [`Self::set_entry_bounds`].
+    ///
+    /// Every visible Grid card and Thumbs row reports its bounds continuously
+    /// (not just the selected one), so by the time an entry can be clicked it
+    /// has already painted and its bounds are available immediately — no
+    /// one-frame flash at a fallback position before the popover settles
+    /// beside the entry.
+    pub fn entry_bounds(&self, id: &str) -> Option<Bounds<Pixels>> {
+        self.entry_bounds.get(id).copied()
     }
 
-    /// Records the on-screen bounds of the selected catalog entry, called
-    /// from that entry's own render pass once painted (see
+    /// Records the on-screen bounds of catalog entry `id`, called from that
+    /// entry's own render pass once painted (see
     /// `catalog_view::render_grid_card` / `render_thumb_row`).
     ///
     /// Only re-emits [`LibraryChanged`] when the bounds actually changed, so
     /// repeated paints of an entry that hasn't moved don't trigger a
     /// re-render feedback loop.
-    pub fn set_popover_anchor_bounds(&mut self, bounds: Bounds<Pixels>, cx: &mut Context<Self>) {
-        if self.popover_anchor_bounds != Some(bounds) {
-            self.popover_anchor_bounds = Some(bounds);
+    pub fn set_entry_bounds(&mut self, id: Arc<str>, bounds: Bounds<Pixels>,
+                            cx: &mut Context<Self>) {
+        if self.entry_bounds.get(&id) != Some(&bounds) {
+            self.entry_bounds.insert(id, bounds);
             cx.emit(LibraryChanged);
         }
     }
