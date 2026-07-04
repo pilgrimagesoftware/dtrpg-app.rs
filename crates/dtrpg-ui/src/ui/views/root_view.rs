@@ -640,7 +640,8 @@ impl Render for LibraryRootView {
                                                   settings_snap.storage_root_path.clone(),
                                                   lib_entity.clone(),
                                                   colors,
-                                                  cover_image)
+                                                  cover_image,
+                                                  cx)
                     }
                     None => div().flex_1().min_h_0().into_any_element(),
                 }

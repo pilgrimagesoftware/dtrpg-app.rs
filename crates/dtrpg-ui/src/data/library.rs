@@ -54,6 +54,13 @@ pub struct LibraryItem {
     /// to cache.
     #[serde(skip)]
     pub thumbnail_last_attempted: Option<std::time::SystemTime>,
+    /// Per-item files bundled in this catalog entry, mapped from the SDK's
+    /// `OrderProductFile` array. More than one entry means this is a
+    /// multi-item catalog entry (see the `catalog-entry-detail-view`
+    /// capability). Defaults to empty for cache entries written before this
+    /// field existed.
+    #[serde(default)]
+    pub files:                    Vec<LibraryItemFile>,
 }
 
 impl LibraryItem {
@@ -80,8 +87,37 @@ impl LibraryItem {
                desc: desc.into(),
                cover_url: None,
                date_added,
-               thumbnail_last_attempted: None }
+               thumbnail_last_attempted: None,
+               files: Vec::new() }
     }
+
+    /// Returns `true` if this catalog entry bundles more than one
+    /// downloadable file (a "multi-item" entry per
+    /// `catalog-entry-detail-view`).
+    #[must_use]
+    pub fn is_multi_item(&self) -> bool {
+        self.files.len() > 1
+    }
+}
+
+// ── LibraryItemFile
+// ───────────────────────────────────────────────────────
+
+/// A single downloadable file within a catalog entry, e.g. the book or the
+/// map sheet inside a bundled product like Moria.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LibraryItemFile {
+    /// Stable identifier for this file within its entry (the SDK's
+    /// `orderProductDownloadId`).
+    pub id:      Arc<str>,
+    /// Display name of the file (the SDK file's `title`, e.g.
+    /// `"Player's Handbook.pdf"`).
+    pub name:    Arc<str>,
+    /// Uppercase format label derived from the filename extension (e.g.
+    /// `"PDF"`).
+    pub format:  Arc<str>,
+    /// File size in megabytes.
+    pub size_mb: f64,
 }
 
 // ── Smart section counts

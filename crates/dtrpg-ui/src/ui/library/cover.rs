@@ -260,7 +260,8 @@ mod tests {
                       desc:                     "A test item.".into(),
                       cover_url:                None,
                       date_added:               None,
-                      thumbnail_last_attempted: None, }
+                      thumbnail_last_attempted: None,
+                      files:                    Vec::new(), }
     }
 
     #[test]

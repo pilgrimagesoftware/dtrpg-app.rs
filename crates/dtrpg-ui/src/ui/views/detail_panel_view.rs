@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, Entity, Image, InteractiveElement, IntoElement, ObjectFit, ParentElement,
+    AnyElement, App, Entity, Image, InteractiveElement, IntoElement, ObjectFit, ParentElement,
     SharedString, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 };
 use gpui_component::Disableable;
@@ -15,12 +15,13 @@ use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
+use gpui_component::table::{Table, TableBody, TableCell, TableHeader, TableRow};
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::enums::ItemStatus;
-use crate::data::library::LibraryItem;
+use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::render_generative_cover;
 use crate::util::datetime::{format_absolute, format_relative};
@@ -33,12 +34,13 @@ use crate::util::reveal::reveal_in_file_manager;
 /// it's opened as a full tab (double-click on a catalog item, see
 /// `main-window-tabs`) and closed via the tab strip.
 ///
-/// Does not render a file list for multi-item entries: that requires a
-/// per-item file list data model this crate does not yet have (tracked as a
-/// known gap in the `add-rust-main-window-structure` change).
+/// For multi-item entries (`item.is_multi_item()`), renders a persistent
+/// item list alongside the entry tier; selecting a row updates the item
+/// metadata area in place (see `catalog-entry-detail-view`). Single-item
+/// entries keep the existing inline entry-tier metadata table.
 pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                  entity: Entity<LibraryController>, colors: &ColorTokens,
-                                 cover_image: Option<Arc<Image>>)
+                                 cover_image: Option<Arc<Image>>, cx: &App)
                                  -> AnyElement {
     let surface = colors.surface;
     let text_primary = colors.text_primary;
@@ -46,7 +48,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 
     let item = item.clone();
     let entity_download = entity.clone();
-    let entity_refresh_thumbnail = entity;
+    let entity_refresh_thumbnail = entity.clone();
+    let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
     let read_item_id = Arc::clone(&item.id);
@@ -167,39 +170,34 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                             t!("detail.tooltip_download_first")))
                                     })
                                     .when(is_downloaded, |b| {
+                                        let read_item = item.clone();
                                         b.tooltip(t!("detail.read_button")).on_click(
                                             move |_, _, _| {
                                                 use crate::util::item_opener::{
                                                     ItemOpener, OpenError,
                                                 };
 
-                                                if !read_path.exists() {
-                                                    tracing::warn!(
-                                                        path = %read_path.display(),
-                                                        "open: file not found — item may need re-download"
-                                                    );
-                                                    return;
-                                                }
-                                                if let Err(e) = ItemOpener::open(&read_path) {
-                                                    match e {
-                                                        OpenError::FileNotFound(path) => {
-                                                            tracing::warn!(
-                                                                "open: file not found: {path}"
-                                                            );
-                                                        }
-                                                        OpenError::NoDefaultApp => {
-                                                            tracing::warn!(
-                                                                "open: no default application configured"
-                                                            );
-                                                        }
-                                                        OpenError::OsFailed(msg) => {
-                                                            tracing::warn!("open: OS failed: {msg}");
-                                                        }
-                                                        OpenError::MultipleFilesRequireSelection => {
-                                                            tracing::warn!(
-                                                                "open: multiple files require selection"
-                                                            );
-                                                        }
+                                                match ItemOpener::open_item(&read_path,
+                                                                            &read_item.files)
+                                                {
+                                                    Ok(()) => {}
+                                                    // The item list is already rendered in this
+                                                    // same tab (see `render_item_tier`) — no
+                                                    // further navigation needed, see
+                                                    // `catalog-entry-detail-view`.
+                                                    Err(OpenError::MultipleFilesRequireSelection) => {}
+                                                    Err(OpenError::FileNotFound(path)) => {
+                                                        tracing::warn!(
+                                                            "open: file not found: {path}"
+                                                        );
+                                                    }
+                                                    Err(OpenError::NoDefaultApp) => {
+                                                        tracing::warn!(
+                                                            "open: no default application configured"
+                                                        );
+                                                    }
+                                                    Err(OpenError::OsFailed(msg)) => {
+                                                        tracing::warn!("open: OS failed: {msg}");
                                                     }
                                                 }
                                             },
@@ -253,10 +251,143 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 )
                             }),
                     )
-                    .child(render_metadata_table(&item, colors)),
+                    .child(if item.is_multi_item() {
+                        render_item_tier(&item, entity_item_tier.clone(), colors, cx)
+                            .into_any_element()
+                    } else {
+                        render_metadata_table(&item, colors).into_any_element()
+                    }),
             ),
         )
         .into_any_element()
+}
+
+/// Renders the item tier for a multi-item entry: a persistent, selectable
+/// item list and an item metadata area that updates in place on selection.
+///
+/// See `catalog-entry-detail-view`'s persistent-item-list and
+/// update-in-place requirements.
+fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, colors: &ColorTokens,
+                    cx: &App)
+                    -> impl IntoElement + 'static {
+    let entry_id = Arc::clone(&item.id);
+    let selected_id = entity.read(cx).selected_item_file(&entry_id).cloned();
+
+    let mut header_row = TableRow::new().child(
+        TableCell::new().child(
+            div().text_xs()
+                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                 .text_color(colors.text_secondary)
+                 .child(t!("detail.item_list_column_name").to_string()),
+        ),
+    );
+    header_row = header_row.child(
+        TableCell::new().child(
+            div().text_xs()
+                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                 .text_color(colors.text_secondary)
+                 .child(t!("detail.item_list_column_type").to_string()),
+        ),
+    );
+
+    let mut body = TableBody::new();
+    for file in &item.files {
+        let is_selected = selected_id.as_deref() == Some(file.id.as_ref());
+
+        // `TableRow` itself has no click hook, so each cell's content is
+        // wrapped in its own clickable, hoverable div — together they cover
+        // the full row's clickable area while the row stays a proper
+        // `TableRow`/`TableCell` for header/row alignment (see this crate's
+        // `gpui-component` usage policy).
+        let make_cell_click = |entity: Entity<LibraryController>,
+                               entry_id: Arc<str>,
+                               file_id: Arc<str>| {
+            move |_: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut App| {
+                entity.update(cx, |ctrl, cx| {
+                          ctrl.select_item_file(Arc::clone(&entry_id), Arc::clone(&file_id), cx);
+                      });
+            }
+        };
+        let row_id_base = format!("item-row-{}", file.id);
+
+        let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
+                                 .child(
+                                     TableCell::new().child(
+                                         div().id(SharedString::from(format!("{row_id_base}-name")))
+                                              .cursor_pointer()
+                                              .hover(|d| d.bg(colors.hover))
+                                              .text_sm()
+                                              .text_color(colors.text_primary)
+                                              .on_click(make_cell_click(entity.clone(),
+                                                                       Arc::clone(&entry_id),
+                                                                       Arc::clone(&file.id)))
+                                              .child(file.name.to_string()),
+                                     ),
+                                 )
+                                 .child(
+                                     TableCell::new().child(
+                                         div().id(SharedString::from(format!("{row_id_base}-type")))
+                                              .cursor_pointer()
+                                              .hover(|d| d.bg(colors.hover))
+                                              .text_sm()
+                                              .text_color(colors.text_secondary)
+                                              .on_click(make_cell_click(entity.clone(),
+                                                                       Arc::clone(&entry_id),
+                                                                       Arc::clone(&file.id)))
+                                              .child(file.format.to_string()),
+                                     ),
+                                 );
+
+        body = body.child(row);
+    }
+
+    let item_list = Table::new().child(TableHeader::new().child(header_row))
+                                .child(body);
+
+    let selected_file =
+        selected_id.and_then(|id| item.files.iter().find(|f| f.id.as_ref() == id.as_ref()));
+
+    div().flex()
+         .flex_col()
+         .gap(px(12.0))
+         .child(div().text_sm()
+                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .text_color(colors.text_primary)
+                     .child(t!("detail.items_heading").to_string()))
+         .child(item_list)
+         .child(match selected_file {
+                    Some(file) => render_item_metadata(item, file).into_any_element(),
+                    None => div().text_sm()
+                                 .text_color(colors.text_tertiary)
+                                 .py(px(12.0))
+                                 .child(t!("detail.item_prompt_select").to_string())
+                                 .into_any_element(),
+                })
+}
+
+/// Renders the metadata area for a single selected item within a multi-item
+/// entry: name, type, format, file size, and the entry's download state
+/// (individual files share the entry's on-disk download state today; see
+/// `define-rust-catalog-entry-detail-view`'s open questions for future
+/// per-file tracking).
+fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile) -> impl IntoElement + 'static {
+    DescriptionList::vertical()
+        .columns(2)
+        .bordered(false)
+        .child(DescriptionItem::new(t!("detail.item_list_column_name").to_string())
+                   .value(file.name.to_string())
+                   .span(2))
+        .child(DescriptionItem::new(t!("detail.field_format").to_string())
+                   .value(file.format.to_string()))
+        .child(DescriptionItem::new(t!("detail.field_file_size").to_string())
+                   .value(format!("{:.1} MB", file.size_mb)))
+        .child(DescriptionItem::new(t!("detail.field_status").to_string())
+                   .value(if item.status == ItemStatus::Downloaded {
+                       t!("detail.status_on_device").to_string()
+                   } else {
+                       t!("detail.status_in_cloud").to_string()
+                   })
+                   .span(2))
 }
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {

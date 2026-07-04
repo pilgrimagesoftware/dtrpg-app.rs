@@ -83,6 +83,11 @@ detail:
   field_status: "Statut"
   status_on_device: "Sur cet appareil"
   status_in_cloud: "Dans le cloud"
+  items_heading: "Éléments"
+  item_list_column_name: "Nom"
+  item_list_column_type: "Type"
+  item_prompt_select: "Sélectionnez un élément dans la liste pour voir ses détails"
+  item_count_badge_tooltip: "%{count} éléments dans cette entrée"
 
 settings:
   title: "Réglages"

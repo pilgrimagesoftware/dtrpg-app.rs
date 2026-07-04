@@ -168,6 +168,11 @@ pub struct LibraryController {
     /// scrolled out of view keep their last-known bounds; this is harmless
     /// since a stale entry can't be clicked again until it repaints.
     entry_bounds:            HashMap<Arc<str>, Bounds<Pixels>>,
+    /// Selected item file id within a multi-item entry's expanded detail
+    /// tab, keyed by catalog entry id. Ephemeral — never persisted, and
+    /// cleared whenever the entry's detail tab is closed or reopened (see
+    /// `catalog-entry-detail-view`).
+    selected_item_file:      HashMap<Arc<str>, Arc<str>>,
 }
 
 impl LibraryController {
@@ -216,7 +221,8 @@ impl LibraryController {
                               collection_search_query: String::new(),
                               detail_panel_width:
                                   crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-                              entry_bounds: HashMap::new() };
+                              entry_bounds: HashMap::new(),
+                              selected_item_file: HashMap::new() };
         ctrl.start_load(cx);
         ctrl
     }
@@ -1358,6 +1364,36 @@ impl LibraryController {
     #[must_use]
     pub fn item_by_id(&self, id: &str) -> Option<&LibraryItem> {
         self.catalog.iter().find(|i| i.id.as_ref() == id)
+    }
+
+    // ── Item selection (multi-item detail tab) ───────────────────────────────
+
+    /// Returns the currently selected item file for a multi-item entry's
+    /// detail tab, if any item has been selected.
+    #[must_use]
+    pub fn selected_item_file(&self, entry_id: &str) -> Option<&Arc<str>> {
+        self.selected_item_file.get(entry_id)
+    }
+
+    /// Selects `file_id` as the active item within `entry_id`'s expanded
+    /// detail tab, updating the item metadata area in place.
+    ///
+    /// Emits [`LibraryChanged`].
+    pub fn select_item_file(&mut self, entry_id: Arc<str>, file_id: Arc<str>,
+                            cx: &mut Context<Self>) {
+        self.selected_item_file.insert(entry_id, file_id);
+        cx.emit(LibraryChanged);
+    }
+
+    /// Clears any selected item for `entry_id`'s detail tab, so reopening it
+    /// shows no pre-selected item (selection is ephemeral, see
+    /// `catalog-entry-detail-view`).
+    ///
+    /// Emits [`LibraryChanged`].
+    pub fn clear_item_selection(&mut self, entry_id: &str, cx: &mut Context<Self>) {
+        if self.selected_item_file.remove(entry_id).is_some() {
+            cx.emit(LibraryChanged);
+        }
     }
 
     // ── Detail panel width ────────────────────────────────────────────────────

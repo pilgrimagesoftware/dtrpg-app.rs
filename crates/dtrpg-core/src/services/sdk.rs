@@ -11,7 +11,10 @@ use dtrpg_sdk::{
 use dtrpg_ui::{
     credentials::{CredentialStore, KeyringCredentialStore},
     data::constants::{KEYRING_API_KEY, KEYRING_SERVICE},
-    data::{enums::ItemStatus, library::LibraryItem},
+    data::{
+        enums::ItemStatus,
+        library::{LibraryItem, LibraryItemFile},
+    },
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
 };
 use tokio::runtime::{Builder, Runtime};
@@ -440,6 +443,22 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
 
     let size_mb = attributes.files.iter().map(|f| f.size as f64).sum::<f64>() / BYTES_PER_MB;
 
+    // Per-item file breakdown — more than one entry marks this a multi-item
+    // catalog entry (see the `catalog-entry-detail-view` capability).
+    let files: Vec<LibraryItemFile> = attributes.files
+                                                .iter()
+                                                .map(|f| {
+                                                    LibraryItemFile {
+                      id:      f.order_product_download_id.to_string().into(),
+                      name:    f.title.as_str().into(),
+                      format:  file_extension_label(&f.filename)
+                                   .unwrap_or_else(|| "FILE".to_string())
+                                   .into(),
+                      size_mb: f.size as f64 / BYTES_PER_MB,
+                  }
+                                                })
+                                                .collect();
+
     let year = attributes.file_last_modified
                          .as_deref()
                          .or(attributes.date_purchased.as_deref())
@@ -476,7 +495,8 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                   desc: desc.as_str().into(),
                   cover_url: cover_url.map(Into::into),
                   date_added: None,
-                  thumbnail_last_attempted: None }
+                  thumbnail_last_attempted: None,
+                  files }
 }
 
 fn map_client_error(error: ClientError) -> LibraryServiceError {
@@ -694,6 +714,54 @@ mod tests {
         let items = service.list_items().expect("list items");
 
         assert_eq!(items[0].format.as_ref(), "EPUB + PDF");
+    }
+
+    #[test]
+    fn map_order_product_populates_per_item_files_for_multi_item_entries() {
+        let mut item = order_product_item(515_276, "Moria");
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "Moria Rulebook".to_string(),
+                                    filename:                  "moria-rulebook.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1235,
+                                    title:                     "Moria Map Sheet".to_string(),
+                                    filename:                  "moria-map.pdf".to_string(),
+                                    size:                      524_288,
+                                    size_mb:                   "0.5".to_string(),
+                                    checksums:                 vec![], },];
+
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+        let items = service.list_items().expect("list items");
+
+        assert!(items[0].is_multi_item());
+        assert_eq!(items[0].files.len(), 2);
+        assert_eq!(items[0].files[0].name.as_ref(), "Moria Rulebook");
+        assert_eq!(items[0].files[0].id.as_ref(), "1234");
+        assert_eq!(items[0].files[1].name.as_ref(), "Moria Map Sheet");
+    }
+
+    #[test]
+    fn map_order_product_single_file_is_not_multi_item() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], }];
+
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+        let items = service.list_items().expect("list items");
+
+        assert!(!items[0].is_multi_item());
+        assert_eq!(items[0].files.len(), 1);
     }
 
     #[test]

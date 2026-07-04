@@ -5,6 +5,8 @@ use std::path::Path;
 
 use thiserror::Error;
 
+use crate::data::library::LibraryItemFile;
+
 /// Errors that can occur when attempting to open an item.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum OpenError {
@@ -57,6 +59,29 @@ impl ItemOpener {
                                 OpenError::OsFailed(error_msg)
                             }
                         })
+    }
+
+    /// Opens a catalog entry's downloaded content, given its per-item file
+    /// list (`LibraryItem::files`).
+    ///
+    /// - Zero known files (e.g. stub/legacy items with no file breakdown):
+    ///   falls back to opening `entry_dir` itself, as before.
+    /// - Exactly one file: opens that specific file within `entry_dir`.
+    /// - More than one file: returns
+    ///   [`OpenError::MultipleFilesRequireSelection`] so the caller can route
+    ///   the user to the entry's item list instead of guessing which file to
+    ///   open (see `catalog-entry-detail-view`).
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::open`], plus
+    /// [`OpenError::MultipleFilesRequireSelection`] for multi-item entries.
+    pub fn open_item(entry_dir: &Path, files: &[LibraryItemFile]) -> Result<(), OpenError> {
+        match files {
+            [] => Self::open(entry_dir),
+            [only] => Self::open(&entry_dir.join(only.name.as_ref())),
+            _ => Err(OpenError::MultipleFilesRequireSelection),
+        }
     }
 }
 
@@ -116,5 +141,49 @@ mod tests {
         let err1 = OpenError::NoDefaultApp;
         let err2 = OpenError::NoDefaultApp;
         assert_eq!(err1, err2);
+    }
+
+    fn make_file(name: &str) -> LibraryItemFile {
+        LibraryItemFile { id:      name.into(),
+                          name:    name.into(),
+                          format:  "PDF".into(),
+                          size_mb: 1.0, }
+    }
+
+    #[test]
+    fn open_item_returns_multiple_files_require_selection_for_more_than_one_file() {
+        let files = vec![make_file("book.pdf"), make_file("map.pdf")];
+        let result = ItemOpener::open_item(Path::new("/tmp/does-not-matter"), &files);
+        assert_eq!(result, Err(OpenError::MultipleFilesRequireSelection));
+    }
+
+    #[test]
+    fn open_item_falls_back_to_directory_when_no_files_known() {
+        let result = ItemOpener::open_item(Path::new("/tmp/nonexistent_entry_dir_stub"), &[]);
+        assert!(matches!(result, Err(OpenError::FileNotFound(_))));
+    }
+
+    #[test]
+    fn open_item_resolves_the_single_file_path_for_one_file() {
+        let dir = std::env::temp_dir().join("dtrpg_open_item_single_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let file_path = dir.join("book.pdf");
+        let Ok(mut file) = File::create(&file_path)
+        else {
+            return;
+        };
+        let _ = file.write_all(b"stub");
+        drop(file);
+
+        let files = vec![make_file("book.pdf")];
+        let result = ItemOpener::open_item(&dir, &files);
+
+        let _ = std::fs::remove_file(&file_path);
+        let _ = std::fs::remove_dir(&dir);
+
+        if let Err(e) = result {
+            assert!(!matches!(e, OpenError::FileNotFound(_)),
+                    "Should resolve the single file's path, not report it missing");
+        }
     }
 }

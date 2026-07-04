@@ -2,8 +2,10 @@
 //! a catalog item.
 //!
 //! Distinct from the expanded detail tab (opened by double-clicking), which
-//! renders full attributes and a file list in its own closable tab — see
-//! `main-window-tabs`.
+//! renders full attributes and, for multi-item entries, a persistent item
+//! list in its own closable tab — see `main-window-tabs` and
+//! `catalog-entry-detail-view`. This popover never renders an item list,
+//! regardless of item count.
 
 use std::sync::Arc;
 
@@ -52,6 +54,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
 
     let entity_close = entity.clone();
     let entity_download = entity.clone();
+    let entity_open_detail = entity.clone();
     let is_downloaded = item.status == ItemStatus::Downloaded;
     let item_id = Arc::clone(&item.id);
     let item_id_for_detail = Arc::clone(&item.id);
@@ -123,9 +126,12 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                     DescriptionItem::new(t!("detail.field_format").to_string())
                         .value(item.format.to_string()),
                 )
-                // .when(item.file_count > 1, |list| {
-                //     TODO: add file count
-                // })
+                .when(item.files.len() > 1, |list| {
+                    list.child(
+                        DescriptionItem::new(t!("detail.field_file_count").to_string())
+                            .value(item.files.len().to_string()),
+                    )
+                })
                 .child(
                     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
                 ),
@@ -163,7 +169,14 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .on_click(move |_, _, cx| {
                             let id = Arc::clone(&item_id_for_detail);
                             let title = item_title.clone();
-                            tabs.update(cx, |ctrl, cx| ctrl.open_detail_tab(id, title, cx));
+                            tabs.update(cx, |ctrl, cx| {
+                                    ctrl.open_detail_tab(Arc::clone(&id), title, cx);
+                                });
+                            // Reopening a detail tab must show no pre-selected
+                            // item (selection is ephemeral, see
+                            // `catalog-entry-detail-view`).
+                            entity_open_detail
+                                .update(cx, |ctrl, cx| ctrl.clear_item_selection(&id, cx));
                         }),
                 ),
         );

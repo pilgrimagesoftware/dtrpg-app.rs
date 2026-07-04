@@ -56,7 +56,42 @@ fn item_click_handler(id: Arc<str>, title: String, entity: Entity<LibraryControl
             tabs.update(cx, |t, cx| {
                     t.open_detail_tab(Arc::clone(&id), title.clone(), cx);
                 });
-            entity.update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+            entity.update(cx, |ctrl, cx| {
+                      ctrl.clear_selection(cx);
+                      // Reopening a detail tab must show no pre-selected item
+                      // (selection is ephemeral, see `catalog-entry-detail-view`).
+                      ctrl.clear_item_selection(&id, cx);
+                  });
+        }
+    }
+}
+
+/// Opens a catalog entry's downloaded content. If the entry bundles more
+/// than one file, opens (or focuses) its expanded detail tab and clears any
+/// stale item selection instead of guessing which file to open — see
+/// `catalog-entry-detail-view`'s requirement that multi-file opens route to
+/// the persistent item list rather than a dead-end warning log.
+pub(crate) fn open_item_or_focus_detail_tab(entry_dir: &Path, item: &LibraryItem,
+                                            tabs: &Entity<TabsController>,
+                                            controller: &Entity<LibraryController>, cx: &mut App) {
+    use crate::util::item_opener::{ItemOpener, OpenError};
+
+    match ItemOpener::open_item(entry_dir, &item.files) {
+        Ok(()) => {}
+        Err(OpenError::MultipleFilesRequireSelection) => {
+            let id = Arc::clone(&item.id);
+            let title = item.title.to_string();
+            tabs.update(cx, |t, cx| t.open_detail_tab(Arc::clone(&id), title, cx));
+            controller.update(cx, |ctrl, cx| ctrl.clear_item_selection(&id, cx));
+        }
+        Err(OpenError::FileNotFound(path)) => {
+            tracing::warn!("open: file not found: {path}");
+        }
+        Err(OpenError::NoDefaultApp) => {
+            tracing::warn!("open: no default application configured");
+        }
+        Err(OpenError::OsFailed(msg)) => {
+            tracing::warn!("open: OS failed: {msg}");
         }
     }
 }
@@ -159,13 +194,42 @@ fn kind_badge(kind: &str) -> &'static str {
     }
 }
 
+/// Renders a small item-count badge for multi-item catalog entries, shown on
+/// list rows and grid tiles so users can identify bundled entries before
+/// opening the detail view (see `catalog-entry-detail-view`). Returns
+/// `None` for single-item entries — callers should render nothing.
+fn render_item_count_badge(item: &LibraryItem, colors: &ColorTokens)
+                           -> Option<impl IntoElement + 'static + use<>> {
+    if !item.is_multi_item() {
+        return None;
+    }
+    let count = item.files.len();
+    let badge_id: Arc<str> = Arc::from(format!("item-count-badge-{}", &*item.id));
+    let tooltip_text = t!("detail.item_count_badge_tooltip", count = count).to_string();
+    Some(div().id(badge_id)
+              .flex_none()
+              .text_xs()
+              .font_weight(FontWeight::SEMIBOLD)
+              .text_color(colors.accent_on)
+              .px(px(4.0))
+              .py(px(1.0))
+              .rounded(px(3.0))
+              .bg(colors.accent)
+              .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+              .child(count.to_string()))
+}
+
 /// Renders a single data cell (column `col_ix`) for `item`. Shared between
 /// the ungrouped `CatalogListDelegate` and the grouped
 /// `GroupedCatalogListDelegate` so grouped and ungrouped list rows stay
 /// visually identical and both benefit from `DataTable`'s virtualization.
+// Matches the existing arity of this file's other render_* row functions
+// (`render_thumb_row`, `render_grid_card`), which are all-render-context
+// parameter lists rather than a natural grouping into a smaller struct.
+#[allow(clippy::too_many_arguments)]
 fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens,
                          storage_root: &Path, controller: &Entity<LibraryController>,
-                         column_width: Pixels, window: &Window)
+                         tabs: &Entity<TabsController>, column_width: Pixels, window: &Window)
                          -> AnyElement {
     match col_ix {
         0 => {
@@ -205,6 +269,7 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                              .rounded(px(3.0))
                              .bg(colors.hover)
                              .child(badge))
+                 .children(render_item_count_badge(item, colors))
                  .into_any_element()
         }
 
@@ -261,38 +326,21 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
             if item.status == ItemStatus::Downloaded {
                 let item_open_path = storage_root.join("items").join(&*item.id);
                 let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
+                let item_for_open = item.clone();
+                let tabs_for_open = tabs.clone();
+                let controller_for_open = controller.clone();
                 div().id(open_elem_id)
                      .h_full()
                      .flex()
                      .items_center()
                      .justify_center()
                      .cursor_pointer()
-                     .on_click(move |_, _, _| {
-                         use crate::util::item_opener::{ItemOpener, OpenError};
-
-                         if !item_open_path.exists() {
-                             tracing::warn!(
-                                 path = %item_open_path.display(),
-                                 "open: file not found — item may need re-download"
-                             );
-                             return;
-                         }
-                         if let Err(e) = ItemOpener::open(&item_open_path) {
-                             match e {
-                                 OpenError::FileNotFound(path) => {
-                                     tracing::warn!("open: file not found: {path}");
-                                 }
-                                 OpenError::NoDefaultApp => {
-                                     tracing::warn!("open: no default application configured");
-                                 }
-                                 OpenError::OsFailed(msg) => {
-                                     tracing::warn!("open: OS failed: {msg}");
-                                 }
-                                 OpenError::MultipleFilesRequireSelection => {
-                                     tracing::warn!("open: multiple files require selection");
-                                 }
-                             }
-                         }
+                     .on_click(move |_, _, cx| {
+                         open_item_or_focus_detail_tab(&item_open_path,
+                                                       &item_for_open,
+                                                       &tabs_for_open,
+                                                       &controller_for_open,
+                                                       cx);
                      })
                      .child(div().text_xs().text_color(colors.text_tertiary).child("▶"))
                      .into_any_element()
@@ -322,6 +370,10 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
 /// `TableDelegate` for the ungrouped list view. Backed by `LibraryController`.
 struct CatalogListDelegate {
     controller:   Entity<LibraryController>,
+    /// Used to open/focus a multi-item entry's expanded detail tab when the
+    /// row's inline open action hits
+    /// `OpenError::MultipleFilesRequireSelection`.
+    tabs:         Entity<TabsController>,
     storage_root: PathBuf,
     columns:      Vec<Column>,
     /// User-adjusted column widths captured from
@@ -415,35 +467,17 @@ impl TableDelegate for CatalogListDelegate {
                 let item_path = self.storage_root.join("items").join(&*id);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
-                let item_path_open = item_path.clone();
                 let item_path_reveal = item_path.clone();
+                let item_for_open = item.clone();
+                let tabs_for_open = self.tabs.clone();
+                let controller_for_open = entity.clone();
                 menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
-                        use crate::util::item_opener::{ItemOpener, OpenError};
-
-                        if !item_path_open.exists() {
-                            tracing::warn!(
-                                path = %item_path_open.display(),
-                                "open: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = ItemOpener::open(&item_path_open) {
-                            match e {
-                                OpenError::FileNotFound(path) => {
-                                    tracing::warn!("open: file not found: {path}");
-                                }
-                                OpenError::NoDefaultApp => {
-                                    tracing::warn!("open: no default application configured");
-                                }
-                                OpenError::OsFailed(msg) => {
-                                    tracing::warn!("open: OS failed: {msg}");
-                                }
-                                OpenError::MultipleFilesRequireSelection => {
-                                    tracing::warn!("open: multiple files require selection");
-                                }
-                            }
-                        }
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
+                        open_item_or_focus_detail_tab(&item_path,
+                                                      &item_for_open,
+                                                      &tabs_for_open,
+                                                      &controller_for_open,
+                                                      cx);
                     }),
                 )
                 .item(
@@ -494,6 +528,7 @@ impl TableDelegate for CatalogListDelegate {
                               &colors,
                               &self.storage_root,
                               &self.controller,
+                              &self.tabs,
                               column_width,
                               window)
     }
@@ -526,7 +561,7 @@ enum GroupedRow {
         publisher: Arc<str>,
         count:     usize,
     },
-    Item(LibraryItem),
+    Item(Box<LibraryItem>),
 }
 
 /// `TableDelegate` for the grouped list view. Backed by a flattened row list
@@ -534,6 +569,10 @@ enum GroupedRow {
 /// visible items change (see `CatalogView::grouped_items`).
 struct GroupedCatalogListDelegate {
     controller:   Entity<LibraryController>,
+    /// Used to open/focus a multi-item entry's expanded detail tab when the
+    /// row's inline open action hits
+    /// `OpenError::MultipleFilesRequireSelection`.
+    tabs:         Entity<TabsController>,
     storage_root: PathBuf,
     columns:      Vec<Column>,
     user_widths:  Vec<Option<Pixels>>,
@@ -578,35 +617,17 @@ impl TableDelegate for GroupedCatalogListDelegate {
                 let item_path = self.storage_root.join("items").join(&*id);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
-                let item_path_open = item_path.clone();
                 let item_path_reveal = item_path.clone();
+                let item_for_open = item.clone();
+                let tabs_for_open = self.tabs.clone();
+                let controller_for_open = entity.clone();
                 menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
-                        use crate::util::item_opener::{ItemOpener, OpenError};
-
-                        if !item_path_open.exists() {
-                            tracing::warn!(
-                                path = %item_path_open.display(),
-                                "open: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = ItemOpener::open(&item_path_open) {
-                            match e {
-                                OpenError::FileNotFound(path) => {
-                                    tracing::warn!("open: file not found: {path}");
-                                }
-                                OpenError::NoDefaultApp => {
-                                    tracing::warn!("open: no default application configured");
-                                }
-                                OpenError::OsFailed(msg) => {
-                                    tracing::warn!("open: OS failed: {msg}");
-                                }
-                                OpenError::MultipleFilesRequireSelection => {
-                                    tracing::warn!("open: multiple files require selection");
-                                }
-                            }
-                        }
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
+                        open_item_or_focus_detail_tab(&item_path,
+                                                      &item_for_open,
+                                                      &tabs_for_open,
+                                                      &controller_for_open,
+                                                      cx);
                     }),
                 )
                 .item(
@@ -680,6 +701,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                                       &colors,
                                       &self.storage_root,
                                       &self.controller,
+                                      &self.tabs,
                                       column_width,
                                       window)
             }
@@ -751,6 +773,7 @@ impl CatalogView {
         let cols = list_columns();
         let col_count = cols.len();
         let delegate = CatalogListDelegate { controller:   controller.clone(),
+                                             tabs:         tabs.clone(),
                                              storage_root: storage_root.clone(),
                                              columns:      cols.clone(),
                                              user_widths:  vec![None; col_count], };
@@ -763,6 +786,7 @@ impl CatalogView {
                                    });
 
         let grouped_delegate = GroupedCatalogListDelegate { controller: controller.clone(),
+                                                            tabs: tabs.clone(),
                                                             storage_root,
                                                             columns: cols,
                                                             user_widths: vec![None; col_count],
@@ -809,10 +833,13 @@ impl CatalogView {
                              if let Some(item) = items.first() {
                                  let id = Arc::clone(&item.id);
                                  let title = item.title.to_string();
-                                 this.tabs
-                                     .update(cx, |t, cx| t.open_detail_tab(id, title, cx));
-                                 this.controller
-                                     .update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+                                 this.tabs.update(cx, |t, cx| {
+                                              t.open_detail_tab(Arc::clone(&id), title, cx);
+                                          });
+                                 this.controller.update(cx, |ctrl, cx| {
+                                                    ctrl.clear_selection(cx);
+                                                    ctrl.clear_item_selection(&id, cx);
+                                                });
                              }
                          }
                          TableEvent::ColumnWidthsChanged(widths) => {
@@ -859,10 +886,13 @@ impl CatalogView {
                              if let Some(item) = item {
                                  let id = Arc::clone(&item.id);
                                  let title = item.title.to_string();
-                                 this.tabs
-                                     .update(cx, |t, cx| t.open_detail_tab(id, title, cx));
-                                 this.controller
-                                     .update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+                                 this.tabs.update(cx, |t, cx| {
+                                              t.open_detail_tab(Arc::clone(&id), title, cx);
+                                          });
+                                 this.controller.update(cx, |ctrl, cx| {
+                                                    ctrl.clear_selection(cx);
+                                                    ctrl.clear_item_selection(&id, cx);
+                                                });
                              }
                          }
                          TableEvent::ColumnWidthsChanged(widths) => {
@@ -908,7 +938,9 @@ impl CatalogView {
             for group in groups {
                 rows.push(GroupedRow::Header { publisher: Arc::clone(&group.publisher),
                                                count:     group.items.len(), });
-                rows.extend(group.items.into_iter().map(GroupedRow::Item));
+                rows.extend(group.items
+                                 .into_iter()
+                                 .map(|item| GroupedRow::Item(Box::new(item))));
             }
             self.catalog_grouped_list_table.update(cx, |state, cx| {
                                                state.delegate_mut().rows = rows;
@@ -1373,6 +1405,8 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
+    let ctx_item = item.clone();
+    let ctx_tabs = tabs.clone();
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
     // Approximation: the title column fills the remaining row width after the cover
@@ -1401,10 +1435,14 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     };
 
     let cover_cell: AnyElement = {
-        let inner = div().rounded(px(3.0))
-                         .overflow_hidden()
-                         .flex_none()
-                         .child(cover);
+        let mut inner = div().relative()
+                             .rounded(px(3.0))
+                             .overflow_hidden()
+                             .flex_none()
+                             .child(cover);
+        if let Some(badge) = render_item_count_badge(item, &colors) {
+            inner = inner.child(div().absolute().bottom(px(2.0)).right(px(2.0)).child(badge));
+        }
         if status == ItemStatus::Downloaded {
             Badge::new().dot()
                         .color(gpui::green())
@@ -1477,33 +1515,16 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                  let reveal_path = ctx_path.clone();
                  let remove_id = Arc::clone(&ctx_id);
                  let entity_remove = ctx_entity.clone();
+                 let item_for_open = ctx_item.clone();
+                 let tabs_for_open = ctx_tabs.clone();
+                 let controller_for_open = ctx_entity.clone();
                  menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
-                        use crate::util::item_opener::{ItemOpener, OpenError};
-
-                        if !open_path.exists() {
-                            tracing::warn!(
-                                path = %open_path.display(),
-                                "open: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = ItemOpener::open(&open_path) {
-                            match e {
-                                OpenError::FileNotFound(path) => {
-                                    tracing::warn!("open: file not found: {path}");
-                                }
-                                OpenError::NoDefaultApp => {
-                                    tracing::warn!("open: no default application configured");
-                                }
-                                OpenError::OsFailed(msg) => {
-                                    tracing::warn!("open: OS failed: {msg}");
-                                }
-                                OpenError::MultipleFilesRequireSelection => {
-                                    tracing::warn!("open: multiple files require selection");
-                                }
-                            }
-                        }
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
+                        open_item_or_focus_detail_tab(&open_path,
+                                                      &item_for_open,
+                                                      &tabs_for_open,
+                                                      &controller_for_open,
+                                                      cx);
                     }),
                 )
                 .item(
@@ -1609,6 +1630,8 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
+    let ctx_item = item.clone();
+    let ctx_tabs = tabs.clone();
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
     let ctx_path = storage_root_path.join("items").join(&*id);
@@ -1641,7 +1664,10 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     };
 
     let cover_cell: AnyElement = {
-        let inner = div().child(cover);
+        let mut inner = div().relative().child(cover);
+        if let Some(badge) = render_item_count_badge(item, &colors) {
+            inner = inner.child(div().absolute().bottom(px(2.0)).right(px(2.0)).child(badge));
+        }
         if status == ItemStatus::Downloaded {
             Badge::new().dot()
                         .color(gpui::green())
@@ -1708,33 +1734,16 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                  let reveal_path = ctx_path.clone();
                  let remove_id = Arc::clone(&ctx_id);
                  let entity_remove = ctx_entity.clone();
+                 let item_for_open = ctx_item.clone();
+                 let tabs_for_open = ctx_tabs.clone();
+                 let controller_for_open = ctx_entity.clone();
                  menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, _| {
-                        use crate::util::item_opener::{ItemOpener, OpenError};
-
-                        if !open_path.exists() {
-                            tracing::warn!(
-                                path = %open_path.display(),
-                                "open: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = ItemOpener::open(&open_path) {
-                            match e {
-                                OpenError::FileNotFound(path) => {
-                                    tracing::warn!("open: file not found: {path}");
-                                }
-                                OpenError::NoDefaultApp => {
-                                    tracing::warn!("open: no default application configured");
-                                }
-                                OpenError::OsFailed(msg) => {
-                                    tracing::warn!("open: OS failed: {msg}");
-                                }
-                                OpenError::MultipleFilesRequireSelection => {
-                                    tracing::warn!("open: multiple files require selection");
-                                }
-                            }
-                        }
+                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
+                        open_item_or_focus_detail_tab(&open_path,
+                                                      &item_for_open,
+                                                      &tabs_for_open,
+                                                      &controller_for_open,
+                                                      cx);
                     }),
                 )
                 .item(
