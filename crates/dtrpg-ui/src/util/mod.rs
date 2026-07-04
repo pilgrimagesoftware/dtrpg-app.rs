@@ -1,6 +1,7 @@
 pub mod datetime;
 pub mod filter;
 pub mod hash;
+pub mod image_format;
 pub mod init;
 pub mod item_opener;
 pub mod matching;

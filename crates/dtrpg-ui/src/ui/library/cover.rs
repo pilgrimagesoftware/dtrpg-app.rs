@@ -7,6 +7,7 @@ use gpui::{Hsla, Image, ImageFormat, IntoElement, ParentElement, Styled, div, px
 
 use crate::data::library::LibraryItem;
 use crate::util::hash::fnv1a_32;
+use crate::util::image_format::{ImageKind, sniff};
 
 // ── CoverCache
 // ────────────────────────────────────────────────────────────────
@@ -40,7 +41,13 @@ impl CoverCache {
     /// and clears its in-flight marker.
     pub fn insert(&mut self, id: Arc<str>, bytes: Vec<u8>) {
         self.in_flight.remove(&id);
-        let format = sniff_image_format(&bytes);
+        let format = match sniff(&bytes) {
+            ImageKind::Png => ImageFormat::Png,
+            ImageKind::Jpeg => ImageFormat::Jpeg,
+            ImageKind::Webp => ImageFormat::Webp,
+            ImageKind::Gif => ImageFormat::Gif,
+            ImageKind::Bmp => ImageFormat::Bmp,
+        };
         let image = Image::from_bytes(format, bytes);
         self.images.insert(id, Arc::new(image));
     }
@@ -53,30 +60,6 @@ impl CoverCache {
     /// Marks `id` as having an in-flight download.
     pub fn mark_in_flight(&mut self, id: Arc<str>) {
         self.in_flight.insert(id);
-    }
-}
-
-/// Detects image format from leading magic bytes; defaults to JPEG.
-fn sniff_image_format(bytes: &[u8]) -> ImageFormat {
-    match bytes {
-        [0x89, b'P', b'N', b'G', ..] => ImageFormat::Png,
-        [0xFF, 0xD8, 0xFF, ..] => ImageFormat::Jpeg,
-        [b'R',
-         b'I',
-         b'F',
-         b'F',
-         _,
-         _,
-         _,
-         _,
-         b'W',
-         b'E',
-         b'B',
-         b'P',
-         ..] => ImageFormat::Webp,
-        [b'G', b'I', b'F', b'8', ..] => ImageFormat::Gif,
-        [b'B', b'M', ..] => ImageFormat::Bmp,
-        _ => ImageFormat::Jpeg,
     }
 }
 
