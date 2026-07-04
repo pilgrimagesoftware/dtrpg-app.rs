@@ -12,9 +12,9 @@ use gpui::{
     AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, Styled, anchored, deferred, div,
     px,
 };
-use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
+use gpui_component::{IconName, Sizable};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -113,10 +113,12 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
             DescriptionList::vertical()
                 .columns(1)
                 .bordered(false)
-                .child(
-                    DescriptionItem::new(t!("detail.field_system").to_string())
-                        .value(item.line.to_string()),
-                )
+                .small()
+                .when(!item.line.is_empty(), |list|
+                    list.child(
+                        DescriptionItem::new(t!("detail.field_system").to_string())
+                            .value(item.line.to_string()),
+                    ))
                 .child(
                     DescriptionItem::new(t!("detail.field_format").to_string())
                         .value(item.format.to_string()),
@@ -134,8 +136,9 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .ghost()
                         .outline()
                         .compact()
+                        .small()
                         .icon(download_button_icon(is_downloaded))
-                        .label(if is_downloaded {
+                        .tooltip(if is_downloaded {
                             t!("catalog.action_remove_download")
                         }
                         else {
@@ -151,8 +154,9 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .ghost()
                         .outline()
                         .compact()
+                        .small()
                         .icon(IconName::ExternalLink)
-                        .label(t!("detail.open_in_detail_button"))
+                        .tooltip(t!("detail.open_in_detail_button"))
                         .on_click(move |_, _, cx| {
                             let id = Arc::clone(&item_id_for_detail);
                             let title = item_title.clone();
