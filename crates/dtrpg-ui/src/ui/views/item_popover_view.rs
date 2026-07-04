@@ -11,12 +11,13 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, Styled, anchored, deferred, div,
-    px,
+    AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, SharedString, Styled, anchored,
+    deferred, div, px,
 };
 use gpui_component::Disableable;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
+use gpui_component::tooltip::Tooltip;
 use gpui_component::{IconName, Sizable};
 use rust_i18n::t;
 
@@ -26,6 +27,7 @@ use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
+use crate::util::datetime::{format_absolute, format_relative};
 
 /// Renders a compact popover anchored at `position`, showing `item`'s title,
 /// publisher, and a few key attributes, plus a close button and action
@@ -118,7 +120,6 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                 .columns(1)
                 .bordered(false)
                 .small()
-                // TODO: add updated date HUMAN READABLE
                 .when(!item.line.is_empty(), |list|
                     list.child(
                         DescriptionItem::new(t!("detail.field_system").to_string())
@@ -133,6 +134,20 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         DescriptionItem::new(t!("detail.field_file_count").to_string())
                             .value(item.files.len().to_string()),
                     )
+                })
+                .when_some(item.date_added, |list, ts| {
+                    let relative = format_relative(ts);
+                    let absolute = format_absolute(ts);
+                    let id = SharedString::from(format!("item-popover-added-{}", item.id));
+                    let value =
+                        div().id(id)
+                             .child(relative)
+                             .tooltip(move |window, cx| {
+                                 Tooltip::new(absolute.clone()).build(window, cx)
+                             })
+                             .into_any_element();
+                    list.child(DescriptionItem::new(t!("detail.field_added").to_string())
+                                              .value(value))
                 })
                 // .child(
                 //     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),

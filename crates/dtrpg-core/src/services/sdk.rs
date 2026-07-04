@@ -446,19 +446,27 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
 
     // Per-item file breakdown — more than one entry marks this a multi-item
     // catalog entry (see the `catalog-entry-detail-view` capability).
-    let files: Vec<LibraryItemFile> = attributes.files
-                                                .iter()
-                                                .map(|f| {
-                                                    LibraryItemFile {
-                      id:      f.order_product_download_id.to_string().into(),
-                      name:    f.title.as_str().into(),
-                      format:  file_extension_label(&f.filename)
-                                   .unwrap_or_else(|| "FILE".to_string())
-                                   .into(),
-                      size_mb: f.size as f64 / BYTES_PER_MB,
-                  }
-                                                })
-                                                .collect();
+    //
+    // The API has been observed to repeat the same download record (identical
+    // `orderProductDownloadId`) across entries in `files` — deduplicate by that id
+    // so a genuinely single-file product never renders its one item more than
+    // once in the detail tab's item list.
+    let mut seen_download_ids: HashSet<u64> = HashSet::new();
+    let files: Vec<LibraryItemFile> =
+        attributes.files
+                  .iter()
+                  .filter(|f| seen_download_ids.insert(f.order_product_download_id))
+                  .map(|f| {
+                      LibraryItemFile {
+                          id:      f.order_product_download_id.to_string().into(),
+                          name:    f.title.as_str().into(),
+                          format:  file_extension_label(&f.filename)
+                                       .unwrap_or_else(|| "FILE".to_string())
+                                       .into(),
+                          size_mb: f.size as f64 / BYTES_PER_MB,
+                      }
+                  })
+                  .collect();
 
     let year = attributes.file_last_modified
                          .as_deref()

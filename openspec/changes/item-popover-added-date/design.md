@@ -29,11 +29,13 @@ already solves the identical problem for the expanded detail tab: it formats
   logic in the popover module. Alternative considered: inline formatting in
   `item_popover_view.rs`; rejected because it would drift from the detail
   panel's behavior over time.
-- **Guard with `.when(item.date_added.is_some(), ...)`** to match the
-  existing conditional-row pattern already used in this file (`line`,
-  `files.len() > 1`), rather than introducing an `if`-based list mutation
-  like the detail panel does. Keeps the popover's builder chain consistent
-  with itself.
+- **Guard with `.when_some(item.date_added, |list, ts| ...)`** rather than
+  `.when(item.date_added.is_some(), ...)` plus an inner `unwrap`/`expect` —
+  `when_some` hands the unwrapped timestamp straight to the closure, so the
+  guard and the value stay in one place with no risk of a panicking unwrap
+  (this crate denies `clippy::expect_used`). Still keeps the popover's
+  builder-chain style consistent with the existing `line`/`files.len() > 1`
+  conditional rows.
 - **Row label**: reuse `t!("detail.field_added")`, the same i18n key the
   detail panel uses, since it is the same concept in both views.
 

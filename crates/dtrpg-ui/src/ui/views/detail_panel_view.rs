@@ -76,7 +76,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
         .flex()
         .bg(surface)
         .child({
-            let mut cover_box = div().relative().w(px(cover_w)).flex_none().child(cover);
+            let mut cover_box =
+                div().relative().w(px(cover_w)).flex_none().overflow_hidden().child(cover);
             if let Some(cover_url) = cover_url {
                 cover_box = cover_box.child(
                     div()
@@ -291,7 +292,7 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
     );
 
     let mut body = TableBody::new();
-    for file in &item.files {
+    for (row_ix, file) in item.files.iter().enumerate() {
         let is_selected = selected_id.as_deref() == Some(file.id.as_ref());
 
         // `TableRow` itself has no click hook, so each cell's content is
@@ -308,7 +309,12 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
                       });
             }
         };
-        let row_id_base = format!("item-row-{}", file.id);
+        // Includes `row_ix` (not just `file.id`) so that rows stay uniquely
+        // identifiable — and therefore individually clickable — even if a stale
+        // catalog cache (written before file records were deduplicated by
+        // download id, see `map_order_product`) still has two rows sharing an
+        // id; GPUI needs distinct element ids to hit-test each row separately.
+        let row_id_base = format!("item-row-{row_ix}-{}", file.id);
 
         let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
                                  .child(
