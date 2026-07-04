@@ -691,12 +691,19 @@ impl LibraryController {
     ///
     /// Clears the activity panel so stale error messages from the previous
     /// (unauthenticated) service do not persist after sign-in.
+    ///
+    /// Sets `catalog_loading` before clearing the catalog so the catalog view
+    /// shows its loading spinner instead of the "library empty" state for the
+    /// gap between this clear and `start_load` repopulating it — otherwise a
+    /// catalog already populated from disk cache (e.g. during startup's
+    /// silent re-authentication) flashes empty before reappearing.
     pub fn replace_service(&mut self, service: Box<dyn LibraryService>,
                            collections_service: Box<dyn CollectionsService>,
                            cx: &mut Context<Self>) {
         tracing::debug!("replace_service: installing authenticated services");
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
+        self.catalog_loading = true;
         self.catalog.clear();
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
