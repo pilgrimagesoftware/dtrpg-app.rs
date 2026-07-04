@@ -12,4 +12,4 @@
 ## 3. Verify
 
 - [x] 3.1 Run `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo fmt --all -- --check`, and `cargo test --workspace` — all pass (93 unit tests, 4 doctests)
-- [ ] 3.2 Delete `~/Downloads/dtrpg` (or the platform equivalent), launch the app, and confirm the folder is recreated and the Settings storage warning does not appear
+- [x] 3.2 Delete `~/Downloads/dtrpg` (or the platform equivalent), launch the app, and confirm the folder is recreated and the Settings storage warning does not appear
