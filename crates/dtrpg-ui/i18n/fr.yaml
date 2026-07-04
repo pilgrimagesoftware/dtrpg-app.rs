@@ -81,6 +81,7 @@ detail:
   field_released: "Date de sortie"
   field_added: "Ajouté"
   field_status: "Statut"
+  field_file_count: "Files"
   status_on_device: "Sur cet appareil"
   status_in_cloud: "Dans le cloud"
   items_heading: "Éléments"

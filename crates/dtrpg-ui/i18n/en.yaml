@@ -82,6 +82,7 @@ detail:
   field_released: "Released"
   field_added: "Added"
   field_status: "Status"
+  field_file_count: "Files"
   status_on_device: "On this device"
   status_in_cloud: "In the cloud"
   items_heading: "Items"
