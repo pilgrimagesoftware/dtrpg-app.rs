@@ -300,4 +300,18 @@ mod tests {
             let _ = style.motif;
         }
     }
+
+    #[test]
+    fn malformed_color_falls_back_without_panicking() {
+        // Advanced-details swatch rendering (`render_advanced_details` in
+        // `detail_panel_view.rs`) reuses `cover_style(item).background`, so this
+        // fallback path must never panic on a malformed or empty `item.color`.
+        for color in ["", "not-a-color", "#zzzzzz"] {
+            let item = make_item("b_malformed", "Malformed Color Book", color);
+            let style = cover_style(&item);
+            let default_background: Hsla = rgb(0x1C_2A_44).into();
+            assert_eq!(style.background, default_background,
+                       "expected fallback background for malformed color {color:?}");
+        }
+    }
 }

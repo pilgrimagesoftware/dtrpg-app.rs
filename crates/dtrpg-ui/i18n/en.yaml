@@ -91,6 +91,13 @@ detail:
   item_list_column_type: "Type"
   item_prompt_select: "Select an item from the list to view its details"
   item_count_badge_tooltip: "%{count} items in this entry"
+  advanced_details_heading: "Advanced details"
+  field_stable_id: "Stable ID"
+  field_numeric_id: "Numeric ID"
+  field_order_product_id: "Order product ID"
+  field_product_id: "Product ID"
+  field_added_order: "Added order"
+  field_cover_color: "Cover color"
 
 settings:
   title: "Settings"
