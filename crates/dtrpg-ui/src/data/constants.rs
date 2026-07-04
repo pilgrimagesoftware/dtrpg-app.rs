@@ -82,3 +82,8 @@ pub const DETAIL_PANEL_COVER_MAX_WIDTH: f32 = DETAIL_PANEL_DEFAULT_WIDTH;
 /// otherwise stretches its tab (and the whole strip) rather than eliding —
 /// see [`crate::util::text::truncate_with_ellipsis`].
 pub const DETAIL_TAB_TITLE_MAX_CHARS: usize = 40;
+
+/// Width of the single-click item popover, in pixels.
+pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
+/// Gap between the item popover and the catalog entry it's anchored beside.
+pub const ITEM_POPOVER_MARGIN: f32 = 8.0;

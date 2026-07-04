@@ -6,10 +6,11 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement,
+    AnyElement, App, Bounds, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement,
     MouseButton, MouseDownEvent, ObjectFit, ParentElement, Pixels, Point, Render, Styled,
     StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
+use gpui_component::ElementExt;
 use gpui_component::badge::Badge;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
@@ -23,6 +24,7 @@ use rust_i18n::t;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::controllers::tabs::TabsController;
+use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
 use crate::data::enums::CatalogPresentation;
 use crate::data::enums::*;
 use crate::data::events::LibraryChanged;
@@ -729,6 +731,12 @@ pub struct CatalogView {
     /// the popover — never updated by subsequent mouse movement — so the
     /// popover stays put while the pointer wanders after opening it, instead
     /// of following the cursor. Cleared to `None` when the popover closes.
+    ///
+    /// Used only as a fallback anchor rectangle (zero-sized, at the click
+    /// point) for the first frame after selection and for presentations
+    /// (List) whose entries don't report their own bounds — see
+    /// `LibraryController::popover_anchor_bounds` for the precise rectangle
+    /// Grid/Thumbs entries supply once painted.
     popover_anchor_pos:         Option<Point<Pixels>>,
 }
 
@@ -913,10 +921,36 @@ impl CatalogView {
     }
 }
 
+/// Computes the top-left corner at which to draw the item popover so it sits
+/// beside `entry` — the clicked catalog entry's on-screen bounds — rather
+/// than on top of it.
+///
+/// Prefers the entry's right edge; falls back to its left edge when the
+/// popover wouldn't fit within `window_width` on the right. Vertically, the
+/// popover is always top-aligned with the entry, so it never covers it.
+fn popover_anchor_point(entry: Bounds<Pixels>, popover_width: Pixels, margin: Pixels,
+                        window_width: Pixels)
+                        -> Point<Pixels> {
+    let right_x = entry.origin.x + entry.size.width + margin;
+    let x = if right_x + popover_width <= window_width {
+        right_x
+    }
+    else {
+        (entry.origin.x - margin - popover_width).max(px(0.0))
+    };
+    Point { x,
+            y: entry.origin.y }
+}
+
 impl Render for CatalogView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let snap = self.controller.read(cx).snapshot();
         let item_count = self.controller.read(cx).visible_items_count();
+        // Computed once here (rather than re-reading the controller per row) so
+        // every Grid/Thumbs entry closure below can cheaply check whether it is
+        // the one entry that needs to report its bounds for popover anchoring.
+        let selected_id: Option<Arc<str>> =
+            snap.selected_item.as_ref().map(|item| Arc::clone(&item.id));
         let theme = cx.global::<LibriTheme>().clone();
         let colors = theme.colors;
         let density = theme.density_constants;
@@ -951,11 +985,17 @@ impl Render for CatalogView {
 
         let outer = div().flex_1().min_h_0().flex().flex_col();
 
+        // Non-virtualized branches (grouped Thumbs/Grid, empty/loading states) size
+        // their content to its natural height and need `root` itself to scroll.
+        // Virtualized branches (uniform_list-backed Thumbs/Grid, and DataTable-backed
+        // List) manage their own scrolling and scrollbar via `scroll_handle` /
+        // internally, so wrapping them in a second, unrelated scroll container here
+        // would leave the outer scrollbar tracking a handle that never reflects the
+        // true (virtualized) content size — the bug behind a missing grid scrollbar.
         let root = div().flex_1()
                         .min_h_0()
                         .flex()
                         .flex_col()
-                        .overflow_y_scrollbar()
                         .pt(pad_top)
                         .pb(pad_bottom);
 
@@ -1015,29 +1055,42 @@ impl Render for CatalogView {
                 let d = density.clone();
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
+                let sel = selected_id.clone();
                 root.px(pad_side)
-                    .child(uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
-                               let items = ctrl.read(cx).visible_items_slice(range);
-                               let covers: Vec<Option<Arc<Image>>> = {
-                                   let cache = cx.global::<CoverCache>();
-                                   items.iter().map(|item| cache.get(&item.id)).collect()
-                               };
-                               items.iter()
-                                    .zip(covers)
-                                    .map(|(item, cover)| {
-                                        render_thumb_row(item,
-                                                         cover,
-                                                         &c,
-                                                         &d,
-                                                         ctrl.clone(),
-                                                         t.clone(),
-                                                         s.clone(),
-                                                         window).into_any_element()
-                                    })
-                                    .collect()
-                           }).track_scroll(&scroll_handle)
-                             .flex_1()
-                             .min_h_0())
+                    .child(div().relative()
+                                .flex_1()
+                                .min_h_0()
+                                .child(uniform_list("catalog-thumbs",
+                                                    item_count,
+                                                    move |range, window, cx| {
+                                                        let items = ctrl.read(cx)
+                                                                        .visible_items_slice(range);
+                                                        let covers: Vec<Option<Arc<Image>>> = {
+                                                            let cache = cx.global::<CoverCache>();
+                                                            items.iter()
+                                                                 .map(|item| cache.get(&item.id))
+                                                                 .collect()
+                                                        };
+                                                        items.iter()
+                                                             .zip(covers)
+                                                             .map(|(item, cover)| {
+                                                                 let is_selected =
+                                                                     sel.as_deref()
+                                                                     == Some(item.id.as_ref());
+                                                                 render_thumb_row(item,
+                                                                  cover,
+                                                                  &c,
+                                                                  &d,
+                                                                  ctrl.clone(),
+                                                                  t.clone(),
+                                                                  s.clone(),
+                                                                  window,
+                                                                  is_selected).into_any_element()
+                                                             })
+                                                             .collect()
+                                                    }).track_scroll(&scroll_handle)
+                                                      .size_full())
+                                .vertical_scrollbar(&scroll_handle))
                     .into_any_element()
             }
 
@@ -1048,7 +1101,8 @@ impl Render for CatalogView {
                     let cache = cx.global::<CoverCache>();
                     cache.images.clone()
                 };
-                root.px(pad_side)
+                root.overflow_y_scrollbar()
+                    .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                                                     let c = colors.clone();
                                                     let d = density.clone();
@@ -1056,6 +1110,7 @@ impl Render for CatalogView {
                                                     let t = tabs_entity.clone();
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
+                                                    let sel = selected_id.clone();
                                                     // Reborrow as `&Window` (Copy) so the nested
                                                     // `move` closure can capture it on every
                                                     // outer iteration without moving `window`.
@@ -1069,6 +1124,10 @@ impl Render for CatalogView {
                                                                         let cover =
                                                                             cc.get(&item.id)
                                                                               .cloned();
+                                                                        let is_selected =
+                                                                            sel.as_deref()
+                                                                            == Some(item.id
+                                                                                       .as_ref());
                                                                         render_thumb_row(&item,
                                                                                          cover,
                                                                                          &c,
@@ -1076,7 +1135,8 @@ impl Render for CatalogView {
                                                                                          e.clone(),
                                                                                          t.clone(),
                                                                                          s.clone(),
-                                                                                         window)
+                                                                                         window,
+                                                                                         is_selected)
                                                                     }))
                                                 }))
                     .into_any_element()
@@ -1089,42 +1149,54 @@ impl Render for CatalogView {
                 let d = density.clone();
                 let s = storage_root.clone();
                 let t = tabs_entity.clone();
+                let sel = selected_id.clone();
                 root.px(pad_side)
-                    .child(uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
-                               let range_start = row_range.start;
-                               let item_start = range_start * items_per_row;
-                               let item_end = (row_range.end * items_per_row).min(item_count);
-                               let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
-                               let covers: Vec<Option<Arc<Image>>> = {
-                                   let cache = cx.global::<CoverCache>();
-                                   items.iter().map(|item| cache.get(&item.id)).collect()
-                               };
-                               row_range.map(|row| {
-                                            let offset = (row - range_start) * items_per_row;
-                                            let row_end = (offset + items_per_row).min(items.len());
-                                            let row_items = &items[offset..row_end];
-                                            let row_covers = &covers[offset..row_end];
-                                            div().flex()
-                                                 .gap(d.card_gap_x)
-                                                 .mb(d.card_gap_y)
-                                                 .children(row_items.iter()
-                                                                    .zip(row_covers.iter())
-                                                                    .map(|(item, cover)| {
-                                                                        render_grid_card(item,
+                    .child(
+                           div().relative()
+                                .flex_1()
+                                .min_h_0()
+                                .child(
+                    uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
+                        let range_start = row_range.start;
+                        let item_start = range_start * items_per_row;
+                        let item_end = (row_range.end * items_per_row).min(item_count);
+                        let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                        let covers: Vec<Option<Arc<Image>>> = {
+                            let cache = cx.global::<CoverCache>();
+                            items.iter().map(|item| cache.get(&item.id)).collect()
+                        };
+                        row_range.map(|row| {
+                                     let offset = (row - range_start) * items_per_row;
+                                     let row_end = (offset + items_per_row).min(items.len());
+                                     let row_items = &items[offset..row_end];
+                                     let row_covers = &covers[offset..row_end];
+                                     div().flex()
+                                          .gap(d.card_gap_x)
+                                          .mb(d.card_gap_y)
+                                          .children(row_items.iter()
+                                                             .zip(row_covers.iter())
+                                                             .map(|(item, cover)| {
+                                                                 let is_selected =
+                                                                     sel.as_deref()
+                                                                     == Some(item.id.as_ref());
+                                                                 render_grid_card(item,
                                                                                   cover.clone(),
                                                                                   &c,
                                                                                   d.card_min_width,
                                                                                   ctrl.clone(),
                                                                                   t.clone(),
                                                                                   s.clone(),
-                                                                                  window)
-                                                                    }))
-                                                 .into_any_element()
-                                        })
-                                        .collect()
-                           }).track_scroll(&scroll_handle)
-                             .flex_1()
-                             .min_h_0())
+                                                                                  window,
+                                                                                  is_selected)
+                                                             }))
+                                          .into_any_element()
+                                 })
+                                 .collect()
+                    }).track_scroll(&scroll_handle)
+                      .size_full(),
+                )
+                                .vertical_scrollbar(&scroll_handle),
+                )
                     .into_any_element()
             }
 
@@ -1135,7 +1207,8 @@ impl Render for CatalogView {
                     let cache = cx.global::<CoverCache>();
                     cache.images.clone()
                 };
-                root.px(pad_side)
+                root.overflow_y_scrollbar()
+                    .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                                                     let c = colors.clone();
                                                     let d = density.clone();
@@ -1143,11 +1216,12 @@ impl Render for CatalogView {
                                                     let t = tabs_entity.clone();
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
+                                                    let sel = selected_id.clone();
                                                     div().child(render_group_header(&g.publisher,
                                                                                     g.items.len(),
                                                                                     &c))
                                                          .child(render_grid(g.items, cc, c, d, e,
-                                                                            t, s, &*window))
+                                                                            t, s, &*window, sel))
                                                 }))
                     .into_any_element()
             }
@@ -1162,11 +1236,18 @@ impl Render for CatalogView {
                  .child(content);
 
         if let Some(item) = snap.selected_item.as_ref() {
-            let anchor_pos = self.popover_anchor_pos.unwrap_or_default();
-            result = result.child(render_item_popover(item,
-                                                      anchor_pos,
-                                                      self.controller.clone(),
-                                                      &colors));
+            let entry_bounds = self.controller
+                                   .read(cx)
+                                   .popover_anchor_bounds()
+                                   .unwrap_or(Bounds { origin: self.popover_anchor_pos
+                                                                   .unwrap_or_default(),
+                                                       size:   gpui::Size::default(), });
+            let anchor = popover_anchor_point(entry_bounds,
+                                              px(ITEM_POPOVER_WIDTH),
+                                              px(ITEM_POPOVER_MARGIN),
+                                              window.viewport_size().width);
+            result =
+                result.child(render_item_popover(item, anchor, self.controller.clone(), &colors));
         }
 
         result.into_any_element()
@@ -1301,7 +1382,8 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 #[allow(clippy::too_many_arguments)]
 fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     density: &DensityConstants, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
+                    is_selected: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1319,6 +1401,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
+    let bounds_entity = entity.clone();
     // Approximation: the title column fills the remaining row width after the cover
     // and gap, which depends on the actual panel layout (sidebar/detail panel
     // state) that isn't known synchronously here. `window.viewport_size()`
@@ -1369,6 +1452,13 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
          .border_b_1()
          .border_color(colors.border)
          .cursor_pointer()
+         // Only the selected row needs to report its bounds — it's the one
+         // the item popover anchors beside (see `popover_anchor_point`).
+         .when(is_selected, |el| {
+             el.on_prepaint(move |bounds, _window, cx| {
+                   bounds_entity.update(cx, |ctrl, cx| ctrl.set_popover_anchor_bounds(bounds, cx));
+               })
+         })
          .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
          .child(cover_cell)
          .child({
@@ -1487,7 +1577,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
 fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image>>,
                colors: ColorTokens, density: DensityConstants,
                entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-               storage_root_path: PathBuf, window: &Window)
+               storage_root_path: PathBuf, window: &Window, selected_id: Option<Arc<str>>)
                -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -1499,6 +1589,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
          .mb(gap_y)
          .children(items.into_iter().map(|item| {
                                         let cover = cover_cache.get(&item.id).cloned();
+                                        let is_selected =
+                                            selected_id.as_deref() == Some(item.id.as_ref());
                                         render_grid_card(&item,
                                                          cover,
                                                          &colors,
@@ -1506,7 +1598,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
                                                          entity.clone(),
                                                          tabs.clone(),
                                                          storage_root_path.clone(),
-                                                         window)
+                                                         window,
+                                                         is_selected)
                                     }))
 }
 
@@ -1515,7 +1608,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
 #[allow(clippy::too_many_arguments)]
 fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     card_w: f32, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
+                    is_selected: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1544,6 +1638,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
+    let bounds_entity = entity.clone();
     let ctx_path = storage_root_path.join("items").join(&*id);
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
@@ -1607,6 +1702,13 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
          .rounded(px(6.0))
          .overflow_hidden()
          .cursor_pointer()
+         // Only the selected card needs to report its bounds — it's the one
+         // the item popover anchors beside (see `popover_anchor_point`).
+         .when(is_selected, |el| {
+             el.on_prepaint(move |bounds, _window, cx| {
+                   bounds_entity.update(cx, |ctrl, cx| ctrl.set_popover_anchor_bounds(bounds, cx));
+               })
+         })
          .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
          .child(cover_cell)
          .child(div().px(px(4.0))

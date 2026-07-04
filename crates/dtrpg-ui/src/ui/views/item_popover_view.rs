@@ -16,6 +16,7 @@ use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
+use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
@@ -23,6 +24,11 @@ use crate::data::theme::ColorTokens;
 /// Renders a compact popover anchored at `position`, showing `item`'s title,
 /// publisher, and a few key attributes, plus a close button and an
 /// accessible "open in tab" affordance as an alternative to double-click.
+///
+/// `position` is the top-left corner at which the popover is drawn — callers
+/// are responsible for computing it (see
+/// `catalog_view::popover_anchor_point`) so the popover sits beside the
+/// catalog entry rather than over it.
 pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                            entity: Entity<LibraryController>, colors: &ColorTokens)
                            -> AnyElement {
@@ -45,7 +51,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
     let content = div()
         .id("item-popover")
         .occlude()
-        .w(px(260.0))
+        .w(px(ITEM_POPOVER_WIDTH))
         .bg(surface)
         .border_1()
         .border_color(border)
@@ -111,7 +117,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                 ),
         );
 
-    deferred(anchored().snap_to_window_with_margin(px(8.))
+    deferred(anchored().snap_to_window_with_margin(px(ITEM_POPOVER_MARGIN))
                        .position(position)
                        .child(content)).with_priority(1)
                                        .into_any_element()
