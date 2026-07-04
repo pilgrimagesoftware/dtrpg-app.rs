@@ -55,14 +55,14 @@ pub fn format_relative(ts: i64) -> String {
         let mins = elapsed / 60;
         return match mins {
             1 => t!("date.minutes_ago.one").to_string(),
-            _ => t!("date.minutes_ago.other", n = mins).to_string(),
+            _ => t!("date.minutes_ago.many", n = mins).to_string(),
         };
     }
     if elapsed < 86_400 {
         let hrs = elapsed / 3_600;
         return match hrs {
             1 => t!("date.hours_ago.one").to_string(),
-            _ => t!("date.hours_ago.other", n = hrs).to_string(),
+            _ => t!("date.hours_ago.many", n = hrs).to_string(),
         };
     }
     if elapsed < 2 * 86_400 {
@@ -70,13 +70,13 @@ pub fn format_relative(ts: i64) -> String {
     }
     if elapsed < 7 * 86_400 {
         let days = elapsed / 86_400;
-        return t!("date.days_ago.other", n = days).to_string();
+        return t!("date.days_ago.many", n = days).to_string();
     }
     if elapsed < 30 * 86_400 {
         let weeks = elapsed / (7 * 86_400);
         return match weeks {
             1 => t!("date.weeks_ago.one").to_string(),
-            _ => t!("date.weeks_ago.other", n = weeks).to_string(),
+            _ => t!("date.weeks_ago.many", n = weeks).to_string(),
         };
     }
 
@@ -87,14 +87,14 @@ pub fn format_relative(ts: i64) -> String {
     if months < 12 {
         return match months {
             1 => t!("date.months_ago.one").to_string(),
-            _ => t!("date.months_ago.other", n = months).to_string(),
+            _ => t!("date.months_ago.many", n = months).to_string(),
         };
     }
 
     let years = months / 12;
     match years {
         1 => t!("date.years_ago.one").to_string(),
-        _ => t!("date.years_ago.other", n = years).to_string(),
+        _ => t!("date.years_ago.many", n = years).to_string(),
     }
 }
 
