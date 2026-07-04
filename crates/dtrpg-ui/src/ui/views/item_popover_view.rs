@@ -14,6 +14,7 @@ use gpui::{
     AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, Styled, anchored, deferred, div,
     px,
 };
+use gpui_component::Disableable;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::{IconName, Sizable};
@@ -45,12 +46,12 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
 
     let title = item.title.to_string();
     let publisher = item.publisher.to_string();
-    let status_label = if item.status == ItemStatus::Downloaded {
-        t!("detail.status_on_device").to_string()
-    }
-    else {
-        t!("detail.status_in_cloud").to_string()
-    };
+    // let status_label = if item.status == ItemStatus::Downloaded {
+    //     t!("detail.status_on_device").to_string()
+    // }
+    // else {
+    //     t!("detail.status_in_cloud").to_string()
+    // };
 
     let entity_close = entity.clone();
     let entity_download = entity.clone();
@@ -132,14 +133,26 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                             .value(item.files.len().to_string()),
                     )
                 })
-                .child(
-                    DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
-                ),
+                // .child(
+                //     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
+                // ),
         )
         .child(
             div()
                 .flex()
                 .gap(px(8.0))
+                .child(
+                    Button::new("item-popover-status")
+                        .primary()
+                        .small()
+                        .disabled(true)
+                        .icon(if is_downloaded {
+                            IconName::ArrowDown // TODO: FileCheckCorner
+                        }
+                        else {
+                            IconName::Globe // TODO: CloudCog
+                        })
+                )
                 .child(
                     Button::new("item-popover-download")
                         .ghost()
