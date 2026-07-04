@@ -448,14 +448,21 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
     // catalog entry (see the `catalog-entry-detail-view` capability).
     //
     // The API has been observed to repeat the same download record (identical
-    // `orderProductDownloadId`) across entries in `files` — deduplicate by that id
-    // so a genuinely single-file product never renders its one item more than
-    // once in the detail tab's item list.
-    let mut seen_download_ids: HashSet<u64> = HashSet::new();
+    // `orderProductDownloadId`, identical `title`) verbatim across entries in
+    // `files` for what is genuinely a single file — deduplicate those exact
+    // repeats so a single-file product never renders its one item more than
+    // once in the detail tab's item list. `orderProductDownloadId` alone is
+    // NOT a reliable per-file key — the API has also been observed to reuse
+    // the same download id across genuinely distinct files within a bundle,
+    // so deduplicating on the id alone would incorrectly collapse a real
+    // multi-file entry down to one and hide its item-count badge. Keying on
+    // `(order_product_download_id, title)` catches true verbatim repeats
+    // while never merging two files with different titles.
+    let mut seen_files: HashSet<(u64, &str)> = HashSet::new();
     let files: Vec<LibraryItemFile> =
         attributes.files
                   .iter()
-                  .filter(|f| seen_download_ids.insert(f.order_product_download_id))
+                  .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
                   .map(|f| {
                       LibraryItemFile { id:      f.order_product_download_id.to_string().into(),
                                         name:    f.title.as_str().into(),
@@ -818,6 +825,37 @@ mod tests {
 
         assert_eq!(items[0].files.len(), 1);
         assert!(!items[0].is_multi_item());
+    }
+
+    #[test]
+    fn map_order_product_keeps_distinct_files_that_share_a_download_id() {
+        // Regression: `orderProductDownloadId` alone is not a reliable
+        // per-file key — the API has been observed to reuse it across
+        // genuinely distinct files within a bundle. Deduping on the id alone
+        // would collapse this real 2-file bundle down to 1 and hide its
+        // item-count badge in the catalog grid/list views.
+        let mut item = order_product_item(515_276, "Moria");
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "Moria Rulebook".to_string(),
+                                    filename:                  "moria-rulebook.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1234,
+                                    title:                     "Moria Map Sheet".to_string(),
+                                    filename:                  "moria-map.pdf".to_string(),
+                                    size:                      524_288,
+                                    size_mb:                   "0.5".to_string(),
+                                    checksums:                 vec![], },];
+
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+        let items = service.list_items().expect("list items");
+
+        assert_eq!(items[0].files.len(), 2);
+        assert!(items[0].is_multi_item());
     }
 
     #[test]
