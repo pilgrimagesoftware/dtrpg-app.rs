@@ -90,13 +90,16 @@ detail:
   item_list_column_type: "Typ"
   item_prompt_select: "Wählen Sie einen Titel aus der Liste, um Details anzuzeigen"
   item_count_badge_tooltip: "%{count} Titel in diesem Eintrag"
-  advanced_details_heading: "Erweiterte Details"
+  other_details_heading: "Weitere Details"
   field_stable_id: "Stabile ID"
   field_numeric_id: "Numerische ID"
   field_order_product_id: "Bestellprodukt-ID"
   field_product_id: "Produkt-ID"
   field_added_order: "Hinzufügereihenfolge"
   field_cover_color: "Cover-Farbe"
+  field_file_id: "Datei-ID"
+  field_download_location: "Speicherort"
+  copy_tooltip: "Kopieren"
 
 settings:
   title: "Einstellungen"

@@ -1,7 +1,7 @@
 //! Expanded detail tab content: full item metadata and actions, filling a
 //! tab's content area (opened by double-clicking a catalog item).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
@@ -13,6 +13,7 @@ use gpui_component::Disableable;
 use gpui_component::Icon;
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::clipboard::Clipboard;
 use gpui_component::collapsible::Collapsible;
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
@@ -50,7 +51,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let item = item.clone();
     let entity_download = entity.clone();
     let entity_refresh_thumbnail = entity.clone();
-    let entity_advanced_details = entity.clone();
+    let entity_other_details = entity.clone();
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
@@ -255,12 +256,13 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             }),
                     )
                     .child(if item.is_multi_item() {
-                        render_item_tier(&item, entity_item_tier.clone(), colors, cx)
+                        render_item_tier(&item, &storage_root_path, entity_item_tier.clone(),
+                                         colors, cx)
                             .into_any_element()
                     } else {
                         render_metadata_table(&item, colors).into_any_element()
                     })
-                    .child(render_advanced_details(&item, entity_advanced_details, colors, cx)),
+                    .child(render_other_details(&item, entity_other_details, colors, cx)),
             ),
         )
         .into_any_element()
@@ -271,8 +273,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 ///
 /// See `catalog-entry-detail-view`'s persistent-item-list and
 /// update-in-place requirements.
-fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, colors: &ColorTokens,
-                    cx: &App)
+fn render_item_tier(item: &LibraryItem, storage_root_path: &Path, entity: Entity<LibraryController>,
+                    colors: &ColorTokens, cx: &App)
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
@@ -353,7 +355,7 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
     let item_list = Table::new().child(TableHeader::new().child(header_row))
                                 .child(body);
 
-    let selected_file = selected_ix.and_then(|ix| item.files.get(ix));
+    let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
     div().flex()
          .flex_col()
@@ -364,7 +366,9 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
                      .child(t!("detail.items_heading").to_string()))
          .child(item_list)
          .child(match selected_file {
-                    Some(file) => render_item_metadata(item, file).into_any_element(),
+                    Some((ix, file)) => render_item_metadata(item, file, ix, storage_root_path,
+                                                              entity.clone(), colors, cx)
+                        .into_any_element(),
                     None => div().text_sm()
                                  .text_color(colors.text_tertiary)
                                  .py(px(12.0))
@@ -374,16 +378,28 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
 }
 
 /// Renders the metadata area for a single selected item within a multi-item
-/// entry: name, type, format, file size, and the entry's download state
+/// entry: name, type, format, file size, the entry's download state
 /// (individual files share the entry's on-disk download state today; see
 /// `define-rust-catalog-entry-detail-view`'s open questions for future
-/// per-file tracking).
-fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile) -> impl IntoElement + 'static {
-    DescriptionList::vertical()
+/// per-file tracking), and a per-file "Other details" disclosure (file id,
+/// download location).
+///
+/// `row_ix` is the file's position within the entry's `files` list — used to
+/// key element ids and disclosure state, since the API has been observed to
+/// reuse the same download id across genuinely distinct files within a
+/// bundle (see `LibraryItem::dedupe_files`).
+fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usize,
+                        storage_root_path: &Path, entity: Entity<LibraryController>,
+                        colors: &ColorTokens, cx: &App)
+                        -> impl IntoElement + 'static {
+    let name_value =
+        copyable_value(SharedString::from(format!("file-name-{row_ix}")), file.name.to_string());
+
+    let metadata = DescriptionList::vertical()
         .columns(2)
         .bordered(false)
         .child(DescriptionItem::new(t!("detail.item_list_column_name").to_string())
-                   .value(file.name.to_string())
+                   .value(name_value)
                    .span(2))
         .child(DescriptionItem::new(t!("detail.field_format").to_string())
                    .value(file.format.to_string()))
@@ -395,25 +411,57 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile) -> impl Into
                    } else {
                        t!("detail.status_in_cloud").to_string()
                    })
-                   .span(2))
+                   .span(2));
+
+    div().flex()
+         .flex_col()
+         .gap(px(12.0))
+         .child(metadata)
+         .child(render_file_other_details(
+             FileOtherDetailsContext { entry_id: &item.id,
+                                       row_ix,
+                                       is_downloaded: item.status == ItemStatus::Downloaded,
+                                       storage_root_path },
+             file,
+             entity,
+             colors,
+             cx,
+         ))
 }
 
-/// Renders the "Advanced details" disclosure section: a clickable header that
-/// toggles a collapsed-by-default panel of fields not already shown in the
-/// primary metadata table or item tier (stable id, numeric id, order product
-/// id, product id, added-order value, and the generative cover color).
+/// Builds the shared toggle-state key for a single file's "Other details"
+/// disclosure within a multi-item entry's item tier.
+fn file_other_details_key(entry_id: &str, row_ix: usize) -> Arc<str> {
+    Arc::from(format!("{entry_id}:{row_ix}"))
+}
+
+/// Grouped context for [`render_file_other_details`], kept below Rust's
+/// preferred argument count.
+struct FileOtherDetailsContext<'a> {
+    entry_id:          &'a str,
+    row_ix:            usize,
+    is_downloaded:     bool,
+    storage_root_path: &'a Path,
+}
+
+/// Renders a single file's "Other details" disclosure section: a
+/// clickable header that toggles a collapsed-by-default panel showing the
+/// file's id and its on-disk download location.
 ///
-/// See `catalog-entry-detail-advanced-disclosure`.
-fn render_advanced_details(item: &LibraryItem, entity: Entity<LibraryController>,
-                           colors: &ColorTokens, cx: &App)
-                           -> impl IntoElement + 'static {
-    let entry_id = Arc::clone(&item.id);
-    let open = entity.read(cx).is_advanced_details_open(&entry_id);
+/// The download location is the entry's shared item folder — per-file paths
+/// aren't tracked separately (see `LibraryItemFile`), so every file in a
+/// bundle reports the same location.
+fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryItemFile,
+                             entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App)
+                             -> impl IntoElement + 'static {
+    let FileOtherDetailsContext { entry_id, row_ix, is_downloaded, storage_root_path } = ctx;
+    let toggle_key = file_other_details_key(entry_id, row_ix);
+    let open = entity.read(cx).is_file_other_details_open(&toggle_key);
 
     let toggle_entity = entity;
-    let toggle_entry_id = Arc::clone(&entry_id);
+    let toggle_key_for_click = Arc::clone(&toggle_key);
 
-    let header = div().id("advanced-details-header")
+    let header = div().id(SharedString::from(format!("file-other-details-header-{toggle_key}")))
                       .flex()
                       .items_center()
                       .gap(px(6.0))
@@ -423,7 +471,7 @@ fn render_advanced_details(item: &LibraryItem, entity: Entity<LibraryController>
                       .text_color(colors.text_primary)
                       .on_click(move |_, _, cx| {
                           toggle_entity.update(cx, |ctrl, cx| {
-                              ctrl.toggle_advanced_details(Arc::clone(&toggle_entry_id), cx);
+                              ctrl.toggle_file_other_details(Arc::clone(&toggle_key_for_click), cx);
                           });
                       })
                       .child(Icon::new(if open {
@@ -432,20 +480,84 @@ fn render_advanced_details(item: &LibraryItem, entity: Entity<LibraryController>
                                        else {
                                            IconName::ChevronDown
                                        }).text_color(colors.text_secondary))
-                      .child(t!("detail.advanced_details_heading").to_string());
+                      .child(t!("detail.other_details_heading").to_string());
+
+    let path_value = if is_downloaded {
+        storage_root_path.join("items").join(entry_id).display().to_string()
+    } else {
+        value_or_dash("")
+    };
+
+    let content = DescriptionList::vertical()
+        .columns(2)
+        .bordered(false)
+        .child(DescriptionItem::new(t!("detail.field_file_id").to_string())
+                   .value(copyable_value(SharedString::from(format!("file-id-{toggle_key}")),
+                                         file.id.to_string()))
+                   .span(2))
+        .child(DescriptionItem::new(t!("detail.field_download_location").to_string())
+                   .value(copyable_value(SharedString::from(format!("file-path-{toggle_key}")),
+                                         path_value))
+                   .span(2));
+
+    Collapsible::new().gap(px(8.0))
+                      .open(open)
+                      .child(header)
+                      .content(content)
+}
+
+/// Renders the "Other details" disclosure section: a clickable header that
+/// toggles a collapsed-by-default panel of fields not already shown in the
+/// primary metadata table or item tier (stable id, numeric id, order product
+/// id, product id, added-order value, and the generative cover color).
+///
+/// See `catalog-entry-detail-advanced-disclosure`.
+fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>, colors: &ColorTokens,
+                        cx: &App)
+                        -> impl IntoElement + 'static {
+    let entry_id = Arc::clone(&item.id);
+    let open = entity.read(cx).is_other_details_open(&entry_id);
+
+    let toggle_entity = entity;
+    let toggle_entry_id = Arc::clone(&entry_id);
+
+    let header = div().id("other-details-header")
+                      .flex()
+                      .items_center()
+                      .gap(px(6.0))
+                      .cursor_pointer()
+                      .text_sm()
+                      .font_weight(gpui::FontWeight::SEMIBOLD)
+                      .text_color(colors.text_primary)
+                      .on_click(move |_, _, cx| {
+                          toggle_entity.update(cx, |ctrl, cx| {
+                              ctrl.toggle_other_details(Arc::clone(&toggle_entry_id), cx);
+                          });
+                      })
+                      .child(Icon::new(if open {
+                                           IconName::ChevronUp
+                                       }
+                                       else {
+                                           IconName::ChevronDown
+                                       }).text_color(colors.text_secondary))
+                      .child(t!("detail.other_details_heading").to_string());
 
     let swatch_color = cover_style(item).background;
     let content = DescriptionList::vertical()
         .columns(2)
         .bordered(false)
         .child(DescriptionItem::new(t!("detail.field_stable_id").to_string())
-                   .value(item.id.to_string()))
+                   .value(copyable_value(SharedString::from("other-details-stable-id"),
+                                         item.id.to_string())))
         .child(DescriptionItem::new(t!("detail.field_numeric_id").to_string())
-                   .value(item.numeric_id.to_string()))
+                   .value(copyable_value(SharedString::from("other-details-numeric-id"),
+                                         item.numeric_id.to_string())))
         .child(DescriptionItem::new(t!("detail.field_order_product_id").to_string())
-                   .value(item.order_product_id.to_string()))
+                   .value(copyable_value(SharedString::from("other-details-order-product-id"),
+                                         item.order_product_id.to_string())))
         .child(DescriptionItem::new(t!("detail.field_product_id").to_string())
-                   .value(item.product_id.to_string()))
+                   .value(copyable_value(SharedString::from("other-details-product-id"),
+                                         item.product_id.to_string())))
         .child(DescriptionItem::new(t!("detail.field_added_order").to_string())
                    .value(item.added_order.to_string()))
         .child(DescriptionItem::new(t!("detail.field_cover_color").to_string())
@@ -454,7 +566,8 @@ fn render_advanced_details(item: &LibraryItem, entity: Entity<LibraryController>
                             .items_center()
                             .gap(px(6.0))
                             .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
-                            .child(item.color.to_string())
+                            .child(copyable_value(SharedString::from("other-details-cover-color"),
+                                                  item.color.to_string()))
                             .into_any_element(),
                    )
                    .span(2));
@@ -463,6 +576,32 @@ fn render_advanced_details(item: &LibraryItem, entity: Entity<LibraryController>
                       .open(open)
                       .child(header)
                       .content(content)
+}
+
+/// Renders a text value with an appear-on-hover copy button.
+///
+/// `field_id` must be unique within the surrounding view — it doubles as the
+/// hover group name and the copy button's element id.
+fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> AnyElement {
+    let value: SharedString = value.into();
+
+    div().id(SharedString::from(format!("{field_id}-row")))
+         .group(field_id.clone())
+         .flex()
+         .items_center()
+         .gap(px(6.0))
+         .child(value.clone())
+         .child(
+             div()
+                 .invisible()
+                 .group_hover(field_id.clone(), |d| d.visible())
+                 .child(
+                     Clipboard::new(SharedString::from(format!("{field_id}-copy")))
+                         .value(value)
+                         .tooltip(t!("detail.copy_tooltip").to_string()),
+                 ),
+         )
+         .into_any_element()
 }
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {

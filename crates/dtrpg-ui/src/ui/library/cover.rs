@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn malformed_color_falls_back_without_panicking() {
-        // Advanced-details swatch rendering (`render_advanced_details` in
+        // Other-details swatch rendering (`render_other_details` in
         // `detail_panel_view.rs`) reuses `cover_style(item).background`, so this
         // fallback path must never panic on a malformed or empty `item.color`.
         for color in ["", "not-a-color", "#zzzzzz"] {
