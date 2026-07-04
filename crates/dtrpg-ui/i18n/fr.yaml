@@ -23,7 +23,6 @@ toolbar:
   view_grid: "Grille"
   sign_in: "Se connecter…"
   log_out: "Se déconnecter"
-  page_size_label: "%{n} / page"
   tooltip_settings: "Réglages"
   tooltip_not_signed_in: "Non connecté"
   tooltip_account: "Compte"
@@ -63,8 +62,6 @@ catalog:
   action_show_in_finder: "Afficher dans le Finder"
   action_show_in_explorer: "Afficher dans l'Explorateur"
   action_show_in_files: "Afficher dans Fichiers"
-  pagination_first: "Première"
-  pagination_last: "Dernière"
 
 detail:
   read_button: "Lire"

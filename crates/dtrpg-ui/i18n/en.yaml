@@ -23,7 +23,6 @@ toolbar:
   view_grid: "Grid"
   sign_in: "Sign In…"
   log_out: "Log Out"
-  page_size_label: "%{n} / page"
   tooltip_settings: "Settings"
   tooltip_not_signed_in: "Not signed in"
   tooltip_account: "Account"
@@ -64,8 +63,6 @@ catalog:
   action_show_in_finder: "Show in Finder"
   action_show_in_explorer: "Show in Explorer"
   action_show_in_files: "Show in Files"
-  pagination_first: "First"
-  pagination_last: "Last"
 
 detail:
   read_button: "Read"

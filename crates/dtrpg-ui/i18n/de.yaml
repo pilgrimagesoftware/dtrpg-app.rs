@@ -23,7 +23,6 @@ toolbar:
   view_grid: "Raster"
   sign_in: "Anmelden…"
   log_out: "Abmelden"
-  page_size_label: "%{n} / Seite"
   tooltip_settings: "Einstellungen"
   tooltip_not_signed_in: "Nicht angemeldet"
   tooltip_account: "Konto"
@@ -63,8 +62,6 @@ catalog:
   action_show_in_finder: "Im Finder anzeigen"
   action_show_in_explorer: "Im Explorer anzeigen"
   action_show_in_files: "In Dateien anzeigen"
-  pagination_first: "Erste"
-  pagination_last: "Letzte"
 
 detail:
   read_button: "Lesen"

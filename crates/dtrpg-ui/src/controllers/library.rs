@@ -57,9 +57,6 @@ pub struct LibrarySnapshot {
     pub selected_item:           Option<LibraryItem>,
     pub items:                   Vec<LibraryItem>,
     pub catalog_loading:         bool,
-    pub current_page:            usize,
-    pub page_size:               usize,
-    pub total_pages:             usize,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
     pub publisher_search_open:   bool,
@@ -141,10 +138,6 @@ pub struct LibraryController {
     /// writing catalog state, so a load started before a `clear_and_reload`
     /// cannot clobber it after the fact.
     load_generation:         u64,
-    /// 1-based current page index.
-    pub current_page:        usize,
-    /// Number of items per page. One of: 10, 25, 50, 100, 200.
-    pub page_size:           usize,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
@@ -203,9 +196,6 @@ impl LibraryController {
                               thumbnail_processed: 0,
                               catalog_loading: true,
                               load_generation: 0,
-                              current_page: 1,
-                              page_size: crate::data::ui_prefs::UiPrefs::load().page_size()
-                                                                               .unwrap_or(25),
                               items_cache: None,
                               publisher_search_open: false,
                               publisher_search_query: String::new(),
@@ -1083,14 +1073,8 @@ impl LibraryController {
                 .iter()
                 .filter(|i| item_matches_filter(i, &self.filter, &self.collection_members))
                 .count();
-        let all_items = self.visible_items();
-        let matched_count = all_items.len();
-        let total_pages = matched_count.div_ceil(self.page_size).max(1);
-        let page_start = (self.current_page - 1) * self.page_size;
-        let items: Vec<LibraryItem> = all_items.into_iter()
-                                               .skip(page_start)
-                                               .take(self.page_size)
-                                               .collect();
+        let items = self.visible_items();
+        let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
         // Build a set of all IDs that can match collection member_ids.
         // Include both order_product_id and product_id since the product list items
@@ -1126,9 +1110,6 @@ impl LibraryController {
                           selected_item,
                           items,
                           catalog_loading: self.catalog_loading,
-                          current_page: self.current_page,
-                          page_size: self.page_size,
-                          total_pages,
                           publisher_search_open: self.publisher_search_open,
                           publisher_search_query: self.publisher_search_query.clone(),
                           collection_search_open: self.collection_search_open,
@@ -1140,40 +1121,6 @@ impl LibraryController {
     /// items have arrived.
     pub fn is_loading(&self) -> bool {
         self.catalog_loading && self.catalog.is_empty()
-    }
-
-    // ── Pagination ────────────────────────────────────────────────────────────
-
-    /// Total number of pages for the current filtered result set.
-    ///
-    /// Always returns at least 1.
-    pub fn total_pages(&self) -> usize {
-        let count = self.visible_items().len();
-        count.div_ceil(self.page_size).max(1)
-    }
-
-    /// Navigates to the given 1-based page, clamped to the valid range.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn set_page(&mut self, page: usize, cx: &mut Context<Self>) {
-        let total = self.total_pages();
-        self.current_page = page.clamp(1, total);
-        cx.emit(LibraryChanged);
-    }
-
-    /// Sets the number of items shown per page.
-    ///
-    /// Accepted values: `[10, 25, 50, 100, 200]`. Ignored for other values.
-    /// Resets `current_page` to 1 and emits [`LibraryChanged`].
-    pub fn set_page_size(&mut self, size: usize, cx: &mut Context<Self>) {
-        const VALID: [usize; 5] = [10, 25, 50, 100, 200];
-        if !VALID.contains(&size) {
-            return;
-        }
-        self.page_size = size;
-        self.current_page = 1;
-        crate::data::ui_prefs::UiPrefs::load().save_page_size(size);
-        cx.emit(LibraryChanged);
     }
 
     // ── Filtered result set ───────────────────────────────────────────────────
@@ -1207,37 +1154,20 @@ impl LibraryController {
     ///
     /// Cheaper than cloning the full `Vec` when only the count is needed.
     #[must_use]
-    /// Returns the number of items on the current page.
     pub fn visible_items_count(&self) -> usize {
-        let all = self.visible_items();
-        let page_start = (self.current_page - 1) * self.page_size;
-        all.len().saturating_sub(page_start).min(self.page_size)
+        self.visible_items().len()
     }
 
-    /// Returns a slice within the current page window.
+    /// Returns a slice of the filtered, sorted result set.
     ///
-    /// `range` is 0-based relative to the start of the current page.
-    /// Used by `uniform_list` render closures.
+    /// `range` is 0-based relative to the start of the full result set. Used
+    /// by `uniform_list` render closures.
     #[must_use]
     pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
-        let page_start = (self.current_page - 1) * self.page_size;
         let items = self.visible_items();
-        let abs_start = page_start + range.start;
-        let abs_end = page_start + range.end;
-        items.get(abs_start..abs_end)
-             .map(|s| s.to_vec())
+        items.get(range)
+             .map(<[LibraryItem]>::to_vec)
              .unwrap_or_default()
-    }
-
-    /// Returns all items on the current page.
-    #[must_use]
-    pub fn visible_page_items(&self) -> Vec<LibraryItem> {
-        let page_start = (self.current_page - 1) * self.page_size;
-        let items = self.visible_items();
-        items.into_iter()
-             .skip(page_start)
-             .take(self.page_size)
-             .collect()
     }
 
     // ── Sidebar filter mutations ──────────────────────────────────────────────
@@ -1259,7 +1189,6 @@ impl LibraryController {
             self.collection_members.clear();
         }
         self.filter = filter;
-        self.current_page = 1;
         self.selection = Selection::None;
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -1270,7 +1199,6 @@ impl LibraryController {
     /// Updates the text search query.
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
         self.search_query = query;
-        self.current_page = 1;
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }

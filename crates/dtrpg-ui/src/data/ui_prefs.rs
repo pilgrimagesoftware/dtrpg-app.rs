@@ -10,8 +10,6 @@ pub struct UiPrefsFile {
     pub sidebar_width:    Option<f32>,
     /// Width of the detail panel in pixels.
     pub detail_width:     Option<f32>,
-    /// Catalog page size (items per page).
-    pub page_size:        Option<usize>,
     /// Whether the Collections sidebar section is open (`true`) or collapsed
     /// (`false`).
     pub collections_open: Option<bool>,
@@ -49,11 +47,6 @@ impl UiPrefs {
         self.data.detail_width
     }
 
-    /// Catalog page size, or `None` if not saved.
-    pub fn page_size(&self) -> Option<usize> {
-        self.data.page_size
-    }
-
     /// Persist the sidebar width only.
     pub fn save_sidebar_width(&mut self, sidebar: f32) {
         self.data.sidebar_width = Some(sidebar);
@@ -86,12 +79,6 @@ impl UiPrefs {
     /// Persist the Publishers section open state.
     pub fn save_publishers_open(&mut self, open: bool) {
         self.data.publishers_open = Some(open);
-        self.flush();
-    }
-
-    /// Persist the catalog page size.
-    pub fn save_page_size(&mut self, size: usize) {
-        self.data.page_size = Some(size);
         self.flush();
     }
 
