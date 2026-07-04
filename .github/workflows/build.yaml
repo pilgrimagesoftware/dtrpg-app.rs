@@ -13,6 +13,12 @@ on:
 
 env:
     CARGO_TERM_COLOR: always
+    # Injected only into this release-build workflow, never into pr.yaml.
+    # `build.rs` embeds these into the binary at compile time when the
+    # `sentry` feature is enabled; an empty/unset secret leaves Sentry
+    # disabled with no build failure.
+    DTRPG_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+    DTRPG_SENTRY_ENVIRONMENT: production
 
 permissions:
     contents: write
@@ -54,14 +60,14 @@ jobs:
               with:
                   use-cross: true
                   command: build
-                  args: --verbose --release --target ${{ matrix.target }}
+                  args: --verbose --release --target ${{ matrix.target }} --features dtrpg-core/sentry
 
             - name: Test
               uses: actions-rs/cargo@v1
               with:
                   use-cross: true
                   command: test
-                  args: --verbose --release --target ${{ matrix.target }}
+                  args: --verbose --release --target ${{ matrix.target }} --features dtrpg-core/sentry
 
             - name: Bump version and push tag
               id: bump_version
