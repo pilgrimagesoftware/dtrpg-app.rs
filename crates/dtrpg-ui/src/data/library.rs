@@ -105,19 +105,31 @@ impl LibraryItem {
     }
 
     /// Removes duplicate entries from `files`, keeping the first occurrence
-    /// of each unique `id`.
+    /// of each unique `(id, name)` pair.
     ///
     /// The DriveThruRPG API has been observed to repeat a download record
-    /// (identical `id`) across `files`; the SDK mapping layer
-    /// (`map_order_product`) already dedupes on ingest, but catalog data
-    /// cached to disk before that fix still has the duplicates. Without this,
-    /// every row in the detail tab's item list compares equal by `id`, so
+    /// (identical `id` *and* `name`) verbatim across `files` for what is
+    /// genuinely a single file; the SDK mapping layer (`map_order_product`)
+    /// already dedupes those exact repeats on ingest, but catalog data
+    /// cached to disk before that fix still has them. Without this, every
+    /// row in the detail tab's item list compares equal by `id`, so
     /// selecting one row highlights all of them and further clicks appear to
-    /// do nothing. Call this on any `LibraryItem` loaded from a source this
-    /// crate does not fully control (e.g. the on-disk catalog cache).
+    /// do nothing.
+    ///
+    /// `id` alone is deliberately NOT used as the key: the API has also been
+    /// observed to reuse the same download id across genuinely distinct
+    /// files within a multi-file bundle, so deduplicating on `id` alone
+    /// would collapse a real bundle down to one file and hide its
+    /// item-count badge (`catalog-entry-detail-view`). Requiring `name` to
+    /// match too means two files are only merged when they're truly
+    /// identical repeats.
+    ///
+    /// Call this on any `LibraryItem` loaded from a source this crate does
+    /// not fully control (e.g. the on-disk catalog cache).
     pub fn dedupe_files(&mut self) {
-        let mut seen_ids = std::collections::HashSet::new();
-        self.files.retain(|f| seen_ids.insert(Arc::clone(&f.id)));
+        let mut seen = std::collections::HashSet::new();
+        self.files
+            .retain(|f| seen.insert((Arc::clone(&f.id), Arc::clone(&f.name))));
     }
 }
 
@@ -254,6 +266,36 @@ mod tests {
                                         None);
         item.files = vec![file("1234", "Moria Rulebook"),
                           file("1235", "Moria Map Sheet")];
+
+        item.dedupe_files();
+
+        assert_eq!(item.files.len(), 2);
+        assert!(item.is_multi_item());
+    }
+
+    #[test]
+    fn dedupe_files_keeps_distinct_files_that_share_an_id() {
+        // Regression: the API has been observed to reuse the same download
+        // id across genuinely distinct files within a bundle. Deduping on
+        // `id` alone would collapse this real 2-file bundle down to 1 and
+        // hide its item-count badge — the `name` must differ, not just the
+        // id, before two entries are treated as duplicates.
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.files = vec![file("1234", "Moria Rulebook"),
+                          file("1234", "Moria Map Sheet")];
 
         item.dedupe_files();
 
