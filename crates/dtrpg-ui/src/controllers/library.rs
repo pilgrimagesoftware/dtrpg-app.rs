@@ -29,7 +29,7 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 /// Flips a per-key boolean flag in `map`, treating a missing entry as `false`.
 ///
-/// Used by per-entry ephemeral UI toggles (e.g. the "Advanced details"
+/// Used by per-entry ephemeral UI toggles (e.g. the "Other details"
 /// disclosure) that default to a collapsed/off state until first toggled.
 fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, bool>, key: K) -> bool {
     let flag = map.entry(key).or_insert(false);
@@ -183,11 +183,15 @@ pub struct LibraryController {
     /// cleared whenever the entry's detail tab is closed or reopened (see
     /// `catalog-entry-detail-view`).
     selected_item_file:      HashMap<Arc<str>, Arc<str>>,
-    /// Whether the "Advanced details" disclosure section is expanded in a
+    /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
     /// here (see `catalog-entry-detail-advanced-disclosure`).
-    advanced_details_open:   HashMap<Arc<str>, bool>,
+    other_details_open:      HashMap<Arc<str>, bool>,
+    /// Whether a per-file "Other details" disclosure is expanded within a
+    /// multi-item entry's item tier, keyed by `"{entry_id}:{file_id}"`.
+    /// Ephemeral — never persisted, and defaults to collapsed.
+    file_other_details_open: HashMap<Arc<str>, bool>,
 }
 
 impl LibraryController {
@@ -238,7 +242,8 @@ impl LibraryController {
                                   crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
                               entry_bounds: HashMap::new(),
                               selected_item_file: HashMap::new(),
-                              advanced_details_open: HashMap::new() };
+                              other_details_open: HashMap::new(),
+                              file_other_details_open: HashMap::new() };
         ctrl.start_load(cx);
         ctrl
     }
@@ -1412,27 +1417,47 @@ impl LibraryController {
         }
     }
 
-    // ── Advanced details disclosure ──────────────────────────────────────────
+    // ── Other details disclosure ─────────────────────────────────────────────
 
-    /// Returns whether `entry_id`'s "Advanced details" section is expanded.
+    /// Returns whether `entry_id`'s "Other details" section is expanded.
     ///
     /// Defaults to `false` (collapsed) for any entry id not yet toggled, per
     /// `catalog-entry-detail-advanced-disclosure`.
     #[must_use]
-    pub fn is_advanced_details_open(&self, entry_id: &str) -> bool {
-        self.advanced_details_open
-            .get(entry_id)
-            .copied()
-            .unwrap_or(false)
+    pub fn is_other_details_open(&self, entry_id: &str) -> bool {
+        self.other_details_open.get(entry_id).copied().unwrap_or(false)
     }
 
-    /// Flips `entry_id`'s "Advanced details" open/collapsed state.
+    /// Flips `entry_id`'s "Other details" open/collapsed state.
     ///
     /// Ephemeral — never persisted, and independent per entry id.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn toggle_advanced_details(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
-        toggle_bool_flag(&mut self.advanced_details_open, entry_id);
+    pub fn toggle_other_details(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
+        toggle_bool_flag(&mut self.other_details_open, entry_id);
+        cx.emit(LibraryChanged);
+    }
+
+    /// Returns whether a single file's "Other details" section is expanded
+    /// within a multi-item entry's item tier.
+    ///
+    /// `key` is `"{entry_id}:{file_id}"` (built by `file_other_details_key` in
+    /// `ui::views::detail_panel_view`). Defaults to `false` (collapsed) for
+    /// any key not yet toggled.
+    #[must_use]
+    pub fn is_file_other_details_open(&self, key: &str) -> bool {
+        self.file_other_details_open.get(key).copied().unwrap_or(false)
+    }
+
+    /// Flips a single file's "Other details" open/collapsed state within a
+    /// multi-item entry's item tier.
+    ///
+    /// Ephemeral — never persisted, and independent per `"{entry_id}:{file_id}"`
+    /// key.
+    ///
+    /// Emits [`LibraryChanged`].
+    pub fn toggle_file_other_details(&mut self, key: Arc<str>, cx: &mut Context<Self>) {
+        toggle_bool_flag(&mut self.file_other_details_open, key);
         cx.emit(LibraryChanged);
     }
 
