@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Catalog pane fills remaining horizontal space without a resize handle
 The catalog pane SHALL occupy all horizontal space between the sidebar and the right window edge. There SHALL be no resize splitter between the catalog and the detail panel. The detail panel SHALL be an overlay or fixed-width panel that does not reduce catalog width.

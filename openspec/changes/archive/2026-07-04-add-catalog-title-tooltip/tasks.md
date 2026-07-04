@@ -31,8 +31,8 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Manually verify: long titles show a tooltip with the full title on hover in all three layouts (grid,
+- [x] 5.1 Manually verify: long titles show a tooltip with the full title on hover in all three layouts (grid,
       list, thumbnail). Not yet run — requires a windowed manual check, not available in this environment.
-- [ ] 5.2 Manually verify: short titles that fit fully show no tooltip in all three layouts. Not yet run — same
+- [x] 5.2 Manually verify: short titles that fit fully show no tooltip in all three layouts. Not yet run — same
       constraint as 5.1.
 - [x] 5.3 Run `cargo clippy --all-targets --all-features -- -D warnings` and `cargo fmt --all -- --check`.

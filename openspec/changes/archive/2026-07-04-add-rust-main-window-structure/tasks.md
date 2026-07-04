@@ -50,6 +50,6 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Verify browsing-state requirements from `rust-main-window-library-layout` still hold
-- [ ] 6.2 Verify tab overflow, popover/tab distinction, and status bar sync with sidebar/catalog
+- [x] 6.1 Verify browsing-state requirements from `rust-main-window-library-layout` still hold
+- [x] 6.2 Verify tab overflow, popover/tab distinction, and status bar sync with sidebar/catalog
       state
