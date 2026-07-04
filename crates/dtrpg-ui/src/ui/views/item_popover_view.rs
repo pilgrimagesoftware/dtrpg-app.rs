@@ -118,6 +118,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                 .columns(1)
                 .bordered(false)
                 .small()
+                // TODO: add updated date HUMAN READABLE
                 .when(!item.line.is_empty(), |list|
                     list.child(
                         DescriptionItem::new(t!("detail.field_system").to_string())
