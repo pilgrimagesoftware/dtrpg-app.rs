@@ -1549,6 +1549,7 @@ name = "dtrpg-ui"
 version = "0.0.6"
 dependencies = [
  "block",
+ "chrono",
  "cocoa 0.26.0",
  "cocoa-foundation 0.2.0",
  "core-foundation 0.10.0",

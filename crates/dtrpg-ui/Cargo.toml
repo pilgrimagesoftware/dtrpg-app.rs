@@ -24,6 +24,7 @@ rfd = { workspace = true }
 md5 = { workspace = true }
 reqwest = { workspace = true }
 rust-i18n = { workspace = true }
+chrono = { workspace = true }
 sys-locale = { workspace = true }
 open = { workspace = true }
 
