@@ -37,6 +37,23 @@ fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, bool>, key: K)
     *flag
 }
 
+/// Selects `row_ix` for `key` in a per-entry row-selection map, toggling it
+/// off if `row_ix` is already selected for that key.
+///
+/// Used by the multi-item detail tab's file list so clicking the selected
+/// row deselects it, and clicking any other row switches the selection to
+/// it — regardless of whether rows share a duplicate id (see
+/// `LibraryItem::dedupe_files`).
+fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, key: K,
+                                                 row_ix: usize) {
+    if map.get(&key) == Some(&row_ix) {
+        map.remove(&key);
+    }
+    else {
+        map.insert(key, row_ix);
+    }
+}
+
 // ── LibraryController
 // ─────────────────────────────────────────────────────────
 
@@ -178,11 +195,16 @@ pub struct LibraryController {
     /// scrolled out of view keep their last-known bounds; this is harmless
     /// since a stale entry can't be clicked again until it repaints.
     entry_bounds:            HashMap<Arc<str>, Bounds<Pixels>>,
-    /// Selected item file id within a multi-item entry's expanded detail
-    /// tab, keyed by catalog entry id. Ephemeral — never persisted, and
-    /// cleared whenever the entry's detail tab is closed or reopened (see
-    /// `catalog-entry-detail-view`).
-    selected_item_file:      HashMap<Arc<str>, Arc<str>>,
+    /// Selected item file row (its position within the entry's `files`
+    /// list) within a multi-item entry's expanded detail tab, keyed by
+    /// catalog entry id. Keyed by row position rather than file id because
+    /// the API has been observed to reuse the same download id across
+    /// genuinely distinct files within a bundle (see
+    /// `LibraryItem::dedupe_files`), which would otherwise make two
+    /// unrelated rows select and deselect together. Ephemeral — never
+    /// persisted, and cleared whenever the entry's detail tab is closed or
+    /// reopened (see `catalog-entry-detail-view`).
+    selected_item_file:      HashMap<Arc<str>, usize>,
     /// Whether the "Advanced details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
@@ -1384,20 +1406,22 @@ impl LibraryController {
 
     // ── Item selection (multi-item detail tab) ───────────────────────────────
 
-    /// Returns the currently selected item file for a multi-item entry's
-    /// detail tab, if any item has been selected.
+    /// Returns the row index of the currently selected item file for a
+    /// multi-item entry's detail tab, if any item has been selected.
     #[must_use]
-    pub fn selected_item_file(&self, entry_id: &str) -> Option<&Arc<str>> {
-        self.selected_item_file.get(entry_id)
+    pub fn selected_item_file(&self, entry_id: &str) -> Option<usize> {
+        self.selected_item_file.get(entry_id).copied()
     }
 
-    /// Selects `file_id` as the active item within `entry_id`'s expanded
-    /// detail tab, updating the item metadata area in place.
+    /// Selects the file at `row_ix` as the active item within `entry_id`'s
+    /// expanded detail tab, updating the item metadata area in place.
+    ///
+    /// Clicking the already-selected row deselects it (toggle), returning
+    /// the item list to its unselected prompt state.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn select_item_file(&mut self, entry_id: Arc<str>, file_id: Arc<str>,
-                            cx: &mut Context<Self>) {
-        self.selected_item_file.insert(entry_id, file_id);
+    pub fn select_item_file(&mut self, entry_id: Arc<str>, row_ix: usize, cx: &mut Context<Self>) {
+        toggle_row_selection(&mut self.selected_item_file, entry_id, row_ix);
         cx.emit(LibraryChanged);
     }
 
@@ -2268,5 +2292,56 @@ mod advanced_details_tests {
 
         assert!(map.get("entry-a").copied().unwrap_or(false));
         assert!(!map.get("entry-b").copied().unwrap_or(false));
+    }
+}
+
+#[cfg(test)]
+mod item_row_selection_tests {
+    use std::collections::HashMap;
+
+    use super::toggle_row_selection;
+
+    #[test]
+    fn selecting_a_row_selects_only_that_row() {
+        // Regression: two files in a bundle can share the same download id
+        // (see `LibraryItem::dedupe_files`), so selection must be tracked by
+        // row position, not by id, or selecting one row would also select
+        // any other row sharing its id.
+        let mut map: HashMap<&str, usize> = HashMap::new();
+
+        toggle_row_selection(&mut map, "entry-a", 0);
+
+        assert_eq!(map.get("entry-a").copied(), Some(0));
+    }
+
+    #[test]
+    fn selecting_a_different_row_switches_the_selection() {
+        let mut map: HashMap<&str, usize> = HashMap::new();
+        toggle_row_selection(&mut map, "entry-a", 0);
+
+        toggle_row_selection(&mut map, "entry-a", 1);
+
+        assert_eq!(map.get("entry-a").copied(), Some(1));
+    }
+
+    #[test]
+    fn selecting_the_same_row_again_deselects_it() {
+        let mut map: HashMap<&str, usize> = HashMap::new();
+        toggle_row_selection(&mut map, "entry-a", 0);
+
+        toggle_row_selection(&mut map, "entry-a", 0);
+
+        assert_eq!(map.get("entry-a"), None);
+    }
+
+    #[test]
+    fn selection_does_not_affect_other_entries() {
+        let mut map: HashMap<&str, usize> = HashMap::new();
+
+        toggle_row_selection(&mut map, "entry-a", 0);
+        toggle_row_selection(&mut map, "entry-b", 0);
+
+        assert_eq!(map.get("entry-a").copied(), Some(0));
+        assert_eq!(map.get("entry-b").copied(), Some(0));
     }
 }

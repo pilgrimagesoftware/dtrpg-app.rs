@@ -275,7 +275,7 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
                     cx: &App)
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
-    let selected_id = entity.read(cx).selected_item_file(&entry_id).cloned();
+    let selected_ix = entity.read(cx).selected_item_file(&entry_id);
 
     let mut header_row = TableRow::new().child(
         TableCell::new().child(
@@ -296,7 +296,12 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
 
     let mut body = TableBody::new();
     for (row_ix, file) in item.files.iter().enumerate() {
-        let is_selected = selected_id.as_deref() == Some(file.id.as_ref());
+        // Selection is keyed by row position, not `file.id` — the API has
+        // been observed to reuse the same download id across genuinely
+        // distinct files within a bundle (see `LibraryItem::dedupe_files`),
+        // so comparing by id would select/deselect multiple unrelated rows
+        // together and make it impossible to pick between them.
+        let is_selected = selected_ix == Some(row_ix);
 
         // `TableRow` itself has no click hook, so the whole row's clickable
         // area is a single wrapping div inside one `col_span(2)` `TableCell`
@@ -309,7 +314,6 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
         // the base component here instead of a hand-rolled flex layout).
         let entity_row = entity.clone();
         let entry_id_row = Arc::clone(&entry_id);
-        let file_id_row = Arc::clone(&file.id);
         // Includes `row_ix` (not just `file.id`) so that rows stay uniquely
         // identifiable — and therefore individually clickable — even if a
         // stale catalog cache (written before file records were deduplicated
@@ -327,7 +331,7 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
                  .on_click(move |_: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut App| {
                                entity_row.update(cx, |ctrl, cx| {
                                              ctrl.select_item_file(Arc::clone(&entry_id_row),
-                                                                   Arc::clone(&file_id_row),
+                                                                   row_ix,
                                                                    cx);
                                          });
                            })
@@ -349,8 +353,7 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
     let item_list = Table::new().child(TableHeader::new().child(header_row))
                                 .child(body);
 
-    let selected_file =
-        selected_id.and_then(|id| item.files.iter().find(|f| f.id.as_ref() == id.as_ref()));
+    let selected_file = selected_ix.and_then(|ix| item.files.get(ix));
 
     div().flex()
          .flex_col()
