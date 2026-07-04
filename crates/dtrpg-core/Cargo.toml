@@ -34,3 +34,36 @@ serde_json = { workspace = true }
 # artifacts; source builds (`cargo build`/`cargo test`/`cargo run` with no
 # explicit feature flags) never pull in the Sentry dependency.
 sentry = ["dep:sentry", "dep:sentry-tracing"]
+
+# cargo-packager configuration (`cargo install cargo-packager`). Invoked in CI as
+# `cargo packager --release -p dtrpg-core --formats <fmt>`; the binary is
+# auto-detected from this package's `[[bin]]` target.
+#
+# `icons` is left unset: this app has no dedicated app icon yet (only the
+# generic Lucide icon set under `assets/icons/`). cargo-packager falls back to
+# a default icon when none is configured. Add real icon assets under
+# `assets/icon/` and list them here once available (see openspec change
+# add-release-packaging-workflow, task 1.2).
+[package.metadata.packager]
+product-name = "DriveThruRPG"
+identifier = "com.pilgrimagesoftware.dtrpg"
+description = "DriveThruRPG desktop frontend"
+homepage = "https://github.com/pilgrimagesoftware/dtrpg-app"
+category = "Utility"
+before-packaging-command = "cargo build --release --package dtrpg-core --features sentry"
+
+[package.metadata.packager.deb]
+depends = ["libsecret-1-0"]
+
+[package.metadata.packager.appimage]
+libs = ["libsecret-1.so.0"]
+
+[package.metadata.packager.dmg]
+window-size = { width = 660, height = 400 }
+
+[package.metadata.packager.nsis]
+installer-mode = "currentUser"
+
+[package.metadata.packager.wix]
+# Uses the default WiX-generated GUIDs; upgrade-code intentionally unset here
+# since this is the first packaged release (no prior MSI to upgrade from).
