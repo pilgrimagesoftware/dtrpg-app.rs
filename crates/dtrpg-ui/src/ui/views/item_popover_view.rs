@@ -123,6 +123,9 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                     DescriptionItem::new(t!("detail.field_format").to_string())
                         .value(item.format.to_string()),
                 )
+                // .when(item.file_count > 1, |list| {
+                //     TODO: add file count
+                // })
                 .child(
                     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
                 ),
