@@ -768,12 +768,12 @@ impl CatalogView {
                                                             user_widths: vec![None; col_count],
                                                             rows: Vec::new() };
         let catalog_grouped_list_table = cx.new(|cx| {
-                                               TableState::new(grouped_delegate, window,
-                                                             cx).row_selectable(true)
-                                                                .col_selectable(false)
-                                                                .col_movable(false)
-                                                                .col_resizable(true)
-                                                                .sortable(false)
+                                               TableState::new(grouped_delegate, window, cx)
+                .row_selectable(true)
+                .col_selectable(false)
+                .col_movable(false)
+                .col_resizable(true)
+                .sortable(false)
                                            });
 
         cx.subscribe(&controller, {
@@ -839,11 +839,9 @@ impl CatalogView {
                              let row_ix = *row_ix;
                              let id = table.read(cx).delegate().row_at(row_ix).and_then(|row| {
                                                                                   match row {
-                                                  GroupedRow::Item(item) => {
-                                                      Some(Arc::clone(&item.id))
-                                                  }
-                                                  GroupedRow::Header { .. } => None,
-                                              }
+                            GroupedRow::Item(item) => Some(Arc::clone(&item.id)),
+                            GroupedRow::Header { .. } => None,
+                        }
                                                                               });
                              if let Some(id) = id {
                                  this.controller
@@ -854,9 +852,9 @@ impl CatalogView {
                              let row_ix = *row_ix;
                              let item = table.read(cx).delegate().row_at(row_ix).and_then(|row| {
                                                                                     match row {
-                                                 GroupedRow::Item(item) => Some(item.clone()),
-                                                 GroupedRow::Header { .. } => None,
-                                             }
+                            GroupedRow::Item(item) => Some(item.clone()),
+                            GroupedRow::Header { .. } => None,
+                        }
                                                                                 });
                              if let Some(item) = item {
                                  let id = Arc::clone(&item.id);
@@ -1014,11 +1012,12 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement = match (snap.presentation, snap.grouped) {
-            // ── List, ungrouped — DataTable (handles header/row alignment) ──
-            (CatalogPresentation::List, false) => {
-                use gpui_component::Size;
-                root.px(pad_side)
+        let content: AnyElement =
+            match (snap.presentation, snap.grouped) {
+                // ── List, ungrouped — DataTable (handles header/row alignment) ──
+                (CatalogPresentation::List, false) => {
+                    use gpui_component::Size;
+                    root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1026,15 +1025,15 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-            }
+                }
 
-            // ── List, grouped — DataTable over a flattened header/item row
-            // list, so it gets the same virtualization as the ungrouped
-            // branch instead of hand-rolled, fully-materialized rows ──
-            (CatalogPresentation::List, true) => {
-                use gpui_component::Size;
-                self.grouped_items(cx);
-                root.px(pad_side)
+                // ── List, grouped — DataTable over a flattened header/item row
+                // list, so it gets the same virtualization as the ungrouped
+                // branch instead of hand-rolled, fully-materialized rows ──
+                (CatalogPresentation::List, true) => {
+                    use gpui_component::Size;
+                    self.grouped_items(cx);
+                    root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_grouped_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1042,168 +1041,161 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-            }
+                }
 
-            // ── Thumbs, ungrouped — virtualized ───────────────────────────
-            (CatalogPresentation::Thumbs, false) => {
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
-                let t = tabs_entity.clone();
-                root.px(pad_side)
-                    .child(div().relative()
-                                .flex_1()
-                                .min_h_0()
-                                .child(uniform_list("catalog-thumbs",
-                                                    item_count,
-                                                    move |range, window, cx| {
-                                                        let items = ctrl.read(cx)
-                                                                        .visible_items_slice(range);
-                                                        let covers: Vec<Option<Arc<Image>>> = {
-                                                            let cache = cx.global::<CoverCache>();
-                                                            items.iter()
-                                                                 .map(|item| cache.get(&item.id))
-                                                                 .collect()
-                                                        };
-                                                        items.iter()
-                                                             .zip(covers)
-                                                             .map(|(item, cover)| {
-                                                                 render_thumb_row(item,
-                                                                  cover,
-                                                                  &c,
-                                                                  &d,
-                                                                  ctrl.clone(),
-                                                                  t.clone(),
-                                                                  s.clone(),
-                                                                  window).into_any_element()
-                                                             })
-                                                             .collect()
-                                                    }).track_scroll(&scroll_handle)
-                                                      .size_full())
-                                .vertical_scrollbar(&scroll_handle))
-                    .into_any_element()
-            }
-
-            // ── Thumbs, grouped — non-virtualized ─────────────────────────
-            (CatalogPresentation::Thumbs, true) => {
-                let groups = self.grouped_items(cx);
-                let cover_cache = {
-                    let cache = cx.global::<CoverCache>();
-                    cache.images.clone()
-                };
-                root.overflow_y_scrollbar()
-                    .px(pad_side)
-                    .children(groups.into_iter().map(|g| {
-                                                    let c = colors.clone();
-                                                    let d = density.clone();
-                                                    let e = self.controller.clone();
-                                                    let t = tabs_entity.clone();
-                                                    let s = storage_root.clone();
-                                                    let cc = cover_cache.clone();
-                                                    // Reborrow as `&Window` (Copy) so the nested
-                                                    // `move` closure can capture it on every
-                                                    // outer iteration without moving `window`.
-                                                    let window: &Window = &*window;
-                                                    div().child(render_group_header(&g.publisher,
-                                                                                    g.items.len(),
-                                                                                    &c))
-                                                         .children(g.items
-                                                                    .into_iter()
-                                                                    .map(move |item| {
-                                                                        let cover =
-                                                                            cc.get(&item.id)
-                                                                              .cloned();
-                                                                        render_thumb_row(&item,
-                                                                                         cover,
-                                                                                         &c,
-                                                                                         &d,
-                                                                                         e.clone(),
-                                                                                         t.clone(),
-                                                                                         s.clone(),
-                                                                                         window)
-                                                                    }))
-                                                }))
-                    .into_any_element()
-            }
-
-            // ── Grid, ungrouped — row-virtualized ─────────────────────────
-            (CatalogPresentation::Grid, false) => {
-                let row_count = item_count.div_ceil(items_per_row);
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
-                let t = tabs_entity.clone();
-                root.px(pad_side)
-                    .child(
-                           div().relative()
-                                .flex_1()
-                                .min_h_0()
-                                .child(
-                    uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
-                        let range_start = row_range.start;
-                        let item_start = range_start * items_per_row;
-                        let item_end = (row_range.end * items_per_row).min(item_count);
-                        let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
-                        let covers: Vec<Option<Arc<Image>>> = {
-                            let cache = cx.global::<CoverCache>();
-                            items.iter().map(|item| cache.get(&item.id)).collect()
-                        };
-                        row_range.map(|row| {
-                                     let offset = (row - range_start) * items_per_row;
-                                     let row_end = (offset + items_per_row).min(items.len());
-                                     let row_items = &items[offset..row_end];
-                                     let row_covers = &covers[offset..row_end];
-                                     div().flex()
-                                          .gap(d.card_gap_x)
-                                          .mb(d.card_gap_y)
-                                          .children(row_items.iter()
-                                                             .zip(row_covers.iter())
-                                                             .map(|(item, cover)| {
-                                                                 render_grid_card(item,
-                                                                                  cover.clone(),
-                                                                                  &c,
-                                                                                  d.card_min_width,
-                                                                                  ctrl.clone(),
-                                                                                  t.clone(),
-                                                                                  s.clone(),
-                                                                                  window)
-                                                             }))
-                                          .into_any_element()
+                // ── Thumbs, ungrouped — virtualized ───────────────────────────
+                (CatalogPresentation::Thumbs, false) => {
+                    let c = colors.clone();
+                    let d = density.clone();
+                    let s = storage_root.clone();
+                    let t = tabs_entity.clone();
+                    root.px(pad_side)
+                        .child(
+                               div().relative()
+                                    .flex_1()
+                                    .min_h_0()
+                                    .child(
+                        uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
+                            let items = ctrl.read(cx).visible_items_slice(range);
+                            let covers: Vec<Option<Arc<Image>>> = {
+                                let cache = cx.global::<CoverCache>();
+                                items.iter().map(|item| cache.get(&item.id)).collect()
+                            };
+                            items.iter()
+                                 .zip(covers)
+                                 .map(|(item, cover)| {
+                                     render_thumb_row(item,
+                                                      cover,
+                                                      &c,
+                                                      &d,
+                                                      ctrl.clone(),
+                                                      t.clone(),
+                                                      s.clone(),
+                                                      window).into_any_element()
                                  })
                                  .collect()
-                    }).track_scroll(&scroll_handle)
-                      .size_full(),
-                )
-                                .vertical_scrollbar(&scroll_handle),
-                )
-                    .into_any_element()
-            }
+                        }).track_scroll(&scroll_handle)
+                          .size_full(),
+                    )
+                                    .vertical_scrollbar(&scroll_handle),
+                    )
+                        .into_any_element()
+                }
 
-            // ── Grid, grouped — non-virtualized ───────────────────────────
-            (CatalogPresentation::Grid, true) => {
-                let groups = self.grouped_items(cx);
-                let cover_cache = {
-                    let cache = cx.global::<CoverCache>();
-                    cache.images.clone()
-                };
-                root.overflow_y_scrollbar()
-                    .px(pad_side)
-                    .children(groups.into_iter().map(|g| {
-                                                    let c = colors.clone();
-                                                    let d = density.clone();
-                                                    let e = self.controller.clone();
-                                                    let t = tabs_entity.clone();
-                                                    let s = storage_root.clone();
-                                                    let cc = cover_cache.clone();
-                                                    div().child(render_group_header(&g.publisher,
-                                                                                    g.items.len(),
-                                                                                    &c))
-                                                         .child(render_grid(g.items, cc, c, d, e,
-                                                                            t, s, &*window))
-                                                }))
-                    .into_any_element()
-            }
-        };
+                // ── Thumbs, grouped — non-virtualized ─────────────────────────
+                (CatalogPresentation::Thumbs, true) => {
+                    let groups = self.grouped_items(cx);
+                    let cover_cache = {
+                        let cache = cx.global::<CoverCache>();
+                        cache.images.clone()
+                    };
+                    root.overflow_y_scrollbar()
+                        .px(pad_side)
+                        .children(groups.into_iter().map(|g| {
+                            let c = colors.clone();
+                            let d = density.clone();
+                            let e = self.controller.clone();
+                            let t = tabs_entity.clone();
+                            let s = storage_root.clone();
+                            let cc = cover_cache.clone();
+                            // Reborrow as `&Window` (Copy) so the nested
+                            // `move` closure can capture it on every
+                            // outer iteration without moving `window`.
+                            let window: &Window = &*window;
+                            div().child(render_group_header(&g.publisher, g.items.len(), &c))
+                                 .children(g.items.into_iter().map(move |item| {
+                                                                  let cover =
+                                                                      cc.get(&item.id).cloned();
+                                                                  render_thumb_row(&item,
+                                                                                   cover,
+                                                                                   &c,
+                                                                                   &d,
+                                                                                   e.clone(),
+                                                                                   t.clone(),
+                                                                                   s.clone(),
+                                                                                   window)
+                                                              }))
+                        }))
+                        .into_any_element()
+                }
+
+                // ── Grid, ungrouped — row-virtualized ─────────────────────────
+                (CatalogPresentation::Grid, false) => {
+                    let row_count = item_count.div_ceil(items_per_row);
+                    let c = colors.clone();
+                    let d = density.clone();
+                    let s = storage_root.clone();
+                    let t = tabs_entity.clone();
+                    root.px(pad_side)
+                        .child(
+                               div().relative()
+                                    .flex_1()
+                                    .min_h_0()
+                                    .child(
+                        uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
+                            let range_start = row_range.start;
+                            let item_start = range_start * items_per_row;
+                            let item_end = (row_range.end * items_per_row).min(item_count);
+                            let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                            let covers: Vec<Option<Arc<Image>>> = {
+                                let cache = cx.global::<CoverCache>();
+                                items.iter().map(|item| cache.get(&item.id)).collect()
+                            };
+                            row_range.map(|row| {
+                                         let offset = (row - range_start) * items_per_row;
+                                         let row_end = (offset + items_per_row).min(items.len());
+                                         let row_items = &items[offset..row_end];
+                                         let row_covers = &covers[offset..row_end];
+                                         div().flex()
+                                              .gap(d.card_gap_x)
+                                              .mb(d.card_gap_y)
+                                              .children(row_items.iter()
+                                                                 .zip(row_covers.iter())
+                                                                 .map(|(item, cover)| {
+                                                                     render_grid_card(
+                                                                    item,
+                                                                    cover.clone(),
+                                                                    &c,
+                                                                    d.card_min_width,
+                                                                    ctrl.clone(),
+                                                                    t.clone(),
+                                                                    s.clone(),
+                                                                    window,
+                                                                )
+                                                                 }))
+                                              .into_any_element()
+                                     })
+                                     .collect()
+                        }).track_scroll(&scroll_handle)
+                          .size_full(),
+                    )
+                                    .vertical_scrollbar(&scroll_handle),
+                    )
+                        .into_any_element()
+                }
+
+                // ── Grid, grouped — non-virtualized ───────────────────────────
+                (CatalogPresentation::Grid, true) => {
+                    let groups = self.grouped_items(cx);
+                    let cover_cache = {
+                        let cache = cx.global::<CoverCache>();
+                        cache.images.clone()
+                    };
+                    root.overflow_y_scrollbar()
+                        .px(pad_side)
+                        .children(groups.into_iter().map(|g| {
+                            let c = colors.clone();
+                            let d = density.clone();
+                            let e = self.controller.clone();
+                            let t = tabs_entity.clone();
+                            let s = storage_root.clone();
+                            let cc = cover_cache.clone();
+                            div().child(render_group_header(&g.publisher, g.items.len(), &c))
+                                 .child(render_grid(g.items, cc, c, d, e, t, s, &*window))
+                        }))
+                        .into_any_element()
+                }
+            };
 
         let mut result =
             outer.relative()
@@ -1224,8 +1216,11 @@ impl Render for CatalogView {
                                               px(ITEM_POPOVER_WIDTH),
                                               px(ITEM_POPOVER_MARGIN),
                                               window.viewport_size().width);
-            result =
-                result.child(render_item_popover(item, anchor, self.controller.clone(), &colors));
+            result = result.child(render_item_popover(item,
+                                                      anchor,
+                                                      self.controller.clone(),
+                                                      tabs_entity.clone(),
+                                                      &colors));
         }
 
         result.into_any_element()

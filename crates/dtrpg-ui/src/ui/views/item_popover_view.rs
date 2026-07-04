@@ -5,6 +5,8 @@
 //! renders full attributes and a file list in its own closable tab — see
 //! `main-window-tabs`.
 
+use std::sync::Arc;
+
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, Styled, anchored, deferred, div,
@@ -16,21 +18,23 @@ use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
+use crate::controllers::tabs::TabsController;
 use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
 
 /// Renders a compact popover anchored at `position`, showing `item`'s title,
-/// publisher, and a few key attributes, plus a close button and an
-/// accessible "open in tab" affordance as an alternative to double-click.
+/// publisher, and a few key attributes, plus a close button and action
+/// buttons to toggle the download status and open the item's detail tab.
 ///
 /// `position` is the top-left corner at which the popover is drawn — callers
 /// are responsible for computing it (see
 /// `catalog_view::popover_anchor_point`) so the popover sits beside the
 /// catalog entry rather than over it.
 pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
-                           entity: Entity<LibraryController>, colors: &ColorTokens)
+                           entity: Entity<LibraryController>, tabs: Entity<TabsController>,
+                           colors: &ColorTokens)
                            -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
@@ -47,6 +51,11 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
     };
 
     let entity_close = entity.clone();
+    let entity_download = entity.clone();
+    let is_downloaded = item.status == ItemStatus::Downloaded;
+    let item_id = Arc::clone(&item.id);
+    let item_id_for_detail = Arc::clone(&item.id);
+    let item_title = item.title.to_string();
 
     let content = div()
         .id("item-popover")
@@ -115,10 +124,71 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                 .child(
                     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
                 ),
+        )
+        .child(
+            div()
+                .flex()
+                .gap(px(8.0))
+                .child(
+                    Button::new("item-popover-download")
+                        .ghost()
+                        .outline()
+                        .compact()
+                        .icon(download_button_icon(is_downloaded))
+                        .label(if is_downloaded {
+                            t!("catalog.action_remove_download")
+                        }
+                        else {
+                            t!("catalog.action_download")
+                        })
+                        .on_click(move |_, _, cx| {
+                            let id = Arc::clone(&item_id);
+                            entity_download.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
+                        }),
+                )
+                .child(
+                    Button::new("item-popover-open-detail")
+                        .ghost()
+                        .outline()
+                        .compact()
+                        .icon(IconName::ExternalLink)
+                        .label(t!("detail.open_in_detail_button"))
+                        .on_click(move |_, _, cx| {
+                            let id = Arc::clone(&item_id_for_detail);
+                            let title = item_title.clone();
+                            tabs.update(cx, |ctrl, cx| ctrl.open_detail_tab(id, title, cx));
+                        }),
+                ),
         );
 
     deferred(anchored().snap_to_window_with_margin(px(ITEM_POPOVER_MARGIN))
                        .position(position)
                        .child(content)).with_priority(1)
                                        .into_any_element()
+}
+
+/// Returns the icon for the popover's download action button: a checkmark
+/// once the item is downloaded, otherwise a download arrow.
+fn download_button_icon(is_downloaded: bool) -> IconName {
+    if is_downloaded {
+        IconName::CircleCheck
+    }
+    else {
+        IconName::ArrowDown
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn download_button_icon_shows_check_when_downloaded() {
+        assert!(matches!(download_button_icon(true), IconName::CircleCheck));
+    }
+
+    #[test]
+    fn download_button_icon_shows_arrow_when_not_downloaded() {
+        assert!(matches!(download_button_icon(false), IconName::ArrowDown));
+    }
 }

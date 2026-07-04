@@ -325,7 +325,7 @@ impl LibraryRootView {
         cx.subscribe_in(&activity,
                         window,
                         |_this, _ctrl, event: &DownloadComplete, window, cx| {
-                            let msg = format!("Downloaded: {}", event.title);
+                            let msg = format!("{}", event.title);
                             window.push_notification(Notification::success(msg), cx);
                         })
           .detach();

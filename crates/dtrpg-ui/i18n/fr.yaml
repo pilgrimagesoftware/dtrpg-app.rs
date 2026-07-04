@@ -67,6 +67,7 @@ detail:
   read_button: "Lire"
   download_button: "Télécharger"
   downloaded_button: "Téléchargé"
+  open_in_detail_button: "Ouvrir dans le détail"
   show_in_finder: "Afficher dans le Finder"
   show_in_explorer: "Afficher dans l'Explorateur"
   show_in_files: "Afficher dans Fichiers"
