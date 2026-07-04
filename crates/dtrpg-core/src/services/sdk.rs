@@ -457,14 +457,14 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                   .iter()
                   .filter(|f| seen_download_ids.insert(f.order_product_download_id))
                   .map(|f| {
-                      LibraryItemFile {
-                          id:      f.order_product_download_id.to_string().into(),
-                          name:    f.title.as_str().into(),
-                          format:  file_extension_label(&f.filename)
-                                       .unwrap_or_else(|| "FILE".to_string())
-                                       .into(),
-                          size_mb: f.size as f64 / BYTES_PER_MB,
-                      }
+                      LibraryItemFile { id:      f.order_product_download_id.to_string().into(),
+                                        name:    f.title.as_str().into(),
+                                        format:
+                                            file_extension_label(&f.filename).unwrap_or_else(|| {
+                                                                                 "FILE".to_string()
+                                                                             })
+                                                                             .into(),
+                                        size_mb: f.size as f64 / BYTES_PER_MB, }
                   })
                   .collect();
 
@@ -790,6 +790,35 @@ mod tests {
         assert_eq!(items[0].files[0].name.as_ref(), "Moria Rulebook");
         assert_eq!(items[0].files[0].id.as_ref(), "1234");
         assert_eq!(items[0].files[1].name.as_ref(), "Moria Map Sheet");
+    }
+
+    #[test]
+    fn map_order_product_dedupes_repeated_download_ids() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 // Same `orderProductDownloadId` as above — the API has been
+                 // observed to repeat a download record; the mapper must not
+                 // surface it as a second, distinct item.
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },];
+
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+        let items = service.list_items().expect("list items");
+
+        assert_eq!(items[0].files.len(), 1);
+        assert!(!items[0].is_multi_item());
     }
 
     #[test]

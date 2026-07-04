@@ -295,54 +295,50 @@ fn render_item_tier(item: &LibraryItem, entity: Entity<LibraryController>, color
     for (row_ix, file) in item.files.iter().enumerate() {
         let is_selected = selected_id.as_deref() == Some(file.id.as_ref());
 
-        // `TableRow` itself has no click hook, so each cell's content is
-        // wrapped in its own clickable, hoverable div — together they cover
-        // the full row's clickable area while the row stays a proper
-        // `TableRow`/`TableCell` for header/row alignment (see this crate's
-        // `gpui-component` usage policy).
-        let make_cell_click = |entity: Entity<LibraryController>,
-                               entry_id: Arc<str>,
-                               file_id: Arc<str>| {
-            move |_: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut App| {
-                entity.update(cx, |ctrl, cx| {
-                          ctrl.select_item_file(Arc::clone(&entry_id), Arc::clone(&file_id), cx);
-                      });
-            }
-        };
+        // `TableRow` itself has no click hook, so the whole row's clickable
+        // area is a single wrapping div inside one `col_span(2)` `TableCell`
+        // (mirroring the two-column header width via its own internal flex
+        // split) rather than one on_click per column — attaching separate
+        // click listeners to adjacent sibling cells of the same logical row
+        // left later rows unresponsive after the first selection, since each
+        // sibling tracks its own independent mouse-down/mouse-up state (see
+        // this crate's `gpui-component` usage policy for why `Table` stays
+        // the base component here instead of a hand-rolled flex layout).
+        let entity_row = entity.clone();
+        let entry_id_row = Arc::clone(&entry_id);
+        let file_id_row = Arc::clone(&file.id);
         // Includes `row_ix` (not just `file.id`) so that rows stay uniquely
-        // identifiable — and therefore individually clickable — even if a stale
-        // catalog cache (written before file records were deduplicated by
-        // download id, see `map_order_product`) still has two rows sharing an
-        // id; GPUI needs distinct element ids to hit-test each row separately.
-        let row_id_base = format!("item-row-{row_ix}-{}", file.id);
+        // identifiable — and therefore individually clickable — even if a
+        // stale catalog cache (written before file records were deduplicated
+        // by download id, see `map_order_product`) still has two rows
+        // sharing an id; GPUI needs distinct element ids to hit-test each
+        // row separately.
+        let row_id = SharedString::from(format!("item-row-{row_ix}-{}", file.id));
+
+        let row_content =
+            div().id(row_id)
+                 .flex()
+                 .w_full()
+                 .cursor_pointer()
+                 .hover(|d| d.bg(colors.hover))
+                 .on_click(move |_: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut App| {
+                               entity_row.update(cx, |ctrl, cx| {
+                                             ctrl.select_item_file(Arc::clone(&entry_id_row),
+                                                                   Arc::clone(&file_id_row),
+                                                                   cx);
+                                         });
+                           })
+                 .child(div().flex_1()
+                             .text_sm()
+                             .text_color(colors.text_primary)
+                             .child(file.name.to_string()))
+                 .child(div().flex_1()
+                             .text_sm()
+                             .text_color(colors.text_secondary)
+                             .child(file.format.to_string()));
 
         let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
-                                 .child(
-                                     TableCell::new().child(
-                                         div().id(SharedString::from(format!("{row_id_base}-name")))
-                                              .cursor_pointer()
-                                              .hover(|d| d.bg(colors.hover))
-                                              .text_sm()
-                                              .text_color(colors.text_primary)
-                                              .on_click(make_cell_click(entity.clone(),
-                                                                       Arc::clone(&entry_id),
-                                                                       Arc::clone(&file.id)))
-                                              .child(file.name.to_string()),
-                                     ),
-                                 )
-                                 .child(
-                                     TableCell::new().child(
-                                         div().id(SharedString::from(format!("{row_id_base}-type")))
-                                              .cursor_pointer()
-                                              .hover(|d| d.bg(colors.hover))
-                                              .text_sm()
-                                              .text_color(colors.text_secondary)
-                                              .on_click(make_cell_click(entity.clone(),
-                                                                       Arc::clone(&entry_id),
-                                                                       Arc::clone(&file.id)))
-                                              .child(file.format.to_string()),
-                                     ),
-                                 );
+                                 .child(TableCell::new().col_span(2).child(row_content));
 
         body = body.child(row);
     }
