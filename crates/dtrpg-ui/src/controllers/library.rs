@@ -257,6 +257,33 @@ impl LibraryController {
                 .update(async_cx, |a, cx| a.start(&t!("activity.loading_library"), None, cx))
                 .unwrap_or(0);
 
+            // ── Pre-populate catalog from disk cache ────────────────────────────
+            // Runs first, ahead of the collections stage below: it's a local disk
+            // read with no network dependency, so any catalog just cleared by this
+            // load's caller (e.g. `replace_service` swapping in an authenticated
+            // service, or `clear_and_reload`) reappears immediately instead of
+            // sitting empty for however long the collections network call below
+            // takes to resolve — see `catalog-live-merge`.
+            let cache_root = storage_root.clone();
+            let meta_root = cache_root.clone();
+
+            let cached = async_cx
+                .background_executor()
+                .spawn(async move { load_catalog_cache(&cache_root) })
+                .await;
+            if let Some(items) = cached.as_ref() {
+                this.update(async_cx, |ctrl, cx| {
+                    if ctrl.load_generation != generation {
+                        return; // superseded by a newer load (e.g. cache-clear reload)
+                    }
+                    if force_reload {
+                        ctrl.catalog.clear();
+                    }
+                    ctrl.append_catalog_page(items.clone(), cx);
+                })
+                .ok();
+            }
+
             // ── Stage: collections ──────────────────────────────────────────────
             weak_activity
                 .update(async_cx, |a, cx| {
@@ -315,27 +342,6 @@ impl LibraryController {
                         tracing::warn!(error = %e, "collections load failed");
                     }
                 }
-            }
-
-            // ── Pre-populate catalog from disk cache ────────────────────────────
-            let cache_root = storage_root.clone();
-            let meta_root = cache_root.clone();
-
-            let cached = async_cx
-                .background_executor()
-                .spawn(async move { load_catalog_cache(&cache_root) })
-                .await;
-            if let Some(items) = cached.as_ref() {
-                this.update(async_cx, |ctrl, cx| {
-                    if ctrl.load_generation != generation {
-                        return; // superseded by a newer load (e.g. cache-clear reload)
-                    }
-                    if force_reload {
-                        ctrl.catalog.clear();
-                    }
-                    ctrl.append_catalog_page(items.clone(), cx);
-                })
-                .ok();
             }
 
             // ── Auto-load policy ──────────────────────────────────────────────
