@@ -120,7 +120,10 @@ pub fn setup(cx: &mut App) {
                   KeyBinding::new("cmd-h", HideApplication, None),
                   KeyBinding::new("alt-cmd-h", HideOthers, None),
                   KeyBinding::new("cmd-m", Minimize, None),
-                  KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None)]);
+                  KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
+                  KeyBinding::new("cmd-shift-n", AddCollection, None),
+                  KeyBinding::new("cmd-r", ReloadCatalog, None),
+                  KeyBinding::new("cmd-shift-r", RefreshThumbnails, None)]);
 
     // App-level action handlers
     cx.on_action::<Quit>(|_, cx| cx.quit());

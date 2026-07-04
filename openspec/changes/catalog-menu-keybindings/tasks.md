@@ -1,17 +1,17 @@
 ## 1. Key bindings
 
-- [ ] 1.1 In `crates/dtrpg-ui/src/ui/app/mod.rs`, add `KeyBinding::new("cmd-shift-n", AddCollection, None)` to the `cx.bind_keys([...])` call in `setup()`
-- [ ] 1.2 Add `KeyBinding::new("cmd-r", ReloadCatalog, None)` to the same call
-- [ ] 1.3 Add `KeyBinding::new("cmd-shift-r", RefreshThumbnails, None)` to the same call
-- [ ] 1.4 Confirm `AddCollection`, `ReloadCatalog`, `RefreshThumbnails` are already imported in `ui/app/mod.rs` (they're referenced by `build_menus`); add imports if missing
+- [x] 1.1 In `crates/dtrpg-ui/src/ui/app/mod.rs`, add `KeyBinding::new("cmd-shift-n", AddCollection, None)` to the `cx.bind_keys([...])` call in `setup()`
+- [x] 1.2 Add `KeyBinding::new("cmd-r", ReloadCatalog, None)` to the same call
+- [x] 1.3 Add `KeyBinding::new("cmd-shift-r", RefreshThumbnails, None)` to the same call
+- [x] 1.4 Confirm `AddCollection`, `ReloadCatalog`, `RefreshThumbnails` are already imported in `ui/app/mod.rs` (they're referenced by `build_menus`); add imports if missing
 
 ## 2. Verify no conflicts
 
-- [ ] 2.1 Grep `crates/dtrpg-ui/src/ui/app/mod.rs` for any existing `cmd-shift-n`, `cmd-r`, or `cmd-shift-r` bindings to confirm no collision before adding the new ones
-- [ ] 2.2 `cargo build --workspace --all-features`
-- [ ] 2.3 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- [ ] 2.4 `cargo test --workspace --all-features`
-- [ ] 2.5 `cargo fmt --all -- --check`
+- [x] 2.1 Grep `crates/dtrpg-ui/src/ui/app/mod.rs` for any existing `cmd-shift-n`, `cmd-r`, or `cmd-shift-r` bindings to confirm no collision before adding the new ones
+- [x] 2.2 `cargo build --workspace --all-features`
+- [x] 2.3 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- [x] 2.4 `cargo test --workspace --all-features`
+- [x] 2.5 `cargo fmt --all -- --check`
 
 ## 3. Manual verification
 
