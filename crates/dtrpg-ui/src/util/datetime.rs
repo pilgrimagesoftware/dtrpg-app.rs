@@ -113,6 +113,82 @@ pub fn format_relative(ts: i64) -> String {
     }
 }
 
+/// Converts a proleptic Gregorian civil date to days since the Unix epoch.
+///
+/// Inverse of [`epoch_to_ymd`]; uses Howard Hinnant's `days_from_civil`
+/// algorithm.
+fn civil_to_days(year: i32, month: u32, day: u32) -> i64 {
+    let y = if month <= 2 {
+        year as i64 - 1
+    }
+    else {
+        year as i64
+    };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as u32;
+    let mp = if month > 2 { month - 3 } else { month + 9 };
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe as i64 - 719_468
+}
+
+/// Parses an RFC 3339 / ISO 8601 timestamp (e.g. `2024-07-16T10:45:52-05:00`
+/// or `2024-07-16T10:45:52Z`) into a Unix timestamp in seconds.
+///
+/// Accepts an optional fractional-seconds component (discarded) and either a
+/// `Z` suffix or a numeric `+HH:MM` / `-HH:MM` offset. Returns `None` if the
+/// input does not match the expected shape.
+///
+/// # Examples
+///
+/// ```
+/// let ts = dtrpg_ui::util::datetime::parse_rfc3339_to_epoch("2024-07-16T10:45:52-05:00");
+/// assert_eq!(ts, Some(1_721_144_752));
+/// ```
+pub fn parse_rfc3339_to_epoch(input: &str) -> Option<i64> {
+    let bytes = input.as_bytes();
+    if bytes.len() < 19 || bytes.get(4) != Some(&b'-') || bytes.get(7) != Some(&b'-') {
+        return None;
+    }
+    let date_part = input.get(..10)?;
+    let time_start = input.get(10..11)?;
+    if time_start != "T" && time_start != "t" && time_start != " " {
+        return None;
+    }
+    let time_part = input.get(11..19)?;
+
+    let year: i32 = date_part.get(0..4)?.parse().ok()?;
+    let month: u32 = date_part.get(5..7)?.parse().ok()?;
+    let day: u32 = date_part.get(8..10)?.parse().ok()?;
+    let hour: i64 = time_part.get(0..2)?.parse().ok()?;
+    let minute: i64 = time_part.get(3..5)?.parse().ok()?;
+    let second: i64 = time_part.get(6..8)?.parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+
+    let remainder = input.get(19..)?;
+    let offset_str = match remainder.find(['+', '-', 'Z', 'z']) {
+        Some(idx) => remainder.get(idx..)?,
+        None => return None,
+    };
+
+    let offset_secs: i64 = if offset_str.eq_ignore_ascii_case("z") {
+        0
+    }
+    else {
+        let sign = if offset_str.starts_with('-') { -1 } else { 1 };
+        let digits = offset_str.get(1..)?;
+        let oh: i64 = digits.get(0..2)?.parse().ok()?;
+        let om: i64 = digits.get(3..5)?.parse().ok()?;
+        sign * (oh * 3_600 + om * 60)
+    };
+
+    let days = civil_to_days(year, month, day);
+    let utc_secs = days * 86_400 + hour * 3_600 + minute * 60 + second - offset_secs;
+    Some(utc_secs)
+}
+
 /// Formats a Unix timestamp as a full absolute date/time string.
 ///
 /// Output format: "Month D, YYYY at H:MM AM/PM" (e.g. "January 5, 2024 at 3:42
@@ -204,5 +280,52 @@ mod tests {
     fn absolute_known_date() {
         // 2024-01-05 15:42:00 UTC = 1704469320
         assert_eq!(format_absolute(1_704_469_320), "January 5, 2024 at 3:42 PM");
+    }
+
+    #[test]
+    fn parses_rfc3339_with_negative_offset() {
+        // 2024-07-16T10:45:52-05:00 == 2024-07-16T15:45:52Z
+        assert_eq!(parse_rfc3339_to_epoch("2024-07-16T10:45:52-05:00"),
+                   Some(1_721_144_752));
+    }
+
+    #[test]
+    fn parses_rfc3339_with_positive_offset() {
+        // 2024-07-17T00:45:52+09:00 == 2024-07-16T15:45:52Z
+        assert_eq!(parse_rfc3339_to_epoch("2024-07-17T00:45:52+09:00"),
+                   Some(1_721_144_752));
+    }
+
+    #[test]
+    fn parses_rfc3339_with_z_suffix() {
+        assert_eq!(parse_rfc3339_to_epoch("2024-01-05T15:42:00Z"),
+                   Some(1_704_469_320));
+    }
+
+    #[test]
+    fn parses_rfc3339_epoch_zero() {
+        assert_eq!(parse_rfc3339_to_epoch("1970-01-01T00:00:00Z"), Some(0));
+    }
+
+    #[test]
+    fn rejects_malformed_rfc3339() {
+        assert_eq!(parse_rfc3339_to_epoch("not-a-date"), None);
+        assert_eq!(parse_rfc3339_to_epoch("2024-13-05T15:42:00Z"), None);
+        assert_eq!(parse_rfc3339_to_epoch(""), None);
+    }
+
+    #[test]
+    fn civil_to_days_round_trips_epoch_to_ymd() {
+        for ts in [0_i64, 1_704_469_320, -86_400, 1_721_140_952] {
+            let (y, m, d) = epoch_to_ymd(ts);
+            let days = civil_to_days(y, m, d);
+            assert_eq!(days,
+                       if ts >= 0 {
+                           ts / 86_400
+                       }
+                       else {
+                           (ts - 86_399) / 86_400
+                       });
+        }
     }
 }

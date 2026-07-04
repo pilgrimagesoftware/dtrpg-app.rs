@@ -16,6 +16,7 @@ use dtrpg_ui::{
         library::{LibraryItem, LibraryItemFile},
     },
     services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
+    util::datetime::{format_absolute, parse_rfc3339_to_epoch},
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -466,13 +467,24 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                          .and_then(|y| y.parse::<u32>().ok())
                          .unwrap_or(0);
 
+    // The API reports `datePurchased`/`fileLastModified` as raw RFC 3339 strings
+    // (e.g. "2024-07-16T10:45:52-05:00") — parse them so the UI can render
+    // human-readable text instead of leaking the machine format into the
+    // description shown in the detail panel.
+    let date_purchased_epoch = attributes.date_purchased
+                                         .as_deref()
+                                         .and_then(parse_rfc3339_to_epoch);
+    let file_last_modified_epoch = attributes.file_last_modified
+                                             .as_deref()
+                                             .and_then(parse_rfc3339_to_epoch);
+
     let desc = {
         let mut parts = Vec::new();
-        if let Some(date) = &attributes.date_purchased {
-            parts.push(format!("Purchased {date}"));
+        if let Some(ts) = date_purchased_epoch {
+            parts.push(format!("Purchased {}", format_absolute(ts)));
         }
-        if let Some(date) = &attributes.file_last_modified {
-            parts.push(format!("Updated {date}"));
+        if let Some(ts) = file_last_modified_epoch {
+            parts.push(format!("Updated {}", format_absolute(ts)));
         }
         parts.join(". ")
     };
@@ -494,7 +506,7 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                   color: DEFAULT_COLOR.into(),
                   desc: desc.as_str().into(),
                   cover_url: cover_url.map(Into::into),
-                  date_added: None,
+                  date_added: date_purchased_epoch,
                   thumbnail_last_attempted: None,
                   files }
 }
@@ -669,6 +681,33 @@ mod tests {
         assert_eq!(items[0].title.as_ref(), "A Better Dungeon");
         assert_eq!(items[0].publisher.as_ref(), "Lantern Press");
         assert_eq!(items[0].kind.as_ref(), "Adventure");
+    }
+
+    #[test]
+    fn map_order_product_parses_date_purchased_into_date_added() {
+        let item = order_product_item(515_276, "The Wellspring");
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        // "2026-01-01T10:45:52-05:00" == 2026-01-01T15:45:52Z
+        assert_eq!(mapped.date_added, Some(1_767_282_352));
+    }
+
+    #[test]
+    fn map_order_product_desc_is_human_readable_not_raw_rfc3339() {
+        let item = order_product_item(515_276, "The Wellspring");
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        assert!(!mapped.desc.contains('T'),
+                "desc leaked a raw RFC3339 timestamp: {}",
+                mapped.desc);
+        assert!(mapped.desc.contains("Purchased January 1, 2026"),
+                "desc: {}",
+                mapped.desc);
+        assert!(mapped.desc.contains("Updated January 2, 2026"),
+                "desc: {}",
+                mapped.desc);
     }
 
     #[test]
@@ -913,7 +952,7 @@ mod tests {
                 royalty_publisher_id: 7,
                 isbn: None,
                 name: name.to_string(),
-                date_purchased: Some("2026-01-01".to_string()),
+                date_purchased: Some("2026-01-01T10:45:52-05:00".to_string()),
                 filesize: Some(1024),
                 final_price: 12.5,
                 quantity: 1,
@@ -922,7 +961,7 @@ mod tests {
                 add_on_info: None,
                 order_product_id: id,
                 customer_id: 123,
-                file_last_modified: Some("2026-01-02".to_string()),
+                file_last_modified: Some("2026-01-02T08:30:00Z".to_string()),
                 file_last_downloaded: None,
                 files: vec![OrderProductFile {
                     index: 0,
