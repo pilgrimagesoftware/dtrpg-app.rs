@@ -724,12 +724,12 @@ pub struct CatalogView {
     /// every hover-triggered re-render. Also drives the flattened rows
     /// pushed into `catalog_grouped_list_table`.
     grouped_cache:              Option<Vec<PublisherGroup>>,
-    /// Cursor position captured at the most recent mouse-down within the
-    /// catalog area, used to anchor the single-click item popover (see
-    /// `render_item_popover`). Captured on mouse-down rather than tracked
-    /// continuously on mouse-move so the popover stays put while the pointer
-    /// wanders after opening it, instead of following the cursor.
-    last_mouse_pos:             Point<Pixels>,
+    /// Cursor position captured at the mouse-down that opened the single-click
+    /// item popover (see `render_item_popover`). Frozen for the lifetime of
+    /// the popover — never updated by subsequent mouse movement — so the
+    /// popover stays put while the pointer wanders after opening it, instead
+    /// of following the cursor. Cleared to `None` when the popover closes.
+    popover_anchor_pos:         Option<Point<Pixels>>,
 }
 
 impl CatalogView {
@@ -770,9 +770,12 @@ impl CatalogView {
 
         cx.subscribe(&controller, {
               let table = catalog_list_table.clone();
-              move |this, _ctrl, _event: &LibraryChanged, cx| {
+              move |this, ctrl, _event: &LibraryChanged, cx| {
                   table.update(cx, |state, cx| state.refresh(cx));
                   this.grouped_cache = None;
+                  if ctrl.read(cx).selected_item().is_none() {
+                      this.popover_anchor_pos = None;
+                  }
               }
           })
           .detach();
@@ -881,7 +884,7 @@ impl CatalogView {
                catalog_grouped_list_table,
                items_per_row: 4,
                grouped_cache: None,
-               last_mouse_pos: Point::default() }
+               popover_anchor_pos: None }
     }
 
     /// Returns the cached publisher grouping, computing and storing it first if
@@ -1154,13 +1157,14 @@ impl Render for CatalogView {
             outer.relative()
                  .on_mouse_down(MouseButton::Left,
                                 cx.listener(|this, event: &MouseDownEvent, _window, _cx| {
-                                      this.last_mouse_pos = event.position;
+                                      this.popover_anchor_pos = Some(event.position);
                                   }))
                  .child(content);
 
         if let Some(item) = snap.selected_item.as_ref() {
+            let anchor_pos = self.popover_anchor_pos.unwrap_or_default();
             result = result.child(render_item_popover(item,
-                                                      self.last_mouse_pos,
+                                                      anchor_pos,
                                                       self.controller.clone(),
                                                       &colors));
         }
