@@ -1,7 +1,7 @@
 //! Formatting helpers for timestamps in the detail panel.
 
 use std::time::{SystemTime, UNIX_EPOCH};
-
+use rust_i18n::t;
 use crate::data::constants::MONTH_NAMES;
 
 /// Returns the current Unix timestamp in seconds.
@@ -98,26 +98,36 @@ pub fn format_relative(ts: i64) -> String {
     let elapsed = (now - ts).max(0);
 
     if elapsed < 60 {
-        return "just now".to_string();
+        return t!("date.now").to_string();
     }
     if elapsed < 3_600 {
         let mins = elapsed / 60;
-        return format!("{mins} minute{} ago", plural_suffix(mins));
+        return match mins {
+            1 => t!("date.minutes_ago.one").to_string(),
+            _ => t!("date.minutes_ago.other", n = mins).to_string(),
+        };
     }
     if elapsed < 86_400 {
         let hrs = elapsed / 3_600;
-        return format!("{hrs} hour{} ago", plural_suffix(hrs));
+        return match hrs {
+            1 => t!("date.hours_ago.one").to_string(),
+            _ => t!("date.hours_ago.other", n = hrs).to_string(),
+        };
+
     }
     if elapsed < 2 * 86_400 {
-        return "yesterday".to_string();
+        return t!("date.yesterday").to_string();
     }
     if elapsed < 7 * 86_400 {
         let days = elapsed / 86_400;
-        return format!("{days} days ago");
+        return t!("date.days_ago.other", n = days).to_string();
     }
     if elapsed < 30 * 86_400 {
         let weeks = elapsed / (7 * 86_400);
-        return format!("{weeks} week{} ago", plural_suffix(weeks));
+        return match weeks {
+            1 => t!("date.weeks_ago.one").to_string(),
+            _ => t!("date.weeks_ago.other", n = weeks).to_string(),
+        };
     }
 
     // Guaranteed >= 1 by the 30-day threshold above in all but rare
@@ -125,11 +135,17 @@ pub fn format_relative(ts: i64) -> String {
     // February); floor at 1 so we never fall through to "0 months ago".
     let months = months_between(ts, now).max(1);
     if months < 12 {
-        return format!("{months} month{} ago", plural_suffix(months));
+        return match months {
+            1 => t!("date.months_ago.one").to_string(),
+            _ => t!("date.months_ago.other", n = months).to_string(),
+        };
     }
 
     let years = months / 12;
-    format!("{years} year{} ago", plural_suffix(years))
+    return match years {
+        1 => t!("date.years_ago.one").to_string(),
+        _ => t!("date.years_ago.other", n = years).to_string(),
+    };
 }
 
 /// Converts a proleptic Gregorian civil date to days since the Unix epoch.

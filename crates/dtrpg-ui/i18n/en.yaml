@@ -218,6 +218,25 @@ status_bar:
   notifications_tooltip_title: "Notifications"
   notifications_tooltip: "%{n} unread"
 
+date:
+  now: "just now"
+  yesterday: "yesterday"
+  minutes_ago:
+    one: "a minute ago"
+    many: "%{n} minutes ago"
+  hours_ago:
+    one: "an hour ago"
+    many: "%{n} hours ago"
+  days_ago:
+    one: "a day ago"
+    many: "%{n} days ago"
+  months_ago:
+    one: "a month ago"
+    many: "%{n} months ago"
+  years_ago:
+    one: "a year ago"
+    many: "%{n} years ago"
+
 size:
   tb: "TB"
   gb: "GB"
