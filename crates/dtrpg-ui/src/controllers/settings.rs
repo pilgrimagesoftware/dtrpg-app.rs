@@ -144,23 +144,20 @@ impl SettingsController {
     /// fresh install.
     pub fn new(login_service: Box<dyn LoginService>, cx: &mut Context<Self>) -> Self {
         let file_openers = FileOpenerConfig::load();
-        let loaded_credential = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
-            .load()
-            .ok()
-            .flatten();
+        let loaded_credential =
+            KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
+                                                                         .ok()
+                                                                         .flatten();
         let is_authenticated = loaded_credential.is_some();
         // Pre-fill email from the stored credential; fall back to ProfileConfig
         // for users whose email was saved there before this field moved to the
         // keyring entry.
-        let email_draft = loaded_credential.as_ref()
-                                           .and_then(|c| c.email.as_deref())
-                                           .map(str::to_owned)
-                                           .or_else(|| {
-                                               ProfileConfig::load()
-                                                   .email()
-                                                   .map(str::to_owned)
-                                           })
-                                           .unwrap_or_default();
+        let email_draft =
+            loaded_credential.as_ref()
+                             .and_then(|c| c.email.as_deref())
+                             .map(str::to_owned)
+                             .or_else(|| ProfileConfig::load().email().map(str::to_owned))
+                             .unwrap_or_default();
 
         let storage = StorageConfig::load();
         if storage.is_default()
@@ -488,9 +485,7 @@ impl SettingsController {
                                                             secret:  key.clone(),
                                                             email:   Some(email.clone()), })
                               {
-                                  tracing::warn!(
-                                      "failed to save credential to keyring: {e}"
-                                  );
+                                  tracing::warn!("failed to save credential to keyring: {e}");
                               }
                               ProfileConfig::save(Some(&email));
                               ctrl.password_draft.clear();
@@ -498,10 +493,8 @@ impl SettingsController {
                               cx.emit(SignInSucceeded(tokens));
                           }
                           Err(e) => {
-                              ctrl.sign_in_error = Some(format!(
-                                  "Session setup failed after sign-in: {}",
-                                  e.0
-                              ));
+                              ctrl.sign_in_error =
+                                  Some(format!("Session setup failed after sign-in: {}", e.0));
                               cx.emit(SettingsChanged);
                           }
                       }

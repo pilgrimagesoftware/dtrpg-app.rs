@@ -50,7 +50,9 @@ impl LoginService for SdkLoginService {
                 ClientError::ApplicationKeyRequestFailed { status } => {
                     LoginError(format!("Sign-in failed: server returned status '{status}'."))
                 }
-                ClientError::Http(err) => LoginError(format!("Network error during sign-in: {err}")),
+                ClientError::Http(err) => {
+                    LoginError(format!("Network error during sign-in: {err}"))
+                }
                 other => LoginError(format!("Sign-in failed: {other:?}")),
             })
     }
@@ -65,7 +67,6 @@ impl LoginService for SdkLoginService {
                                    refresh_token_ttl: r.refresh_token_ttl, })
             .map_err(|e| LoginError(format!("Authentication failed: {e}")))
     }
-
 }
 
 /// A [`LoginService`] that always fails with the given error message.
@@ -89,7 +90,6 @@ impl LoginService for UnavailableLoginService {
     fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
         Err(self.error.clone())
     }
-
 }
 
 /// Builds a boxed [`LoginService`] from the platform environment.

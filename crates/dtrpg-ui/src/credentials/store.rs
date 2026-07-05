@@ -98,10 +98,13 @@ impl CredentialStore for KeyringCredentialStore {
     fn store(&self, credential: &Credential) -> Result<(), CredentialError> {
         let payload = KeyringPayload { key:   credential.secret.clone(),
                                        email: credential.email.clone(), };
-        let json = serde_json::to_string(&payload).map_err(|e| CredentialError::Store {
-                                                       account: self.account.clone(),
-                                                       reason:  e.to_string(),
-                                                   })?;
+        let json = serde_json::to_string(&payload).map_err(|e| {
+                                                      CredentialError::Store { account:
+                                                                                   self.account
+                                                                                       .clone(),
+                                                                               reason:
+                                                                                   e.to_string(), }
+                                                  })?;
         self.entry()?
             .set_password(&json)
             .map_err(|e| CredentialError::Store { account: self.account.clone(),

@@ -66,49 +66,40 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
          .gap(px(24.0))
          .p(px(24.0))
          // ── Identity row ──────────────────────────────────────────────────
-         .child(div().flex()
-                     .items_center()
-                     .child(div().flex()
-                                 .items_center()
-                                 .gap(px(16.0))
-                                 .flex_1()
-                                 .min_w_0()
-                                 .child(avatar)
-                                 .child({
-                                     let mut col =
-                                         div().flex()
-                                              .flex_col()
-                                              .gap(px(4.0))
-                                              .child(div().text_sm()
-                                                          .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                          .text_color(text_primary)
-                                                          .child(t!("settings.account_title")))
-                                              .child(div().text_sm()
-                                                          .text_color(text_secondary)
-                                                          .child(email_text));
-                                     if let Some(hint) = &auth.api_key_hint {
-                                         col = col.child(
-                                    div()
-                                        .flex()
-                                        .items_baseline()
-                                        .gap(px(6.0))
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(colors.text_tertiary)
-                                                .child(t!("settings.api_key_label")),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .font_family(MONOSPACE_FONT)
-                                                .text_color(colors.text_tertiary)
-                                                .child(hint.clone()),
-                                        ),
-                                );
-                                     }
-                                     col
-                                 })))
+         .child(
+                div().flex().items_center().child(
+        div().flex()
+             .items_center()
+             .gap(px(16.0))
+             .flex_1()
+             .min_w_0()
+             .child(avatar)
+             .child({
+                 let mut col =
+                     div().flex()
+                          .flex_col()
+                          .gap(px(4.0))
+                          .child(div().text_sm()
+                                      .font_weight(gpui::FontWeight::SEMIBOLD)
+                                      .text_color(text_primary)
+                                      .child(t!("settings.account_title")))
+                          .child(div().text_sm().text_color(text_secondary).child(email_text));
+                 if let Some(hint) = &auth.api_key_hint {
+                     col = col.child(div().flex()
+                                          .items_baseline()
+                                          .gap(px(6.0))
+                                          .child(div().text_xs()
+                                                      .text_color(colors.text_tertiary)
+                                                      .child(t!("settings.api_key_label")))
+                                          .child(div().text_xs()
+                                                      .font_family(MONOSPACE_FONT)
+                                                      .text_color(colors.text_tertiary)
+                                                      .child(hint.clone())));
+                 }
+                 col
+             }),
+    ),
+    )
          // ── Divider ───────────────────────────────────────────────────────
          .child(div().h(px(1.0)).bg(border))
          // ── Actions ───────────────────────────────────────────────────────
@@ -148,9 +139,8 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
 
 fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorTokens,
                           email_input: Option<Entity<InputState>>,
-                          password_input: Option<Entity<InputState>>,
-                          sign_in_in_progress: bool, sign_in_enabled: bool,
-                          sign_in_error: Option<String>)
+                          password_input: Option<Entity<InputState>>, sign_in_in_progress: bool,
+                          sign_in_enabled: bool, sign_in_error: Option<String>)
                           -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -187,6 +177,7 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
         let entity_for_btn = entity.clone();
         let can_click = sign_in_enabled && !sign_in_in_progress;
         let btn_bg = if can_click { accent } else { disabled_bg };
+        let btn_text = if can_click { accent_on } else { text_secondary };
         let btn_label = if sign_in_in_progress {
             t!("settings.sign_in_in_progress")
         }
@@ -194,12 +185,15 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
             t!("settings.sign_in_button")
         };
 
-        let mut form_section =
-            div().flex()
-                 .flex_col()
-                 .gap(px(10.0))
-                 .child(Input::new(&email_state).appearance(true).into_element())
-                 .child(Input::new(&pw_state).appearance(true).into_element());
+        let mut form_section = div().flex()
+                                    .flex_col()
+                                    .gap(px(10.0))
+                                    .child(Input::new(&email_state).appearance(true)
+                                                                   .disabled(sign_in_in_progress)
+                                                                   .into_element())
+                                    .child(Input::new(&pw_state).appearance(true)
+                                                                .disabled(sign_in_in_progress)
+                                                                .into_element());
 
         if let Some(err) = sign_in_error {
             form_section = form_section.child(div().text_xs().text_color(error_color).child(err));
@@ -222,7 +216,7 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
                                     })
                                     .child(div().text_sm()
                                                 .font_weight(gpui::FontWeight::MEDIUM)
-                                                .text_color(accent_on)
+                                                .text_color(btn_text)
                                                 .child(btn_label)));
 
         form = form.child(form_section);

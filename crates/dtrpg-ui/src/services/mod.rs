@@ -184,7 +184,6 @@ pub trait LoginService: Send + Sync + 'static {
     /// Returns [`LoginError`] if authentication fails (network error, invalid
     /// key, etc.).
     fn authenticate(&self, api_key: &str) -> Result<LoginTokens, LoginError>;
-
 }
 
 #[cfg(test)]
