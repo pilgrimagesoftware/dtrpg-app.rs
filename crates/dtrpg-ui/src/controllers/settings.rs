@@ -225,12 +225,6 @@ impl SettingsController {
 }
 
 impl SettingsController {
-    /// Emits `LogoutRequested` so the library root view can coordinate the
-    /// logout flow.
-    pub fn request_logout(&mut self, cx: &mut Context<Self>) {
-        cx.emit(LogoutRequested);
-    }
-
     // ── Auth state ────────────────────────────────────────────────────────────
 
     /// Marks the user as signed in.
