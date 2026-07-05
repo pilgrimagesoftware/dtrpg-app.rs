@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "dtrpg-sdk"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
