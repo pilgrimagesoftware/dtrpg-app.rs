@@ -31,9 +31,9 @@ use crate::ui::views::{
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage_root_path: PathBuf, storage_path_exists: bool,
                              entity: Entity<SettingsController>, focus_handle: &FocusHandle,
-                             colors: &ColorTokens, api_key_input: Option<Entity<InputState>>,
-                             email_input: Option<Entity<InputState>>, sign_in_in_progress: bool,
-                             sign_in_error: Option<String>,
+                             colors: &ColorTokens, email_input: Option<Entity<InputState>>,
+                             password_input: Option<Entity<InputState>>,
+                             sign_in_in_progress: bool, sign_in_error: Option<String>,
                              storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>)
@@ -51,8 +51,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
     let account_entity = entity.clone();
     let account_auth = auth.clone();
     let account_colors = colors.clone();
-    let account_api_key_input = api_key_input.clone();
     let account_email_input = email_input.clone();
+    let account_password_input = password_input.clone();
 
     let storage_entity = entity.clone();
     let storage_path = storage_root_path.clone();
@@ -81,8 +81,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                             &account_auth,
                             account_entity.clone(),
                             &account_colors,
-                            account_api_key_input.clone(),
                             account_email_input.clone(),
+                            account_password_input.clone(),
                             sign_in_in_progress,
                             sign_in_error.clone(),
                         )

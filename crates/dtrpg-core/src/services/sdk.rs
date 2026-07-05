@@ -554,6 +554,12 @@ fn map_client_error(error: ClientError) -> LibraryServiceError {
 
             LibraryServiceError::new(kind, msg)
         }
+        // These variants are only produced by credential_login, never by
+        // library requests.
+        ClientError::InvalidCredentials | ClientError::ApplicationKeyRequestFailed { .. } => {
+            LibraryServiceError::new(LibraryServiceErrorKind::Session,
+                                     "Unexpected credential exchange error in library request")
+        }
     }
 }
 

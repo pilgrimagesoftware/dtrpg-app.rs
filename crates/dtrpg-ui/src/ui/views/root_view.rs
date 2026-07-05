@@ -119,22 +119,6 @@ impl LibraryRootView {
         let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
-        let api_key_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t!("settings.api_key_placeholder").to_string())
-        });
-        let settings_for_input = settings.clone();
-        cx.subscribe(&api_key_input,
-                     move |_this, input_entity, event: &InputEvent, cx| {
-                         if matches!(event, InputEvent::Change) {
-                             let value = input_entity.read(cx).value().to_string();
-                             settings_for_input.update(cx, |ctrl, cx| {
-                                                   ctrl.set_api_key_draft(value, cx)
-                                               });
-                         }
-                     })
-          .detach();
-        settings.update(cx, |ctrl, _cx| ctrl.set_api_key_input(api_key_input));
-
         let email_initial = settings.read(cx).email_draft().to_owned();
         let email_input = cx.new(|cx| {
                                 let mut state = InputState::new(window, cx)
@@ -156,6 +140,22 @@ impl LibraryRootView {
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_email_input(email_input));
+
+        let password_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("settings.password_placeholder").to_string())
+        });
+        let settings_for_password = settings.clone();
+        cx.subscribe(&password_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             settings_for_password.update(cx, |ctrl, cx| {
+                                                      ctrl.set_password_draft(value, cx)
+                                                  });
+                         }
+                     })
+          .detach();
+        settings.update(cx, |ctrl, _cx| ctrl.set_password_input(password_input));
 
         let storage_path_placeholder = {
             use crate::data::storage::StorageConfig;
@@ -665,7 +665,7 @@ impl Render for LibraryRootView {
 
             if settings_snap.is_open {
                 // Focus the backdrop on first open so Escape works immediately.
-                // Don't steal focus if a child (e.g. the API key input) already has it.
+                // Don't steal focus if a child (e.g. the email input) already has it.
                 if !self.settings_focus.contains_focused(window, cx) {
                     window.focus(&self.settings_focus, cx);
                 }
@@ -676,8 +676,8 @@ impl Render for LibraryRootView {
                                                     settings_entity,
                                                     &self.settings_focus,
                                                     colors,
-                                                    settings_snap.api_key_input,
                                                     settings_snap.email_input,
+                                                    settings_snap.password_input,
                                                     settings_snap.sign_in_in_progress,
                                                     settings_snap.sign_in_error,
                                                     settings_snap.storage_path_input,

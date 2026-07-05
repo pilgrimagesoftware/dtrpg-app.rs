@@ -60,7 +60,7 @@ pub struct AuthStateSnapshot {
 pub struct SettingsSnapshot {
     pub is_open:             bool,
     pub file_openers:        Vec<FileOpenerEntry>,
-    /// `true` when an API key is present in the keyring.
+    /// `true` when credentials are present in the keyring.
     pub is_authenticated:    bool,
     /// Resolved storage root path (override or platform default).
     pub storage_root_path:   PathBuf,
@@ -71,19 +71,18 @@ pub struct SettingsSnapshot {
     pub storage_path_exists: bool,
     /// Current auth state for the toolbar avatar button.
     pub auth:                AuthStateSnapshot,
-    /// Current value of the API key draft field in the Account tab.
-    pub api_key_draft:       String,
-    /// Current value of the email draft field in the Account tab (optional, for
-    /// avatar).
+    /// Current value of the email draft field in the Account tab.
     pub email_draft:         String,
+    /// Current value of the password draft field in the Account tab.
+    pub password_draft:      String,
     /// `true` while a sign-in request is in flight.
     pub sign_in_in_progress: bool,
     /// Error message from the last failed sign-in attempt, if any.
     pub sign_in_error:       Option<String>,
-    /// Shared input state for the API key text field in the Account tab.
-    pub api_key_input:       Option<Entity<InputState>>,
     /// Shared input state for the email text field in the Account tab.
     pub email_input:         Option<Entity<InputState>>,
+    /// Shared input state for the password text field in the Account tab.
+    pub password_input:      Option<Entity<InputState>>,
     /// Current draft value of the storage path text field.
     pub storage_path_draft:  String,
     /// Shared input state for the storage path text field in the Storage tab.
@@ -105,16 +104,16 @@ pub struct SettingsController {
     storage_unavailable: bool,
     storage_path_exists: bool,
     login_service:       Arc<dyn LoginService>,
-    api_key_draft:       String,
     email_draft:         String,
+    password_draft:      String,
     sign_in_in_progress: bool,
     sign_in_error:       Option<String>,
-    /// Input state for the API key text field; set by the root view after
-    /// creation.
-    api_key_input:       Option<Entity<InputState>>,
     /// Input state for the email text field; set by the root view after
     /// creation.
     email_input:         Option<Entity<InputState>>,
+    /// Input state for the password text field; set by the root view after
+    /// creation.
+    password_input:      Option<Entity<InputState>>,
     /// Draft value of the storage path text field.
     storage_path_draft:  String,
     /// Input state for the storage path text field; set by the root view after
@@ -145,11 +144,24 @@ impl SettingsController {
     /// fresh install.
     pub fn new(login_service: Box<dyn LoginService>, cx: &mut Context<Self>) -> Self {
         let file_openers = FileOpenerConfig::load();
-        let is_authenticated =
-            KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
-                                                                         .ok()
-                                                                         .flatten()
-                                                                         .is_some();
+        let loaded_credential = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
+            .load()
+            .ok()
+            .flatten();
+        let is_authenticated = loaded_credential.is_some();
+        // Pre-fill email from the stored credential; fall back to ProfileConfig
+        // for users whose email was saved there before this field moved to the
+        // keyring entry.
+        let email_draft = loaded_credential.as_ref()
+                                           .and_then(|c| c.email.as_deref())
+                                           .map(str::to_owned)
+                                           .or_else(|| {
+                                               ProfileConfig::load()
+                                                   .email()
+                                                   .map(str::to_owned)
+                                           })
+                                           .unwrap_or_default();
+
         let storage = StorageConfig::load();
         if storage.is_default()
            && !storage.is_accessible()
@@ -170,7 +182,6 @@ impl SettingsController {
         }
         let initial_path = storage.root_path();
         let storage_path_draft = initial_path.to_string_lossy().into_owned();
-        let email_draft = ProfileConfig::load().email().unwrap_or_default().to_owned();
 
         let mut ctrl = Self { is_open: false,
                               file_openers,
@@ -180,12 +191,12 @@ impl SettingsController {
                               storage,
                               storage_unavailable,
                               login_service: Arc::from(login_service),
-                              api_key_draft: String::new(),
                               email_draft,
+                              password_draft: String::new(),
                               sign_in_in_progress: false,
                               sign_in_error: None,
-                              api_key_input: None,
                               email_input: None,
+                              password_input: None,
                               storage_path_draft,
                               storage_path_input: None,
                               api_key_hint: None,
@@ -194,17 +205,14 @@ impl SettingsController {
         ctrl
     }
 
-    /// Attaches the API key input state entity created by the root view.
-    ///
-    /// Must be called once after construction, before the settings panel is
-    /// first rendered.
-    pub fn set_api_key_input(&mut self, input: Entity<InputState>) {
-        self.api_key_input = Some(input);
-    }
-
     /// Attaches the email input state entity created by the root view.
     pub fn set_email_input(&mut self, input: Entity<InputState>) {
         self.email_input = Some(input);
+    }
+
+    /// Attaches the password input state entity created by the root view.
+    pub fn set_password_input(&mut self, input: Entity<InputState>) {
+        self.password_input = Some(input);
     }
 
     /// Attaches the storage path input state entity created by the root view.
@@ -355,21 +363,22 @@ impl SettingsController {
 
     // ── Sign-in ───────────────────────────────────────────────────────────────
 
-    /// Updates the API key draft field.
-    pub fn set_api_key_draft(&mut self, value: String, cx: &mut Context<Self>) {
-        self.api_key_draft = value;
-        self.sign_in_error = None;
-        cx.emit(SettingsChanged);
-    }
-
     /// Returns the current email draft value.
     pub fn email_draft(&self) -> &str {
         &self.email_draft
     }
 
-    /// Updates the email draft field.
+    /// Updates the email draft field and clears any prior sign-in error.
     pub fn set_email_draft(&mut self, value: String, cx: &mut Context<Self>) {
         self.email_draft = value;
+        self.sign_in_error = None;
+        cx.emit(SettingsChanged);
+    }
+
+    /// Updates the password draft field and clears any prior sign-in error.
+    pub fn set_password_draft(&mut self, value: String, cx: &mut Context<Self>) {
+        self.password_draft = value;
+        self.sign_in_error = None;
         cx.emit(SettingsChanged);
     }
 
@@ -414,57 +423,85 @@ impl SettingsController {
           .detach();
     }
 
-    /// Attempts to sign in with the current `api_key_draft`.
+    /// Signs in using the current `email_draft` and `password_draft`.
     ///
-    /// Runs authentication on a background thread. On success, stores the API
-    /// key to the keyring, marks the user as signed in, and emits
-    /// [`SignInSucceeded`] so the root view can replace the library
-    /// service. On failure, sets `sign_in_error`.
+    /// First exchanges the email/password pair for an application key via
+    /// the SDK credential exchange, then exchanges that key for session tokens
+    /// via the existing authentication call. On success, stores the credential
+    /// to the keyring and emits [`SignInSucceeded`]. On failure at either step,
+    /// sets `sign_in_error` with a message identifying which step failed.
     pub fn sign_in(&mut self, cx: &mut Context<Self>) {
-        if self.sign_in_in_progress || self.api_key_draft.is_empty() {
+        let email = self.email_draft.trim().to_owned();
+        let password = self.password_draft.trim().to_owned();
+        if self.sign_in_in_progress || email.is_empty() || password.is_empty() {
             return;
         }
         self.sign_in_in_progress = true;
         self.sign_in_error = None;
         cx.emit(SettingsChanged);
 
-        let key = self.api_key_draft.clone();
-        let email = {
-            let trimmed = self.email_draft.trim();
-            if trimmed.is_empty() {
-                None
-            }
-            else {
-                Some(trimmed.to_owned())
-            }
-        };
         let svc = self.login_service.clone();
 
         cx.spawn(async move |this, async_cx| {
-              let result = async_cx.background_executor()
-                                   .spawn(async move { svc.authenticate(&key).map(|t| (key, t)) })
-                                   .await;
+              // Step 1: exchange email + password for application key.
+              let credential_result = async_cx.background_executor()
+                                              .spawn({
+                                                  let email = email.clone();
+                                                  let password = password.clone();
+                                                  async move {
+                                                      svc.login_with_credentials(&email, &password)
+                                                         .map(|key| (svc, key))
+                                                  }
+                                              })
+                                              .await;
+
+              let (svc, api_key) = match credential_result {
+                  Ok(pair) => pair,
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.sign_in_in_progress = false;
+                              ctrl.sign_in_error = Some(e.0);
+                              cx.emit(SettingsChanged);
+                          })
+                          .ok();
+                      return;
+                  }
+              };
+
+              // Step 2: exchange application key for session tokens.
+              let auth_result = async_cx.background_executor()
+                                        .spawn({
+                                            let key = api_key.clone();
+                                            async move { svc.authenticate(&key).map(|t| (key, t)) }
+                                        })
+                                        .await;
 
               this.update(async_cx, |ctrl, cx| {
                       ctrl.sign_in_in_progress = false;
-                      match result {
-                          Ok((api_key, tokens)) => {
+                      match auth_result {
+                          Ok((key, tokens)) => {
                               let store =
                                   KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
                               if let Err(e) =
                                   store.store(&Credential { service: KEYRING_SERVICE.into(),
                                                             account: KEYRING_API_KEY.into(),
-                                                            secret:  api_key.clone(), })
+                                                            secret:  key.clone(),
+                                                            email:   Some(email.clone()), })
                               {
-                                  tracing::warn!("failed to save API key to keyring: {e}");
+                                  tracing::warn!(
+                                      "failed to save credential to keyring: {e}"
+                                  );
                               }
-                              ProfileConfig::save(email.as_deref());
-                              ctrl.api_key_draft.clear();
-                              ctrl.set_logged_in(email, Some(api_key.as_str()), cx);
+                              ProfileConfig::save(Some(&email));
+                              ctrl.password_draft.clear();
+                              ctrl.set_logged_in(Some(email), Some(key.as_str()), cx);
                               cx.emit(SignInSucceeded(tokens));
                           }
                           Err(e) => {
-                              ctrl.sign_in_error = Some(e.0);
+                              ctrl.sign_in_error = Some(format!(
+                                  "Session setup failed after sign-in: {}",
+                                  e.0
+                              ));
                               cx.emit(SettingsChanged);
                           }
                       }
@@ -589,12 +626,12 @@ impl SettingsController {
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,
-                           api_key_draft: self.api_key_draft.clone(),
                            email_draft: self.email_draft.clone(),
+                           password_draft: self.password_draft.clone(),
                            sign_in_in_progress: self.sign_in_in_progress,
                            sign_in_error: self.sign_in_error.clone(),
-                           api_key_input: self.api_key_input.clone(),
                            email_input: self.email_input.clone(),
+                           password_input: self.password_input.clone(),
                            storage_path_draft: self.storage_path_draft.clone(),
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone() }

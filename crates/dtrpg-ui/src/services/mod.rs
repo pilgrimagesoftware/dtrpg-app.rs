@@ -155,9 +155,27 @@ impl std::fmt::Display for LoginError {
 
 /// Service boundary for the login flow.
 ///
-/// Implementations exchange a DriveThruRPG API key for JWT session tokens.
+/// Implementations first exchange an email/password pair for an application
+/// key via [`login_with_credentials`], then exchange that key for session
+/// tokens via [`authenticate`].
+///
+/// [`login_with_credentials`]: LoginService::login_with_credentials
+/// [`authenticate`]: LoginService::authenticate
 pub trait LoginService: Send + Sync + 'static {
-    /// Authenticates with the given API key and returns session tokens.
+    /// Exchanges an email/password pair for a DriveThruRPG application key.
+    ///
+    /// Returns the application key string on success. The caller must then
+    /// pass that key to [`authenticate`] to obtain session tokens.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LoginError`] on invalid credentials, network failure, or
+    /// if the server declines to issue an application key.
+    ///
+    /// [`authenticate`]: LoginService::authenticate
+    fn login_with_credentials(&self, email: &str, password: &str) -> Result<String, LoginError>;
+
+    /// Authenticates with the given application key and returns session tokens.
     ///
     /// # Errors
     ///
