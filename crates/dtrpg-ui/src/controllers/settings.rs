@@ -91,6 +91,8 @@ pub struct SettingsSnapshot {
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
     pub pending_file_opener: Option<PathBuf>,
+    /// Index of the currently active settings page.
+    pub active_page_ix:      usize,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -126,6 +128,15 @@ pub struct SettingsController {
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
     pending_file_opener: Option<PathBuf>,
+    /// Index of the currently active settings page.
+    ///
+    /// Persisted to [`crate::data::ui_prefs::UiPrefs`] so the settings window
+    /// reopens on the same page it was closed on, rather than always
+    /// resetting to the first page — gpui-component's `Settings` widget
+    /// tracks page selection in its own per-window state with no way to read
+    /// it back, so this is tracked here instead and used to drive our own
+    /// page navigation in `render_settings_panel`.
+    active_page_ix:      usize,
 }
 
 impl SettingsController {
@@ -197,7 +208,10 @@ impl SettingsController {
                               storage_path_draft,
                               storage_path_input: None,
                               api_key_hint: None,
-                              pending_file_opener: None };
+                              pending_file_opener: None,
+                              active_page_ix:
+                                  crate::data::ui_prefs::UiPrefs::load().settings_page_ix()
+                                                                        .unwrap_or(0) };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
     }
@@ -221,6 +235,14 @@ impl SettingsController {
     pub fn set_storage_path_draft(&mut self, value: String, cx: &mut Context<Self>) {
         self.storage_path_draft = value;
         cx.emit(SettingsChanged);
+    }
+
+    /// Switches the active settings page and persists the choice so the
+    /// settings window reopens on the same page next time.
+    pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
+        self.active_page_ix = ix;
+        crate::data::ui_prefs::UiPrefs::load().save_settings_page_ix(ix);
+        cx.notify();
     }
 }
 
@@ -621,7 +643,8 @@ impl SettingsController {
                            password_input: self.password_input.clone(),
                            storage_path_draft: self.storage_path_draft.clone(),
                            storage_path_input: self.storage_path_input.clone(),
-                           pending_file_opener: self.pending_file_opener.clone() }
+                           pending_file_opener: self.pending_file_opener.clone(),
+                           active_page_ix: self.active_page_ix }
     }
 }
 
