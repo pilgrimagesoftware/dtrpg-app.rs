@@ -45,6 +45,10 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
             formats: dmg
+          # Uses the `gnu` target rather than `build.yaml`'s `musl` CI target:
+          # AppImage/.deb packaging expects dynamic linking against the
+          # system's GUI libraries (X11/Wayland, fontconfig, D-Bus/libsecret),
+          # which is impractical to statically link via musl for a GUI app.
           - name: Linux
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
