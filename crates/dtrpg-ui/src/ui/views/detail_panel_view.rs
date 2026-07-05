@@ -273,8 +273,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 ///
 /// See `catalog-entry-detail-view`'s persistent-item-list and
 /// update-in-place requirements.
-fn render_item_tier(item: &LibraryItem, storage_root_path: &Path, entity: Entity<LibraryController>,
-                    colors: &ColorTokens, cx: &App)
+fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
+                    entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App)
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
@@ -293,6 +293,14 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path, entity: Entity
                  .font_weight(gpui::FontWeight::SEMIBOLD)
                  .text_color(colors.text_secondary)
                  .child(t!("detail.item_list_column_type").to_string()),
+        ),
+    );
+    header_row = header_row.child(
+        TableCell::new().child(
+            div().text_xs()
+                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                 .text_color(colors.text_secondary)
+                 .child(t!("detail.item_list_column_status").to_string()),
         ),
     );
 
@@ -337,14 +345,24 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path, entity: Entity
                                                                    cx);
                                          });
                            })
+                 // File name
                  .child(div().flex_1()
                              .text_sm()
                              .text_color(colors.text_primary)
                              .child(file.name.to_string()))
+                 // File type
                  .child(div().flex_1()
                              .text_sm()
                              .text_color(colors.text_secondary)
-                             .child(file.format.to_string()));
+                             .child(file.format.to_string()))
+                 // Status
+                 .child(div().flex_1()
+                             .text_sm()
+                             .text_color(colors.text_secondary)
+                             .child(t!("detail.item_status_").to_string() /* TODO: replace
+                                                                           * with cloud/
+                                                                           * downloaded icon
+                                                                           * and tooltip */));
 
         let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
                                  .child(TableCell::new().col_span(2).child(row_content));
@@ -364,16 +382,21 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path, entity: Entity
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(colors.text_primary)
                      .child(t!("detail.items_heading").to_string()))
+         .child(div().text_sm()
+                     .text_color(colors.text_tertiary)
+                     // .py(px(12.0))
+                     .child(t!("detail.item_prompt_select").to_string())
+                     .into_any_element())
          .child(item_list)
          .child(match selected_file {
-                    Some((ix, file)) => render_item_metadata(item, file, ix, storage_root_path,
-                                                              entity.clone(), colors, cx)
-                        .into_any_element(),
-                    None => div().text_sm()
-                                 .text_color(colors.text_tertiary)
-                                 .py(px(12.0))
-                                 .child(t!("detail.item_prompt_select").to_string())
-                                 .into_any_element(),
+                    Some((ix, file)) => render_item_metadata(item,
+                                                             file,
+                                                             ix,
+                                                             storage_root_path,
+                                                             entity.clone(),
+                                                             colors,
+                                                             cx).into_any_element(),
+                    None => div().into_any_element(),
                 })
 }
 
@@ -392,8 +415,8 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
                         storage_root_path: &Path, entity: Entity<LibraryController>,
                         colors: &ColorTokens, cx: &App)
                         -> impl IntoElement + 'static {
-    let name_value =
-        copyable_value(SharedString::from(format!("file-name-{row_ix}")), file.name.to_string());
+    let name_value = copyable_value(SharedString::from(format!("file-name-{row_ix}")),
+                                    file.name.to_string());
 
     let metadata = DescriptionList::vertical()
         .columns(2)
@@ -405,28 +428,29 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
                    .value(file.format.to_string()))
         .child(DescriptionItem::new(t!("detail.field_file_size").to_string())
                    .value(format!("{:.1} MB", file.size_mb)))
-        .child(DescriptionItem::new(t!("detail.field_status").to_string())
-                   .value(if item.status == ItemStatus::Downloaded {
-                       t!("detail.status_on_device").to_string()
-                   } else {
-                       t!("detail.status_in_cloud").to_string()
-                   })
-                   .span(2));
+        // .child(DescriptionItem::new(t!("detail.field_status").to_string())
+        //            .value(if item.status == ItemStatus::Downloaded {
+        //                t!("detail.status_on_device").to_string()
+        //            } else {
+        //                t!("detail.status_in_cloud").to_string()
+        //            })
+        //            .span(2))
+    ;
 
     div().flex()
          .flex_col()
          .gap(px(12.0))
          .child(metadata)
-         .child(render_file_other_details(
-             FileOtherDetailsContext { entry_id: &item.id,
-                                       row_ix,
-                                       is_downloaded: item.status == ItemStatus::Downloaded,
-                                       storage_root_path },
-             file,
-             entity,
-             colors,
-             cx,
-         ))
+         .child(render_file_other_details(FileOtherDetailsContext { entry_id: &item.id,
+                                                                    row_ix,
+                                                                    is_downloaded:
+                                                                        item.status
+                                                                        == ItemStatus::Downloaded,
+                                                                    storage_root_path },
+                                          file,
+                                          entity,
+                                          colors,
+                                          cx))
 }
 
 /// Builds the shared toggle-state key for a single file's "Other details"
@@ -454,7 +478,10 @@ struct FileOtherDetailsContext<'a> {
 fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryItemFile,
                              entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App)
                              -> impl IntoElement + 'static {
-    let FileOtherDetailsContext { entry_id, row_ix, is_downloaded, storage_root_path } = ctx;
+    let FileOtherDetailsContext { entry_id,
+                                  row_ix,
+                                  is_downloaded,
+                                  storage_root_path, } = ctx;
     let toggle_key = file_other_details_key(entry_id, row_ix);
     let open = entity.read(cx).is_file_other_details_open(&toggle_key);
 
@@ -483,8 +510,12 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                       .child(t!("detail.other_details_heading").to_string());
 
     let path_value = if is_downloaded {
-        storage_root_path.join("items").join(entry_id).display().to_string()
-    } else {
+        storage_root_path.join("items")
+                         .join(entry_id)
+                         .display()
+                         .to_string()
+    }
+    else {
         value_or_dash("")
     };
 
@@ -512,8 +543,8 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
 /// id, product id, added-order value, and the generative cover color).
 ///
 /// See `catalog-entry-detail-advanced-disclosure`.
-fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>, colors: &ColorTokens,
-                        cx: &App)
+fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
+                        colors: &ColorTokens, cx: &App)
                         -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let open = entity.read(cx).is_other_details_open(&entry_id);
@@ -531,8 +562,9 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>, c
                       .text_color(colors.text_primary)
                       .on_click(move |_, _, cx| {
                           toggle_entity.update(cx, |ctrl, cx| {
-                              ctrl.toggle_other_details(Arc::clone(&toggle_entry_id), cx);
-                          });
+                                           ctrl.toggle_other_details(Arc::clone(&toggle_entry_id),
+                                                                     cx);
+                                       });
                       })
                       .child(Icon::new(if open {
                                            IconName::ChevronUp
