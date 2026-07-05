@@ -1,5 +1,5 @@
-//! Account settings section: identity display, log-out, and API key sign-in
-//! form.
+//! Account settings section: identity display, sign-out, and email/password
+//! sign-in form.
 
 use std::sync::Arc;
 
@@ -28,8 +28,8 @@ const MONOSPACE_FONT: &str = "Liberation Mono";
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
 pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsController>,
-                              colors: &ColorTokens, api_key_input: Option<Entity<InputState>>,
-                              email_input: Option<Entity<InputState>>,
+                              colors: &ColorTokens, email_input: Option<Entity<InputState>>,
+                              password_input: Option<Entity<InputState>>,
                               sign_in_in_progress: bool, sign_in_error: Option<String>)
                               -> AnyElement {
     if auth.is_logged_in {
@@ -38,8 +38,8 @@ pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsC
     else {
         render_unauthenticated(entity,
                                colors,
-                               api_key_input,
                                email_input,
+                               password_input,
                                sign_in_in_progress,
                                sign_in_error).into_any_element()
     }
@@ -122,7 +122,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                  .justify_center()
                                  .cursor_pointer()
                                  .tooltip(|window, cx| {
-                                     Tooltip::new(t!("settings.reset_api_key_tooltip").to_string())
+                                     Tooltip::new(t!("settings.sign_out_tooltip").to_string())
                                 .build(window, cx)
                                  })
                                  .on_click(move |_, _, cx| {
@@ -167,9 +167,9 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
 // ─────────────────────────────────────────────────────
 
 fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorTokens,
-                          api_key_input: Option<Entity<InputState>>,
-                          email_input: Option<Entity<InputState>>, sign_in_in_progress: bool,
-                          sign_in_error: Option<String>)
+                          email_input: Option<Entity<InputState>>,
+                          password_input: Option<Entity<InputState>>,
+                          sign_in_in_progress: bool, sign_in_error: Option<String>)
                           -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -202,7 +202,8 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
                                                 .text_color(text_tertiary)
                                                 .child(t!("settings.sign_in_prompt"))));
 
-    if let Some(input_state) = api_key_input {
+    if let Some(email_state) = email_input {
+        let can_sign_in_now = !sign_in_in_progress;
         let entity_for_btn = entity.clone();
         let btn_bg = if sign_in_in_progress {
             disabled_bg
@@ -220,10 +221,10 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
         let mut form_section = div().flex()
                                     .flex_col()
                                     .gap(px(10.0))
-                                    .child(Input::new(&input_state).appearance(true).into_element())
-                                    .when_some(email_input, |el, email_state| {
-                                        el.child(Input::new(&email_state).appearance(true)
-                                                                         .into_element())
+                                    .child(Input::new(&email_state).appearance(true).into_element())
+                                    .when_some(password_input, |el, pw_state| {
+                                        el.child(Input::new(&pw_state).appearance(true)
+                                                                      .into_element())
                                     });
 
         if let Some(err) = sign_in_error {
@@ -241,7 +242,7 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
                                     .justify_center()
                                     .cursor_pointer()
                                     .on_click(move |_event, _window, cx| {
-                                        if !sign_in_in_progress {
+                                        if can_sign_in_now {
                                             entity_for_btn.update(cx, |ctrl, cx| ctrl.sign_in(cx));
                                         }
                                     })

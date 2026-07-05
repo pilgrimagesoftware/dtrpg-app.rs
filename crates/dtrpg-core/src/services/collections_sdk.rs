@@ -370,6 +370,12 @@ fn map_client_error(error: ClientError) -> CollectionsServiceError {
             msg.push_str(&format!(": {error}"));
             CollectionsServiceError::new(kind, msg)
         }
+        // These variants are only produced by credential_login, never by
+        // library/collections requests.
+        ClientError::InvalidCredentials | ClientError::ApplicationKeyRequestFailed { .. } => {
+            CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                         "Unexpected credential exchange error in collections request")
+        }
     }
 }
 

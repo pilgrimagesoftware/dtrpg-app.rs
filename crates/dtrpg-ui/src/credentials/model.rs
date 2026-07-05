@@ -5,15 +5,19 @@ use thiserror::Error;
 /// A single credential entry scoped to a service + account pair.
 ///
 /// The `service` and `account` fields identify the keyring entry; `secret`
-/// carries the sensitive value (API key, bearer token, etc.).
+/// carries the sensitive value (application key). `email` carries the
+/// account email stored alongside the key so the sign-in form can pre-fill it.
 #[derive(Clone)]
 pub struct Credential {
     /// Reverse-DNS service name, e.g. `com.pilgrimagesoftware.dtrpg`.
     pub service: String,
     /// Account sub-key distinguishing credential type, e.g. `api-key`.
     pub account: String,
-    /// The secret value to protect.
+    /// The application key.
     pub secret:  String,
+    /// Account email, if known. `None` for legacy entries written before this
+    /// field was introduced.
+    pub email:   Option<String>,
 }
 
 impl std::fmt::Debug for Credential {
@@ -22,6 +26,7 @@ impl std::fmt::Debug for Credential {
          .field("service", &self.service)
          .field("account", &self.account)
          .field("secret", &"[redacted]")
+         .field("email", &self.email)
          .finish()
     }
 }

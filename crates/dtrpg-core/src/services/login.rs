@@ -1,6 +1,6 @@
 //! SDK-backed implementation of [`LoginService`].
 
-use dtrpg_sdk::{auth_client, config::Config};
+use dtrpg_sdk::{ClientError, auth_client, config::Config, credential_login};
 use dtrpg_ui::services::{LoginError, LoginService, LoginTokens};
 use tokio::runtime::{Builder, Runtime};
 
@@ -37,6 +37,24 @@ impl SdkLoginService {
 }
 
 impl LoginService for SdkLoginService {
+    fn login_with_credentials(&self, email: &str, password: &str) -> Result<String, LoginError> {
+        let email = email.to_string();
+        let password = password.to_string();
+        let config = self.config.clone();
+        self.runtime
+            .block_on(credential_login::login_with_credentials(&email, &password, &config))
+            .map_err(|e| match e {
+                ClientError::InvalidCredentials => {
+                    LoginError("Invalid email or password.".to_owned())
+                }
+                ClientError::ApplicationKeyRequestFailed { status } => {
+                    LoginError(format!("Sign-in failed: server returned status '{status}'."))
+                }
+                ClientError::Http(err) => LoginError(format!("Network error during sign-in: {err}")),
+                other => LoginError(format!("Sign-in failed: {other:?}")),
+            })
+    }
+
     fn authenticate(&self, api_key: &str) -> Result<LoginTokens, LoginError> {
         let config = Config::with_base_url(api_key, self.config.base_url());
         let key = api_key.to_string();
@@ -63,6 +81,10 @@ impl UnavailableLoginService {
 }
 
 impl LoginService for UnavailableLoginService {
+    fn login_with_credentials(&self, _email: &str, _password: &str) -> Result<String, LoginError> {
+        Err(self.error.clone())
+    }
+
     fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
         Err(self.error.clone())
     }
