@@ -126,7 +126,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                 .build(window, cx)
                                  })
                                  .on_click(move |_, _, cx| {
-                                     entity_reset.update(cx, |ctrl, cx| ctrl.request_logout(cx));
+                                     entity_reset.update(cx, |ctrl, cx| ctrl.logout(cx));
                                  })
                                  .child(div().text_sm().text_color(text_primary).child("↺"))))
          // ── Divider ───────────────────────────────────────────────────────
@@ -261,6 +261,6 @@ fn render_logout_button(entity: Entity<SettingsController>) -> impl IntoElement 
     Button::new("logout-btn").danger()
                              .label(t!("settings.log_out_button"))
                              .on_click(move |_, _, cx| {
-                                 entity.update(cx, |ctrl, cx| ctrl.request_logout(cx));
+                                 entity.update(cx, |ctrl, cx| ctrl.logout(cx));
                              })
 }
