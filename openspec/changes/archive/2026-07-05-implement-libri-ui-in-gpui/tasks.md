@@ -95,13 +95,13 @@
 
 ## 10. Verification
 
-- [ ] 10.1 Smoke test all four themes: parchment, slate, sage, ink — confirm token coverage with no hardcoded colors remaining
-- [ ] 10.2 Smoke test comfortable and compact density variants across all three catalog layouts
+- [x] 10.1 Smoke test all four themes: parchment, slate, sage, ink — confirm token coverage with no hardcoded colors remaining
+- [x] 10.2 Smoke test comfortable and compact density variants across all three catalog layouts
 - [x] 10.3 Verify search filters title, publisher, and game line fields case-insensitively
 - [x] 10.4 Verify empty state appears when no items match the active query
 - [x] 10.5 Verify group-by-publisher sections appear and disappear correctly across all three layouts
-- [ ] 10.6 Verify detail panel opens and closes via click and Escape; confirm metadata table values are correct
-- [ ] 10.7 Verify Download/Downloaded button toggles item status and the status glyph updates in the catalog
+- [x] 10.6 Verify detail panel opens and closes via click and Escape; confirm metadata table values are correct
+- [x] 10.7 Verify Download/Downloaded button toggles item status and the status glyph updates in the catalog
 - [x] 10.8 Verify generative covers are deterministic: same item always produces the same motif and foreground color
-- [ ] 10.9 Verify that real thumbnail images replace the generative fallback after a successful background download
-- [ ] 10.10 Verify that duplicate cover download tasks are not enqueued when multiple cards for the same item are visible simultaneously
+- [x] 10.9 Verify that real thumbnail images replace the generative fallback after a successful background download
+- [x] 10.10 Verify that duplicate cover download tasks are not enqueued when multiple cards for the same item are visible simultaneously

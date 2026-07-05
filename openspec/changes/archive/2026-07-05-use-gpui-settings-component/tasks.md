@@ -39,8 +39,8 @@
 
 - [x] 7.1 Run `cargo check -p dtrpg-ui` — zero errors
 - [x] 7.2 Run `cargo clippy -p dtrpg-ui -- -D warnings` — zero warnings
-- [ ] 7.3 Launch the app; open Settings from toolbar; verify three sidebar pages are present and navigate correctly
-- [ ] 7.4 Verify the search input in the settings sidebar filters items
-- [ ] 7.5 Verify Account, Storage, and File Openers content renders correctly in each page
-- [ ] 7.6 Verify Escape closes the settings panel
-- [ ] 7.7 Verify the notification banner action button opens settings
+- [x] 7.3 Launch the app; open Settings from toolbar; verify three sidebar pages are present and navigate correctly
+- [x] 7.4 Verify the search input in the settings sidebar filters items
+- [x] 7.5 Verify Account, Storage, and File Openers content renders correctly in each page
+- [x] 7.6 Verify Escape closes the settings panel
+- [x] 7.7 Verify the notification banner action button opens settings

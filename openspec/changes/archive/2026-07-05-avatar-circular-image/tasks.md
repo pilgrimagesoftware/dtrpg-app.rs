@@ -9,7 +9,7 @@
 
 - [x] 2.1 Add a branch inside the authenticated path: when `auth.avatar_bytes` is `Some`, render an `img()` element inside the circular `div`
 - [x] 2.2 Apply `rounded_full()` to the `img()` element (or its container) to clip the image to a circle
-- [ ] 2.3 Verify the image fills the 30×30 px container without distortion
+- [x] 2.3 Verify the image fills the 30×30 px container without distortion
 
 ## 3. Verification
 

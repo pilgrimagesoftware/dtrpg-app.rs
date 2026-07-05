@@ -27,5 +27,5 @@
 
 - [x] 5.1 Add unit tests to `auth_state.rs`: pending flag produces `Authenticating` notice; `set_state` clears pending flag; clearing flag with `Unauthenticated` restores `NotSignedIn` notice
 - [x] 5.2 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 5.3 Manually launch the app with a valid stored API key and confirm "Signing in..." appears briefly before the banner disappears
-- [ ] 5.4 Manually launch the app with an invalid stored API key and confirm "Signing in..." appears then transitions to "Not signed in"
+- [x] 5.3 Manually launch the app with a valid stored API key and confirm "Signing in..." appears briefly before the banner disappears
+- [x] 5.4 Manually launch the app with an invalid stored API key and confirm "Signing in..." appears then transitions to "Not signed in"
