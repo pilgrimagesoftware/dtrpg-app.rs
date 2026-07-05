@@ -52,7 +52,6 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                         colors: &ColorTokens)
                         -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
-    let text_secondary = colors.text_secondary;
     let border = colors.border;
 
     let avatar = render_avatar_circle(auth, colors);
