@@ -167,6 +167,7 @@ notification:
   set_up_account: "Set Up Account"
   session_expired: "Session expired — sign in again to refresh your library"
   sign_in_again: "Sign In Again"
+  signing_in: "Signing in to DriveThruRPG…"
 
 about:
   version: "Version %{version}"

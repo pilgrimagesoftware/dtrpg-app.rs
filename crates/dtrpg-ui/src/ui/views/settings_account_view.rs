@@ -11,7 +11,6 @@ use gpui_component::Sizable;
 use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
-use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -62,8 +61,6 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                          .or_else(|| auth.api_key_hint.clone())
                          .unwrap_or_else(|| t!("settings.default_account_name").to_string());
 
-    let entity_reset = entity.clone();
-
     div().flex()
          .flex_col()
          .gap(px(24.0))
@@ -71,7 +68,6 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
          // ── Identity row ──────────────────────────────────────────────────
          .child(div().flex()
                      .items_center()
-                     .justify_between()
                      .child(div().flex()
                                  .items_center()
                                  .gap(px(16.0))
@@ -112,24 +108,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                 );
                                      }
                                      col
-                                 }))
-                     .child(div().id("reset-api-key-btn")
-                                 .size(px(32.0))
-                                 .rounded(px(8.0))
-                                 .border_1()
-                                 .border_color(border)
-                                 .flex()
-                                 .items_center()
-                                 .justify_center()
-                                 .cursor_pointer()
-                                 .tooltip(|window, cx| {
-                                     Tooltip::new(t!("settings.sign_out_tooltip").to_string())
-                                .build(window, cx)
-                                 })
-                                 .on_click(move |_, _, cx| {
-                                     entity_reset.update(cx, |ctrl, cx| ctrl.request_logout(cx));
-                                 })
-                                 .child(div().text_sm().text_color(text_primary).child("↺"))))
+                                 })))
          // ── Divider ───────────────────────────────────────────────────────
          .child(div().h(px(1.0)).bg(border))
          // ── Actions ───────────────────────────────────────────────────────
@@ -256,6 +235,6 @@ fn render_logout_button(entity: Entity<SettingsController>) -> impl IntoElement 
     Button::new("logout-btn").danger()
                              .label(t!("settings.log_out_button"))
                              .on_click(move |_, _, cx| {
-                                 entity.update(cx, |ctrl, cx| ctrl.request_logout(cx));
+                                 entity.update(cx, |ctrl, cx| ctrl.logout(cx));
                              })
 }

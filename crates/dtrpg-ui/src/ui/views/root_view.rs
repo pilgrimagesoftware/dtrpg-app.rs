@@ -423,7 +423,7 @@ impl LibraryRootView {
                                                 });
                             window.push_notification(
                     Notification::new()
-                        .message("Signing in to DriveThruRPG...")
+                        .message(t!("notification.signing_in").to_string())
                         .autohide(false)
                         .id::<AuthPendingNotif>(),
                     cx,
