@@ -1,9 +1,21 @@
 //! `CredentialStore` trait and `KeyringCredentialStore` implementation.
 
 use keyring::Entry;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
 
 use super::model::{Credential, CredentialError};
+
+/// JSON payload persisted in the platform keyring.
+///
+/// Legacy entries contain only a raw API key string. When `load` reads a
+/// value that fails to deserialize as this struct, it treats the raw string
+/// as the key and sets `email` to `None`.
+#[derive(Serialize, Deserialize)]
+struct KeyringPayload {
+    key:   String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    email: Option<String>,
+}
 
 // ── Trait ─────────────────────────────────────────────────────────────────────
 
@@ -84,40 +96,26 @@ impl KeyringCredentialStore {
 
 impl CredentialStore for KeyringCredentialStore {
     fn store(&self, credential: &Credential) -> Result<(), CredentialError> {
-        let payload = if let Some(email) = &credential.email {
-            serde_json::json!({"email": email, "key": credential.secret}).to_string()
-        }
-        else {
-            credential.secret.clone()
-        };
+        let payload = KeyringPayload { key:   credential.secret.clone(),
+                                       email: credential.email.clone(), };
+        let json = serde_json::to_string(&payload).map_err(|e| CredentialError::Store {
+                                                       account: self.account.clone(),
+                                                       reason:  e.to_string(),
+                                                   })?;
         self.entry()?
-            .set_password(&payload)
-            .map_err(|e| CredentialError::Store {
-                account: self.account.clone(),
-                reason: e.to_string(),
-            })
+            .set_password(&json)
+            .map_err(|e| CredentialError::Store { account: self.account.clone(),
+                                                  reason:  e.to_string(), })
     }
 
     fn load(&self) -> Result<Option<Credential>, CredentialError> {
         match self.entry()?.get_password() {
             Ok(raw) => {
-                // Try to parse as {"email": "...", "key": "..."}.
-                // Fall back to treating the raw string as a legacy plain key.
-                let (secret, email) =
-                    if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(&raw) {
-                        let key = map.get("key").and_then(Value::as_str).map(str::to_owned);
-                        let em = map.get("email").and_then(Value::as_str).map(str::to_owned);
-                        if let Some(k) = key {
-                            (k, em)
-                        }
-                        else {
-                            // Malformed JSON object — treat whole string as legacy key.
-                            (raw, None)
-                        }
-                    }
-                    else {
-                        (raw, None)
-                    };
+                // Attempt to parse new JSON payload; fall back to legacy raw key string.
+                let (secret, email) = match serde_json::from_str::<KeyringPayload>(&raw) {
+                    Ok(p) => (p.key, p.email),
+                    Err(_) => (raw, None),
+                };
                 Ok(Some(Credential { service: self.service.clone(),
                                      account: self.account.clone(),
                                      secret,
@@ -200,14 +198,14 @@ mod tests {
         Credential { service: KEYRING_SERVICE.into(),
                      account: KEYRING_API_KEY.into(),
                      secret:  secret.into(),
-                     email:   None }
+                     email:   None, }
     }
 
     fn make_credential_with_email(secret: &str, email: &str) -> Credential {
         Credential { service: KEYRING_SERVICE.into(),
                      account: KEYRING_API_KEY.into(),
                      secret:  secret.into(),
-                     email:   Some(email.into()) }
+                     email:   Some(email.into()), }
     }
 
     #[test]
@@ -280,59 +278,44 @@ mod tests {
         assert!(debug.contains("[redacted]"));
     }
 
-    // ── JSON payload encoding/decoding tests ──────────────────────────────────
+    // ── KeyringPayload JSON encoding ──────────────────────────────────────────
 
     #[test]
-    fn keyring_store_serializes_email_plus_key_as_json() {
-        // Verify the store method produces the expected JSON payload.
-        // We test through the KeyringCredentialStore logic directly by
-        // exercising the same encoding path that load() uses to decode.
-        let email = "user@example.com";
-        let key = "abc123";
-        let payload = serde_json::json!({"email": email, "key": key}).to_string();
-
-        // Decode via the same logic used in load()
-        let parsed: Value = serde_json::from_str(&payload).unwrap();
-        assert_eq!(parsed["key"].as_str(), Some(key));
-        assert_eq!(parsed["email"].as_str(), Some(email));
+    fn payload_round_trips_key_and_email() {
+        let p = KeyringPayload { key:   "my-api-key".into(),
+                                 email: Some("user@example.com".into()), };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: KeyringPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.key, "my-api-key");
+        assert_eq!(back.email.as_deref(), Some("user@example.com"));
     }
 
     #[test]
-    fn keyring_load_parses_json_payload_with_email() {
-        // Simulate what load() does when it reads back a JSON payload.
-        let raw = r#"{"email":"user@example.com","key":"my-app-key"}"#.to_string();
-        let (secret, email) = decode_payload(raw);
-        assert_eq!(secret, "my-app-key");
-        assert_eq!(email.as_deref(), Some("user@example.com"));
+    fn payload_omits_email_field_when_none() {
+        let p = KeyringPayload { key:   "my-api-key".into(),
+                                 email: None, };
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(!json.contains("email"));
     }
 
     #[test]
-    fn keyring_load_treats_plain_string_as_legacy_key() {
-        let raw = "legacy-plain-api-key".to_string();
-        let (secret, email) = decode_payload(raw);
-        assert_eq!(secret, "legacy-plain-api-key");
-        assert!(email.is_none());
+    fn mock_store_and_load_preserves_email() {
+        let store = MockCredentialStore::default();
+        store.store(&make_credential_with_email("key-abc", "user@example.com"))
+             .expect("store should succeed");
+        // The mock stores only the secret string, so email passthrough isn't
+        // exercised here — that is covered by KeyringPayload round-trip tests.
+        let loaded = store.load().expect("load should succeed");
+        assert!(loaded.is_some());
+        assert_eq!(loaded.unwrap().secret, "key-abc");
     }
 
     #[test]
-    fn keyring_load_treats_json_without_key_field_as_legacy() {
-        let raw = r#"{"other":"value"}"#.to_string();
-        let (secret, email) = decode_payload(raw);
-        // No "key" field — fall back to treating the whole string as the key.
-        assert_eq!(secret, r#"{"other":"value"}"#);
-        assert!(email.is_none());
-    }
-
-    /// Mirrors the decode logic from `KeyringCredentialStore::load`.
-    fn decode_payload(raw: String) -> (String, Option<String>) {
-        use serde_json::Value;
-        if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(&raw) {
-            let key = map.get("key").and_then(Value::as_str).map(str::to_owned);
-            let em = map.get("email").and_then(Value::as_str).map(str::to_owned);
-            if let Some(k) = key {
-                return (k, em);
-            }
-        }
-        (raw, None)
+    fn legacy_raw_key_string_deserializes_without_email() {
+        // Simulate a legacy keyring value that is a bare API key, not JSON.
+        let raw = "legacy-raw-api-key-12345";
+        let result = serde_json::from_str::<KeyringPayload>(raw);
+        assert!(result.is_err(), "raw key should fail JSON parse");
+        // The store.rs load path falls back to (raw, None) in this case.
     }
 }

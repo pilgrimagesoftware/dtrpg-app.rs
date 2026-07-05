@@ -143,6 +143,7 @@ impl LibraryRootView {
 
         let password_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t!("settings.password_placeholder").to_string())
+                                      .masked(true)
         });
         let settings_for_password = settings.clone();
         cx.subscribe(&password_input,
@@ -669,6 +670,9 @@ impl Render for LibraryRootView {
                 if !self.settings_focus.contains_focused(window, cx) {
                     window.focus(&self.settings_focus, cx);
                 }
+                let sign_in_enabled = !settings_snap.sign_in_in_progress
+                                      && !settings_snap.email_draft.is_empty()
+                                      && !settings_snap.password_draft.is_empty();
                 let overlay = render_settings_panel(&settings_snap.file_openers,
                                                     settings_snap.auth,
                                                     settings_snap.storage_root_path,
@@ -679,6 +683,7 @@ impl Render for LibraryRootView {
                                                     settings_snap.email_input,
                                                     settings_snap.password_input,
                                                     settings_snap.sign_in_in_progress,
+                                                    sign_in_enabled,
                                                     settings_snap.sign_in_error,
                                                     settings_snap.storage_path_input,
                                                     self.file_opener_extension_input.clone(),

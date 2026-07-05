@@ -65,6 +65,7 @@ impl LoginService for SdkLoginService {
                                    refresh_token_ttl: r.refresh_token_ttl, })
             .map_err(|e| LoginError(format!("Authentication failed: {e}")))
     }
+
 }
 
 /// A [`LoginService`] that always fails with the given error message.
@@ -88,6 +89,7 @@ impl LoginService for UnavailableLoginService {
     fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
         Err(self.error.clone())
     }
+
 }
 
 /// Builds a boxed [`LoginService`] from the platform environment.
