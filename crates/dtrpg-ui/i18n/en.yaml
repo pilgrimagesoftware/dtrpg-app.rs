@@ -124,6 +124,7 @@ settings:
   file_opener_app_not_found: "App not found"
   file_opener_app_filter_name: "Applications"
   default_account_name: "DriveThruRPG Account"
+  email_label: "Email"
   api_key_label: "API Key"
   password_placeholder: "Password"
   email_placeholder: "Email address"

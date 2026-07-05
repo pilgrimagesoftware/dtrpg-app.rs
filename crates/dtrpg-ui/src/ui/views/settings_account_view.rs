@@ -66,67 +66,43 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
          .gap(px(24.0))
          .p(px(24.0))
          // ── Identity row ──────────────────────────────────────────────────
-         .child(div().flex()
-                     .items_center()
-                     .justify_between()
-                     .child(div().flex()
-                                 .items_center()
-                                 .gap(px(16.0))
-                                 .flex_1()
-                                 .min_w_0()
-                                 .child(avatar)
-                                 .child({
-                                     let mut col =
-                                         div().flex()
-                                              .flex_col()
-                                              .gap(px(4.0))
-                                              .child(div().text_sm()
-                                                          .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                          .text_color(text_primary)
-                                                          .child(t!("settings.account_title")))
-                                              .child(div().text_sm()
-                                                          .text_color(text_secondary)
-                                                          .child(email_text));
-                                     if let Some(hint) = &auth.api_key_hint {
-                                         col = col.child(
-                                    div()
-                                        .flex()
-                                        .items_baseline()
-                                        .gap(px(6.0))
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(colors.text_tertiary)
-                                                .child(t!("settings.api_key_label")),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .font_family(MONOSPACE_FONT)
-                                                .text_color(colors.text_tertiary)
-                                                .child(hint.clone()),
-                                        ),
-                                );
-                                     }
-                                     col
-                                 }))
-                     .child(div().id("reset-api-key-btn")
-                                 .size(px(32.0))
-                                 .rounded(px(8.0))
-                                 .border_1()
-                                 .border_color(border)
-                                 .flex()
-                                 .items_center()
-                                 .justify_center()
-                                 .cursor_pointer()
-                                 .tooltip(|window, cx| {
-                                     Tooltip::new(t!("settings.sign_out_tooltip").to_string())
-                                .build(window, cx)
-                                 })
-                                 .on_click(move |_, _, cx| {
-                                     entity_reset.update(cx, |ctrl, cx| ctrl.logout(cx));
-                                 })
-                                 .child(div().text_sm().text_color(text_primary).child("↺"))))
+         .child(
+                div().flex().items_center().child(
+        div().flex()
+             .items_center()
+             .gap(px(16.0))
+             .flex_1()
+             .min_w_0()
+             .child(avatar)
+             .child({
+                 let mut col =
+                     div().flex()
+                          .flex_col()
+                          .gap(px(4.0))
+                          .child(div().text_xs()
+                                      .text_color(colors.text_secondary)
+                                      .child(t!("settings.email_label")))
+                          .child(div().text_sm()
+                                      .font_weight(gpui::FontWeight::SEMIBOLD)
+                                      .text_color(text_primary)
+                                      .child(t!("settings.account_title")))
+                          .child(div().text_sm().text_color(text_secondary).child(email_text));
+                 if let Some(hint) = &auth.api_key_hint {
+                     col = col.child(div().flex()
+                                          .items_baseline()
+                                          .gap(px(6.0))
+                                          .child(div().text_xs()
+                                                      .text_color(colors.text_secondary)
+                                                      .child(t!("settings.api_key_label")))
+                                          .child(div().text_xs()
+                                                      .font_family(MONOSPACE_FONT)
+                                                      .text_color(colors.text_tertiary)
+                                                      .child(hint.clone())));
+                 }
+                 col
+             }),
+    ),
+    )
          // ── Divider ───────────────────────────────────────────────────────
          .child(div().h(px(1.0)).bg(border))
          // ── Actions ───────────────────────────────────────────────────────
