@@ -15,6 +15,6 @@
 - [x] 3.1 Run `cargo check --all-targets` — no compile errors
 - [x] 3.2 No new clippy warnings introduced
 - [x] 3.3 Run `cargo test --all-features --workspace` — all tests pass
-- [ ] 3.4 Launch the app; open the avatar button menu and confirm the account email appears as a non-interactive label at the top
+- [x] 3.4 Launch the app; open the avatar button menu and confirm the account email appears as a non-interactive label at the top
 - [x] 3.5 Confirm a visual separator appears between the email label and the "Log Out" item
-- [ ] 3.6 Confirm "Log Out" still functions correctly
+- [x] 3.6 Confirm "Log Out" still functions correctly
