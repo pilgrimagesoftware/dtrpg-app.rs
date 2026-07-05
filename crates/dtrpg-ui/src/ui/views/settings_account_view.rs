@@ -1,9 +1,8 @@
-//! Account settings section: identity display, sign-out, and email/password
+//! Account settings section: identity display, log-out, and email+password
 //! sign-in form.
 
 use std::sync::Arc;
 
-use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, Entity, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
     ParentElement, StatefulInteractiveElement, Styled, div, px,
@@ -12,7 +11,6 @@ use gpui_component::Sizable;
 use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
-use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -30,7 +28,8 @@ const MONOSPACE_FONT: &str = "Liberation Mono";
 pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsController>,
                               colors: &ColorTokens, email_input: Option<Entity<InputState>>,
                               password_input: Option<Entity<InputState>>,
-                              sign_in_in_progress: bool, sign_in_error: Option<String>)
+                              sign_in_in_progress: bool, sign_in_enabled: bool,
+                              sign_in_error: Option<String>)
                               -> AnyElement {
     if auth.is_logged_in {
         render_authenticated(auth, entity, colors).into_any_element()
@@ -41,6 +40,7 @@ pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsC
                                email_input,
                                password_input,
                                sign_in_in_progress,
+                               sign_in_enabled,
                                sign_in_error).into_any_element()
     }
 }
@@ -60,8 +60,6 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                          .clone()
                          .or_else(|| auth.api_key_hint.clone())
                          .unwrap_or_else(|| t!("settings.default_account_name").to_string());
-
-    let entity_reset = entity.clone();
 
     div().flex()
          .flex_col()
@@ -168,8 +166,8 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
 
 fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorTokens,
                           email_input: Option<Entity<InputState>>,
-                          password_input: Option<Entity<InputState>>,
-                          sign_in_in_progress: bool, sign_in_error: Option<String>)
+                          password_input: Option<Entity<InputState>>, sign_in_in_progress: bool,
+                          sign_in_enabled: bool, sign_in_error: Option<String>)
                           -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -202,15 +200,11 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
                                                 .text_color(text_tertiary)
                                                 .child(t!("settings.sign_in_prompt"))));
 
-    if let Some(email_state) = email_input {
-        let can_sign_in_now = !sign_in_in_progress;
+    if let (Some(email_state), Some(pw_state)) = (email_input, password_input) {
         let entity_for_btn = entity.clone();
-        let btn_bg = if sign_in_in_progress {
-            disabled_bg
-        }
-        else {
-            accent
-        };
+        let can_click = sign_in_enabled && !sign_in_in_progress;
+        let btn_bg = if can_click { accent } else { disabled_bg };
+        let btn_text = if can_click { accent_on } else { text_secondary };
         let btn_label = if sign_in_in_progress {
             t!("settings.sign_in_in_progress")
         }
@@ -221,11 +215,12 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
         let mut form_section = div().flex()
                                     .flex_col()
                                     .gap(px(10.0))
-                                    .child(Input::new(&email_state).appearance(true).into_element())
-                                    .when_some(password_input, |el, pw_state| {
-                                        el.child(Input::new(&pw_state).appearance(true)
-                                                                      .into_element())
-                                    });
+                                    .child(Input::new(&email_state).appearance(true)
+                                                                   .disabled(sign_in_in_progress)
+                                                                   .into_element())
+                                    .child(Input::new(&pw_state).appearance(true)
+                                                                .disabled(sign_in_in_progress)
+                                                                .into_element());
 
         if let Some(err) = sign_in_error {
             form_section = form_section.child(div().text_xs().text_color(error_color).child(err));
@@ -242,13 +237,13 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
                                     .justify_center()
                                     .cursor_pointer()
                                     .on_click(move |_event, _window, cx| {
-                                        if can_sign_in_now {
+                                        if can_click {
                                             entity_for_btn.update(cx, |ctrl, cx| ctrl.sign_in(cx));
                                         }
                                     })
                                     .child(div().text_sm()
                                                 .font_weight(gpui::FontWeight::MEDIUM)
-                                                .text_color(accent_on)
+                                                .text_color(btn_text)
                                                 .child(btn_label)));
 
         form = form.child(form_section);

@@ -25,14 +25,14 @@
 
 ## 3. Toolbar Avatar Button
 
-- [x] 3.1 In `toolbar_view.rs`, add `render_avatar_button(auth: &AuthStateSnapshot, settings: Entity<SettingsController>, colors: &ColorTokens) -> AnyElement` function
-- [x] 3.2 Implement the unauthenticated state: a 30×30 circle with `surface_alt` background and `👤` text centered in it; no click handler
-- [x] 3.3 Implement the logged-in state: a `Button` with the `display_initial` char as label
-- [x] 3.4 Avatar image bytes state noted as future work; initials are used as fallback in all logged-in states
-- [x] 3.5 When `is_logged_in`, attach a `DropdownMenu` via `Button::dropdown_menu()` with a single "Log Out" item whose `on_click` calls `settings.update(cx, |ctrl, cx| ctrl.logout(cx))`
-- [x] 3.6 Insert `render_avatar_button(&snap.auth, settings.clone(), colors)` into the controls row in `render_toolbar()`, after `render_settings_button()`
-- [x] 3.7 Updated `render_toolbar()` signature to accept `auth: &AuthStateSnapshot`; updated call site in `root_view.rs` to pass `&settings_snap.auth`
-- [x] 3.8 Run `cargo check -p dtrpg-ui` and confirm zero errors
+- [ ] 3.1 In `toolbar_view.rs`, add `render_avatar_button(auth: &AuthStateSnapshot, settings: Entity<SettingsController>, colors: &ColorTokens) -> AnyElement` function
+- [ ] 3.2 Implement the unauthenticated state: a 30×30 circle with `surface_alt` background and `👤` text centered in it; no click handler
+- [ ] 3.3 Implement the logged-in state: a `Button` with the `display_initial` char as label
+- [ ] 3.4 Avatar image bytes state noted as future work; initials are used as fallback in all logged-in states
+- [ ] 3.5 When `is_logged_in`, attach a `DropdownMenu` via `Button::dropdown_menu()` with a single "Log Out" item whose `on_click` calls `settings.update(cx, |ctrl, cx| ctrl.logout(cx))`
+- [ ] 3.6 Insert `render_avatar_button(&snap.auth, settings.clone(), colors)` into the controls row in `render_toolbar()`, after `render_settings_button()`
+- [ ] 3.7 Updated `render_toolbar()` signature to accept `auth: &AuthStateSnapshot`; updated call site in `root_view.rs` to pass `&settings_snap.auth`
+- [ ] 3.8 Run `cargo check -p dtrpg-ui` and confirm zero errors
 
 ## 4. Stub and Verification
 

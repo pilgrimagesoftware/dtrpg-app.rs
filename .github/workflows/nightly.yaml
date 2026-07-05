@@ -1,0 +1,26 @@
+name: Nightly
+
+# Builds and publishes a rolling `nightly` pre-release from the latest
+# `develop` commit. See openspec/changes/add-release-packaging-workflow.
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "crates/**"
+      - rust-toolchain.toml
+      - Cargo.toml
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  package:
+    uses: ./.github/workflows/package.yaml
+    with:
+      tag: nightly
+      prerelease: true
+    secrets: inherit

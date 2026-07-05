@@ -1,5 +1,11 @@
 name: Bump version
 
+# Manual escape hatch for out-of-band version bumps (e.g. forcing a major
+# bump). Independent of, and not required by, the automated tagging that
+# `release.yaml` performs on every push to `master` via Conventional
+# Commits. Prefer letting `release.yaml` compute the version automatically;
+# use this only when the automatic bump type needs to be overridden.
+
 concurrency: ci-${{ github.ref }}
 
 on:

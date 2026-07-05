@@ -50,7 +50,9 @@ impl LoginService for SdkLoginService {
                 ClientError::ApplicationKeyRequestFailed { status } => {
                     LoginError(format!("Sign-in failed: server returned status '{status}'."))
                 }
-                ClientError::Http(err) => LoginError(format!("Network error during sign-in: {err}")),
+                ClientError::Http(err) => {
+                    LoginError(format!("Network error during sign-in: {err}"))
+                }
                 other => LoginError(format!("Sign-in failed: {other:?}")),
             })
     }

@@ -166,6 +166,7 @@ notification:
   set_up_account: "Konto einrichten"
   session_expired: "Sitzung abgelaufen — melden Sie sich erneut an, um Ihre Bibliothek zu aktualisieren"
   sign_in_again: "Erneut anmelden"
+  signing_in: "Bei DriveThruRPG anmelden…"
 
 about:
   version: "Version %{version}"

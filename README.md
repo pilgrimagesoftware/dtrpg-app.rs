@@ -44,6 +44,33 @@ No additional setup required. The app uses Windows Credential Manager via the `k
 cargo test --workspace
 ```
 
+## Releases
+
+Installable packages for macOS (`.dmg`), Linux (`.deb`/`.AppImage`), and Windows (`.msi`/NSIS
+`.exe`) are built by [`cargo-packager`](https://github.com/crabnebula-dev/cargo-packager) and
+published to GitHub Releases:
+
+- **Nightly**: every push to `develop` rebuilds all three platform packages and
+  republishes them under the rolling `nightly` pre-release, replacing the previous nightly's
+  assets. Triggered by `.github/workflows/nightly.yaml`.
+- **Tagged**: when `develop` is merged into `master`, `.github/workflows/release.yaml` computes
+  the next version from [Conventional Commits](https://www.conventionalcommits.org/) since the
+  last version tag (`fix:` -> patch, `feat:` -> minor, a `BREAKING CHANGE:` footer or `!` -> major),
+  updates `Cargo.toml`, tags the commit, and publishes a full GitHub Release with the packages
+  attached.
+
+Both paths share the build/publish logic in `.github/workflows/package.yaml` (a reusable
+`workflow_call` workflow). The Windows leg is currently marked `continue-on-error` pending
+confirmation that the pinned `gpui` revision builds cleanly on Windows (see
+`.github/workflows/windows-spike.yaml` and `openspec/changes/add-release-packaging-workflow`).
+
+Packages are unsigned; macOS Gatekeeper and Windows SmartScreen will warn on first run. Signing is
+a follow-up, not yet implemented.
+
+`.github/workflows/build.yaml` remains CI build/test only and does not publish packages.
+`.github/workflows/bump-version.yaml` is a manual escape hatch for out-of-band version bumps and
+is independent of the automated tagging in `release.yaml`.
+
 ## Crash Reporting (Sentry)
 
 Sentry crash/error reporting is opt-in and off by default. A plain `cargo build`/`cargo run` from
@@ -56,9 +83,9 @@ Sentry is only active when both of the following are true:
   dtrpg-core/sentry`).
 - A DSN is available from either:
   - the `DTRPG_SENTRY_DSN` environment variable at process startup, or
-  - a value embedded at compile time (see `crates/dtrpg-core/build.rs`), which the release build
-    workflow (`.github/workflows/build.yaml`) sets from the `SENTRY_DSN` repository secret. This
-    is how official CI-built release artifacts report crashes without requiring end users to set
+  - a value embedded at compile time (see `crates/dtrpg-core/build.rs`), which the packaging
+    workflow (`.github/workflows/package.yaml`) sets from the `SENTRY_DSN` repository secret. This
+    is how official nightly/release artifacts report crashes without requiring end users to set
     any environment variable themselves.
 
 Other supported variables (all optional, all read at runtime and overridable locally even in a

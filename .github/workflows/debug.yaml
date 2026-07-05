@@ -1,5 +1,9 @@
 name: Debug
 
+# Standalone diagnostics workflow; does not depend on any step or output
+# from build.yaml/nightly.yaml/release.yaml/package.yaml, so it is
+# unaffected by the release-packaging-workflow change.
+
 on:
   workflow_dispatch:
     inputs:

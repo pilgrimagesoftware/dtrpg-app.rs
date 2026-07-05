@@ -33,7 +33,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              entity: Entity<SettingsController>, focus_handle: &FocusHandle,
                              colors: &ColorTokens, email_input: Option<Entity<InputState>>,
                              password_input: Option<Entity<InputState>>,
-                             sign_in_in_progress: bool, sign_in_error: Option<String>,
+                             sign_in_in_progress: bool, sign_in_enabled: bool,
+                             sign_in_error: Option<String>,
                              storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>)
@@ -84,6 +85,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                             account_email_input.clone(),
                             account_password_input.clone(),
                             sign_in_in_progress,
+                            sign_in_enabled,
                             sign_in_error.clone(),
                         )
                     }),

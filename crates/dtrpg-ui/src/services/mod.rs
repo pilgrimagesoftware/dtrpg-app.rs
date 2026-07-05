@@ -177,6 +177,8 @@ pub trait LoginService: Send + Sync + 'static {
 
     /// Authenticates with the given application key and returns session tokens.
     ///
+    /// Used for silent startup re-authentication from a stored key.
+    ///
     /// # Errors
     ///
     /// Returns [`LoginError`] if authentication fails (network error, invalid

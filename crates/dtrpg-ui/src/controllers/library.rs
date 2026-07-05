@@ -1451,7 +1451,10 @@ impl LibraryController {
     /// `catalog-entry-detail-advanced-disclosure`.
     #[must_use]
     pub fn is_other_details_open(&self, entry_id: &str) -> bool {
-        self.other_details_open.get(entry_id).copied().unwrap_or(false)
+        self.other_details_open
+            .get(entry_id)
+            .copied()
+            .unwrap_or(false)
     }
 
     /// Flips `entry_id`'s "Other details" open/collapsed state.
@@ -1472,7 +1475,10 @@ impl LibraryController {
     /// any key not yet toggled.
     #[must_use]
     pub fn is_file_other_details_open(&self, key: &str) -> bool {
-        self.file_other_details_open.get(key).copied().unwrap_or(false)
+        self.file_other_details_open
+            .get(key)
+            .copied()
+            .unwrap_or(false)
     }
 
     /// Flips a single file's "Other details" open/collapsed state within a

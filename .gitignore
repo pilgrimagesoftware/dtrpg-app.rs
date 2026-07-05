@@ -23,4 +23,5 @@ target
 .DS_Store
 
 node_modules/
+.env
 .envrc
