@@ -83,23 +83,18 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                                 .text_color(text_primary)
                                                 .child(t!("settings.account_title")));
 
-                                    // Email
-                                    col = col.child(div().flex()
-                                                         .items_baseline()
-                                                         .gap(px(6.0))
-                                                         .child(div().text_xs()
-                                                                     .text_color(colors.text_secondary)
-                                                                     .child(t!("settings.email_label")))
-                                                         .child(div().text_xs()
-                                                                     .font_family(MONOSPACE_FONT)
-                                                                     .text_color(colors.text_tertiary)
-                                                                     .child(email_text.clone())));
-                                       // .child(div().text_sm()
-                                       //          .text_color(text_secondary)
-                                       //          .child(div().text_xs()
-                                       //                      .text_color(colors.text_secondary)
-                                       //                      .child(t!("settings.email_label")))
-                                       //          .child(email_text));
+                // Email
+                col = col.child(div().flex()
+                                        .items_baseline()
+                                        .gap(px(6.0))
+                                        .child(div().text_xs()
+                                                    .text_color(colors.text_secondary)
+                                                    .child(t!("settings.email_label")))
+                                        .child(div().text_xs()
+                                                    .font_family(MONOSPACE_FONT)
+                                                    .text_color(colors.text_tertiary)
+                                                    .child(email_text.clone())));
+
                  // API Key
                  if let Some(hint) = &auth.api_key_hint {
                      col = col.child(div().flex()
