@@ -1,12 +1,21 @@
-//! Settings panel overlay: sidebar navigation + per-page content via
-//! gpui-component Settings.
+//! Settings panel: sidebar navigation + per-page content. Renders as the
+//! content of a dedicated settings window (see `settings_window_view`), not
+//! as an in-window overlay.
+//!
+//! Page navigation is a custom `Sidebar`/`SidebarMenu` rather than
+//! gpui-component's `Settings` widget: that widget tracks the active page in
+//! its own per-window state with no way to read it back, which would reset
+//! the active page to the first one every time the settings window is closed
+//! and reopened (a new window has its own state). Driving the active page
+//! from `SettingsController::active_page_ix` instead lets it persist across
+//! close/reopen (see `crate::data::ui_prefs::UiPrefs`).
 
 use std::path::PathBuf;
 
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::input::InputState;
-use gpui_component::setting::{SettingGroup, SettingItem, SettingPage, Settings};
+use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -19,14 +28,31 @@ use crate::ui::views::{
     settings_storage_view::render_storage_section,
 };
 
+/// Number of settings pages (Account, Downloads Location, File Openers,
+/// Advanced, About); see [`page_title`] and the `match` in
+/// [`render_settings_panel`].
+const PAGE_COUNT: usize = 5;
+
+/// Returns the i18n title for page `ix`, or the Account page's title if `ix`
+/// is out of range (defensive default for a persisted index from a prior app
+/// version with fewer pages).
+fn page_title(ix: usize) -> String {
+    match ix {
+        1 => t!("settings.downloads_location").to_string(),
+        2 => t!("settings.file_openers_title").to_string(),
+        3 => t!("settings.advanced_title").to_string(),
+        4 => t!("settings.about_title").to_string(),
+        _ => t!("settings.account_title").to_string(),
+    }
+}
+
 // ── Public render entry point
 // ─────────────────────────────────────────────────
 
-/// Renders the settings panel overlay when settings are open.
+/// Renders the settings panel, filling the settings window's content area.
 ///
-/// The returned element is positioned absolute and fills its containing block,
-/// which must have `position: relative` set. The sidebar is outside that
-/// container so it remains visible.
+/// `focus_handle` is the settings window's root focus handle; Escape closes
+/// the window via [`SettingsController::close`].
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage_root_path: PathBuf, storage_path_exists: bool,
@@ -37,147 +63,71 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              sign_in_error: Option<String>,
                              storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
-                             pending_file_opener: Option<PathBuf>)
+                             pending_file_opener: Option<PathBuf>, active_page_ix: usize)
                              -> AnyElement {
     let surface = colors.surface;
-    let border = colors.border;
-    let text_primary = colors.text_primary;
-    let backdrop = gpui::hsla(0.0, 0.0, 0.0, 0.35);
+    let active_page_ix = if active_page_ix < PAGE_COUNT {
+        active_page_ix
+    }
+    else {
+        0
+    };
 
-    let entity_close = entity.clone();
     let entity_escape = entity.clone();
 
-    // ── Capture data for each page's render closure ───────────────────────────
+    let sidebar_menu = SidebarMenu::new().children((0..PAGE_COUNT).map(|ix| {
+                                                       let entity = entity.clone();
+                                                       SidebarMenuItem::new(page_title(ix))
+                    .active(ix == active_page_ix)
+                    .on_click(move |_, _, cx| {
+                        entity.update(cx, |ctrl, cx| ctrl.set_active_page_ix(ix, cx));
+                    })
+                                                   }));
+    let sidebar = Sidebar::new("settings-sidebar").w(px(160.0))
+                                                  .border_0()
+                                                  .collapsible(false)
+                                                  .collapsed(false)
+                                                  .child(sidebar_menu);
 
-    let account_entity = entity.clone();
-    let account_auth = auth.clone();
-    let account_colors = colors.clone();
-    let account_email_input = email_input.clone();
-    let account_password_input = password_input.clone();
+    let content: AnyElement = match active_page_ix {
+        1 => render_storage_section(storage_root_path,
+                                    storage_path_exists,
+                                    entity.clone(),
+                                    colors,
+                                    storage_path_input).into_any_element(),
+        2 => render_file_openers_section(file_openers,
+                                         entity.clone(),
+                                         colors,
+                                         file_opener_extension_input,
+                                         pending_file_opener).into_any_element(),
+        3 => render_advanced_section(entity.clone(), colors).into_any_element(),
+        4 => render_about_section(colors).into_any_element(),
+        _ => render_account_section(&auth,
+                                    entity.clone(),
+                                    colors,
+                                    email_input,
+                                    password_input,
+                                    sign_in_in_progress,
+                                    sign_in_enabled,
+                                    sign_in_error),
+    };
 
-    let storage_entity = entity.clone();
-    let storage_path = storage_root_path.clone();
-    let storage_colors = colors.clone();
-    let storage_path_input = storage_path_input.clone();
-
-    let file_openers_vec = file_openers.to_vec();
-    let file_openers_entity = entity.clone();
-    let file_openers_colors = colors.clone();
-    let file_opener_extension_input = file_opener_extension_input.clone();
-    let pending_file_opener = pending_file_opener.clone();
-
-    let advanced_entity = entity.clone();
-    let advanced_colors = colors.clone();
-    let about_colors = colors.clone();
-
-    // ── Build the Settings component ──────────────────────────────────────────
-
-    let settings =
-        Settings::new("settings-panel")
-            .sidebar_width(px(160.0))
-            .page(
-                SettingPage::new(t!("settings.account_title")).group(SettingGroup::new().item(
-                    SettingItem::render(move |_, _window, _cx| {
-                        render_account_section(
-                            &account_auth,
-                            account_entity.clone(),
-                            &account_colors,
-                            account_email_input.clone(),
-                            account_password_input.clone(),
-                            sign_in_in_progress,
-                            sign_in_enabled,
-                            sign_in_error.clone(),
-                        )
-                    }),
-                )),
-            )
-            .page(SettingPage::new(t!("settings.downloads_location")).group(
-                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
-                    render_storage_section(
-                        storage_path.clone(),
-                        storage_path_exists,
-                        storage_entity.clone(),
-                        &storage_colors,
-                        storage_path_input.clone(),
-                    )
-                })),
-            ))
-            .page(SettingPage::new(t!("settings.file_openers_title")).group(
-                SettingGroup::new().item(SettingItem::render(move |_, _window, _cx| {
-                    render_file_openers_section(
-                        &file_openers_vec,
-                        file_openers_entity.clone(),
-                        &file_openers_colors,
-                        file_opener_extension_input.clone(),
-                        pending_file_opener.clone(),
-                    )
-                })),
-            ))
-            .page(
-                SettingPage::new(t!("settings.advanced_title")).group(SettingGroup::new().item(
-                    SettingItem::render(move |_, _window, _cx| {
-                        render_advanced_section(advanced_entity.clone(), &advanced_colors)
-                    }),
-                )),
-            )
-            .page(
-                SettingPage::new(t!("settings.about_title")).group(SettingGroup::new().item(
-                    SettingItem::render(move |_, _window, _cx| render_about_section(&about_colors)),
-                )),
-            );
-
-    div().id("settings-backdrop")
+    div().id("settings-window-root")
          .track_focus(focus_handle)
-         .occlude()
          .on_key_down(move |event, _window, cx| {
              if event.keystroke.key == "escape" {
                  entity_escape.update(cx, |ctrl, cx| ctrl.close(cx));
              }
          })
-         .absolute()
-         .inset_0()
-         .bg(backdrop)
+         .size_full()
+         .bg(surface)
          .flex()
-         .items_center()
-         .justify_center()
-         .child(div().w(px(720.0))
-                     .h(px(480.0))
-                     .bg(surface)
-                     .border_1()
-                     .border_color(border)
-                     .rounded(px(12.0))
-                     .shadow_lg()
-                     .flex()
-                     .flex_col()
+         .flex_row()
+         .child(sidebar)
+         .child(div().flex_1()
+                     .min_w_0()
+                     .min_h_0()
                      .overflow_hidden()
-                     // ── Title bar ─────────────────────────────────────────────
-                     .child(div().h(px(48.0))
-                                 .flex_none()
-                                 .flex()
-                                 .items_center()
-                                 .justify_between()
-                                 .px(px(20.0))
-                                 .border_b_1()
-                                 .border_color(border)
-                                 .child(div().text_base()
-                                             .font_weight(gpui::FontWeight::SEMIBOLD)
-                                             .text_color(text_primary)
-                                             .child(t!("settings.title")))
-                                 .child(div().id("settings-close")
-                                             .size(px(24.0))
-                                             .rounded_full()
-                                             .bg(colors.hover)
-                                             .flex()
-                                             .items_center()
-                                             .justify_center()
-                                             .cursor_pointer()
-                                             .text_sm()
-                                             .text_color(colors.text_secondary)
-                                             .on_click(move |_, _, cx| {
-                                                 entity_close.update(cx, |ctrl, cx| ctrl.close(cx));
-                                             })
-                                             .child("x")))
-                     // ── Settings component (sidebar + active page) ────────────
-                     .child(div().flex_1().min_h_0().child(settings)))
+                     .child(content))
          .into_any_element()
 }

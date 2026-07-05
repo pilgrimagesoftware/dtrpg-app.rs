@@ -10,6 +10,7 @@ pub mod settings_advanced_view;
 pub mod settings_file_openers_view;
 pub mod settings_storage_view;
 pub mod settings_view;
+pub mod settings_window_view;
 pub mod sidebar_view;
 pub mod status_bar_view;
 pub mod tab_strip_view;

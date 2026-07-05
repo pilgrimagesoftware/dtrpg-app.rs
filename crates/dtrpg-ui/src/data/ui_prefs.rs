@@ -16,6 +16,10 @@ pub struct UiPrefsFile {
     /// Whether the Publishers sidebar section is open (`true`) or collapsed
     /// (`false`).
     pub publishers_open:  Option<bool>,
+    /// Index of the last-active settings page (Account/Storage/File
+    /// Openers/Advanced/About), so the settings window reopens on the same
+    /// tab it was closed on.
+    pub settings_page_ix: Option<usize>,
 }
 
 /// Persists and restores small UI preferences.
@@ -79,6 +83,17 @@ impl UiPrefs {
     /// Persist the Publishers section open state.
     pub fn save_publishers_open(&mut self, open: bool) {
         self.data.publishers_open = Some(open);
+        self.flush();
+    }
+
+    /// Index of the last-active settings page, or `None` if never saved.
+    pub fn settings_page_ix(&self) -> Option<usize> {
+        self.data.settings_page_ix
+    }
+
+    /// Persist the active settings page index.
+    pub fn save_settings_page_ix(&mut self, ix: usize) {
+        self.data.settings_page_ix = Some(ix);
         self.flush();
     }
 

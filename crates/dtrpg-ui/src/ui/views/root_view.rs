@@ -2,7 +2,7 @@
 
 use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, ParentElement, Pixels, Render, Styled, div, px,
+    IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
 };
 use gpui_component::Root;
 use gpui_component::WindowExt as _;
@@ -20,12 +20,12 @@ use crate::ui::actions::{
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
+    open_settings_window,
 };
 use crate::ui::views::{
     catalog_view::CatalogView,
     detail_panel_view::render_detail_tab_content,
     notification_banner_view::render_notification_banner,
-    settings_view::render_settings_panel,
     sidebar_view::render_sidebar,
     status_bar_view::{ActivityBarData, StatusBarSnapshot, render_status_bar},
     tab_strip_view::render_tab_strip,
@@ -76,9 +76,10 @@ pub struct LibraryRootView {
     /// Default focus handle for the root div, ensuring menu-triggered actions
     /// always have a dispatch path even before any child element grabs focus.
     root_focus:                  FocusHandle,
-    /// Focus handle for the settings overlay; grabbed when the panel opens so
-    /// Escape key events route to the backdrop instead of the catalog.
-    settings_focus:              FocusHandle,
+    /// Handle to the currently-open settings window, if any. Used by the
+    /// `ShowSettings` action to bring an already-open window to front instead
+    /// of opening a duplicate; `None` when no settings window is open.
+    settings_window:             Option<WindowHandle<Root>>,
     /// Editable search input wired to the library controller's search query.
     search_input:                Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
@@ -191,7 +192,6 @@ impl LibraryRootView {
         let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
         let root_focus = cx.focus_handle();
         root_focus.focus(window, cx);
-        let settings_focus = cx.focus_handle();
 
         let search_input =
             cx.new(|cx| {
@@ -347,23 +347,12 @@ impl LibraryRootView {
         )
           .detach();
 
-        // When the settings overlay closes, its backdrop/input focus handles unmount
-        // and become orphaned in the dispatch tree — `Window::focused` still returns
-        // the stale handle (it stays alive via `self.settings_focus`), but the tree
-        // can no longer resolve its node, so action availability falls back to the
-        // dispatch tree's absolute root instead of our root div. That root div is
-        // where every app-level `.on_action` handler (menu items, shortcuts) lives,
-        // so once this happens the native menu bar shows every custom item as
-        // permanently disabled. Restore focus to `root_focus` on close to keep the
-        // dispatch path anchored inside our tree.
-        cx.subscribe_in(&settings,
-                        window,
-                        |this, ctrl, _event: &SettingsChanged, window, cx| {
-                            if !ctrl.read(cx).is_open() {
-                                window.focus(&this.root_focus, cx);
-                            }
-                            cx.notify();
-                        })
+        // Settings now lives in its own window (see `settings_window_view`), so
+        // `SettingsChanged` no longer affects this window's focus tree — just
+        // repaint to pick up any state (e.g. auth) the main window also reads.
+        cx.subscribe(&settings, |_this, _ctrl, _event: &SettingsChanged, cx| {
+              cx.notify();
+          })
           .detach();
 
         cx.subscribe(&auth_state,
@@ -482,7 +471,7 @@ impl LibraryRootView {
                resize_state,
                sidebar_width,
                root_focus,
-               settings_focus,
+               settings_window: None,
                search_input,
                collection_name_input,
                file_opener_extension_input,
@@ -652,51 +641,23 @@ impl Render for LibraryRootView {
         let surface = colors.surface;
         let text_primary = colors.text_primary;
 
-        // Settings overlay is rendered inside the main content area so the
-        // sidebar remains visible behind it.
-        let main_content = {
-            let mut content = div().flex_1()
-                                   .min_w_0()
-                                   .flex()
-                                   .flex_col()
-                                   .relative()
-                                   .bg(surface)
-                                   .child(tab_strip)
-                                   .child(active_tab_content);
-
-            if settings_snap.is_open {
-                // Focus the backdrop on first open so Escape works immediately.
-                // Don't steal focus if a child (e.g. the email input) already has it.
-                if !self.settings_focus.contains_focused(window, cx) {
-                    window.focus(&self.settings_focus, cx);
-                }
-                let sign_in_enabled = !settings_snap.sign_in_in_progress
-                                      && !settings_snap.email_draft.is_empty()
-                                      && !settings_snap.password_draft.is_empty();
-                let overlay = render_settings_panel(&settings_snap.file_openers,
-                                                    settings_snap.auth,
-                                                    settings_snap.storage_root_path,
-                                                    settings_snap.storage_path_exists,
-                                                    settings_entity,
-                                                    &self.settings_focus,
-                                                    colors,
-                                                    settings_snap.email_input,
-                                                    settings_snap.password_input,
-                                                    settings_snap.sign_in_in_progress,
-                                                    sign_in_enabled,
-                                                    settings_snap.sign_in_error,
-                                                    settings_snap.storage_path_input,
-                                                    self.file_opener_extension_input.clone(),
-                                                    settings_snap.pending_file_opener);
-                content = content.child(overlay);
-            }
-
-            content
-        };
+        // Settings renders in its own window (see `settings_window_view`), not as
+        // an overlay here, so the main content area no longer branches on
+        // `settings_snap.is_open`.
+        let main_content = div().flex_1()
+                                .min_w_0()
+                                .flex()
+                                .flex_col()
+                                .relative()
+                                .bg(surface)
+                                .child(tab_strip)
+                                .child(active_tab_content);
 
         let sidebar_col = div().size_full().relative().child(sidebar);
 
         let settings_for_action = self.settings.clone();
+        let file_opener_input_for_settings_window = self.file_opener_extension_input.clone();
+        let this_entity = cx.entity();
         let controller_for_reload = self.controller.clone();
         let controller_for_refresh_thumbnails = self.controller.clone();
         let controller_for_add = self.controller.clone();
@@ -723,7 +684,25 @@ impl Render for LibraryRootView {
             .relative()
             .track_focus(&self.root_focus)
             .on_action(move |_: &ShowSettings, _, cx| {
-                settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
+                let already_open = this_entity.read(cx)
+                                              .settings_window
+                                              .map(|handle| {
+                                                  handle.update(cx, |_, window, _| {
+                                                            window.activate_window();
+                                                        })
+                                                        .is_ok()
+                                              })
+                                              .unwrap_or(false);
+                if !already_open {
+                    settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
+                    let handle =
+                        open_settings_window(settings_for_action.clone(),
+                                             file_opener_input_for_settings_window.clone(),
+                                             cx);
+                    this_entity.update(cx, |view, _cx| {
+                                   view.settings_window = Some(handle);
+                               });
+                }
             })
             .on_action(move |_: &About, window, cx| {
                 window.open_dialog(cx, move |dialog, _window, _cx| {

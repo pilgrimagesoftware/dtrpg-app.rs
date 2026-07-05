@@ -25,6 +25,13 @@ The Rust frontend SHALL reuse the existing `Entity<SettingsController>` handle f
 - **WHEN** the user edits a draft field (e.g. storage path) in the settings window, closes the window, then reopens it via `ShowSettings`
 - **THEN** the reopened settings window reflects the same `SettingsController` entity state, including the unsaved draft value
 
+### Requirement: The active settings page persists across window close/reopen
+The Rust frontend SHALL track the active settings page in `SettingsController` (persisted to `UiPrefs`) and drive its own page navigation from that value, rather than relying on gpui-component's `Settings` widget's internal per-window page-selection state, which cannot be read back and would reset to the first page on every new window.
+
+#### Scenario: Reopening settings on the same page
+- **WHEN** the user switches to a non-default settings page (e.g. "About"), closes the settings window, then reopens it via `ShowSettings`
+- **THEN** the reopened settings window shows the same page that was active when it was closed
+
 ### Requirement: Overlay-specific focus handling is removed from the main window
 The Rust frontend SHALL remove `LibraryRootView`'s `settings_focus` focus-trap handle and the `settings_snap.is_open` conditional overlay branch, since settings no longer renders inside the main window.
 
