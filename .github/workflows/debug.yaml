@@ -29,6 +29,11 @@ jobs:
           fetch-depth: 0
           show-progress: true
 
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy rustfmt
+
       - name: Dump GitHub context
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}
