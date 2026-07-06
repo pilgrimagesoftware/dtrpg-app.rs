@@ -33,6 +33,23 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
     }
 }
 
+/// Resolves the id used for collection membership: `order_product_id`,
+/// falling back to `product_id` when the former is absent (`0`).
+///
+/// Mirrors the preference `item_matches_filter` and
+/// `RustSdkCollectionsService::list_collections` (in `dtrpg-core`) already
+/// use when reading membership, so an id added here matches correctly when
+/// the collections cache is next reloaded from the API.
+#[must_use]
+pub fn collection_member_id(item: &LibraryItem) -> u64 {
+    if item.order_product_id > 0 {
+        item.order_product_id
+    }
+    else {
+        item.product_id
+    }
+}
+
 /// Returns `true` if `item` contains `query` in title, publisher, or game line
 /// (case-insensitive).
 #[must_use]

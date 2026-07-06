@@ -919,6 +919,64 @@ impl LibraryController {
           .detach();
     }
 
+    /// Adds `item_id` (an item's `order_product_id`/`product_id`) as a member
+    /// of the collection with `collection_id`.
+    ///
+    /// Updates `member_ids` (and `collection_members`, if that collection is
+    /// the active filter) immediately, then confirms the change via the
+    /// service. On failure the optimistic update is rolled back and
+    /// [`CollectionMemberAddFailed`] is emitted so the window can show an
+    /// error notification.
+    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64,
+                                  cx: &mut Context<Self>) {
+        let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
+        else {
+            return;
+        };
+        if collection.member_ids.contains(&item_id) {
+            return;
+        }
+        let mut member_ids: Vec<u64> = collection.member_ids.iter().copied().collect();
+        member_ids.push(item_id);
+        collection.member_ids = Arc::from(member_ids.as_slice());
+
+        if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
+            self.collection_members.insert(item_id);
+        }
+        cx.emit(LibraryChanged);
+
+        let collections_service = Arc::clone(&self.collections_service);
+        cx.spawn(async move |this, async_cx| {
+              let result = async_cx.background_executor()
+                                   .spawn(async move {
+                                       collections_service.add_member(collection_id, item_id)
+                                   })
+                                   .await;
+              if let Err(e) = result {
+                  this.update(async_cx, |ctrl, cx| {
+                          if let Some(collection) =
+                              ctrl.collections.iter_mut().find(|c| c.id == collection_id)
+                          {
+                              let member_ids: Vec<u64> = collection.member_ids
+                                                                   .iter()
+                                                                   .copied()
+                                                                   .filter(|id| *id != item_id)
+                                                                   .collect();
+                              collection.member_ids = Arc::from(member_ids.as_slice());
+                          }
+                          if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
+                          {
+                              ctrl.collection_members.remove(&item_id);
+                          }
+                          cx.emit(LibraryChanged);
+                          cx.emit(CollectionMemberAddFailed { message: e.message.clone(), });
+                      })
+                      .ok();
+              }
+          })
+          .detach();
+    }
+
     // ── Thumbnail loading ──────────────────────────────────────────────────────
 
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
