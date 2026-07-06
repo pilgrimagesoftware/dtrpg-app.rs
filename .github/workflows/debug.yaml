@@ -126,7 +126,7 @@ jobs:
 
       - name: Conventional Release Action
         id: automatic_versioning
-        uses: onesoft-sudo/conventional-release-action@1.8.0
+        uses: onesoft-sudo/conventional-release-action@v1.8.0
 
       - name: Other interesting things
         run: |
