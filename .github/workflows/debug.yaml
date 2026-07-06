@@ -124,6 +124,10 @@ jobs:
         run: |
           echo "$GIT_INFO"
 
+      - name: Conventional Release Action
+        id: automatic_versioning
+        uses: onesoft-sudo/conventional-release-action@latest
+
       - name: Other interesting things
         run: |
           git rev-list --count ${{ github.ref_name }}
