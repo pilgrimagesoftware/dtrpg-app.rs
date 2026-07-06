@@ -125,8 +125,12 @@ jobs:
           echo "$GIT_INFO"
 
       - name: Conventional Release Action
-        id: automatic_versioning
-        uses: onesoft-sudo/conventional-release-action@v1.8.0
+        id: semantic_release
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          semantic_version: ${{ steps.get_latest_tag.outputs.tag }}
+          branch: ${{ github.ref_name }}
+          dry_run: true
 
       - name: Other interesting things
         run: |
