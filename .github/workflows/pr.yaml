@@ -24,6 +24,7 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: nightly
           components: clippy rustfmt
 
       - name: Cache dependencies
