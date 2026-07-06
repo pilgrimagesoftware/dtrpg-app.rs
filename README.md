@@ -1,4 +1,4 @@
-# dtrpg-app (Rust)
+# Libri.app (Rust)
 
 DriveThruRPG desktop frontend in Rust, built with [gpui](https://github.com/zed-industries/zed).
 
