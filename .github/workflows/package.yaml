@@ -41,9 +41,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `macos-latest` runners are Apple Silicon (arm64); build natively
+          # rather than cross-compiling to x86_64-apple-darwin to avoid
+          # cross-compilation risk in gpui's Metal/Objective-C bindings.
+          # Revisit if Intel Mac support is needed.
           - name: macOS
             os: macos-latest
-            target: x86_64-apple-darwin
+            target: aarch64-apple-darwin
             formats: dmg
           # Uses the `gnu` target rather than `build.yaml`'s `musl` CI target:
           # AppImage/.deb packaging expects dynamic linking against the
@@ -81,7 +85,19 @@ jobs:
         if: matrix.name == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsecret-1-dev
+          sudo apt-get install -y \
+            libsecret-1-dev \
+            libasound2-dev \
+            libfontconfig-dev \
+            libgit2-dev \
+            libglib2.0-dev \
+            libssl-dev \
+            libva-dev \
+            libvulkan1 \
+            libwayland-dev \
+            libx11-xcb-dev \
+            libxkbcommon-x11-dev \
+            libzstd-dev
 
       - name: Install cargo-packager
         run: cargo install cargo-packager --locked
@@ -95,6 +111,13 @@ jobs:
           DTRPG_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           DTRPG_SENTRY_ENVIRONMENT: ${{ inputs.prerelease && 'nightly' || 'production' }}
           DTRPG_SENTRY_RELEASE: ${{ inputs.tag }}
+          # `before-packaging-command` in `crates/dtrpg-core/Cargo.toml` runs a
+          # plain `cargo build` with no `--target`. Without this, cargo writes
+          # the binary to `target/release/` while `cargo packager --target
+          # ${{ matrix.target }}` looks for it under
+          # `target/${{ matrix.target }}/release/`, so packaging fails with a
+          # "file not found" error even though the build itself succeeded.
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cargo packager --release --packages dtrpg-core --target ${{ matrix.target }} --formats ${{ matrix.formats }} --verbose
 
       - name: Upload package artifact
