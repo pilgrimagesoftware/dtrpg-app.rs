@@ -118,7 +118,13 @@ jobs:
           # `target/${{ matrix.target }}/release/`, so packaging fails with a
           # "file not found" error even though the build itself succeeded.
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cargo packager --release --packages dtrpg-core --target ${{ matrix.target }} --formats ${{ matrix.formats }} --verbose
+        run: |
+          cargo packager \
+            --release \
+            --packages dtrpg-core \
+            --target ${{ matrix.target }} \
+            --formats ${{ matrix.formats }} \
+            --verbose
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4

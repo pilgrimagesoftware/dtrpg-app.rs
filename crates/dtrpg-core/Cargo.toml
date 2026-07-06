@@ -44,10 +44,14 @@ sentry = ["dep:sentry", "dep:sentry-tracing"]
 # from before resolving any relative paths in the config. Source assets:
 # pilgrimagesoftware/dtrpg-design `app-icons/`.
 [package.metadata.packager]
-product-name = "DriveThruRPG"
+product-name = "Libri"
 identifier = "com.pilgrimagesoftware.dtrpg"
 description = "DriveThruRPG desktop frontend"
 homepage = "https://github.com/pilgrimagesoftware/dtrpg-app"
+authors = ["Paul Schifferer <paul@schifferers.net>"]
+publisher = "Pilgrimage Software"
+license_file = "../../LICENSE.md"
+copyright = "Copyright (c) 2026 Pilgrimage Software"
 category = "Utility"
 before-packaging-command = "cargo build --release --package dtrpg-core --features sentry"
 icons = ["../../assets/icon/icon.png", "../../assets/icon/icon.icns", "../../assets/icon/icon.ico"]
