@@ -21,6 +21,11 @@ on:
         description: "The git ref to build. Defaults to the ref that triggered the caller workflow."
         required: false
         type: string
+      release_notes:
+        description: "Release notes body for the GitHub Release. Falls back to GitHub's auto-generated notes (non-prerelease only) when empty."
+        required: false
+        type: string
+        default: ""
 
 env:
   CARGO_TERM_COLOR: always
@@ -159,10 +164,14 @@ jobs:
         with:
           tag: ${{ inputs.tag }}
           name: ${{ inputs.tag }}
+          body: ${{ inputs.release_notes }}
           prerelease: ${{ inputs.prerelease }}
           allowUpdates: ${{ inputs.prerelease }}
           removeArtifacts: ${{ inputs.prerelease }}
           replacesArtifacts: true
           artifacts: dist/*
           commit: ${{ inputs.ref || github.sha }}
-          generateReleaseNotes: ${{ !inputs.prerelease }}
+          # Only fall back to GitHub's auto-generated notes when the caller
+          # didn't supply its own (release.yaml passes Conventional-Commits
+          # notes from semantic-release; nightly.yaml passes none).
+          generateReleaseNotes: ${{ inputs.release_notes == '' && !inputs.prerelease }}

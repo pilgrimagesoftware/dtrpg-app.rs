@@ -4,6 +4,7 @@
 //! lights — it is not repeated here.
 
 use std::collections::HashSet;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::prelude::*;
@@ -14,17 +15,18 @@ use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputState};
-use gpui_component::menu::PopupMenuItem;
+use gpui_component::menu::{ContextMenuExt, PopupMenuItem};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
-use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _};
+use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as _};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
 use crate::data::ui_prefs::UiPrefs;
+use crate::ui::library::drag::DraggedLibraryItem;
 use crate::util::filter::SidebarFilter;
 use crate::util::matching::name_matches_query;
 use crate::util::publisher::PublisherEntry;
@@ -44,11 +46,12 @@ pub struct SidebarSectionSearch {
     pub input: Entity<InputState>,
 }
 
-/// A sidebar child that is either a [`SidebarMenu`] or a thin horizontal
-/// divider.
+/// A sidebar child that is either a [`SidebarMenu`], the hand-rolled
+/// Collections section, or a thin horizontal divider.
 #[derive(Clone)]
 enum SidebarContent {
     Menu(Box<SidebarMenu>),
+    Collections(Box<CollectionsSection>),
     Separator,
 }
 
@@ -56,6 +59,7 @@ impl Collapsible for SidebarContent {
     fn collapsed(self, collapsed: bool) -> Self {
         match self {
             Self::Menu(m) => Self::Menu(Box::new(m.collapsed(collapsed))),
+            Self::Collections(c) => Self::Collections(c),
             Self::Separator => Self::Separator,
         }
     }
@@ -63,7 +67,7 @@ impl Collapsible for SidebarContent {
     fn is_collapsed(&self) -> bool {
         match self {
             Self::Menu(m) => m.is_collapsed(),
-            Self::Separator => false,
+            Self::Collections(_) | Self::Separator => false,
         }
     }
 }
@@ -73,6 +77,7 @@ impl SidebarItem for SidebarContent {
               -> impl IntoElement {
         match self {
             Self::Menu(m) => m.render(id, window, cx).into_any_element(),
+            Self::Collections(c) => c.render(id, window, cx).into_any_element(),
             Self::Separator => div().h(px(1.))
                                     .w_full()
                                     .my_1()
@@ -80,6 +85,194 @@ impl SidebarItem for SidebarContent {
                                     .into_any_element(),
         }
     }
+}
+
+// ── Collections section (hand-rolled drop target)
+// ──────────────────────────
+
+/// One collection nav row within the Collections section.
+#[derive(Clone)]
+struct CollectionRow {
+    id:        u64,
+    name:      Arc<str>,
+    count:     usize,
+    is_active: bool,
+}
+
+/// Builds the Collections section header's trailing suffix element (item
+/// count, search toggle, add-collection dialog).
+type CollectionsSuffixFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
+
+/// Toggles the Collections section's persisted open/closed `UiPrefs` state.
+type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// The Collections section, rendered as plain `div`s rather than
+/// [`SidebarMenuItem`], because `SidebarMenuItem` has no `on_drop`/
+/// `drag_over` hooks — its row is built entirely inside the vendored
+/// `gpui-component` crate with no way to wrap or extend it from here. This
+/// is the only sidebar section that needs to be a drop target (see
+/// `catalog-drag-drop-to-collection`), so only this section forgoes
+/// `SidebarMenuItem`; smart-filter and publisher rows are unaffected.
+///
+/// The open/closed state is read from `UiPrefs` on every render (same as
+/// before), so — unlike `SidebarMenuItem`, which tracks its own internal
+/// open state — no separate collapse-toggle plumbing is needed here.
+#[derive(Clone)]
+struct CollectionsSection {
+    title:     SharedString,
+    open:      bool,
+    suffix:    CollectionsSuffixFn,
+    on_toggle: CollectionsToggleFn,
+    rows:      Vec<CollectionRow>,
+    entity:    Entity<LibraryController>,
+}
+
+impl Collapsible for CollectionsSection {
+    // The app's `Sidebar` is built with `.collapsible(SidebarCollapsible::None)`,
+    // so the icon-only rail state this trait exists for is never reached.
+    fn collapsed(self, _collapsed: bool) -> Self {
+        self
+    }
+
+    fn is_collapsed(&self) -> bool {
+        false
+    }
+}
+
+impl SidebarItem for CollectionsSection {
+    fn render(self, id: impl Into<ElementId>, window: &mut Window, cx: &mut App)
+              -> impl IntoElement {
+        let id = id.into();
+        let on_toggle = self.on_toggle.clone();
+        let suffix = (self.suffix)(window, cx);
+        let open = self.open;
+        let entity = self.entity.clone();
+
+        let header =
+            div().id(SharedString::from(format!("{id:?}-header")))
+                 .w_full()
+                 .flex()
+                 .items_center()
+                 .overflow_x_hidden()
+                 .flex_shrink_0()
+                 .p_2()
+                 .gap_x_2()
+                 .rounded(cx.theme().radius)
+                 .text_sm()
+                 .h_7()
+                 .hover(|this| {
+                     this.bg(cx.theme().sidebar_accent.opacity(0.8))
+                         .text_color(cx.theme().sidebar_accent_foreground)
+                 })
+                 .on_click(move |_, window, cx| on_toggle(window, cx))
+                 .child(div().flex_1()
+                             .flex()
+                             .items_center()
+                             .justify_between()
+                             .gap_x_2()
+                             .overflow_x_hidden()
+                             .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
+                             .child(suffix));
+
+        let rows: Vec<AnyElement> =
+            self.rows
+                .into_iter()
+                .enumerate()
+                .map(|(ix, row)| {
+                    render_collection_row(format!("{id:?}-row-{ix}"), row, entity.clone(), cx)
+                })
+                .collect();
+
+        div().id(id)
+             .w_full()
+             .flex()
+             .flex_col()
+             .child(header)
+             .when(open, |this| {
+                 this.child(div().id("submenu")
+                                 .border_l_1()
+                                 .border_color(cx.theme().sidebar_border)
+                                 .flex()
+                                 .flex_col()
+                                 .gap_1()
+                                 .ml_3p5()
+                                 .pl_2p5()
+                                 .py_0p5()
+                                 .children(rows))
+             })
+    }
+}
+
+/// Renders a single collection nav row: click to filter, right-click to
+/// reload/delete, and drop target for [`DraggedLibraryItem`] (adds the
+/// dragged catalog item as a member of this collection).
+fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
+                         entity: Entity<LibraryController>, cx: &mut App)
+                         -> AnyElement {
+    let is_active = row.is_active;
+    let filter = SidebarFilter::Collection(row.id, Arc::clone(&row.name));
+    let click_entity = entity.clone();
+    let reload_entity = entity.clone();
+    let delete_entity = entity.clone();
+    let drop_entity = entity;
+    let col_id = row.id;
+
+    div().id(id.into())
+         .w_full()
+         .flex()
+         .items_center()
+         .overflow_x_hidden()
+         .flex_shrink_0()
+         .p_2()
+         .gap_x_2()
+         .rounded(cx.theme().radius)
+         .text_sm()
+         .h_7()
+         .when(!is_active, |this| {
+             this.hover(|this| {
+                     this.bg(cx.theme().sidebar_accent.opacity(0.8))
+                         .text_color(cx.theme().sidebar_accent_foreground)
+                 })
+         })
+         .when(is_active, |this| {
+             this.font_medium()
+                 .bg(cx.theme().tokens.sidebar_accent)
+                 .text_color(cx.theme().sidebar_accent_foreground)
+         })
+         .on_click(move |_, _, cx| {
+             click_entity.update(cx, |ctrl, cx| ctrl.set_filter(filter.clone(), cx));
+         })
+         .child(div().flex_1()
+                     .flex()
+                     .items_center()
+                     .justify_between()
+                     .gap_x_2()
+                     .overflow_x_hidden()
+                     .child(div().flex_1()
+                                 .overflow_x_hidden()
+                                 .child(row.name.to_string()))
+                     .child(div().text_xs().child(row.count.to_string())))
+         .drag_over::<DraggedLibraryItem>(|this, _, _, cx| this.bg(cx.theme().tokens.drop_target))
+         .on_drop(move |drag: &DraggedLibraryItem, _, cx| {
+             drop_entity.update(cx, |ctrl, cx| {
+                            ctrl.add_item_to_collection(col_id, drag.member_id, cx);
+                        });
+         })
+         .context_menu(move |menu, _, _| {
+             menu.item(PopupMenuItem::new(t!("collections.reload")).on_click({
+                           let entity = reload_entity.clone();
+                           move |_, _, cx| {
+                               entity.update(cx, |ctrl, cx| ctrl.load_collections(cx));
+                           }
+                       }))
+                 .item(PopupMenuItem::new(t!("collections.delete")).on_click({
+                           let entity = delete_entity.clone();
+                           move |_, _, cx| {
+                               entity.update(cx, |ctrl, cx| ctrl.delete_collection(col_id, cx));
+                           }
+                       }))
+         })
+         .into_any_element()
 }
 
 /// Renders the full sidebar column using gpui-component `Sidebar`.
@@ -184,38 +377,20 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
         "?".into()
     };
 
-    let col_children: Vec<SidebarMenuItem> =
+    let col_rows: Vec<CollectionRow> =
         collections.into_iter()
                    .filter(|c| name_matches_query(c.name.as_ref(), &collection_search.query))
                    .map(|c| {
                        let is_active =
                            matches!(&active, SidebarFilter::Collection(id, _) if *id == c.id);
-                       let f = SidebarFilter::Collection(c.id, Arc::clone(&c.name));
                        let count = c.member_ids
                                     .iter()
                                     .filter(|id| catalog_ids.contains(id))
                                     .count();
-                       let col_id = c.id;
-                       let entity_reload = entity.clone();
-                       let entity_delete = entity.clone();
-                       nav_item(c.name.as_ref(), count, is_active, f, entity.clone()).context_menu(
-                move |menu, _, _| {
-                    menu.item(PopupMenuItem::new(t!("collections.reload")).on_click({
-                        let entity = entity_reload.clone();
-                        move |_, _, cx| {
-                            entity.update(cx, |ctrl, cx| ctrl.load_collections(cx));
-                        }
-                    }))
-                    .item(
-                        PopupMenuItem::new(t!("collections.delete")).on_click({
-                            let entity = entity_delete.clone();
-                            move |_, _, cx| {
-                                entity.update(cx, |ctrl, cx| ctrl.delete_collection(col_id, cx));
-                            }
-                        }),
-                    )
-                },
-            )
+                       CollectionRow { id: c.id,
+                                       name: c.name,
+                                       count,
+                                       is_active }
                    })
                    .collect();
 
@@ -228,27 +403,23 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     };
     let collection_search_open = collection_search.open;
     let collection_search_input = collection_search.input.clone();
-    let col_menu = SidebarMenu::new().child(
-        SidebarMenuItem::new(col_title)
-            .default_open(collections_open)
-            .click_to_toggle(true)
-            .on_click(move |_, _, cx| {
-                UiPrefs::load().save_collections_open(!collections_open);
-                entity_for_col.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
-            })
-            .suffix({
-                let input = collection_name_input.clone();
-                let ctrl = entity.clone();
-                let search_input = collection_search_input.clone();
-                let entity_for_toggle = entity.clone();
-                move |_window, cx| {
-                    let input = input.clone();
-                    let ctrl = ctrl.clone();
+    let on_toggle: CollectionsToggleFn = Rc::new(move |_window, cx| {
+        UiPrefs::load().save_collections_open(!collections_open);
+        entity_for_col.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
+    });
+    let suffix: CollectionsSuffixFn = Rc::new({
+        let input = collection_name_input.clone();
+        let ctrl = entity.clone();
+        let search_input = collection_search_input.clone();
+        let entity_for_toggle = entity.clone();
+        move |_window, cx| {
+            let input = input.clone();
+            let ctrl = ctrl.clone();
 
-                    if collection_search_open {
-                        let entity_for_close = entity_for_toggle.clone();
-                        let search_input_for_close = search_input.clone();
-                        return div()
+            if collection_search_open {
+                let entity_for_close = entity_for_toggle.clone();
+                let search_input_for_close = search_input.clone();
+                return div()
                             .id("collections-search-suffix")
                             .on_click(|_, _, cx| cx.stop_propagation())
                             .flex()
@@ -271,9 +442,9 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                     }),
                             )
                             .into_any_element();
-                    }
+            }
 
-                    div()
+            div()
                         .id("collections-suffix")
                         // Stop click propagation so the suffix button does not also
                         // fire the SidebarMenuItem header's on_click (which toggles collapse).
@@ -347,12 +518,17 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                 }),
                         )
                         .into_any_element()
-                }
-            })
-            .children(col_children),
-    );
+        }
+    });
 
-    sidebar_builder.child(SidebarContent::Menu(Box::new(col_menu)))
+    let collections_section = CollectionsSection { title: col_title,
+                                                   open: collections_open,
+                                                   suffix,
+                                                   on_toggle,
+                                                   rows: col_rows,
+                                                   entity: entity.clone() };
+
+    sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
                    .child(SidebarContent::Separator)
                    .child(SidebarContent::Menu(Box::new(pub_menu)))
 }

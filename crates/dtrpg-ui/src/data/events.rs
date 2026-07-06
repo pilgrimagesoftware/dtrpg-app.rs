@@ -108,6 +108,22 @@ pub struct CollectionCreateFailed {
 
 impl EventEmitter<CollectionCreateFailed> for LibraryController {}
 
+// ── CollectionMemberAddFailed
+// ─────────────────────────────────────────
+
+/// Emitted by `LibraryController` when a background add-member-to-collection
+/// call fails.
+///
+/// The receiver should push an error `Notification` to the window. The
+/// controller has already rolled back its optimistic local update by the time
+/// this is emitted.
+pub struct CollectionMemberAddFailed {
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl EventEmitter<CollectionMemberAddFailed> for LibraryController {}
+
 // ── StartupAuthFailed
 // ─────────────────────────────────────────────────────────
 

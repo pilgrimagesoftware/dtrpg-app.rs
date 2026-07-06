@@ -66,6 +66,18 @@ pub trait CollectionsService: Send + Sync + 'static {
     /// Returns a [`CollectionsServiceError`] if the request fails or the
     /// session is invalid.
     fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError>;
+
+    /// Adds a single item to a collection as a member.
+    ///
+    /// `item_id` is the item's `order_product_id` (falling back to
+    /// `product_id`), matching the id space `CollectionEntry::member_ids`
+    /// already uses.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CollectionsServiceError`] if the request fails, the session
+    /// is invalid, or the underlying API does not support this operation.
+    fn add_member(&self, collection_id: u64, item_id: u64) -> Result<(), CollectionsServiceError>;
 }
 
 #[cfg(test)]
@@ -128,6 +140,17 @@ pub mod stub {
         }
 
         fn delete_collection(&self, _id: u64) -> Result<(), CollectionsServiceError> {
+            match self.mode {
+                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(()),
+                CollectionsStubMode::Error => {
+                    Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                     "stub: simulated session error"))
+                }
+            }
+        }
+
+        fn add_member(&self, _collection_id: u64, _item_id: u64)
+                      -> Result<(), CollectionsServiceError> {
             match self.mode {
                 CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(()),
                 CollectionsStubMode::Error => {

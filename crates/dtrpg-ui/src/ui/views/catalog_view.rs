@@ -31,7 +31,9 @@ use crate::data::events::LibraryChanged;
 use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
+use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::item_popover_view::render_item_popover;
+use crate::util::matching::collection_member_id;
 use crate::util::publisher::{PublisherGroup, group_by_publisher};
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::sort::{SortDirection, SortMethod};
@@ -1409,6 +1411,8 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_tabs = tabs.clone();
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
+    let drag_payload = DraggedLibraryItem { title:     title.clone().into(),
+                                            member_id: collection_member_id(item), };
     // Approximation: the title column fills the remaining row width after the cover
     // and gap, which depends on the actual panel layout (sidebar/detail panel
     // state) that isn't known synchronously here. `window.viewport_size()`
@@ -1473,6 +1477,10 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                           });
          })
          .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
+         .on_drag(drag_payload, |drag, _, _, cx| {
+             cx.stop_propagation();
+             cx.new(|_| drag.clone())
+         })
          .child(cover_cell)
          .child({
              let title_tooltip = title.clone();
@@ -1635,6 +1643,8 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
     let ctx_path = storage_root_path.join("items").join(&*id);
+    let drag_payload = DraggedLibraryItem { title:     title.clone().into(),
+                                            member_id: collection_member_id(item), };
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
         let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
@@ -1710,6 +1720,10 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                           });
          })
          .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
+         .on_drag(drag_payload, |drag, _, _, cx| {
+             cx.stop_propagation();
+             cx.new(|_| drag.clone())
+         })
          .child(cover_cell)
          .child(div().px(px(4.0))
                      .pt(px(4.0))

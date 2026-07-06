@@ -57,6 +57,16 @@ pub trait SdkCollectionsGateway: Send + Sync {
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures.
     fn delete_product_list(&self, id: u64) -> Result<(), CollectionsServiceError>;
+
+    /// Adds a product to a product list as a member.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CollectionsServiceError`] on network or session failures, or
+    /// if the underlying API has no equivalent endpoint (see
+    /// `HttpSdkCollectionsGateway::add_product_list_item`).
+    fn add_product_list_item(&self, product_list_id: u64, order_product_id: u64)
+                             -> Result<(), CollectionsServiceError>;
 }
 
 // ── Service implementation
@@ -185,6 +195,10 @@ impl CollectionsService for RustSdkCollectionsService {
     fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError> {
         self.gateway.delete_product_list(id)
     }
+
+    fn add_member(&self, collection_id: u64, item_id: u64) -> Result<(), CollectionsServiceError> {
+        self.gateway.add_product_list_item(collection_id, item_id)
+    }
 }
 
 // ── HTTP gateway
@@ -300,6 +314,19 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
             .block_on(self.client.delete_product_list(id))
             .map_err(map_client_error)
     }
+
+    fn add_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                             -> Result<(), CollectionsServiceError> {
+        // The DriveThruRPG API (see dtrpg-api's openapi.yaml) only documents
+        // GET on `product_lists` and `product_list_items`; there is no
+        // documented endpoint to add a member to a product list. Rather than
+        // guess at an undocumented request shape against a live production
+        // API, this fails explicitly until `dtrpg-api`/`dtrpg-sdk` add a real
+        // contract for it (tracked by the `collection-membership-editing`
+        // OpenSpec change).
+        Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
+                                         "Adding items to a collection isn't supported by the DriveThruRPG API yet."))
+    }
 }
 
 // ── Unavailable gateway
@@ -336,6 +363,11 @@ impl SdkCollectionsGateway for UnavailableCollectionsGateway {
     }
 
     fn delete_product_list(&self, _id: u64) -> Result<(), CollectionsServiceError> {
+        Err(self.error.clone())
+    }
+
+    fn add_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                             -> Result<(), CollectionsServiceError> {
         Err(self.error.clone())
     }
 }
@@ -425,6 +457,7 @@ mod tests {
         lists:         Result<Vec<ProductListItem>, CollectionsServiceError>,
         items:         Result<Vec<serde_json::Value>, CollectionsServiceError>,
         create_result: Result<ProductListItem, CollectionsServiceError>,
+        add_result:    Result<(), CollectionsServiceError>,
     }
 
     impl FakeCollectionsGateway {
@@ -432,7 +465,8 @@ mod tests {
             Self { lists:         Ok(vec![product_list_item(7, "Favorites")]),
                    items:         Ok(vec![json!({ "orderProductId": 42 }),
                                           json!({ "orderProductId": 99 }),]),
-                   create_result: Ok(product_list_item(8, "New List")), }
+                   create_result: Ok(product_list_item(8, "New List")),
+                   add_result:    Ok(()), }
         }
 
         fn session_error() -> Self {
@@ -440,7 +474,8 @@ mod tests {
                                                    "fake session error");
             Self { lists:         Err(err.clone()),
                    items:         Err(err.clone()),
-                   create_result: Err(err), }
+                   create_result: Err(err.clone()),
+                   add_result:    Err(err), }
         }
 
         fn items_with_missing_field() -> Self {
@@ -448,7 +483,8 @@ mod tests {
                    items:         Ok(vec![json!({ "orderProductId": 42 }),
                                           json!({ "someOtherField": "abc" }),
                                           json!({ "orderProductId": 99 }),]),
-                   create_result: Ok(product_list_item(8, "New List")), }
+                   create_result: Ok(product_list_item(8, "New List")),
+                   add_result:    Ok(()), }
         }
     }
 
@@ -488,6 +524,11 @@ mod tests {
 
         fn delete_product_list(&self, _id: u64) -> Result<(), CollectionsServiceError> {
             self.lists.as_ref().map(|_| ()).map_err(Clone::clone)
+        }
+
+        fn add_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                                 -> Result<(), CollectionsServiceError> {
+            self.add_result.clone()
         }
     }
 
