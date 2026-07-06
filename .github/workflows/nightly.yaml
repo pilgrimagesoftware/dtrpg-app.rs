@@ -4,13 +4,8 @@ name: Nightly
 # `develop` commit. See openspec/changes/add-release-packaging-workflow.
 
 on:
-  push:
-    branches:
-      - develop
-    paths:
-      - "crates/**"
-      - rust-toolchain.toml
-      - Cargo.toml
+  schedule:
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 concurrency:
