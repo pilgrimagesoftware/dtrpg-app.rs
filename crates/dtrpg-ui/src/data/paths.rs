@@ -31,6 +31,7 @@
 
 use std::path::PathBuf;
 
+#[allow(unused_imports)]
 use crate::data::constants::{APP_NAME, MACOS_BUNDLE_ID};
 
 /// The directory name used under platform data/cache/preferences roots.
