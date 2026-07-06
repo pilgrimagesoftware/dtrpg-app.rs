@@ -39,11 +39,9 @@ sentry = ["dep:sentry", "dep:sentry-tracing"]
 # `cargo packager --release -p dtrpg-core --formats <fmt>`; the binary is
 # auto-detected from this package's `[[bin]]` target.
 #
-# `icons` is left unset: this app has no dedicated app icon yet (only the
-# generic Lucide icon set under `assets/icons/`). cargo-packager falls back to
-# a default icon when none is configured. Add real icon assets under
-# `assets/icon/` and list them here once available (see openspec change
-# add-release-packaging-workflow, task 1.2).
+# Icon paths are resolved relative to the process CWD (workspace root), since
+# that's where `cargo packager` is invoked from in CI, not this manifest's
+# directory. Source assets: pilgrimagesoftware/dtrpg-design `app-icons/`.
 [package.metadata.packager]
 product-name = "DriveThruRPG"
 identifier = "com.pilgrimagesoftware.dtrpg"
@@ -51,6 +49,7 @@ description = "DriveThruRPG desktop frontend"
 homepage = "https://github.com/pilgrimagesoftware/dtrpg-app"
 category = "Utility"
 before-packaging-command = "cargo build --release --package dtrpg-core --features sentry"
+icons = ["assets/icon/icon.png", "assets/icon/icon.icns", "assets/icon/icon.ico"]
 
 [package.metadata.packager.deb]
 depends = ["libsecret-1-0"]
