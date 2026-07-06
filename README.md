@@ -15,6 +15,12 @@ cargo run -p dtrpg-core
 
 No additional setup required. The app links `Security.framework` automatically via the `keyring` crate.
 
+Install Xcode components to get Metal support:
+
+```sh
+xcode-select --install
+```
+
 ### Linux
 
 The credential store requires a running Secret Service daemon (GNOME Keyring or KWallet) and the
