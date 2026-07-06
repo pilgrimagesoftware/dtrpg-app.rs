@@ -95,7 +95,7 @@ jobs:
           DTRPG_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           DTRPG_SENTRY_ENVIRONMENT: ${{ inputs.prerelease && 'nightly' || 'production' }}
           DTRPG_SENTRY_RELEASE: ${{ inputs.tag }}
-        run: cargo packager --release --package dtrpg-core --target ${{ matrix.target }} --formats ${{ matrix.formats }} --verbose
+        run: cargo packager --release --packages dtrpg-core --target ${{ matrix.target }} --formats ${{ matrix.formats }} --verbose
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
