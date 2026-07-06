@@ -23,11 +23,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-tags: true
           fetch-depth: 0
           show-progress: true
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy rustfmt
 
       - name: Dump GitHub context
         env:
@@ -62,10 +67,10 @@ jobs:
       - name: Get build dates
         id: get_build_date
         run: |
-              echo "date=$(date -u)" >> $GITHUB_OUTPUT
-              echo "isodate=$(date -u '+%Y-%m-%dT%H:%M:%S')" >> $GITHUB_OUTPUT
-              echo "tagdate=$(date -u '+%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
-              echo "timestamp=$(date -u '+%s')" >> $GITHUB_OUTPUT
+          echo "date=$(date -u)" >> $GITHUB_OUTPUT
+          echo "isodate=$(date -u '+%Y-%m-%dT%H:%M:%S')" >> $GITHUB_OUTPUT
+          echo "tagdate=$(date -u '+%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u '+%s')" >> $GITHUB_OUTPUT
 
       - name: Get latest tag
         id: get_latest_tag
@@ -97,7 +102,7 @@ jobs:
         env:
           CHANGELOG: ${{ steps.gen_changelog.outputs.changes }}
         run: |
-              echo "$CHANGELOG"
+          echo "$CHANGELOG"
 
       - name: Read git info
         id: git_info
@@ -117,8 +122,8 @@ jobs:
         env:
           GIT_INFO: ${{ toJson(steps.git_info.outputs) }}
         run: |
-              echo "$GIT_INFO"
+          echo "$GIT_INFO"
 
       - name: Other interesting things
         run: |
-              git rev-list --count ${{ github.ref_name }}
+          git rev-list --count ${{ github.ref_name }}
