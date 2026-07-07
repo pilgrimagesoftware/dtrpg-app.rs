@@ -823,12 +823,13 @@ impl LibraryController {
           .detach();
     }
 
-    /// Creates a new collection with the given name and, once the create call succeeds,
-    /// immediately adds `item_id` as a member of it.
+    /// Creates a new collection with the given name and, once the create call
+    /// succeeds, immediately adds `item_id` as a member of it.
     ///
-    /// Used by the "New collection…" affordance in the Manage Collections dialog, so a
-    /// single user action both creates the collection and adds the current item to it.
-    /// On create failure, only [`CollectionCreateFailed`] is emitted — no add is attempted.
+    /// Used by the "New collection…" affordance in the Manage Collections
+    /// dialog, so a single user action both creates the collection and adds
+    /// the current item to it. On create failure, only
+    /// [`CollectionCreateFailed`] is emitted — no add is attempted.
     pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
                                             cx: &mut Context<Self>) {
         let label = format!("Creating collection '{name}'...");

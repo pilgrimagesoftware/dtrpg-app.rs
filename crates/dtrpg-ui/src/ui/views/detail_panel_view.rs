@@ -638,7 +638,10 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
     else {
         div().text_sm()
              .text_color(colors.text_secondary)
-             .child(member_names.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(", "))
+             .child(member_names.iter()
+                                .map(|n| n.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", "))
              .into_any_element()
     };
 

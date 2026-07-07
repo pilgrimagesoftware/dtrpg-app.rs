@@ -212,7 +212,8 @@ impl CollectionsService for RustSdkCollectionsService {
 
     fn remove_member(&self, collection_id: u64, item_id: u64)
                      -> Result<(), CollectionsServiceError> {
-        self.gateway.remove_product_list_item(collection_id, item_id)
+        self.gateway
+            .remove_product_list_item(collection_id, item_id)
     }
 }
 

@@ -1522,15 +1522,15 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
          .child(ctx_menu)
          .context_menu(move |menu, window, cx| {
              let menu = match status {
-             ItemStatus::Downloaded => {
-                 let open_path = ctx_path.clone();
-                 let reveal_path = ctx_path.clone();
-                 let remove_id = Arc::clone(&ctx_id);
-                 let entity_remove = ctx_entity.clone();
-                 let item_for_open = ctx_item.clone();
-                 let tabs_for_open = ctx_tabs.clone();
-                 let controller_for_open = ctx_entity.clone();
-                 menu.item(
+                 ItemStatus::Downloaded => {
+                     let open_path = ctx_path.clone();
+                     let reveal_path = ctx_path.clone();
+                     let remove_id = Arc::clone(&ctx_id);
+                     let entity_remove = ctx_entity.clone();
+                     let item_for_open = ctx_item.clone();
+                     let tabs_for_open = ctx_tabs.clone();
+                     let controller_for_open = ctx_entity.clone();
+                     menu.item(
                     PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
                         open_item_or_focus_detail_tab(&open_path,
                                                       &item_for_open,
@@ -1561,16 +1561,16 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                         },
                     ),
                 )
-             }
-             ItemStatus::Cloud => {
-                 let dl_id = Arc::clone(&ctx_id);
-                 let entity_dl = ctx_entity.clone();
-                 menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
+                 }
+                 ItemStatus::Cloud => {
+                     let dl_id = Arc::clone(&ctx_id);
+                     let entity_dl = ctx_entity.clone();
+                     menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                     move |_, _, cx| {
                         entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
                     },
                 ))
-             }
+                 }
              };
              append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
          })
@@ -1586,8 +1586,9 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
 /// Shared by all four catalog item context menu sites (ungrouped/grouped
 /// list-layout table delegates, and the thumb/grid row builders) so the
 /// collections logic isn't duplicated four times over.
-fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem, entity: &Entity<LibraryController>,
-                                _window: &mut Window, _cx: &mut App)
+fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem,
+                                entity: &Entity<LibraryController>, _window: &mut Window,
+                                _cx: &mut App)
                                 -> PopupMenu {
     let member_id = collection_member_id(item);
     let entity = entity.clone();
@@ -1772,15 +1773,15 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      .child(ctx_menu))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
-             ItemStatus::Downloaded => {
-                 let open_path = ctx_path.clone();
-                 let reveal_path = ctx_path.clone();
-                 let remove_id = Arc::clone(&ctx_id);
-                 let entity_remove = ctx_entity.clone();
-                 let item_for_open = ctx_item.clone();
-                 let tabs_for_open = ctx_tabs.clone();
-                 let controller_for_open = ctx_entity.clone();
-                 menu.item(
+                 ItemStatus::Downloaded => {
+                     let open_path = ctx_path.clone();
+                     let reveal_path = ctx_path.clone();
+                     let remove_id = Arc::clone(&ctx_id);
+                     let entity_remove = ctx_entity.clone();
+                     let item_for_open = ctx_item.clone();
+                     let tabs_for_open = ctx_tabs.clone();
+                     let controller_for_open = ctx_entity.clone();
+                     menu.item(
                     PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
                         open_item_or_focus_detail_tab(&open_path,
                                                       &item_for_open,
@@ -1811,16 +1812,16 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                         },
                     ),
                 )
-             }
-             ItemStatus::Cloud => {
-                 let dl_id = Arc::clone(&ctx_id);
-                 let entity_dl = ctx_entity.clone();
-                 menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
+                 }
+                 ItemStatus::Cloud => {
+                     let dl_id = Arc::clone(&ctx_id);
+                     let entity_dl = ctx_entity.clone();
+                     menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                     move |_, _, cx| {
                         entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
                     },
                 ))
-             }
+                 }
              };
              append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
          })
