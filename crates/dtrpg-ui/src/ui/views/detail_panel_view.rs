@@ -26,7 +26,9 @@ use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::{cover_style, render_generative_cover};
+use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::datetime::{format_absolute, format_relative};
+use crate::util::matching::collection_member_id;
 use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -52,6 +54,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let entity_download = entity.clone();
     let entity_refresh_thumbnail = entity.clone();
     let entity_other_details = entity.clone();
+    let entity_collections = entity.clone();
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let reveal_item_id = Arc::clone(&item.id);
@@ -255,6 +258,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 )
                             }),
                     )
+                    .child(render_collections_section(&item, entity_collections, colors, cx))
                     .child(if item.is_multi_item() {
                         render_item_tier(&item, &storage_root_path, entity_item_tier.clone(),
                                          colors, cx)
@@ -608,6 +612,61 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
                       .open(open)
                       .child(header)
                       .content(content)
+}
+
+/// Renders a summary of the collections this entry currently belongs to, with a
+/// "Manage…" button opening the Manage Collections dialog scoped to this entry.
+///
+/// See `detail-view-collection-membership`.
+fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryController>,
+                              colors: &ColorTokens, cx: &App)
+                              -> impl IntoElement + 'static {
+    let member_id = collection_member_id(item);
+    let member_names: Vec<Arc<str>> = entity.read(cx)
+                                            .collections
+                                            .iter()
+                                            .filter(|c| c.member_ids.contains(&member_id))
+                                            .map(|c| Arc::clone(&c.name))
+                                            .collect();
+
+    let summary: AnyElement = if member_names.is_empty() {
+        div().text_sm()
+             .text_color(colors.text_tertiary)
+             .child(t!("detail.collections_empty").to_string())
+             .into_any_element()
+    }
+    else {
+        div().text_sm()
+             .text_color(colors.text_secondary)
+             .child(member_names.iter()
+                                .map(|n| n.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", "))
+             .into_any_element()
+    };
+
+    let item_title = Arc::clone(&item.title);
+
+    div().flex()
+        .flex_col()
+        .gap(px(6.0))
+        .child(div().text_sm()
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .text_color(colors.text_primary)
+                    .child(t!("detail.collections_heading").to_string()))
+        .child(
+            div().flex()
+                .items_center()
+                .justify_between()
+                .gap(px(8.0))
+                .child(summary)
+                .child(Button::new("detail-tab-manage-collections").ghost().outline().label(
+            t!("detail.collections_manage_button").to_string(),
+        ).on_click(move |_, window, cx| {
+                       open_manage_collections_dialog(window, cx, entity.clone(),
+                                                      Arc::clone(&item_title), member_id);
+                   })),
+        )
 }
 
 /// Renders a text value with an appear-on-hover copy button.

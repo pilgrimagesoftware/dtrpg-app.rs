@@ -3,6 +3,7 @@ pub mod alert_history_view;
 pub mod catalog_view;
 pub mod detail_panel_view;
 pub mod item_popover_view;
+pub mod manage_collections_dialog;
 pub mod notification_banner_view;
 pub mod root_view;
 pub mod settings_account_view;

@@ -124,6 +124,22 @@ pub struct CollectionMemberAddFailed {
 
 impl EventEmitter<CollectionMemberAddFailed> for LibraryController {}
 
+// ── CollectionMemberRemoveFailed
+// ──────────────────────────────────────
+
+/// Emitted by `LibraryController` when a background
+/// remove-member-from-collection call fails.
+///
+/// The receiver should push an error `Notification` to the window. The
+/// controller has already rolled back its optimistic local update by the time
+/// this is emitted.
+pub struct CollectionMemberRemoveFailed {
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl EventEmitter<CollectionMemberRemoveFailed> for LibraryController {}
+
 // ── StartupAuthFailed
 // ─────────────────────────────────────────────────────────
 

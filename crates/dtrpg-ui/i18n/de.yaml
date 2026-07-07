@@ -62,6 +62,7 @@ catalog:
   action_show_in_finder: "Im Finder anzeigen"
   action_show_in_explorer: "Im Explorer anzeigen"
   action_show_in_files: "In Dateien anzeigen"
+  action_manage_collections: "Sammlungen verwalten…"
 
 detail:
   read_button: "Lesen"
@@ -91,6 +92,9 @@ detail:
   item_prompt_select: "Wählen Sie einen Titel aus der Liste, um Details anzuzeigen"
   item_count_badge_tooltip: "%{count} Titel in diesem Eintrag"
   other_details_heading: "Weitere Details"
+  collections_heading: "Sammlungen"
+  collections_empty: "In keiner Sammlung."
+  collections_manage_button: "Verwalten…"
   field_stable_id: "Stabile ID"
   field_numeric_id: "Numerische ID"
   field_order_product_id: "Bestellprodukt-ID"
@@ -146,6 +150,10 @@ collections:
   name_placeholder: "Name der Sammlung…"
   reload: "Neu laden"
   delete: "Löschen"
+  manage_dialog_title: "Sammlungen verwalten — %{title}"
+  manage_close: "Schließen"
+  manage_empty: "Noch keine Sammlungen."
+  manage_new_confirm: "Erstellen"
 
 activity:
   title: "Aktivität"
