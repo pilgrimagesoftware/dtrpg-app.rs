@@ -67,6 +67,16 @@ pub trait SdkCollectionsGateway: Send + Sync {
     /// `HttpSdkCollectionsGateway::add_product_list_item`).
     fn add_product_list_item(&self, product_list_id: u64, order_product_id: u64)
                              -> Result<(), CollectionsServiceError>;
+
+    /// Removes a product from a product list's membership.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CollectionsServiceError`] on network or session failures, or
+    /// if the underlying API has no equivalent endpoint (see
+    /// `HttpSdkCollectionsGateway::remove_product_list_item`).
+    fn remove_product_list_item(&self, product_list_id: u64, order_product_id: u64)
+                                -> Result<(), CollectionsServiceError>;
 }
 
 // ── Service implementation
@@ -199,6 +209,11 @@ impl CollectionsService for RustSdkCollectionsService {
     fn add_member(&self, collection_id: u64, item_id: u64) -> Result<(), CollectionsServiceError> {
         self.gateway.add_product_list_item(collection_id, item_id)
     }
+
+    fn remove_member(&self, collection_id: u64, item_id: u64)
+                     -> Result<(), CollectionsServiceError> {
+        self.gateway.remove_product_list_item(collection_id, item_id)
+    }
 }
 
 // ── HTTP gateway
@@ -327,6 +342,14 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
         Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
                                          "Adding items to a collection isn't supported by the DriveThruRPG API yet."))
     }
+
+    fn remove_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                                -> Result<(), CollectionsServiceError> {
+        // Same rationale as `add_product_list_item`: the documented API has no
+        // endpoint to remove a member from a product list.
+        Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
+                                         "Removing items from a collection isn't supported by the DriveThruRPG API yet."))
+    }
 }
 
 // ── Unavailable gateway
@@ -368,6 +391,11 @@ impl SdkCollectionsGateway for UnavailableCollectionsGateway {
 
     fn add_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
                              -> Result<(), CollectionsServiceError> {
+        Err(self.error.clone())
+    }
+
+    fn remove_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                                -> Result<(), CollectionsServiceError> {
         Err(self.error.clone())
     }
 }
@@ -458,6 +486,7 @@ mod tests {
         items:         Result<Vec<serde_json::Value>, CollectionsServiceError>,
         create_result: Result<ProductListItem, CollectionsServiceError>,
         add_result:    Result<(), CollectionsServiceError>,
+        remove_result: Result<(), CollectionsServiceError>,
     }
 
     impl FakeCollectionsGateway {
@@ -466,7 +495,8 @@ mod tests {
                    items:         Ok(vec![json!({ "orderProductId": 42 }),
                                           json!({ "orderProductId": 99 }),]),
                    create_result: Ok(product_list_item(8, "New List")),
-                   add_result:    Ok(()), }
+                   add_result:    Ok(()),
+                   remove_result: Ok(()), }
         }
 
         fn session_error() -> Self {
@@ -475,7 +505,8 @@ mod tests {
             Self { lists:         Err(err.clone()),
                    items:         Err(err.clone()),
                    create_result: Err(err.clone()),
-                   add_result:    Err(err), }
+                   add_result:    Err(err.clone()),
+                   remove_result: Err(err), }
         }
 
         fn items_with_missing_field() -> Self {
@@ -484,7 +515,8 @@ mod tests {
                                           json!({ "someOtherField": "abc" }),
                                           json!({ "orderProductId": 99 }),]),
                    create_result: Ok(product_list_item(8, "New List")),
-                   add_result:    Ok(()), }
+                   add_result:    Ok(()),
+                   remove_result: Ok(()), }
         }
     }
 
@@ -529,6 +561,11 @@ mod tests {
         fn add_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
                                  -> Result<(), CollectionsServiceError> {
             self.add_result.clone()
+        }
+
+        fn remove_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                                    -> Result<(), CollectionsServiceError> {
+            self.remove_result.clone()
         }
     }
 

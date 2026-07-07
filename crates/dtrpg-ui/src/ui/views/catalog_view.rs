@@ -33,6 +33,7 @@ use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::item_popover_view::render_item_popover;
+use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::matching::collection_member_id;
 use crate::util::publisher::{PublisherGroup, group_by_publisher};
 use crate::util::reveal::reveal_in_file_manager;
@@ -451,7 +452,7 @@ impl TableDelegate for CatalogListDelegate {
                        });
     }
 
-    fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, _window: &mut Window,
+    fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, window: &mut Window,
                     cx: &mut Context<TableState<Self>>)
                     -> PopupMenu {
         let items = self.controller
@@ -464,7 +465,7 @@ impl TableDelegate for CatalogListDelegate {
         let id = Arc::clone(&item.id);
         let status = item.status;
         let entity = self.controller.clone();
-        match status {
+        let menu = match status {
             ItemStatus::Downloaded => {
                 let item_path = self.storage_root.join("items").join(&*id);
                 let entity_remove = entity.clone();
@@ -510,7 +511,8 @@ impl TableDelegate for CatalogListDelegate {
                     entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
                 }),
             ),
-        }
+        };
+        append_collection_menu_items(menu, &item, &self.controller, window, cx)
     }
 
     fn render_td(&mut self, row_ix: usize, col_ix: usize, window: &mut Window,
@@ -604,8 +606,8 @@ impl TableDelegate for GroupedCatalogListDelegate {
         col
     }
 
-    fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, _window: &mut Window,
-                    _cx: &mut Context<TableState<Self>>)
+    fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, window: &mut Window,
+                    cx: &mut Context<TableState<Self>>)
                     -> PopupMenu {
         let Some(GroupedRow::Item(item)) = self.row_at(row_ix)
         else {
@@ -614,7 +616,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
         let id = Arc::clone(&item.id);
         let status = item.status;
         let entity = self.controller.clone();
-        match status {
+        let menu = match status {
             ItemStatus::Downloaded => {
                 let item_path = self.storage_root.join("items").join(&*id);
                 let entity_remove = entity.clone();
@@ -660,7 +662,8 @@ impl TableDelegate for GroupedCatalogListDelegate {
                     entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
                 }),
             ),
-        }
+        };
+        append_collection_menu_items(menu, item, &self.controller, window, cx)
     }
 
     fn render_tr(&mut self, row_ix: usize, _window: &mut Window,
@@ -1517,7 +1520,8 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
          })
          .child(render_status(status, &colors))
          .child(ctx_menu)
-         .context_menu(move |menu, _, _| match status {
+         .context_menu(move |menu, window, cx| {
+             let menu = match status {
              ItemStatus::Downloaded => {
                  let open_path = ctx_path.clone();
                  let reveal_path = ctx_path.clone();
@@ -1567,7 +1571,31 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                     },
                 ))
              }
+             };
+             append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
          })
+}
+
+// ── Collections context menu items
+// ───────────────────────────────────────
+
+/// Appends an "Add to…" submenu (checked per current membership) and, when
+/// the active sidebar filter is a collection, a "Remove from this
+/// collection" item to `menu` for `item`.
+///
+/// Shared by all four catalog item context menu sites (ungrouped/grouped
+/// list-layout table delegates, and the thumb/grid row builders) so the
+/// collections logic isn't duplicated four times over.
+fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem, entity: &Entity<LibraryController>,
+                                _window: &mut Window, _cx: &mut App)
+                                -> PopupMenu {
+    let member_id = collection_member_id(item);
+    let entity = entity.clone();
+    let item_title = Arc::clone(&item.title);
+    menu.item(PopupMenuItem::new(t!("catalog.action_manage_collections")).on_click(move |_, window, cx| {
+              open_manage_collections_dialog(window, cx, entity.clone(), Arc::clone(&item_title),
+                                             member_id);
+          }))
 }
 
 // ── Grid layout
@@ -1742,7 +1770,8 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                  .child(render_status(status, &colors)))
                      .child(reveal_row)
                      .child(ctx_menu))
-         .context_menu(move |menu, _, _| match status {
+         .context_menu(move |menu, window, cx| {
+             let menu = match status {
              ItemStatus::Downloaded => {
                  let open_path = ctx_path.clone();
                  let reveal_path = ctx_path.clone();
@@ -1792,5 +1821,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                     },
                 ))
              }
+             };
+             append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
          })
 }

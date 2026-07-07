@@ -823,6 +823,50 @@ impl LibraryController {
           .detach();
     }
 
+    /// Creates a new collection with the given name and, once the create call succeeds,
+    /// immediately adds `item_id` as a member of it.
+    ///
+    /// Used by the "New collection…" affordance in the Manage Collections dialog, so a
+    /// single user action both creates the collection and adds the current item to it.
+    /// On create failure, only [`CollectionCreateFailed`] is emitted — no add is attempted.
+    pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
+                                            cx: &mut Context<Self>) {
+        let label = format!("Creating collection '{name}'...");
+        let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
+
+        let collections_service = Arc::clone(&self.collections_service);
+        cx.spawn(async move |this, async_cx| {
+              let result =
+                  async_cx.background_executor()
+                          .spawn(async move { collections_service.create_collection(&name) })
+                          .await;
+
+              match result {
+                  Ok(entry) => {
+                      let collection_id = entry.id;
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.collections.push(entry);
+                              ctrl.activity
+                                  .update(cx, |a, cx| a.complete(activity_id, cx));
+                              cx.emit(LibraryChanged);
+                              ctrl.add_item_to_collection(collection_id, item_id, cx);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.activity.update(cx, |a, cx| {
+                                               a.error(activity_id, e.to_string(), cx);
+                                           });
+                              cx.emit(CollectionCreateFailed { message: e.message.clone(), });
+                          })
+                          .ok();
+                  }
+              }
+          })
+          .detach();
+    }
+
     /// Forces a full live catalog fetch, bypassing the auto-load policy.
     ///
     /// Used by the "Catalog > Reload" menu action.
@@ -970,6 +1014,67 @@ impl LibraryController {
                           }
                           cx.emit(LibraryChanged);
                           cx.emit(CollectionMemberAddFailed { message: e.message.clone(), });
+                      })
+                      .ok();
+              }
+          })
+          .detach();
+    }
+
+    /// Removes `item_id` (an item's `order_product_id`/`product_id`) as a
+    /// member of the collection with `collection_id`.
+    ///
+    /// Updates `member_ids` (and `collection_members`, if that collection is
+    /// the active filter) immediately, then confirms the change via the
+    /// service. On failure the optimistic update is rolled back and
+    /// [`CollectionMemberRemoveFailed`] is emitted so the window can show an
+    /// error notification.
+    pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
+                                       cx: &mut Context<Self>) {
+        let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
+        else {
+            return;
+        };
+        if !collection.member_ids.contains(&item_id) {
+            return;
+        }
+        let member_ids: Vec<u64> = collection.member_ids
+                                             .iter()
+                                             .copied()
+                                             .filter(|id| *id != item_id)
+                                             .collect();
+        collection.member_ids = Arc::from(member_ids.as_slice());
+
+        if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
+            self.collection_members.remove(&item_id);
+        }
+        cx.emit(LibraryChanged);
+
+        let collections_service = Arc::clone(&self.collections_service);
+        cx.spawn(async move |this, async_cx| {
+              let result = async_cx.background_executor()
+                                   .spawn(async move {
+                                       collections_service.remove_member(collection_id, item_id)
+                                   })
+                                   .await;
+              if let Err(e) = result {
+                  this.update(async_cx, |ctrl, cx| {
+                          if let Some(collection) =
+                              ctrl.collections.iter_mut().find(|c| c.id == collection_id)
+                          {
+                              let mut member_ids: Vec<u64> = collection.member_ids
+                                                                       .iter()
+                                                                       .copied()
+                                                                       .collect();
+                              member_ids.push(item_id);
+                              collection.member_ids = Arc::from(member_ids.as_slice());
+                          }
+                          if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
+                          {
+                              ctrl.collection_members.insert(item_id);
+                          }
+                          cx.emit(LibraryChanged);
+                          cx.emit(CollectionMemberRemoveFailed { message: e.message.clone(), });
                       })
                       .ok();
               }

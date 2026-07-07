@@ -47,8 +47,9 @@ use crate::{
         enums::CatalogPresentation,
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
-            DownloadComplete, DownloadError, LibraryChanged, LogoutRequested, SettingsChanged,
-            SignInSucceeded, StartupAuthBegun, StartupAuthFailed, TabsChanged,
+            CollectionMemberAddFailed, CollectionMemberRemoveFailed, DownloadComplete,
+            DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded,
+            StartupAuthBegun, StartupAuthFailed, TabsChanged,
         },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
@@ -280,6 +281,36 @@ impl LibraryRootView {
                         &controller,
                         window,
                         |_this, _ctrl, event: &CollectionCreateFailed, window, cx| {
+                            window.push_notification(
+                    Notification::new()
+                        .message(event.message.clone())
+                        .with_type(NotificationType::Error)
+                        .autohide(false),
+                    cx,
+                );
+                        },
+        )
+          .detach();
+
+        cx.subscribe_in(
+                        &controller,
+                        window,
+                        |_this, _ctrl, event: &CollectionMemberAddFailed, window, cx| {
+                            window.push_notification(
+                    Notification::new()
+                        .message(event.message.clone())
+                        .with_type(NotificationType::Error)
+                        .autohide(false),
+                    cx,
+                );
+                        },
+        )
+          .detach();
+
+        cx.subscribe_in(
+                        &controller,
+                        window,
+                        |_this, _ctrl, event: &CollectionMemberRemoveFailed, window, cx| {
                             window.push_notification(
                     Notification::new()
                         .message(event.message.clone())
