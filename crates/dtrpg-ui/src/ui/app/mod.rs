@@ -250,17 +250,23 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
     // `cmd-0` always targets the Catalog tab (`open_tabs[0]`); `cmd-<n>` for
     // `n` in `1..=9` targets the nth open *detail* tab (`open_tabs[n]`),
     // since Catalog occupies index `0` and is never re-targeted by `cmd-1..9`.
-    let tab_label = |position: usize| -> (SharedString, bool) {
+    // Returns (label, enabled, checked) — checked reflects whether the tab at
+    // this position is the currently active tab.
+    let tab_label = |position: usize| -> (SharedString, bool, bool) {
         match tabs.open_tabs.get(position) {
-            Some(TabTarget::Catalog) => (t!("tabs.catalog_tab").to_string().into(), true),
-            Some(TabTarget::Detail(id)) => {
+            Some(target @ TabTarget::Catalog) => {
+                (t!("tabs.catalog_tab").to_string().into(), true, *target == tabs.active)
+            }
+            Some(target @ TabTarget::Detail(id)) => {
                 let title = tabs.titles
                                 .get(id)
                                 .cloned()
                                 .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
-                (truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into(), true)
+                (truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into(),
+                 true,
+                 *target == tabs.active)
             }
-            None => (t!("menu.window_select_tab_empty").to_string().into(), false),
+            None => (t!("menu.window_select_tab_empty").to_string().into(), false, false),
         }
     };
 
@@ -355,44 +361,44 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
             MenuItem::submenu(
                 Menu::new(t!("menu.window_select_tab_title").to_string()).items([
                     {
-                        let (label, enabled) = tab_label(0);
-                        MenuItem::action(label, SelectTab0).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(0);
+                        MenuItem::action(label, SelectTab0).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(1);
-                        MenuItem::action(label, SelectTab1).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(1);
+                        MenuItem::action(label, SelectTab1).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(2);
-                        MenuItem::action(label, SelectTab2).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(2);
+                        MenuItem::action(label, SelectTab2).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(3);
-                        MenuItem::action(label, SelectTab3).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(3);
+                        MenuItem::action(label, SelectTab3).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(4);
-                        MenuItem::action(label, SelectTab4).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(4);
+                        MenuItem::action(label, SelectTab4).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(5);
-                        MenuItem::action(label, SelectTab5).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(5);
+                        MenuItem::action(label, SelectTab5).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(6);
-                        MenuItem::action(label, SelectTab6).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(6);
+                        MenuItem::action(label, SelectTab6).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(7);
-                        MenuItem::action(label, SelectTab7).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(7);
+                        MenuItem::action(label, SelectTab7).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(8);
-                        MenuItem::action(label, SelectTab8).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(8);
+                        MenuItem::action(label, SelectTab8).disabled(!enabled).checked(checked)
                     },
                     {
-                        let (label, enabled) = tab_label(9);
-                        MenuItem::action(label, SelectTab9).disabled(!enabled)
+                        let (label, enabled, checked) = tab_label(9);
+                        MenuItem::action(label, SelectTab9).disabled(!enabled).checked(checked)
                     },
                 ]),
             ),

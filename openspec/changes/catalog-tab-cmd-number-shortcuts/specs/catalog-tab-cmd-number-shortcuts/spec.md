@@ -55,6 +55,19 @@ menu, so the ten fixed slots don't lengthen the Window menu itself.
 - **WHEN** the user clicks an enabled position-<n> item in the "Select Tab" submenu
 - **THEN** the tab at that position becomes active, identical to pressing `cmd-<n>`
 
+### Requirement: Select Tab submenu check-marks the currently active tab
+The "Select Tab" submenu item whose position holds the currently active tab SHALL be
+check-marked. At most one item is check-marked at a time. An unoccupied or disabled
+position is never check-marked.
+
+#### Scenario: Catalog is active
+- **WHEN** the Catalog tab is the active tab
+- **THEN** the "Select Tab" submenu's position-0 item is check-marked and no other item is
+
+#### Scenario: A detail tab is active
+- **WHEN** the 2nd open detail tab is the active tab
+- **THEN** the "Select Tab" submenu's position-2 item is check-marked and no other item is
+
 ### Requirement: Tab-selection menu state stays live as tabs open and close
 The "Select Tab" submenu's items SHALL reflect the current open-tab list without
 requiring the user to reopen the menu bar or restart the app.
@@ -68,3 +81,8 @@ requiring the user to reopen the menu bar or restart the app.
 #### Scenario: Closing a detail tab disables its former menu item
 - **WHEN** the user closes the only open detail tab, previously at position 1
 - **THEN** the "Select Tab" submenu's position-1 item becomes disabled again
+
+#### Scenario: Activating a tab via the tab strip updates the checkmark
+- **WHEN** the user clicks a different tab directly in the tab strip
+- **THEN** the "Select Tab" submenu's checkmark moves to that tab's position on the next
+  time the menu bar is queried

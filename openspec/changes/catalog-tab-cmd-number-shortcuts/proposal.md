@@ -17,9 +17,10 @@ a tab by position — users expect that shortcut family to work here too.
   through `9` (labels reflect each tab's actual title where one is open) — each disabled
   when no tab is open at that position. Nested in a submenu rather than listed flat in the
   Window menu, so the ten fixed slots don't lengthen the Window menu itself.
+- The submenu item for the currently active tab is check-marked.
 - Menu items and key bindings stay in sync with the live tab strip: opening or closing a
-  detail tab immediately updates which numbered slots are enabled and what their labels
-  read.
+  detail tab, or activating one via the tab strip, immediately updates which numbered slots
+  are enabled, what their labels read, and which one is check-marked.
 - No changes to tab-opening, tab-closing, or tab-strip click-to-activate behavior.
 
 ## Capabilities
