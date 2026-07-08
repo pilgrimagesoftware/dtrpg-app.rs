@@ -5,8 +5,9 @@ use rust_i18n::t;
 use tracing::warn;
 
 use crate::controllers::settings::SettingsController;
+use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
 use crate::credentials::{CredentialStore, KeyringCredentialStore};
-use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
+use crate::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::enums::CatalogPresentation;
 use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
@@ -14,6 +15,7 @@ use crate::ui::views::root_view::LibraryRootView;
 use crate::ui::views::settings_window_view::SettingsWindowView;
 use crate::util::init::init_globals;
 use crate::util::sort::{SortDirection, SortMethod};
+use crate::util::text::truncate_with_ellipsis;
 
 /// Snapshot of catalog view state needed to render checkmarks in the native
 /// menu bar's View menu (presentation mode, sort field/direction, and
@@ -169,7 +171,17 @@ pub fn setup(cx: &mut App) {
                   KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
                   KeyBinding::new("cmd-shift-n", AddCollection, None),
                   KeyBinding::new("cmd-r", ReloadCatalog, None),
-                  KeyBinding::new("cmd-shift-r", RefreshThumbnails, None)]);
+                  KeyBinding::new("cmd-shift-r", RefreshThumbnails, None),
+                  KeyBinding::new("cmd-0", SelectTab0, None),
+                  KeyBinding::new("cmd-1", SelectTab1, None),
+                  KeyBinding::new("cmd-2", SelectTab2, None),
+                  KeyBinding::new("cmd-3", SelectTab3, None),
+                  KeyBinding::new("cmd-4", SelectTab4, None),
+                  KeyBinding::new("cmd-5", SelectTab5, None),
+                  KeyBinding::new("cmd-6", SelectTab6, None),
+                  KeyBinding::new("cmd-7", SelectTab7, None),
+                  KeyBinding::new("cmd-8", SelectTab8, None),
+                  KeyBinding::new("cmd-9", SelectTab9, None)]);
 
     // App-level action handlers
     cx.on_action::<Quit>(|_, cx| cx.quit());
@@ -196,7 +208,7 @@ pub fn setup(cx: &mut App) {
       });
 
     // Menu bar
-    cx.set_menus(build_menus(&ViewMenuState::default()));
+    cx.set_menus(build_menus(&ViewMenuState::default(), &TabsController::new().snapshot()));
 
     let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
     {
@@ -213,14 +225,16 @@ pub fn setup(cx: &mut App) {
 }
 
 /// Builds the full native menu bar, applying checkmarks to the View menu's
-/// Presentation and Sort submenus (and the Group toggle) based on `state`.
+/// Presentation and Sort submenus (and the Group toggle) based on `state`, and
+/// building the Window menu's ten tab-selection items from `tabs`.
 ///
 /// `cx.set_menus` replaces the entire menu bar on every call, so this must
 /// reconstruct the whole bar rather than just the affected submenus. Called
 /// once at startup with the default state, and again by `LibraryRootView`
-/// whenever the catalog's presentation/sort/grouping changes, so the OS menu's
-/// checkmarks track the toolbar's current selection.
-pub fn build_menus(state: &ViewMenuState) -> Vec<Menu> {
+/// whenever the catalog's presentation/sort/grouping changes or the open tab
+/// set changes, so the OS menu's checkmarks and tab-selection items track the
+/// toolbar/tab-strip's current state.
+pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
     // Column-header clicks produce `SortMethod::Custom { col_key }` rather than the
     // named variants the menu offers; map each back to the menu item it corresponds
     // to so the checkmark still tracks column-driven sorts.
@@ -232,6 +246,29 @@ pub fn build_menus(state: &ViewMenuState) -> Vec<Menu> {
         method => Some(method),
     };
     let sort_checked = |target: SortMethod| normalized_sort == Some(target);
+
+    // `cmd-0` always targets the Catalog tab (`open_tabs[0]`); `cmd-<n>` for
+    // `n` in `1..=9` targets the nth open *detail* tab (`open_tabs[n]`),
+    // since Catalog occupies index `0` and is never re-targeted by `cmd-1..9`.
+    // Returns (label, enabled, checked) — checked reflects whether the tab at
+    // this position is the currently active tab.
+    let tab_label = |position: usize| -> (SharedString, bool, bool) {
+        match tabs.open_tabs.get(position) {
+            Some(target @ TabTarget::Catalog) => {
+                (t!("tabs.catalog_tab").to_string().into(), true, *target == tabs.active)
+            }
+            Some(target @ TabTarget::Detail(id)) => {
+                let title = tabs.titles
+                                .get(id)
+                                .cloned()
+                                .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
+                (truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into(),
+                 true,
+                 *target == tabs.active)
+            }
+            None => (t!("menu.window_select_tab_empty").to_string().into(), false, false),
+        }
+    };
 
     vec![
         Menu::new(t!("sidebar.app_name").to_string()).items([
@@ -319,6 +356,51 @@ pub fn build_menus(state: &ViewMenuState) -> Vec<Menu> {
             MenuItem::action(
                 t!("menu.window_show_alert_history").to_string(),
                 ShowAlertHistory,
+            ),
+            MenuItem::separator(),
+            MenuItem::submenu(
+                Menu::new(t!("menu.window_select_tab_title").to_string()).items([
+                    {
+                        let (label, enabled, checked) = tab_label(0);
+                        MenuItem::action(label, SelectTab0).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(1);
+                        MenuItem::action(label, SelectTab1).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(2);
+                        MenuItem::action(label, SelectTab2).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(3);
+                        MenuItem::action(label, SelectTab3).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(4);
+                        MenuItem::action(label, SelectTab4).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(5);
+                        MenuItem::action(label, SelectTab5).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(6);
+                        MenuItem::action(label, SelectTab6).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(7);
+                        MenuItem::action(label, SelectTab7).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(8);
+                        MenuItem::action(label, SelectTab8).disabled(!enabled).checked(checked)
+                    },
+                    {
+                        let (label, enabled, checked) = tab_label(9);
+                        MenuItem::action(label, SelectTab9).disabled(!enabled).checked(checked)
+                    },
+                ]),
             ),
         ]),
         Menu::new(t!("menu.help_title").to_string())

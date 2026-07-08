@@ -10,30 +10,32 @@ a tab by position — users expect that shortcut family to work here too.
 
 - Bind `cmd-0` to always activate the Catalog tab (the first, non-closable tab), regardless
   of how many detail tabs are open.
-- Bind `cmd-1` through `cmd-9` to activate the tab at that position (1-indexed) in the tab
-  strip's current open-tab order — `cmd-1` is always the Catalog tab (since it is always
-  first), `cmd-2` through `cmd-9` activate the 1st through 8th open detail tabs.
-- Add corresponding items to the native "Window" menu — `Select Tab 0` through `Select Tab
-  9` (labels reflect each tab's actual title where one is open) — each disabled when no tab
-  is open at that position.
+- Bind `cmd-1` through `cmd-9` to activate the 1st through 9th open *detail* tab (the
+  closable tabs opened by double-clicking a catalog item) — Catalog is never a target of
+  `cmd-1` through `cmd-9`, only of `cmd-0`.
+- Add a "Select Tab" submenu to the native "Window" menu holding ten items — position `0`
+  through `9` (labels reflect each tab's actual title where one is open) — each disabled
+  when no tab is open at that position. Nested in a submenu rather than listed flat in the
+  Window menu, so the ten fixed slots don't lengthen the Window menu itself.
+- The submenu item for the currently active tab is check-marked.
 - Menu items and key bindings stay in sync with the live tab strip: opening or closing a
-  detail tab immediately updates which numbered slots are enabled and what their labels
-  read.
+  detail tab, or activating one via the tab strip, immediately updates which numbered slots
+  are enabled, what their labels read, and which one is check-marked.
 - No changes to tab-opening, tab-closing, or tab-strip click-to-activate behavior.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `catalog-tab-cmd-number-shortcuts`: `cmd-0`...`cmd-9` keyboard shortcuts and matching
-  Window-menu items that activate an open main-window tab by position, disabled when no tab
-  occupies that position.
+- `catalog-tab-cmd-number-shortcuts`: `cmd-0`...`cmd-9` keyboard shortcuts and a matching
+  Window-menu "Select Tab" submenu that activates an open main-window tab by position,
+  disabled when no tab occupies that position.
 
 ### Modified Capabilities
 
-- `window-menu`: The Window menu gains ten new items (`Select Tab 0` through `Select Tab
-  9`) for jumping to a tab by position, in addition to its existing Minimize/Zoom/Show
-  Activity/Show Alert History items.
+- `window-menu`: The Window menu gains a "Select Tab" submenu holding ten items (positions
+  `0` through `9`) for jumping to a tab by position, in addition to its existing
+  Minimize/Zoom/Show Activity/Show Alert History items.
 
 ## Impact
 
