@@ -221,6 +221,7 @@ menu:
   window_zoom: "Zoomen"
   window_show_activity: "Aktivität anzeigen"
   window_show_alert_history: "Warnungsverlauf anzeigen"
+  window_select_tab_empty: "Kein Tab"
   help_title: "Hilfe"
 
 title_bar:
