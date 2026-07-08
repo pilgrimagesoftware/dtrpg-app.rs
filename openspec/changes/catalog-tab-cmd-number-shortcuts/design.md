@@ -19,8 +19,9 @@ whichever view's `.on_action::<T>` claims the type — see the existing `ReloadC
 
 **Goals:**
 - `cmd-0` always activates the Catalog tab.
-- `cmd-1` through `cmd-9` activate the tab at that 1-indexed position in `open_tabs`
-  (`cmd-1` therefore always targets Catalog, since it is always `open_tabs[0]`).
+- `cmd-1` through `cmd-9` activate the 1st through 9th open *detail* tab
+  (`open_tabs[1]`..`open_tabs[9]`) — Catalog (`open_tabs[0]`) is only ever a target of
+  `cmd-0`, never of `cmd-1`..`cmd-9`.
 - A Window-menu item exists for each of `cmd-0`..`cmd-9`, labeled with the tab's title when a
   tab occupies that position, disabled (not hidden) when it doesn't.
 - Menu item labels/enabled-state and the effective keyboard targets both stay live as tabs
@@ -49,7 +50,10 @@ whichever view's `.on_action::<T>` claims the type — see the existing `ReloadC
   handler reads `tabs.read(cx).snapshot().open_tabs.get(index)` and calls
   `TabsController::activate` with the resolved target (or no-ops if `None`). No new method
   needed on `TabsController` — `activate` already no-ops safely if given a stale/closed
-  target, and `open_tabs` already exposes catalog-first order.
+  target, and `open_tabs` already exposes catalog-first order (index `0` is always Catalog,
+  so position `n` for `n` in `0..=9` maps directly to `open_tabs[n]` with no offset
+  arithmetic needed — `cmd-0` -> `open_tabs[0]` = Catalog, `cmd-1..9` -> `open_tabs[1..=9]` =
+  the 1st through 9th detail tab).
 - **Window menu, not Catalog menu.** Matches the macOS convention that a tabbed window's
   numbered tab shortcuts live in the Window menu (see Safari, Terminal, Xcode — "Window >
   <tab name>" with `cmd-1..9`). The existing `window-menu` capability already covers
@@ -70,11 +74,24 @@ whichever view's `.on_action::<T>` claims the type — see the existing `ReloadC
   `LibraryChanged` (which fires on high-frequency events like per-thumbnail progress),
   `TabsChanged` only fires on actual open/close/activate, so redundant rebuilds aren't a
   concern here.
-- **Disabled via `MenuItem::disabled(true)`, not omitted.** `gpui`'s `MenuItem::disabled`
-  (confirmed present in the pinned `zed` revision's `app_menu.rs`) keeps all ten items
-  visible at fixed positions in the Window menu at all times, so the shortcut list is
-  discoverable even when few tabs are open — matches the requirement that "the menu item
-  should be disabled" (not "hidden") for unoccupied positions.
+- **Disabled via `MenuItem::disabled(true)` *and* conditionally registering `.on_action`.**
+  `gpui`'s `MenuItem::disabled` (confirmed present in the pinned `zed` revision's
+  `app_menu.rs`) keeps all ten items visible at fixed positions in the Window menu at all
+  times, so the shortcut list is discoverable even when few tabs are open — but it is not
+  sufficient on its own. On macOS, `NSMenu` calls `validateMenuItem:` immediately before
+  displaying the menu, and `gpui`'s implementation of that callback
+  (`init_app_menus`/`on_validate_app_menu_command` in `zed`'s `crates/gpui/src/platform/
+  app_menu.rs`) ignores the static `disabled` field entirely — it calls
+  `cx.is_action_available(action)`, which is `true` whenever *any* `.on_action::<T>` handler
+  for that action type is registered on the focused view, regardless of what the `MenuItem`
+  was built with. Registering all ten `.on_action::<SelectTabN>` handlers unconditionally
+  (as the first implementation did) therefore left every item enabled at runtime no matter
+  what `MenuItem::disabled` said. The fix: wrap each `.on_action::<SelectTabN>` registration
+  in `.when(tab_target_at(&tabs_snap, n).is_some(), |this| this.on_action(...))` so the
+  handler for an empty position is never attached, making `is_action_available` — and thus
+  `validateMenuItem:` — correctly report it as unavailable. `MenuItem::disabled` is kept too,
+  since it sets the item's state before the first `validateMenuItem:` pass and costs
+  nothing.
 
 ## Risks / Trade-offs
 

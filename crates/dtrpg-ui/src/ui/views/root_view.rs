@@ -1,5 +1,6 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
+use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
     IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
@@ -14,9 +15,11 @@ use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 use rust_i18n::t;
 
 use crate::ui::actions::{
-    About, AddCollection, FocusSearch, RefreshThumbnails, ReloadCatalog, ShowActivity,
-    ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher,
-    SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
+    About, AddCollection, FocusSearch, RefreshThumbnails, ReloadCatalog, SelectTab0, SelectTab1,
+    SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6, SelectTab7, SelectTab8, SelectTab9,
+    ShowActivity, ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages,
+    SortByPublisher, SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList,
+    ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
@@ -38,7 +41,7 @@ use crate::{
         auth_state::AuthStateController,
         library::LibraryController,
         settings::SettingsController,
-        tabs::{TabTarget, TabsController},
+        tabs::{TabTarget, TabsController, TabsSnapshot},
     },
     credentials::{CredentialStore, KeyringCredentialStore},
     data::{
@@ -60,6 +63,17 @@ use crate::{
 
 /// Type-tag used to identify the startup-auth toast notification.
 struct AuthPendingNotif;
+
+/// Resolves a Window-menu/`cmd-<n>` tab position to the `TabTarget` currently
+/// open there, if any.
+///
+/// Position `0` always resolves to `open_tabs[0]` (the Catalog tab). Positions
+/// `1..=9` resolve to `open_tabs[position]` — the 1st through 9th *detail*
+/// tab, since Catalog occupies index `0` and is never re-targeted by
+/// `cmd-1`..`cmd-9`.
+fn tab_target_at(snapshot: &TabsSnapshot, position: usize) -> Option<TabTarget> {
+    snapshot.open_tabs.get(position).cloned()
+}
 
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
@@ -337,14 +351,20 @@ impl LibraryRootView {
                                                sort_direction: ctrl.sort_direction,
                                                grouped:        ctrl.grouped, };
               if this.last_menu_state != Some(menu_state) {
-                  cx.set_menus(build_menus(&menu_state));
+                  cx.set_menus(build_menus(&menu_state, &this.tabs.read(cx).snapshot()));
                   this.last_menu_state = Some(menu_state);
               }
               cx.notify();
           })
           .detach();
 
-        cx.subscribe(&tabs, |_this, _ctrl, _event: &TabsChanged, cx| {
+        cx.subscribe(&tabs, |this, ctrl, _event: &TabsChanged, cx| {
+              // Keep the native Window menu's tab-selection items (labels and
+              // enabled state) in sync with the open tab set. Unlike
+              // `LibraryChanged`, `TabsChanged` only fires on an actual
+              // open/close/activate, so no de-duplication guard is needed here.
+              let menu_state = this.last_menu_state.unwrap_or_default();
+              cx.set_menus(build_menus(&menu_state, &ctrl.read(cx).snapshot()));
               cx.notify();
           })
           .detach();
@@ -706,6 +726,16 @@ impl Render for LibraryRootView {
         let controller_for_sort_desc = self.controller.clone();
         let controller_for_group_toggle = self.controller.clone();
         let search_input_for_focus = self.search_input.clone();
+        let tabs_for_select_0 = self.tabs.clone();
+        let tabs_for_select_1 = self.tabs.clone();
+        let tabs_for_select_2 = self.tabs.clone();
+        let tabs_for_select_3 = self.tabs.clone();
+        let tabs_for_select_4 = self.tabs.clone();
+        let tabs_for_select_5 = self.tabs.clone();
+        let tabs_for_select_6 = self.tabs.clone();
+        let tabs_for_select_7 = self.tabs.clone();
+        let tabs_for_select_8 = self.tabs.clone();
+        let tabs_for_select_9 = self.tabs.clone();
         let sidebar_initial = self.sidebar_width;
 
         div()
@@ -897,6 +927,76 @@ impl Render for LibraryRootView {
             })
             .on_action(move |_: &ShowAlertHistory, _, cx| {
                 activity_for_alert_history.update(cx, |a, cx| a.toggle_alert_panel(cx));
+            })
+            .when(tab_target_at(&tabs_snap, 0).is_some(), |this| {
+                this.on_action(move |_: &SelectTab0, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_0.read(cx).snapshot(), 0) {
+                        tabs_for_select_0.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 1).is_some(), |this| {
+                this.on_action(move |_: &SelectTab1, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_1.read(cx).snapshot(), 1) {
+                        tabs_for_select_1.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 2).is_some(), |this| {
+                this.on_action(move |_: &SelectTab2, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_2.read(cx).snapshot(), 2) {
+                        tabs_for_select_2.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 3).is_some(), |this| {
+                this.on_action(move |_: &SelectTab3, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_3.read(cx).snapshot(), 3) {
+                        tabs_for_select_3.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 4).is_some(), |this| {
+                this.on_action(move |_: &SelectTab4, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_4.read(cx).snapshot(), 4) {
+                        tabs_for_select_4.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 5).is_some(), |this| {
+                this.on_action(move |_: &SelectTab5, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_5.read(cx).snapshot(), 5) {
+                        tabs_for_select_5.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 6).is_some(), |this| {
+                this.on_action(move |_: &SelectTab6, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_6.read(cx).snapshot(), 6) {
+                        tabs_for_select_6.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 7).is_some(), |this| {
+                this.on_action(move |_: &SelectTab7, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_7.read(cx).snapshot(), 7) {
+                        tabs_for_select_7.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 8).is_some(), |this| {
+                this.on_action(move |_: &SelectTab8, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_8.read(cx).snapshot(), 8) {
+                        tabs_for_select_8.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
+            })
+            .when(tab_target_at(&tabs_snap, 9).is_some(), |this| {
+                this.on_action(move |_: &SelectTab9, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_9.read(cx).snapshot(), 9) {
+                        tabs_for_select_9.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
             .child(
                 div()
