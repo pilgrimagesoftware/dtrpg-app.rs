@@ -1,5 +1,6 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
+use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
     IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
@@ -927,55 +928,75 @@ impl Render for LibraryRootView {
             .on_action(move |_: &ShowAlertHistory, _, cx| {
                 activity_for_alert_history.update(cx, |a, cx| a.toggle_alert_panel(cx));
             })
-            .on_action(move |_: &SelectTab0, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_0.read(cx).snapshot(), 0) {
-                    tabs_for_select_0.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 0).is_some(), |this| {
+                this.on_action(move |_: &SelectTab0, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_0.read(cx).snapshot(), 0) {
+                        tabs_for_select_0.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab1, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_1.read(cx).snapshot(), 1) {
-                    tabs_for_select_1.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 1).is_some(), |this| {
+                this.on_action(move |_: &SelectTab1, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_1.read(cx).snapshot(), 1) {
+                        tabs_for_select_1.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab2, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_2.read(cx).snapshot(), 2) {
-                    tabs_for_select_2.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 2).is_some(), |this| {
+                this.on_action(move |_: &SelectTab2, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_2.read(cx).snapshot(), 2) {
+                        tabs_for_select_2.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab3, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_3.read(cx).snapshot(), 3) {
-                    tabs_for_select_3.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 3).is_some(), |this| {
+                this.on_action(move |_: &SelectTab3, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_3.read(cx).snapshot(), 3) {
+                        tabs_for_select_3.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab4, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_4.read(cx).snapshot(), 4) {
-                    tabs_for_select_4.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 4).is_some(), |this| {
+                this.on_action(move |_: &SelectTab4, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_4.read(cx).snapshot(), 4) {
+                        tabs_for_select_4.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab5, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_5.read(cx).snapshot(), 5) {
-                    tabs_for_select_5.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 5).is_some(), |this| {
+                this.on_action(move |_: &SelectTab5, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_5.read(cx).snapshot(), 5) {
+                        tabs_for_select_5.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab6, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_6.read(cx).snapshot(), 6) {
-                    tabs_for_select_6.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 6).is_some(), |this| {
+                this.on_action(move |_: &SelectTab6, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_6.read(cx).snapshot(), 6) {
+                        tabs_for_select_6.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab7, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_7.read(cx).snapshot(), 7) {
-                    tabs_for_select_7.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 7).is_some(), |this| {
+                this.on_action(move |_: &SelectTab7, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_7.read(cx).snapshot(), 7) {
+                        tabs_for_select_7.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab8, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_8.read(cx).snapshot(), 8) {
-                    tabs_for_select_8.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 8).is_some(), |this| {
+                this.on_action(move |_: &SelectTab8, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_8.read(cx).snapshot(), 8) {
+                        tabs_for_select_8.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
-            .on_action(move |_: &SelectTab9, _, cx| {
-                if let Some(target) = tab_target_at(&tabs_for_select_9.read(cx).snapshot(), 9) {
-                    tabs_for_select_9.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-                }
+            .when(tab_target_at(&tabs_snap, 9).is_some(), |this| {
+                this.on_action(move |_: &SelectTab9, _, cx| {
+                    if let Some(target) = tab_target_at(&tabs_for_select_9.read(cx).snapshot(), 9) {
+                        tabs_for_select_9.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                    }
+                })
             })
             .child(
                 div()

@@ -74,11 +74,24 @@ whichever view's `.on_action::<T>` claims the type — see the existing `ReloadC
   `LibraryChanged` (which fires on high-frequency events like per-thumbnail progress),
   `TabsChanged` only fires on actual open/close/activate, so redundant rebuilds aren't a
   concern here.
-- **Disabled via `MenuItem::disabled(true)`, not omitted.** `gpui`'s `MenuItem::disabled`
-  (confirmed present in the pinned `zed` revision's `app_menu.rs`) keeps all ten items
-  visible at fixed positions in the Window menu at all times, so the shortcut list is
-  discoverable even when few tabs are open — matches the requirement that "the menu item
-  should be disabled" (not "hidden") for unoccupied positions.
+- **Disabled via `MenuItem::disabled(true)` *and* conditionally registering `.on_action`.**
+  `gpui`'s `MenuItem::disabled` (confirmed present in the pinned `zed` revision's
+  `app_menu.rs`) keeps all ten items visible at fixed positions in the Window menu at all
+  times, so the shortcut list is discoverable even when few tabs are open — but it is not
+  sufficient on its own. On macOS, `NSMenu` calls `validateMenuItem:` immediately before
+  displaying the menu, and `gpui`'s implementation of that callback
+  (`init_app_menus`/`on_validate_app_menu_command` in `zed`'s `crates/gpui/src/platform/
+  app_menu.rs`) ignores the static `disabled` field entirely — it calls
+  `cx.is_action_available(action)`, which is `true` whenever *any* `.on_action::<T>` handler
+  for that action type is registered on the focused view, regardless of what the `MenuItem`
+  was built with. Registering all ten `.on_action::<SelectTabN>` handlers unconditionally
+  (as the first implementation did) therefore left every item enabled at runtime no matter
+  what `MenuItem::disabled` said. The fix: wrap each `.on_action::<SelectTabN>` registration
+  in `.when(tab_target_at(&tabs_snap, n).is_some(), |this| this.on_action(...))` so the
+  handler for an empty position is never attached, making `is_action_available` — and thus
+  `validateMenuItem:` — correctly report it as unavailable. `MenuItem::disabled` is kept too,
+  since it sets the item's state before the first `validateMenuItem:` pass and costs
+  nothing.
 
 ## Risks / Trade-offs
 
