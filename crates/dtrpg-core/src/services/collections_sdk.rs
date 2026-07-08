@@ -62,9 +62,7 @@ pub trait SdkCollectionsGateway: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns [`CollectionsServiceError`] on network or session failures, or
-    /// if the underlying API has no equivalent endpoint (see
-    /// `HttpSdkCollectionsGateway::add_product_list_item`).
+    /// Returns [`CollectionsServiceError`] on network or session failures.
     fn add_product_list_item(&self, product_list_id: u64, order_product_id: u64)
                              -> Result<(), CollectionsServiceError>;
 
@@ -73,8 +71,7 @@ pub trait SdkCollectionsGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures, or
-    /// if the underlying API has no equivalent endpoint (see
-    /// `HttpSdkCollectionsGateway::remove_product_list_item`).
+    /// if no matching item can be found in the product list.
     fn remove_product_list_item(&self, product_list_id: u64, order_product_id: u64)
                                 -> Result<(), CollectionsServiceError>;
 }
@@ -153,23 +150,7 @@ impl CollectionsService for RustSdkCollectionsService {
                 };
 
                 for item in &items_resp.data {
-                    // Try orderProductId first (flat or JSON:API-style), then productId.
-                    // The product_list_items endpoint returns productId in attributes;
-                    // both IDs are stored so the sidebar filter can match either.
-                    let extracted = item.get("orderProductId")
-                                        .and_then(|v| v.as_u64())
-                                        .or_else(|| {
-                                            item.get("attributes")
-                                                .and_then(|a| a.get("orderProductId"))
-                                                .and_then(|v| v.as_u64())
-                                        })
-                                        .or_else(|| {
-                                            item.get("attributes")
-                                                .and_then(|a| a.get("productId"))
-                                                .and_then(|v| v.as_u64())
-                                        });
-
-                    if let Some(id_value) = extracted {
+                    if let Some(id_value) = extract_member_id(item) {
                         member_ids.push(id_value);
                     }
                     else {
@@ -215,6 +196,51 @@ impl CollectionsService for RustSdkCollectionsService {
         self.gateway
             .remove_product_list_item(collection_id, item_id)
     }
+}
+
+// ── Raw item field extraction
+// ─────────────────────────────────────────────────
+
+/// Extracts the id used for collection membership matching from a raw
+/// `product_list_items` entry: `orderProductId` first (flat or JSON:API-style
+/// `attributes`), falling back to `attributes.productId`.
+fn extract_member_id(item: &serde_json::Value) -> Option<u64> {
+    item.get("orderProductId")
+        .and_then(serde_json::Value::as_u64)
+        .or_else(|| {
+            item.get("attributes")
+                .and_then(|a| a.get("orderProductId"))
+                .and_then(serde_json::Value::as_u64)
+        })
+        .or_else(|| {
+            item.get("attributes")
+                .and_then(|a| a.get("productId"))
+                .and_then(serde_json::Value::as_u64)
+        })
+}
+
+/// Extracts a product list item's own id (`productListItemId`, needed to
+/// delete it via `DELETE /product_list_items/{id}`) from a raw
+/// `product_list_items` entry.
+///
+/// Tries `productListItemId` (flat or nested in `attributes`, matching the
+/// `POST /product_list_items` response shape) first, then falls back to the
+/// JSON:API resource `id`, which the API may send as either a number or a
+/// numeric string.
+fn extract_product_list_item_id(item: &serde_json::Value) -> Option<u64> {
+    item.get("productListItemId")
+        .and_then(serde_json::Value::as_u64)
+        .or_else(|| {
+            item.get("attributes")
+                .and_then(|a| a.get("productListItemId"))
+                .and_then(serde_json::Value::as_u64)
+        })
+        .or_else(|| {
+            item.get("id").and_then(|v| {
+                              v.as_u64()
+                               .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                          })
+        })
 }
 
 // ── HTTP gateway
@@ -298,6 +324,36 @@ impl HttpSdkCollectionsGateway {
 
         Ok(Self { client, runtime })
     }
+
+    /// Paginates a product list's items looking for one whose
+    /// `order_product_id`/`product_id` matches `member_id`, returning that
+    /// entry's own `productListItemId`.
+    fn find_product_list_item_id(&self, product_list_id: u64, member_id: u64)
+                                 -> Result<Option<u64>, CollectionsServiceError> {
+        let mut page: u32 = 1;
+        loop {
+            let response =
+                self.runtime
+                    .block_on(self.client
+                                  .list_product_list_items(product_list_id,
+                                                           PageParams { page:      Some(page),
+                                                                        page_size: None, }))
+                    .map_err(map_client_error)?;
+
+            for item in &response.data {
+                if extract_member_id(item) == Some(member_id)
+                   && let Some(item_id) = extract_product_list_item_id(item)
+                {
+                    return Ok(Some(item_id));
+                }
+            }
+
+            if response.links.next.is_none() {
+                return Ok(None);
+            }
+            page += 1;
+        }
+    }
 }
 
 impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
@@ -331,25 +387,33 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
             .map_err(map_client_error)
     }
 
-    fn add_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+    fn add_product_list_item(&self, product_list_id: u64, order_product_id: u64)
                              -> Result<(), CollectionsServiceError> {
-        // The DriveThruRPG API (see dtrpg-api's openapi.yaml) only documents
-        // GET on `product_lists` and `product_list_items`; there is no
-        // documented endpoint to add a member to a product list. Rather than
-        // guess at an undocumented request shape against a live production
-        // API, this fails explicitly until `dtrpg-api`/`dtrpg-sdk` add a real
-        // contract for it (tracked by the `collection-membership-editing`
-        // OpenSpec change).
-        Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
-                                         "Adding items to a collection isn't supported by the DriveThruRPG API yet."))
+        self.runtime
+            .block_on(self.client
+                          .add_product_list_item(product_list_id, order_product_id))
+            .map_err(map_client_error)
+            .map(|_| ())
     }
 
-    fn remove_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+    fn remove_product_list_item(&self, product_list_id: u64, order_product_id: u64)
                                 -> Result<(), CollectionsServiceError> {
-        // Same rationale as `add_product_list_item`: the documented API has no
-        // endpoint to remove a member from a product list.
-        Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
-                                         "Removing items from a collection isn't supported by the DriveThruRPG API yet."))
+        // `DELETE /product_list_items/{id}` takes the item's own id, not the
+        // product's id, so the matching list entry must be located first.
+        let product_list_item_id = self.find_product_list_item_id(product_list_id,
+                                                                  order_product_id)?
+                                       .ok_or_else(|| {
+                                           CollectionsServiceError::new(
+                    CollectionsServiceErrorKind::Network,
+                    format!(
+                        "Item {order_product_id} was not found in collection {product_list_id}."
+                    ),
+                )
+                                       })?;
+
+        self.runtime
+            .block_on(self.client.delete_product_list_item(product_list_item_id))
+            .map_err(map_client_error)
     }
 }
 
@@ -619,5 +683,59 @@ mod tests {
         let err = service.create_collection("Anything")
                          .expect_err("session error");
         assert_eq!(err.kind, CollectionsServiceErrorKind::Session);
+    }
+
+    #[test]
+    fn extract_member_id_reads_flat_order_product_id() {
+        let item = json!({ "orderProductId": 42 });
+        assert_eq!(extract_member_id(&item), Some(42));
+    }
+
+    #[test]
+    fn extract_member_id_reads_nested_order_product_id() {
+        let item = json!({ "attributes": { "orderProductId": 42 } });
+        assert_eq!(extract_member_id(&item), Some(42));
+    }
+
+    #[test]
+    fn extract_member_id_falls_back_to_nested_product_id() {
+        let item = json!({ "attributes": { "productId": 99 } });
+        assert_eq!(extract_member_id(&item), Some(99));
+    }
+
+    #[test]
+    fn extract_member_id_returns_none_when_no_field_matches() {
+        let item = json!({ "someOtherField": "abc" });
+        assert_eq!(extract_member_id(&item), None);
+    }
+
+    #[test]
+    fn extract_product_list_item_id_reads_flat_field() {
+        let item = json!({ "productListItemId": 2_629_321 });
+        assert_eq!(extract_product_list_item_id(&item), Some(2_629_321));
+    }
+
+    #[test]
+    fn extract_product_list_item_id_reads_nested_field() {
+        let item = json!({ "attributes": { "productListItemId": 2_629_321 } });
+        assert_eq!(extract_product_list_item_id(&item), Some(2_629_321));
+    }
+
+    #[test]
+    fn extract_product_list_item_id_falls_back_to_numeric_resource_id() {
+        let item = json!({ "id": 2_629_321 });
+        assert_eq!(extract_product_list_item_id(&item), Some(2_629_321));
+    }
+
+    #[test]
+    fn extract_product_list_item_id_falls_back_to_string_resource_id() {
+        let item = json!({ "id": "2629321" });
+        assert_eq!(extract_product_list_item_id(&item), Some(2_629_321));
+    }
+
+    #[test]
+    fn extract_product_list_item_id_returns_none_when_no_field_matches() {
+        let item = json!({ "someOtherField": "abc" });
+        assert_eq!(extract_product_list_item_id(&item), None);
     }
 }
