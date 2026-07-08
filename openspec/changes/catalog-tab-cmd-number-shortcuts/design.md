@@ -19,8 +19,9 @@ whichever view's `.on_action::<T>` claims the type — see the existing `ReloadC
 
 **Goals:**
 - `cmd-0` always activates the Catalog tab.
-- `cmd-1` through `cmd-9` activate the tab at that 1-indexed position in `open_tabs`
-  (`cmd-1` therefore always targets Catalog, since it is always `open_tabs[0]`).
+- `cmd-1` through `cmd-9` activate the 1st through 9th open *detail* tab
+  (`open_tabs[1]`..`open_tabs[9]`) — Catalog (`open_tabs[0]`) is only ever a target of
+  `cmd-0`, never of `cmd-1`..`cmd-9`.
 - A Window-menu item exists for each of `cmd-0`..`cmd-9`, labeled with the tab's title when a
   tab occupies that position, disabled (not hidden) when it doesn't.
 - Menu item labels/enabled-state and the effective keyboard targets both stay live as tabs
@@ -49,7 +50,10 @@ whichever view's `.on_action::<T>` claims the type — see the existing `ReloadC
   handler reads `tabs.read(cx).snapshot().open_tabs.get(index)` and calls
   `TabsController::activate` with the resolved target (or no-ops if `None`). No new method
   needed on `TabsController` — `activate` already no-ops safely if given a stale/closed
-  target, and `open_tabs` already exposes catalog-first order.
+  target, and `open_tabs` already exposes catalog-first order (index `0` is always Catalog,
+  so position `n` for `n` in `0..=9` maps directly to `open_tabs[n]` with no offset
+  arithmetic needed — `cmd-0` -> `open_tabs[0]` = Catalog, `cmd-1..9` -> `open_tabs[1..=9]` =
+  the 1st through 9th detail tab).
 - **Window menu, not Catalog menu.** Matches the macOS convention that a tabbed window's
   numbered tab shortcuts live in the Window menu (see Safari, Terminal, Xcode — "Window >
   <tab name>" with `cmd-1..9`). The existing `window-menu` capability already covers

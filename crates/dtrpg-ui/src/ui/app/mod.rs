@@ -247,12 +247,11 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
     };
     let sort_checked = |target: SortMethod| normalized_sort == Some(target);
 
-    // `cmd-0` and `cmd-1` both always target the Catalog tab (always
-    // `open_tabs[0]`); `cmd-<n>` for `n` in `2..=9` targets the (n-1)th open
-    // detail tab.
+    // `cmd-0` always targets the Catalog tab (`open_tabs[0]`); `cmd-<n>` for
+    // `n` in `1..=9` targets the nth open *detail* tab (`open_tabs[n]`),
+    // since Catalog occupies index `0` and is never re-targeted by `cmd-1..9`.
     let tab_label = |position: usize| -> (SharedString, bool) {
-        let open_index = position.saturating_sub(1);
-        match tabs.open_tabs.get(open_index) {
+        match tabs.open_tabs.get(position) {
             Some(TabTarget::Catalog) => (t!("tabs.catalog_tab").to_string().into(), true),
             Some(TabTarget::Detail(id)) => {
                 let title = tabs.titles

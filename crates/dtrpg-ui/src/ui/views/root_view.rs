@@ -66,12 +66,12 @@ struct AuthPendingNotif;
 /// Resolves a Window-menu/`cmd-<n>` tab position to the `TabTarget` currently
 /// open there, if any.
 ///
-/// Position `0` and `1` both resolve to `open_tabs[0]` (always the Catalog
-/// tab); positions `2..=9` resolve to the (position - 1)th open tab, matching
-/// the tab strip's catalog-first ordering.
+/// Position `0` always resolves to `open_tabs[0]` (the Catalog tab). Positions
+/// `1..=9` resolve to `open_tabs[position]` — the 1st through 9th *detail*
+/// tab, since Catalog occupies index `0` and is never re-targeted by
+/// `cmd-1`..`cmd-9`.
 fn tab_target_at(snapshot: &TabsSnapshot, position: usize) -> Option<TabTarget> {
-    let open_index = position.saturating_sub(1);
-    snapshot.open_tabs.get(open_index).cloned()
+    snapshot.open_tabs.get(position).cloned()
 }
 
 /// Top-level GPUI view for the Libri library window.

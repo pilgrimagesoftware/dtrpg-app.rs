@@ -10,9 +10,9 @@ a tab by position — users expect that shortcut family to work here too.
 
 - Bind `cmd-0` to always activate the Catalog tab (the first, non-closable tab), regardless
   of how many detail tabs are open.
-- Bind `cmd-1` through `cmd-9` to activate the tab at that position (1-indexed) in the tab
-  strip's current open-tab order — `cmd-1` is always the Catalog tab (since it is always
-  first), `cmd-2` through `cmd-9` activate the 1st through 8th open detail tabs.
+- Bind `cmd-1` through `cmd-9` to activate the 1st through 9th open *detail* tab (the
+  closable tabs opened by double-clicking a catalog item) — Catalog is never a target of
+  `cmd-1` through `cmd-9`, only of `cmd-0`.
 - Add corresponding items to the native "Window" menu — `Select Tab 0` through `Select Tab
   9` (labels reflect each tab's actual title where one is open) — each disabled when no tab
   is open at that position.
