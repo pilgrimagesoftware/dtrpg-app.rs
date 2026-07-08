@@ -31,37 +31,40 @@ through `cmd-9`.
 - **WHEN** fewer than `n` detail tabs are open and the user presses `cmd-<n>`
 - **THEN** the active tab does not change and no error occurs
 
-### Requirement: Window menu exposes tab-selection items for positions 0 through 9
-The Window menu SHALL contain ten items, one per position `0` through `9`, each dispatching
-the same action as the corresponding `cmd-<n>` shortcut (position `0` is Catalog; positions
-`1` through `9` are the 1st through 9th open detail tab). Each item's label SHALL reflect
-the open tab's title when a tab occupies that position, and each item SHALL be disabled
-(not removed) when no tab occupies that position.
+### Requirement: Window menu exposes a Select Tab submenu with items for positions 0 through 9
+The Window menu SHALL contain a "Select Tab" submenu holding ten items, one per position
+`0` through `9`, each dispatching the same action as the corresponding `cmd-<n>` shortcut
+(position `0` is Catalog; positions `1` through `9` are the 1st through 9th open detail
+tab). Each item's label SHALL reflect the open tab's title when a tab occupies that
+position, and each item SHALL be disabled (not removed) when no tab occupies that
+position. The items are nested under this submenu, not listed directly in the Window
+menu, so the ten fixed slots don't lengthen the Window menu itself.
 
 #### Scenario: Menu item enabled and labeled for an open detail tab
 - **WHEN** a detail tab titled "Curse of Strahd" is the 2nd open detail tab
-- **THEN** the Window menu's position-2 item is enabled and labeled with that tab's title
-  (or a truncated form of it)
+- **THEN** the "Select Tab" submenu's position-2 item is enabled and labeled with that
+  tab's title (or a truncated form of it)
 
 #### Scenario: Menu item disabled for an unoccupied position
 - **WHEN** only the Catalog tab is open (no detail tabs, so positions 1 through 9 are
   unoccupied)
-- **THEN** the Window menu's items for positions 1 through 9 are present but disabled
+- **THEN** the "Select Tab" submenu's items for positions 1 through 9 are present but
+  disabled
 
 #### Scenario: Menu item selecting a tab via click
-- **WHEN** the user clicks an enabled position-<n> Window menu item
+- **WHEN** the user clicks an enabled position-<n> item in the "Select Tab" submenu
 - **THEN** the tab at that position becomes active, identical to pressing `cmd-<n>`
 
 ### Requirement: Tab-selection menu state stays live as tabs open and close
-The Window menu's tab-selection items SHALL reflect the current open-tab list without
+The "Select Tab" submenu's items SHALL reflect the current open-tab list without
 requiring the user to reopen the menu bar or restart the app.
 
 #### Scenario: Opening a detail tab enables its menu item
 - **WHEN** the user double-clicks a catalog item to open a new detail tab as the 2nd open
   detail tab
-- **THEN** the Window menu's position-2 item becomes enabled and labeled with that tab's
-  title on the next time the menu bar is queried
+- **THEN** the "Select Tab" submenu's position-2 item becomes enabled and labeled with
+  that tab's title on the next time the menu bar is queried
 
 #### Scenario: Closing a detail tab disables its former menu item
 - **WHEN** the user closes the only open detail tab, previously at position 1
-- **THEN** the Window menu's position-1 item becomes disabled again
+- **THEN** the "Select Tab" submenu's position-1 item becomes disabled again

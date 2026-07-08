@@ -222,6 +222,7 @@ menu:
   window_zoom: "Zoom"
   window_show_activity: "Show Activity"
   window_show_alert_history: "Show Alert History"
+  window_select_tab_title: "Select Tab"
   window_select_tab_empty: "No Tab"
   help_title: "Help"
 

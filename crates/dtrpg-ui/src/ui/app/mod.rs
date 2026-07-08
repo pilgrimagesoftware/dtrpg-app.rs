@@ -352,46 +352,50 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                 ShowAlertHistory,
             ),
             MenuItem::separator(),
-            {
-                let (label, enabled) = tab_label(0);
-                MenuItem::action(label, SelectTab0).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(1);
-                MenuItem::action(label, SelectTab1).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(2);
-                MenuItem::action(label, SelectTab2).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(3);
-                MenuItem::action(label, SelectTab3).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(4);
-                MenuItem::action(label, SelectTab4).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(5);
-                MenuItem::action(label, SelectTab5).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(6);
-                MenuItem::action(label, SelectTab6).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(7);
-                MenuItem::action(label, SelectTab7).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(8);
-                MenuItem::action(label, SelectTab8).disabled(!enabled)
-            },
-            {
-                let (label, enabled) = tab_label(9);
-                MenuItem::action(label, SelectTab9).disabled(!enabled)
-            },
+            MenuItem::submenu(
+                Menu::new(t!("menu.window_select_tab_title").to_string()).items([
+                    {
+                        let (label, enabled) = tab_label(0);
+                        MenuItem::action(label, SelectTab0).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(1);
+                        MenuItem::action(label, SelectTab1).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(2);
+                        MenuItem::action(label, SelectTab2).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(3);
+                        MenuItem::action(label, SelectTab3).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(4);
+                        MenuItem::action(label, SelectTab4).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(5);
+                        MenuItem::action(label, SelectTab5).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(6);
+                        MenuItem::action(label, SelectTab6).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(7);
+                        MenuItem::action(label, SelectTab7).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(8);
+                        MenuItem::action(label, SelectTab8).disabled(!enabled)
+                    },
+                    {
+                        let (label, enabled) = tab_label(9);
+                        MenuItem::action(label, SelectTab9).disabled(!enabled)
+                    },
+                ]),
+            ),
         ]),
         Menu::new(t!("menu.help_title").to_string())
             .items([MenuItem::action(t!("menu.app_about").to_string(), About)]),

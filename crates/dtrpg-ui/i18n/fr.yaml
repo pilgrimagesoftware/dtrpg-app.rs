@@ -221,6 +221,7 @@ menu:
   window_zoom: "Zoom"
   window_show_activity: "Afficher l'activité"
   window_show_alert_history: "Afficher l'historique des alertes"
+  window_select_tab_title: "Sélectionner l'onglet"
   window_select_tab_empty: "Aucun onglet"
   help_title: "Aide"
 
