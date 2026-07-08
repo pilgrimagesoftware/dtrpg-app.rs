@@ -237,9 +237,9 @@ fn extract_product_list_item_id(item: &serde_json::Value) -> Option<u64> {
         })
         .or_else(|| {
             item.get("id").and_then(|v| {
-                v.as_u64()
-                 .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
-            })
+                              v.as_u64()
+                               .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                          })
         })
 }
 
@@ -332,12 +332,13 @@ impl HttpSdkCollectionsGateway {
                                  -> Result<Option<u64>, CollectionsServiceError> {
         let mut page: u32 = 1;
         loop {
-            let response = self.runtime
-                               .block_on(self.client.list_product_list_items(
-                    product_list_id,
-                    PageParams { page: Some(page), page_size: None },
-                ))
-                               .map_err(map_client_error)?;
+            let response =
+                self.runtime
+                    .block_on(self.client
+                                  .list_product_list_items(product_list_id,
+                                                           PageParams { page:      Some(page),
+                                                                        page_size: None, }))
+                    .map_err(map_client_error)?;
 
             for item in &response.data {
                 if extract_member_id(item) == Some(member_id)
@@ -399,16 +400,16 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
                                 -> Result<(), CollectionsServiceError> {
         // `DELETE /product_list_items/{id}` takes the item's own id, not the
         // product's id, so the matching list entry must be located first.
-        let product_list_item_id =
-            self.find_product_list_item_id(product_list_id, order_product_id)?
-                .ok_or_else(|| {
-                    CollectionsServiceError::new(
+        let product_list_item_id = self.find_product_list_item_id(product_list_id,
+                                                                  order_product_id)?
+                                       .ok_or_else(|| {
+                                           CollectionsServiceError::new(
                     CollectionsServiceErrorKind::Network,
                     format!(
                         "Item {order_product_id} was not found in collection {product_list_id}."
                     ),
                 )
-                })?;
+                                       })?;
 
         self.runtime
             .block_on(self.client.delete_product_list_item(product_list_item_id))
