@@ -63,6 +63,8 @@ catalog:
   action_show_in_explorer: "Im Explorer anzeigen"
   action_show_in_files: "In Dateien anzeigen"
   action_manage_collections: "Sammlungen verwalten…"
+  unavailable_badge: "Nicht verfügbar"
+  unavailable_badge_tooltip: "Dieser Titel wurde beim letzten Abgleich nicht vom Server zurückgegeben. Er bleibt in deiner Bibliothek, die Verfügbarkeit konnte aber nicht bestätigt werden."
 
 detail:
   read_button: "Lesen"
@@ -163,6 +165,7 @@ activity:
   loading_library_collections: "Bibliothek wird geladen: Sammlungen werden abgerufen…"
   loading_library_count: "Bibliothek wird geladen: Anzahl der Einträge wird abgerufen…"
   loading_library_page: "Bibliothek wird geladen: Seite %{page}…"
+  loading_library_partial: "Bibliothek wird geladen: Auf Updates wird geprüft…"
   loading_collections: "Sammlungen werden geladen…"
 
 alert_history:
@@ -194,6 +197,7 @@ menu:
   catalog_add_collection: "Sammlung hinzufügen…"
   catalog_reload: "Neu laden"
   catalog_refresh_thumbnails: "Miniaturansichten aktualisieren"
+  catalog_check_availability: "Auf Updates prüfen"
   edit_title: "Bearbeiten"
   edit_undo: "Rückgängig"
   edit_redo: "Wiederholen"

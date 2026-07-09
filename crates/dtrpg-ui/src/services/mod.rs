@@ -127,6 +127,28 @@ pub trait LibraryService: Send + Sync + 'static {
     /// [`LibraryServiceErrorKind::NotFound`] if the id does not match any
     /// item, or a network/session error if the request fails.
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError>;
+
+    /// Fetches items added or changed since `since_iso8601` (an ISO 8601
+    /// timestamp), calling `on_page` incrementally as pages arrive — a
+    /// cheaper alternative to a full [`list_items_paged`](Self::list_items_paged)
+    /// fetch when only a few items changed.
+    ///
+    /// Returns `None` when a date-filtered fetch is not supported by this
+    /// implementation; callers should treat `None` as "unsupported" and fall
+    /// back to a full paginated fetch, mirroring [`count_items`](Self::count_items)'s
+    /// convention.
+    ///
+    /// # Errors
+    ///
+    /// The inner `Result` is a [`LibraryServiceError`] if any page request
+    /// fails. Items delivered to `on_page` before the failure are not rolled
+    /// back.
+    fn list_items_updated_since(&self, since_iso8601: &str,
+                                on_page: &mut dyn FnMut(Vec<LibraryItem>))
+                                -> Option<Result<(), LibraryServiceError>> {
+        let _ = (since_iso8601, on_page);
+        None
+    }
 }
 
 // ── LoginService

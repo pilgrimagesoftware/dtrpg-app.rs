@@ -10,6 +10,13 @@ use crate::data::enums::ItemStatus;
 // ── LibraryItem
 // ───────────────────────────────────────────────────────────────
 
+/// `serde(default)` helper for [`LibraryItem::is_available`] — serde's `bool`
+/// default is `false`, but a missing field here means the cache predates the
+/// flag and every item in it was current as of the last successful sync.
+fn default_true() -> bool {
+    true
+}
+
 /// A single item in the RPG catalog.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryItem {
@@ -58,6 +65,17 @@ pub struct LibraryItem {
     /// to cache.
     #[serde(skip)]
     pub thumbnail_last_attempted: Option<std::time::SystemTime>,
+    /// Whether this item was present in the most recent successful live
+    /// catalog fetch. `false` means the server no longer lists it, but the
+    /// item is kept (not deleted) so previously-downloaded files stay
+    /// reachable. Defaults to `true` for cache files written before this
+    /// field existed and for items newly added from a live fetch.
+    #[serde(default = "default_true")]
+    pub is_available:             bool,
+    /// Last time an individual server check (`catalog-item-level-reconciliation`)
+    /// ran for this item; not persisted to cache.
+    #[serde(skip)]
+    pub availability_last_checked: Option<std::time::SystemTime>,
     /// Per-item files bundled in this catalog entry, mapped from the SDK's
     /// `OrderProductFile` array. More than one entry means this is a
     /// multi-item catalog entry (see the `catalog-entry-detail-view`
@@ -93,6 +111,8 @@ impl LibraryItem {
                date_added,
                date_updated: None,
                thumbnail_last_attempted: None,
+               is_available: true,
+               availability_last_checked: None,
                files: Vec::new() }
     }
 
@@ -246,6 +266,33 @@ mod tests {
 
         assert_eq!(item.files.len(), 1);
         assert!(!item.is_multi_item());
+    }
+
+    #[test]
+    fn is_available_defaults_to_true_when_field_is_missing() {
+        let json = serde_json::json!({
+            "id": "e1",
+            "numeric_id": 0,
+            "title": "Moria",
+            "publisher": "Free League",
+            "line": "",
+            "kind": "",
+            "format": "",
+            "pages": 0,
+            "size_mb": 0.0,
+            "year": 0,
+            "added_order": 0,
+            "status": "Cloud",
+            "color": "#000000",
+            "desc": "",
+        });
+
+        let item: LibraryItem = match serde_json::from_value(json) {
+            Ok(item) => item,
+            Err(e) => panic!("deserializes: {e}"),
+        };
+
+        assert!(item.is_available);
     }
 
     #[test]

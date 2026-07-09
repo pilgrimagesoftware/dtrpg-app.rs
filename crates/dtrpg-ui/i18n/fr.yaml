@@ -63,6 +63,8 @@ catalog:
   action_show_in_explorer: "Afficher dans l'Explorateur"
   action_show_in_files: "Afficher dans Fichiers"
   action_manage_collections: "Gérer les collections…"
+  unavailable_badge: "Indisponible"
+  unavailable_badge_tooltip: "Cet article n'a pas été renvoyé par le serveur lors de la dernière synchronisation. Il reste dans votre bibliothèque, mais sa disponibilité n'a pas pu être confirmée."
 
 detail:
   read_button: "Lire"
@@ -163,6 +165,7 @@ activity:
   loading_library_collections: "Chargement de la bibliothèque : récupération des collections…"
   loading_library_count: "Chargement de la bibliothèque : récupération du nombre d'éléments…"
   loading_library_page: "Chargement de la bibliothèque : page %{page}…"
+  loading_library_partial: "Chargement de la bibliothèque : vérification des mises à jour…"
   loading_collections: "Chargement des collections…"
 
 alert_history:
@@ -194,6 +197,7 @@ menu:
   catalog_add_collection: "Ajouter une collection…"
   catalog_reload: "Actualiser"
   catalog_refresh_thumbnails: "Actualiser les vignettes"
+  catalog_check_availability: "Vérifier les mises à jour"
   edit_title: "Édition"
   edit_undo: "Annuler"
   edit_redo: "Rétablir"

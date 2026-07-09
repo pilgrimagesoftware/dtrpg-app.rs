@@ -262,6 +262,8 @@ mod tests {
                       date_added:               None,
                       date_updated:             None,
                       thumbnail_last_attempted: None,
+                      is_available:             true,
+                      availability_last_checked: None,
                       files:                    Vec::new(), }
     }
 

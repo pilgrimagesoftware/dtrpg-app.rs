@@ -202,6 +202,70 @@ impl LibraryService for RustSdkLibraryService {
                 .unwrap_or(response.data.len())
                                                      }))
     }
+
+    fn list_items_updated_since(&self, since_iso8601: &str,
+                                on_page: &mut dyn FnMut(Vec<LibraryItem>))
+                                -> Option<Result<(), LibraryServiceError>> {
+        Some((|| {
+                 let mut all_included: Vec<IncludedItem> = Vec::new();
+                 let mut page: u32 = 1;
+                 let mut global_index: u32 = 0;
+                 let page_size: u32 = 100;
+
+                 loop {
+                     let params =
+                         LibraryItemsParams { page:               Some(page),
+                                              page_size:          Some(page_size),
+                                              get_checksum:       Some(false),
+                                              get_filters:        Some(true),
+                                              library:            Some(true),
+                                              archived:           Some(false),
+                                              updated_date_after:
+                                                  Some(since_iso8601.to_string()), };
+
+                     let response = self.gateway.list_order_products(params)?;
+
+                     let products = response.included
+                                            .as_deref()
+                                            .map(product_lookup)
+                                            .unwrap_or_default();
+
+                     if let Some(included) = &response.included {
+                         for entry in included {
+                             if entry.resource_type == "Publisher"
+                                && !all_included.iter().any(|p| p.id == entry.id)
+                             {
+                                 all_included.push(entry.clone());
+                             }
+                         }
+                     }
+
+                     let has_next = response.links.next.is_some();
+                     let publishers = publisher_lookup(&all_included);
+                     let page_items: Vec<LibraryItem> =
+                         response.data
+                                 .iter()
+                                 .enumerate()
+                                 .map(|(i, item)| {
+                                     map_order_product(item,
+                                                       &publishers,
+                                                       &products,
+                                                       global_index + i as u32)
+                                 })
+                                 .collect();
+
+                     global_index += page_items.len() as u32;
+                     on_page(page_items);
+
+                     if !has_next {
+                         break;
+                     }
+                     page += 1;
+                 }
+
+                 Ok(())
+             })())
+    }
 }
 
 struct HttpSdkLibraryGateway {
@@ -514,6 +578,8 @@ fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
                   date_added: date_purchased_epoch,
                   date_updated: file_last_modified_epoch,
                   thumbnail_last_attempted: None,
+                  is_available: true,
+                  availability_last_checked: None,
                   files }
 }
 
