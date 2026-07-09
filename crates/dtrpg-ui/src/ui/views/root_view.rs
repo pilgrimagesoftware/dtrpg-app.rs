@@ -17,9 +17,9 @@ use rust_i18n::t;
 
 use crate::ui::actions::{
     About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
-    SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6,
-    SelectTab7, SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings,
-    SortAscending, SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
+    SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6, SelectTab7,
+    SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending,
+    SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
     ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{

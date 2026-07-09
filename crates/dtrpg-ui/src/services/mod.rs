@@ -130,13 +130,14 @@ pub trait LibraryService: Send + Sync + 'static {
 
     /// Fetches items added or changed since `since_iso8601` (an ISO 8601
     /// timestamp), calling `on_page` incrementally as pages arrive — a
-    /// cheaper alternative to a full [`list_items_paged`](Self::list_items_paged)
-    /// fetch when only a few items changed.
+    /// cheaper alternative to a full
+    /// [`list_items_paged`](Self::list_items_paged) fetch when only a few
+    /// items changed.
     ///
     /// Returns `None` when a date-filtered fetch is not supported by this
     /// implementation; callers should treat `None` as "unsupported" and fall
-    /// back to a full paginated fetch, mirroring [`count_items`](Self::count_items)'s
-    /// convention.
+    /// back to a full paginated fetch, mirroring
+    /// [`count_items`](Self::count_items)'s convention.
     ///
     /// # Errors
     ///

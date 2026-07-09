@@ -213,15 +213,14 @@ impl LibraryService for RustSdkLibraryService {
                  let page_size: u32 = 100;
 
                  loop {
-                     let params =
-                         LibraryItemsParams { page:               Some(page),
-                                              page_size:          Some(page_size),
-                                              get_checksum:       Some(false),
-                                              get_filters:        Some(true),
-                                              library:            Some(true),
-                                              archived:           Some(false),
-                                              updated_date_after:
-                                                  Some(since_iso8601.to_string()), };
+                     let params = LibraryItemsParams { page:               Some(page),
+                                                       page_size:          Some(page_size),
+                                                       get_checksum:       Some(false),
+                                                       get_filters:        Some(true),
+                                                       library:            Some(true),
+                                                       archived:           Some(false),
+                                                       updated_date_after:
+                                                           Some(since_iso8601.to_string()), };
 
                      let response = self.gateway.list_order_products(params)?;
 
@@ -242,17 +241,17 @@ impl LibraryService for RustSdkLibraryService {
 
                      let has_next = response.links.next.is_some();
                      let publishers = publisher_lookup(&all_included);
-                     let page_items: Vec<LibraryItem> =
-                         response.data
-                                 .iter()
-                                 .enumerate()
-                                 .map(|(i, item)| {
-                                     map_order_product(item,
-                                                       &publishers,
-                                                       &products,
-                                                       global_index + i as u32)
-                                 })
-                                 .collect();
+                     let page_items: Vec<LibraryItem> = response.data
+                                                                .iter()
+                                                                .enumerate()
+                                                                .map(|(i, item)| {
+                                                                    map_order_product(item,
+                                                                                      &publishers,
+                                                                                      &products,
+                                                                                      global_index
+                                                                                      + i as u32)
+                                                                })
+                                                                .collect();
 
                      global_index += page_items.len() as u32;
                      on_page(page_items);

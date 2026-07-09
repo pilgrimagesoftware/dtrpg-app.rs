@@ -21,59 +21,60 @@ fn default_true() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryItem {
     /// Stable unique identifier (e.g. `"b1"`).
-    pub id:                       Arc<str>,
+    pub id:                        Arc<str>,
     /// Numeric API identifier used for SDK detail fetches.
-    pub numeric_id:               u64,
+    pub numeric_id:                u64,
     /// The `orderProductId` from the API — used for collection membership
     /// matching.
     #[serde(default)]
-    pub order_product_id:         u64,
+    pub order_product_id:          u64,
     /// The `productId` from the API — used as a fallback for collection
     /// membership matching when product list items return `productId`
     /// rather than `orderProductId`.
     #[serde(default)]
-    pub product_id:               u64,
-    pub title:                    Arc<str>,
-    pub publisher:                Arc<str>,
+    pub product_id:                u64,
+    pub title:                     Arc<str>,
+    pub publisher:                 Arc<str>,
     /// Game line / series name.
-    pub line:                     Arc<str>,
+    pub line:                      Arc<str>,
     /// Category tag: Core, Supplement, Adventure, Bestiary, Setting …
-    pub kind:                     Arc<str>,
+    pub kind:                      Arc<str>,
     /// File format string, e.g. `"PDF"` or `"PDF + EPUB"`.
-    pub format:                   Arc<str>,
-    pub pages:                    u32,
-    pub size_mb:                  f64,
-    pub year:                     u32,
+    pub format:                    Arc<str>,
+    pub pages:                     u32,
+    pub size_mb:                   f64,
+    pub year:                      u32,
     /// Relative ordering — lower means more recently added.
-    pub added_order:              u32,
-    pub status:                   ItemStatus,
+    pub added_order:               u32,
+    pub status:                    ItemStatus,
     /// Hex color string for the generative cover background, e.g. `"#1C2A44"`.
-    pub color:                    Arc<str>,
-    pub desc:                     Arc<str>,
+    pub color:                     Arc<str>,
+    pub desc:                      Arc<str>,
     /// Optional URL for a real cover thumbnail.
     #[serde(default)]
-    pub cover_url:                Option<Arc<str>>,
+    pub cover_url:                 Option<Arc<str>>,
     /// Unix timestamp (seconds since epoch) when the item was added to the
     /// library.
     #[serde(default)]
-    pub date_added:               Option<i64>,
+    pub date_added:                Option<i64>,
     /// Unix timestamp (seconds since epoch) when the item's files were last
     /// updated by the publisher, if known.
     #[serde(default)]
-    pub date_updated:             Option<i64>,
+    pub date_updated:              Option<i64>,
     /// Last time a thumbnail fetch was attempted for this item; not persisted
     /// to cache.
     #[serde(skip)]
-    pub thumbnail_last_attempted: Option<std::time::SystemTime>,
+    pub thumbnail_last_attempted:  Option<std::time::SystemTime>,
     /// Whether this item was present in the most recent successful live
     /// catalog fetch. `false` means the server no longer lists it, but the
     /// item is kept (not deleted) so previously-downloaded files stay
     /// reachable. Defaults to `true` for cache files written before this
     /// field existed and for items newly added from a live fetch.
     #[serde(default = "default_true")]
-    pub is_available:             bool,
-    /// Last time an individual server check (`catalog-item-level-reconciliation`)
-    /// ran for this item; not persisted to cache.
+    pub is_available:              bool,
+    /// Last time an individual server check
+    /// (`catalog-item-level-reconciliation`) ran for this item; not
+    /// persisted to cache.
     #[serde(skip)]
     pub availability_last_checked: Option<std::time::SystemTime>,
     /// Per-item files bundled in this catalog entry, mapped from the SDK's
@@ -82,7 +83,7 @@ pub struct LibraryItem {
     /// capability). Defaults to empty for cache entries written before this
     /// field existed.
     #[serde(default)]
-    pub files:                    Vec<LibraryItemFile>,
+    pub files:                     Vec<LibraryItemFile>,
 }
 
 impl LibraryItem {

@@ -39,12 +39,12 @@ const CACHE_SCHEMA_VERSION: u32 = 2;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheMetadata {
     /// Unix timestamp (seconds since epoch) when the cache was written.
-    pub saved_at_secs:             u64,
+    pub saved_at_secs:              u64,
     /// Number of items in the cache at write time.
-    pub item_count:                usize,
+    pub item_count:                 usize,
     /// Schema version the cache was written with; see [`CACHE_SCHEMA_VERSION`].
     #[serde(default)]
-    pub schema_version:            u32,
+    pub schema_version:             u32,
     /// Unix timestamp (seconds since epoch) of the last per-item availability
     /// check batch (manual or automatic), gating
     /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `#[serde(default)]` so metadata
@@ -110,11 +110,11 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// zeroed placeholders if no metadata file exists yet — a check batch can
 /// run before any catalog has ever been successfully synced).
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
-    let mut meta = load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs: 0,
-                                                                       item_count: 0,
-                                                                       schema_version: 0,
-                                                                       last_item_check_batch_secs:
-                                                                           None });
+    let mut meta =
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:              0,
+                                                            item_count:                 0,
+                                                            schema_version:             0,
+                                                            last_item_check_batch_secs: None, });
     meta.last_item_check_batch_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
@@ -230,20 +230,21 @@ mod tests {
 
     #[test]
     fn fresh_metadata_is_not_stale() {
-        let meta = CacheMetadata { saved_at_secs:  SystemTime::now().duration_since(UNIX_EPOCH)
-                                                                    .unwrap()
-                                                                    .as_secs(),
-                                   item_count:     10,
-                                   schema_version: CACHE_SCHEMA_VERSION,
+        let meta = CacheMetadata { saved_at_secs:
+                                       SystemTime::now().duration_since(UNIX_EPOCH)
+                                                        .unwrap()
+                                                        .as_secs(),
+                                   item_count:                 10,
+                                   schema_version:             CACHE_SCHEMA_VERSION,
                                    last_item_check_batch_secs: None, };
         assert!(!meta.is_stale());
     }
 
     #[test]
     fn old_metadata_is_stale() {
-        let meta = CacheMetadata { saved_at_secs:  0, // epoch — very old
-                                   item_count:     10,
-                                   schema_version: CACHE_SCHEMA_VERSION,
+        let meta = CacheMetadata { saved_at_secs:              0, // epoch — very old
+                                   item_count:                 10,
+                                   schema_version:             CACHE_SCHEMA_VERSION,
                                    last_item_check_batch_secs: None, };
         assert!(meta.is_stale());
     }
@@ -253,11 +254,12 @@ mod tests {
         // Regression: a cache saved before `cover_url` was populated
         // correctly must not be trusted as fresh just because it's recent —
         // it silently disabled thumbnail loading for up to 7 days otherwise.
-        let meta = CacheMetadata { saved_at_secs:  SystemTime::now().duration_since(UNIX_EPOCH)
-                                                                    .unwrap()
-                                                                    .as_secs(),
-                                   item_count:     10,
-                                   schema_version: CACHE_SCHEMA_VERSION - 1,
+        let meta = CacheMetadata { saved_at_secs:
+                                       SystemTime::now().duration_since(UNIX_EPOCH)
+                                                        .unwrap()
+                                                        .as_secs(),
+                                   item_count:                 10,
+                                   schema_version:             CACHE_SCHEMA_VERSION - 1,
                                    last_item_check_batch_secs: None, };
         assert!(meta.is_stale());
     }

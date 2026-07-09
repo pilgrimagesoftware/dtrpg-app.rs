@@ -63,9 +63,8 @@ fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, ke
 ///
 /// - An id present in both: kept at its existing position, replaced with the
 ///   live item's fields, with `is_available` set to `true`.
-/// - An id present only in `existing`: kept unchanged except `is_available`
-///   is set to `false` — the server no longer lists it, but it isn't
-///   removed.
+/// - An id present only in `existing`: kept unchanged except `is_available` is
+///   set to `false` — the server no longer lists it, but it isn't removed.
 /// - An id present only in `live`: appended at the end, `is_available` stays
 ///   `true` (the default for a freshly-fetched item).
 ///
@@ -74,22 +73,23 @@ fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, ke
 /// items are appended.
 fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<LibraryItem> {
     let mut live_by_id: HashMap<Arc<str>, LibraryItem> =
-        live.into_iter().map(|item| (Arc::clone(&item.id), item)).collect();
+        live.into_iter()
+            .map(|item| (Arc::clone(&item.id), item))
+            .collect();
 
-    let mut reconciled: Vec<LibraryItem> = existing.into_iter()
-                                                    .map(|mut item| {
-                                                        if let Some(live_item) =
-                                                            live_by_id.remove(&item.id)
-                                                        {
-                                                            item = live_item;
-                                                            item.is_available = true;
-                                                        }
-                                                        else {
-                                                            item.is_available = false;
-                                                        }
-                                                        item
-                                                    })
-                                                    .collect();
+    let mut reconciled: Vec<LibraryItem> =
+        existing.into_iter()
+                .map(|mut item| {
+                    if let Some(live_item) = live_by_id.remove(&item.id) {
+                        item = live_item;
+                        item.is_available = true;
+                    }
+                    else {
+                        item.is_available = false;
+                    }
+                    item
+                })
+                .collect();
 
     reconciled.extend(live_by_id.into_values());
     reconciled
@@ -108,8 +108,7 @@ fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64) -> bool {
     else {
         return false;
     };
-    now_secs.saturating_sub(meta.saved_at_secs)
-    < crate::data::constants::FORCE_RELOAD_COOLDOWN_SECS
+    now_secs.saturating_sub(meta.saved_at_secs) < crate::data::constants::FORCE_RELOAD_COOLDOWN_SECS
 }
 
 /// Returns `true` if an item last checked at `last_checked` is due for
@@ -128,13 +127,12 @@ fn item_check_due(last_checked: Option<std::time::SystemTime>) -> bool {
 /// Applies the result of a single-item availability check to `item`, per
 /// `catalog-availability-flag`'s single-item check requirement.
 ///
-/// - `Ok`: replaces `item`'s fields with the fresh data, sets `is_available
-///   = true`, and records `checked_at`.
-/// - `Err` with kind `NotFound`: leaves other fields as-is, sets
-///   `is_available = false`, and records `checked_at`.
+/// - `Ok`: replaces `item`'s fields with the fresh data, sets `is_available =
+///   true`, and records `checked_at`.
+/// - `Err` with kind `NotFound`: leaves other fields as-is, sets `is_available
+///   = false`, and records `checked_at`.
 /// - Any other `Err` (network, session, or otherwise): leaves `item` and its
-///   flag entirely unchanged — a transient failure is not evidence of
-///   removal.
+///   flag entirely unchanged — a transient failure is not evidence of removal.
 fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, LibraryServiceError>,
                       checked_at: std::time::SystemTime) {
     match result {
@@ -193,9 +191,14 @@ fn check_batch_cooldown_active(last_batch_secs: Option<u64>, now_secs: u64) -> b
 /// implementation (`None < Some(_)`).
 fn select_check_batch(catalog: &[LibraryItem], limit: usize) -> Vec<Arc<str>> {
     let mut candidates: Vec<&LibraryItem> =
-        catalog.iter().filter(|item| item_check_due(item.availability_last_checked)).collect();
+        catalog.iter()
+               .filter(|item| item_check_due(item.availability_last_checked))
+               .collect();
     candidates.sort_by_key(|item| item.availability_last_checked);
-    candidates.into_iter().take(limit).map(|item| Arc::clone(&item.id)).collect()
+    candidates.into_iter()
+              .take(limit)
+              .map(|item| Arc::clone(&item.id))
+              .collect()
 }
 
 /// Merges a partial date-filtered fetch's `partial` results into `existing`
@@ -488,8 +491,8 @@ impl LibraryController {
                               crate::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
                           ))
                           .await;
-                  let alive =
-                      this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx)).is_ok();
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
+                                  .is_ok();
                   if !alive {
                       break;
                   }
@@ -939,9 +942,12 @@ impl LibraryController {
     /// flagged `is_available = false`, rather than dropped).
     fn set_catalog(&mut self, items: Vec<LibraryItem>, reconcile: bool, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
-        self.catalog =
-            if reconcile { reconcile_catalog(std::mem::take(&mut self.catalog), items) }
-            else { items };
+        self.catalog = if reconcile {
+            reconcile_catalog(std::mem::take(&mut self.catalog), items)
+        }
+        else {
+            items
+        };
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
@@ -1196,8 +1202,8 @@ impl LibraryController {
     pub fn reload_catalog(&mut self, cx: &mut Context<Self>) {
         let meta = load_cache_metadata(&cache_dir());
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                                               .map(|d| d.as_secs())
-                                               .unwrap_or_default();
+                                              .map(|d| d.as_secs())
+                                              .unwrap_or_default();
         if reload_cooldown_active(meta.as_ref(), now) {
             return;
         }
@@ -1973,28 +1979,28 @@ impl LibraryController {
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
-              let result = async_cx.background_executor()
-                                   .spawn(async move { service_arc.get_item(numeric_id) })
-                                   .await;
-              if let Err(e) = &result
-                 && e.kind != LibraryServiceErrorKind::NotFound
-              {
-                  // Transient failure: not evidence of removal, leave the item and
-                  // its flag entirely unchanged.
-                  tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
-              }
-              this.update(async_cx, |ctrl, cx| {
-                      if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
-                          apply_check_result(existing, result, std::time::SystemTime::now());
-                          ctrl.invalidate_cache();
-                      }
-                      ctrl.checking_items.remove(&id);
-                      cx.emit(LibraryChanged);
-                      ctrl.drain_check_queue(cx);
-                  })
-                  .ok();
-          })
-          .detach();
+            let result = async_cx.background_executor()
+                                 .spawn(async move { service_arc.get_item(numeric_id) })
+                                 .await;
+            if let Err(e) = &result
+               && e.kind != LibraryServiceErrorKind::NotFound
+            {
+                // Transient failure: not evidence of removal, leave the item and
+                // its flag entirely unchanged.
+                tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
+            }
+            this.update(async_cx, |ctrl, cx| {
+                    if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
+                        apply_check_result(existing, result, std::time::SystemTime::now());
+                        ctrl.invalidate_cache();
+                    }
+                    ctrl.checking_items.remove(&id);
+                    cx.emit(LibraryChanged);
+                    ctrl.drain_check_queue(cx);
+                })
+                .ok();
+        })
+        .detach();
     }
 
     /// Pushes `ids` not already queued or in flight onto `check_queue`, then
@@ -2040,8 +2046,7 @@ impl LibraryController {
     /// second trigger firing mid-batch.
     pub fn request_check_batch(&mut self, cx: &mut Context<Self>) {
         let root = cache_dir();
-        let last_batch_secs =
-            load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
+        let last_batch_secs = load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
         let now = std::time::SystemTime::now();
         let now_secs = now.duration_since(std::time::UNIX_EPOCH)
                           .map(|d| d.as_secs())
@@ -3076,8 +3081,20 @@ mod reconcile_catalog_tests {
     use crate::data::library::LibraryItem;
 
     fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(id, title, "Publisher", "Line", "Core", "PDF", 0, 0.0, 2020, 0,
-                         ItemStatus::Cloud, "#000000", "", None)
+        LibraryItem::new(id,
+                         title,
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
@@ -3185,8 +3202,20 @@ mod item_check_tests {
     use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
     fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(id, title, "Publisher", "Line", "Core", "PDF", 0, 0.0, 2020, 0,
-                         ItemStatus::Cloud, "#000000", "", None)
+        LibraryItem::new(id,
+                         title,
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
@@ -3316,8 +3345,20 @@ mod check_batch_tests {
     use crate::data::library::LibraryItem;
 
     fn item(id: &str) -> LibraryItem {
-        LibraryItem::new(id, "Title", "Publisher", "Line", "Core", "PDF", 0, 0.0, 2020, 0,
-                         ItemStatus::Cloud, "#000000", "", None)
+        LibraryItem::new(id,
+                         "Title",
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
@@ -3347,13 +3388,16 @@ mod check_batch_tests {
         let mut checked_recently_within_cooldown = item("b3");
         checked_recently_within_cooldown.availability_last_checked = Some(SystemTime::now());
 
-        let catalog =
-            [checked_recently_within_cooldown, checked_long_ago.clone(), never_checked.clone()];
+        let catalog = [checked_recently_within_cooldown,
+                       checked_long_ago.clone(),
+                       never_checked.clone()];
         let batch = select_check_batch(&catalog, 10);
 
         // The recently-checked item is within its cooldown and not due, so it's
         // excluded; the never-checked item sorts before the long-ago-checked one.
-        assert_eq!(batch, vec![Arc::clone(&never_checked.id), Arc::clone(&checked_long_ago.id)]);
+        assert_eq!(batch,
+                   vec![Arc::clone(&never_checked.id),
+                        Arc::clone(&checked_long_ago.id)]);
     }
 
     #[test]
@@ -3373,8 +3417,20 @@ mod partial_fetch_tests {
     use crate::data::library::LibraryItem;
 
     fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(id, title, "Publisher", "Line", "Core", "PDF", 0, 0.0, 2020, 0,
-                         ItemStatus::Cloud, "#000000", "", None)
+        LibraryItem::new(id,
+                         title,
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
