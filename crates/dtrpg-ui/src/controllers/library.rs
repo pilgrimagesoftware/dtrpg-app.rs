@@ -139,7 +139,23 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
                       checked_at: std::time::SystemTime) {
     match result {
         Ok(fresh) => {
+            // Preserve identity/collection-membership fields from the existing item
+            // rather than trusting the single-item response for them: a per-item
+            // availability re-check should only refresh display data, and blindly
+            // overwriting `order_product_id`/`product_id` here has been observed to
+            // silently corrupt `collection_member_id` lookups for the checked item
+            // (its collection membership stops resolving) when the single-item
+            // endpoint's response doesn't carry the exact same id values the list
+            // fetch populated.
+            let id = Arc::clone(&item.id);
+            let numeric_id = item.numeric_id;
+            let order_product_id = item.order_product_id;
+            let product_id = item.product_id;
             *item = fresh;
+            item.id = id;
+            item.numeric_id = numeric_id;
+            item.order_product_id = order_product_id;
+            item.product_id = product_id;
             item.is_available = true;
             item.availability_last_checked = Some(checked_at);
         }
@@ -3202,6 +3218,29 @@ mod item_check_tests {
         assert_eq!(existing.title.as_ref(), "New Title");
         assert!(existing.is_available);
         assert_eq!(existing.availability_last_checked, Some(now));
+    }
+
+    #[test]
+    fn ok_result_preserves_identity_and_membership_ids_even_if_the_fresh_response_differs() {
+        // Regression: a single-item availability re-check must never let the
+        // fresh response clobber `numeric_id`/`order_product_id`/`product_id` —
+        // those drive `collection_member_id` lookups, and a mismatched or
+        // zeroed value from the single-item endpoint silently broke collection
+        // membership display for the checked item.
+        let mut existing = item("b1", "Title");
+        existing.numeric_id = 111;
+        existing.order_product_id = 222;
+        existing.product_id = 333;
+        let mut fresh = item("b1", "Title");
+        fresh.numeric_id = 999;
+        fresh.order_product_id = 0;
+        fresh.product_id = 0;
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert_eq!(existing.numeric_id, 111);
+        assert_eq!(existing.order_product_id, 222);
+        assert_eq!(existing.product_id, 333);
     }
 
     #[test]

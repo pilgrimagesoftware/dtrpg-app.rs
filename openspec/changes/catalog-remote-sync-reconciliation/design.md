@@ -208,8 +208,13 @@ persisting, reset naturally on process restart). A new constant `ITEM_CHECK_COOL
 call a new `LibraryController::maybe_check_item(id, cx)` that no-ops if
 `availability_last_checked` is within the cooldown, otherwise calls `get_item` on the
 background executor and applies the result:
-- `Ok(item)` → replace the catalog entry's fields with the fresh data, set `is_available =
-  true`, set `availability_last_checked = Some(now)`.
+- `Ok(item)` → replace the catalog entry's fields with the fresh data **except**
+  `id`/`numeric_id`/`order_product_id`/`product_id`, which are preserved from the existing
+  entry — a single-item re-check is not authoritative for identity/collection-membership
+  ids, and letting the fresh response overwrite them was found (during manual verification)
+  to silently break `collection_member_id` lookups for the checked item whenever the
+  single-item endpoint's response didn't carry the exact same id values the list fetch
+  populated. Set `is_available = true`, set `availability_last_checked = Some(now)`.
 - `Err(e)` where `e.kind == NotFound` → leave other fields as-is, set `is_available = false`,
   set `availability_last_checked = Some(now)`.
 - Any other error (network, session, rate limit) → leave the item and its flag entirely
