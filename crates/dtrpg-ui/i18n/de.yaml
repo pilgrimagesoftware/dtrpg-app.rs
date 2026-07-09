@@ -251,6 +251,9 @@ date:
   days_ago:
     one: "a day ago"
     many: "%{n} days ago"
+  weeks_ago:
+    one: "a week ago"
+    many: "%{n} weeks ago"
   months_ago:
     one: "a month ago"
     many: "%{n} months ago"

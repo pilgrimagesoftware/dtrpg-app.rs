@@ -25,15 +25,16 @@ fn months_between(then: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
 
 /// Formats a Unix timestamp as a human-readable relative string.
 ///
-/// Buckets:
+/// Buckets (singular phrasing at N=1, e.g. "a minute ago" / "an hour ago",
+/// numeral "N ..." otherwise):
 /// - < 60 s      → "just now"
-/// - < 60 m      → "N minutes ago"
-/// - < 24 h      → "N hours ago"
+/// - < 60 m      → "a minute ago" / "N minutes ago"
+/// - < 24 h      → "an hour ago" / "N hours ago"
 /// - 24–47 h     → "yesterday"
 /// - 2–6 days    → "N days ago"
-/// - 7–29 days   → "N weeks ago"
-/// - 1–11 months → "N months ago"
-/// - 12+ months  → "N years ago"
+/// - 7–29 days   → "a week ago" / "N weeks ago"
+/// - 1–11 months → "a month ago" / "N months ago"
+/// - 12+ months  → "a year ago" / "N years ago"
 ///
 /// # Examples
 ///
@@ -144,7 +145,7 @@ mod tests {
 
     #[test]
     fn minutes_at_60s() {
-        assert_eq!(format_relative(now() - 60), "1 minute ago");
+        assert_eq!(format_relative(now() - 60), "a minute ago");
     }
 
     #[test]
@@ -154,7 +155,7 @@ mod tests {
 
     #[test]
     fn hours_at_1h() {
-        assert_eq!(format_relative(now() - 3_600), "1 hour ago");
+        assert_eq!(format_relative(now() - 3_600), "an hour ago");
     }
 
     #[test]
@@ -184,7 +185,7 @@ mod tests {
 
     #[test]
     fn weeks_at_7d() {
-        assert_eq!(format_relative(now() - 7 * 86_400), "1 week ago");
+        assert_eq!(format_relative(now() - 7 * 86_400), "a week ago");
     }
 
     #[test]
@@ -195,7 +196,7 @@ mod tests {
     #[test]
     fn months_at_1_month() {
         let ts = months_ago_anchored(1);
-        assert_eq!(format_relative(ts), "1 month ago");
+        assert_eq!(format_relative(ts), "a month ago");
     }
 
     #[test]
@@ -215,7 +216,7 @@ mod tests {
     #[test]
     fn years_at_12_months() {
         let ts = months_ago_anchored(12);
-        assert_eq!(format_relative(ts), "1 year ago");
+        assert_eq!(format_relative(ts), "a year ago");
     }
 
     #[test]
