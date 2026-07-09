@@ -264,7 +264,10 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
          .drag_over::<DraggedLibraryItem>(|this, _, _, cx| this.bg(cx.theme().tokens.drop_target))
          .on_drop(move |drag: &DraggedLibraryItem, _, cx| {
              drop_entity.update(cx, |ctrl, cx| {
-                            ctrl.add_item_to_collection(col_id, drag.member_id, cx);
+                            ctrl.add_item_to_collection(col_id,
+                                                        drag.member_id,
+                                                        drag.product_id,
+                                                        cx);
                         });
          })
          .context_menu(move |menu, _, _| {

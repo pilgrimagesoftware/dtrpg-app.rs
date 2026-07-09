@@ -21,7 +21,7 @@ use crate::data::paths::{cache_dir, covers_dir};
 use crate::data::selection::Selection;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
-use crate::services::collections::CollectionsService;
+use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
 use crate::ui::library::cover::CoverCache;
 use crate::util::filter::*;
@@ -595,7 +595,7 @@ impl LibraryController {
                     // Non-fatal: collections and catalog are independent
                     // datasets sharing one activity item, so a collections
                     // failure does not abort the catalog stages below.
-                    if e.kind == crate::services::collections::CollectionsServiceErrorKind::Session
+                    if e.kind == CollectionsServiceErrorKind::Session
                     {
                         tracing::debug!(error = %e, "collections load skipped: no authenticated session");
                     }
@@ -1008,7 +1008,7 @@ impl LibraryController {
                     // Session errors are expected when starting before auth completes
                     // (see `start_load_inner`'s matching treatment for the catalog
                     // fetch); quietly complete rather than surfacing a user-facing error.
-                    if e.kind == crate::services::collections::CollectionsServiceErrorKind::Session
+                    if e.kind == CollectionsServiceErrorKind::Session
                     {
                         tracing::debug!(error = %e, "collections load skipped: no authenticated session");
                         weak_activity
@@ -1125,12 +1125,16 @@ impl LibraryController {
     /// Creates a new collection with the given name and, once the create call
     /// succeeds, immediately adds `item_id` as a member of it.
     ///
+    /// `item_id` drives local membership tracking/matching (the optimistic
+    /// `member_ids` update); `product_id` is the catalog product id sent on
+    /// the network add call. See [`Self::add_item_to_collection`].
+    ///
     /// Used by the "New collection…" affordance in the Manage Collections
     /// dialog, so a single user action both creates the collection and adds
     /// the current item to it. On create failure, only
     /// [`CollectionCreateFailed`] is emitted — no add is attempted.
     pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
-                                            cx: &mut Context<Self>) {
+                                            product_id: u64, cx: &mut Context<Self>) {
         let label = format!("Creating collection '{name}'...");
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
@@ -1149,7 +1153,7 @@ impl LibraryController {
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
-                              ctrl.add_item_to_collection(collection_id, item_id, cx);
+                              ctrl.add_item_to_collection(collection_id, item_id, product_id, cx);
                           })
                           .ok();
                   }
@@ -1280,18 +1284,25 @@ impl LibraryController {
     /// Adds `item_id` (an item's `order_product_id`/`product_id`) as a member
     /// of the collection with `collection_id`.
     ///
+    /// `item_id` drives the local optimistic `member_ids`/`collection_members`
+    /// update and its rollback-on-failure branch, matching the id space
+    /// `CollectionEntry::member_ids` already uses. `product_id` is the item's
+    /// catalog `product_id`, sent as the network add call's product
+    /// identifier — the API's `product_list_items` endpoint rejects
+    /// `order_product_id` values with an invalid-product-id error.
+    ///
     /// Updates `member_ids` (and `collection_members`, if that collection is
     /// the active filter) immediately, then confirms the change via the
     /// service. On failure the optimistic update is rolled back and
     /// [`CollectionMemberAddFailed`] is emitted so the window can show an
     /// error notification.
-    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64,
+    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64, product_id: u64,
                                   cx: &mut Context<Self>) {
         let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
         else {
             return;
         };
-        if collection.member_ids.contains(&item_id) {
+        if member_ids_contain(&collection.member_ids, item_id, product_id) {
             return;
         }
         let collection_name = collection.name.clone();
@@ -1308,10 +1319,21 @@ impl LibraryController {
         cx.spawn(async move |this, async_cx| {
               let result = async_cx.background_executor()
                                    .spawn(async move {
-                                       collections_service.add_member(collection_id, item_id)
+                                       collections_service.add_member(collection_id, product_id)
                                    })
                                    .await;
               if let Err(e) = result {
+                  // A conflict means the item is already a member server-side: the
+                  // optimistic local update already matches reality, so it is left
+                  // in place rather than rolled back, and this is surfaced as a
+                  // low-severity notice instead of a hard failure.
+                  if e.kind == CollectionsServiceErrorKind::Conflict {
+                      this.update(async_cx, |_ctrl, cx| {
+                              cx.emit(CollectionMemberAlreadyPresent { message: e.message.clone(), });
+                          })
+                          .ok();
+                      return;
+                  }
                   this.update(async_cx, |ctrl, cx| {
                           if let Some(collection) =
                               ctrl.collections.iter_mut().find(|c| c.id == collection_id)
@@ -1346,30 +1368,48 @@ impl LibraryController {
     /// Removes `item_id` (an item's `order_product_id`/`product_id`) as a
     /// member of the collection with `collection_id`.
     ///
+    /// `item_id` drives matching against the local optimistic `member_ids`/
+    /// `collection_members` cache, which may hold either id depending on how
+    /// the entry was populated (server data is `product_id`-keyed; a locally
+    /// added entry may still carry `item_id`). `product_id` is the item's
+    /// catalog `product_id`, sent as the network removal call's product
+    /// identifier — the API's server-side lookup that resolves the removal
+    /// target matches by `product_id`, never `order_product_id`, so sending
+    /// the wrong one causes the item to silently not be found.
+    ///
     /// Updates `member_ids` (and `collection_members`, if that collection is
     /// the active filter) immediately, then confirms the change via the
     /// service. On failure the optimistic update is rolled back and
     /// [`CollectionMemberRemoveFailed`] is emitted so the window can show an
     /// error notification.
     pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
-                                       cx: &mut Context<Self>) {
+                                       product_id: u64, cx: &mut Context<Self>) {
         let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
         else {
             return;
         };
-        if !collection.member_ids.contains(&item_id) {
+        if !member_ids_contain(&collection.member_ids, item_id, product_id) {
             return;
         }
         let collection_name = collection.name.clone();
+        // Remove whichever id(s) are actually present, and remember them so a
+        // failed removal restores exactly what was there before rather than
+        // introducing an id that was never actually cached.
+        let removed_ids: Vec<u64> = collection.member_ids
+                                              .iter()
+                                              .copied()
+                                              .filter(|id| *id == item_id || *id == product_id)
+                                              .collect();
         let member_ids: Vec<u64> = collection.member_ids
                                              .iter()
                                              .copied()
-                                             .filter(|id| *id != item_id)
+                                             .filter(|id| *id != item_id && *id != product_id)
                                              .collect();
         collection.member_ids = Arc::from(member_ids.as_slice());
 
         if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
             self.collection_members.remove(&item_id);
+            self.collection_members.remove(&product_id);
         }
         cx.emit(LibraryChanged);
 
@@ -1377,7 +1417,7 @@ impl LibraryController {
         cx.spawn(async move |this, async_cx| {
               let result = async_cx.background_executor()
                                    .spawn(async move {
-                                       collections_service.remove_member(collection_id, item_id)
+                                       collections_service.remove_member(collection_id, product_id)
                                    })
                                    .await;
               if let Err(e) = result {
@@ -1389,12 +1429,12 @@ impl LibraryController {
                                                                        .iter()
                                                                        .copied()
                                                                        .collect();
-                              member_ids.push(item_id);
+                              member_ids.extend(&removed_ids);
                               collection.member_ids = Arc::from(member_ids.as_slice());
                           }
                           if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
                           {
-                              ctrl.collection_members.insert(item_id);
+                              ctrl.collection_members.extend(&removed_ids);
                           }
                           cx.emit(LibraryChanged);
                           ctrl.activity.update(cx, |a, cx| {

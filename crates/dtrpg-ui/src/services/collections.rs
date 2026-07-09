@@ -9,6 +9,11 @@ pub enum CollectionsServiceErrorKind {
     Network,
     /// Request failed due to session or authentication state.
     Session,
+    /// The API rejected the request because it conflicts with existing state
+    /// (e.g. adding an item that is already a member of the collection).
+    /// Distinct from [`Self::Network`] so callers can treat it as a
+    /// non-fatal, expected outcome rather than a genuine failure.
+    Conflict,
 }
 
 /// Error returned by collections service operations.
@@ -69,9 +74,8 @@ pub trait CollectionsService: Send + Sync + 'static {
 
     /// Adds a single item to a collection as a member.
     ///
-    /// `item_id` is the item's `order_product_id` (falling back to
-    /// `product_id`), matching the id space `CollectionEntry::member_ids`
-    /// already uses.
+    /// `item_id` must be the item's catalog `product_id` — the underlying API
+    /// rejects an `order_product_id` value with an invalid-product-id error.
     ///
     /// # Errors
     ///

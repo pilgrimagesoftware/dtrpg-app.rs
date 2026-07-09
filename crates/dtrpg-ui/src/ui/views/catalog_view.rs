@@ -1487,8 +1487,9 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_tabs = tabs.clone();
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
-    let drag_payload = DraggedLibraryItem { title:     title.clone().into(),
-                                            member_id: collection_member_id(item), };
+    let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
+                                            member_id:  collection_member_id(item),
+                                            product_id: item.product_id, };
     // Approximation: the title column fills the remaining row width after the cover
     // and gap, which depends on the actual panel layout (sidebar/detail panel
     // state) that isn't known synchronously here. `window.viewport_size()`
@@ -1666,11 +1667,12 @@ fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem,
                                 _cx: &mut App)
                                 -> PopupMenu {
     let member_id = collection_member_id(item);
+    let product_id = item.product_id;
     let entity = entity.clone();
     let item_title = Arc::clone(&item.title);
     menu.item(PopupMenuItem::new(t!("catalog.action_manage_collections")).on_click(move |_, window, cx| {
               open_manage_collections_dialog(window, cx, entity.clone(), Arc::clone(&item_title),
-                                             member_id);
+                                             member_id, product_id);
           }))
 }
 
@@ -1750,8 +1752,9 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
     let ctx_path = storage_root_path.join("items").join(&*id);
-    let drag_payload = DraggedLibraryItem { title:     title.clone().into(),
-                                            member_id: collection_member_id(item), };
+    let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
+                                            member_id:  collection_member_id(item),
+                                            product_id: item.product_id, };
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
         let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
