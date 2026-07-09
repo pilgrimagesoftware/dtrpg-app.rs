@@ -139,6 +139,28 @@ impl ActivityController {
         }
     }
 
+    /// Appends a failure directly to the durable alert log, without a
+    /// corresponding in-progress entry.
+    ///
+    /// For failures in optimistic-update flows that never call [`start`]
+    /// (e.g. collection membership add/remove) — unlike [`error`], this does
+    /// not touch `in_progress` or `recent`, since there is no in-progress
+    /// item to resolve and registering one for an already-applied optimistic
+    /// change would misrepresent it as a pending background operation.
+    ///
+    /// [`start`]: Self::start
+    /// [`error`]: Self::error
+    pub fn log_alert(&mut self, label: impl Into<Arc<str>>, message: String,
+                     cx: &mut Context<Self>) {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.push_alert(AlertEntry { id,
+                                     label: label.into(),
+                                     message,
+                                     occurred_at: SystemTime::now() });
+        cx.emit(ActivityChanged);
+    }
+
     /// Removes an expired item from the recent list by id.
     ///
     /// No-op if the item was already evicted by the cap or a prior expiry.

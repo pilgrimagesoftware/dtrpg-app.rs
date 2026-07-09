@@ -10,7 +10,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
+use gpui::{AnyElement, Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
+use gpui_component::clipboard::Clipboard;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
@@ -160,5 +161,25 @@ fn render_entry_row(entry: &AlertEntry, text_color: gpui::Hsla, text_tertiary: g
                                  .tooltip(move |window, cx| {
                                      Tooltip::new(absolute_label.clone()).build(window, cx)
                                  })))
-         .child(div().text_xs().text_color(text_tertiary).child(message))
+         .child(render_copyable_message(entry.id, message, text_tertiary))
+}
+
+/// Renders an alert entry's error message with an appear-on-hover copy
+/// button, following the same hover-group pattern used for copyable fields in
+/// the detail panel (`detail_panel_view::copyable_value`).
+fn render_copyable_message(entry_id: u64, message: String, text_tertiary: gpui::Hsla)
+                           -> impl IntoElement + 'static {
+    let group_id = SharedString::from(format!("alert-msg-{entry_id}"));
+
+    div().id(("alert-history-message-row", entry_id))
+         .group(group_id.clone())
+         .flex()
+         .items_start()
+         .gap(px(6.0))
+         .child(div().text_xs().text_color(text_tertiary).flex_1().child(message.clone()))
+         .child(div().invisible().group_hover(group_id.clone(), |d| d.visible()).child(
+             Clipboard::new(SharedString::from(format!("alert-msg-{entry_id}-copy")))
+                 .value(message)
+                 .tooltip(t!("alert_history.copy_tooltip").to_string()),
+         ))
 }

@@ -171,6 +171,7 @@ alert_history:
   empty: "No alerts."
   empty_hint: "Errors from background operations will appear here."
   clear: "Clear"
+  copy_tooltip: "Copy error message"
 
 notification:
   set_up_account: "Set Up Account"
