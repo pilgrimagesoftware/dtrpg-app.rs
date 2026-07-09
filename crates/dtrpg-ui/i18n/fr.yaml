@@ -177,6 +177,7 @@ notification:
   session_expired: "Session expirée — reconnectez-vous pour actualiser votre bibliothèque"
   sign_in_again: "Se reconnecter"
   signing_in: "Connexion à DriveThruRPG en cours…"
+  copy_tooltip: "Copier le message d'erreur"
 
 about:
   version: "Version %{version}"

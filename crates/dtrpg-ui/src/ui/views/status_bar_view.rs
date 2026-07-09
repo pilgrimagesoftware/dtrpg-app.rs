@@ -179,7 +179,7 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
             colors,
         ));
 
-    let has_errors = activity_snap.recent_error_count > 0;
+    let has_unread_alert = alert_snap.has_unread;
     let notification_button = Button::new("status-bar-notifications").ghost()
                                                                      .compact()
                                                                      .icon(IconName::Bell)
@@ -193,7 +193,7 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
 
     let alert_for_open_change = activity.clone();
     // `Popover::trigger` requires `Selectable`, which `Badge` doesn't implement, so
-    // the unread-error dot is layered on as a sibling of the popover rather
+    // the unread-alert dot is layered on as a sibling of the popover rather
     // than wrapping the trigger in a `Badge`.
     let notification_panel = div()
         .relative()
@@ -207,7 +207,7 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                 })
                 .child(render_alert_history_panel(alert_snap, activity, colors)),
         )
-        .when(has_errors, |this| {
+        .when(has_unread_alert, |this| {
             this.child(
                 div()
                     .absolute()

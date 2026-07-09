@@ -28,6 +28,12 @@ pub struct ActivityController {
     alert_log:        VecDeque<AlertEntry>,
     /// Whether the alert history panel overlay is open.
     alert_panel_open: bool,
+    /// Whether an alert has been logged since the panel was last opened.
+    ///
+    /// Drives the status bar notification button's unread badge — set on
+    /// every [`push_alert`](Self::push_alert), cleared when the panel is
+    /// opened.
+    has_unread_alert: bool,
 }
 
 impl ActivityController {
@@ -39,7 +45,8 @@ impl ActivityController {
                panel_open:       false,
                selected_id:      None,
                alert_log:        VecDeque::with_capacity(ALERT_LOG_CAP),
-               alert_panel_open: false, }
+               alert_panel_open: false,
+               has_unread_alert: false, }
     }
 
     /// Clears all activity items (in-progress and recent) and closes the panel.
@@ -235,6 +242,9 @@ impl ActivityController {
     /// Toggles the alert history panel overlay open or closed.
     pub fn toggle_alert_panel(&mut self, cx: &mut Context<Self>) {
         self.alert_panel_open = !self.alert_panel_open;
+        if self.alert_panel_open {
+            self.has_unread_alert = false;
+        }
         cx.emit(ActivityChanged);
     }
 
@@ -246,6 +256,9 @@ impl ActivityController {
     pub fn set_alert_panel_open(&mut self, open: bool, cx: &mut Context<Self>) {
         if self.alert_panel_open != open {
             self.alert_panel_open = open;
+            if open {
+                self.has_unread_alert = false;
+            }
             cx.emit(ActivityChanged);
         }
     }
@@ -253,14 +266,16 @@ impl ActivityController {
     /// Removes all entries from the durable alert history log.
     pub fn clear_alert_log(&mut self, cx: &mut Context<Self>) {
         self.alert_log.clear();
+        self.has_unread_alert = false;
         cx.emit(ActivityChanged);
     }
 
     /// Returns a snapshot of the alert history log for rendering.
     #[must_use]
     pub fn alert_snapshot(&self) -> AlertHistorySnapshot {
-        AlertHistorySnapshot { open:    self.alert_panel_open,
-                               entries: self.alert_log.iter().cloned().collect(), }
+        AlertHistorySnapshot { open:       self.alert_panel_open,
+                               entries:    self.alert_log.iter().cloned().collect(),
+                               has_unread: self.has_unread_alert, }
     }
 
     /// Returns a snapshot of current activity state for rendering.
@@ -302,12 +317,13 @@ impl ActivityController {
     }
 
     /// Appends an entry to the durable alert log, evicting the oldest entry if
-    /// full.
+    /// full, and marks the alert log as having an unread entry.
     fn push_alert(&mut self, entry: AlertEntry) {
         if self.alert_log.len() == ALERT_LOG_CAP {
             self.alert_log.pop_back();
         }
         self.alert_log.push_front(entry);
+        self.has_unread_alert = true;
     }
 }
 

@@ -178,6 +178,7 @@ notification:
   session_expired: "Session expired — sign in again to refresh your library"
   sign_in_again: "Sign In Again"
   signing_in: "Signing in to DriveThruRPG…"
+  copy_tooltip: "Copy error message"
 
 about:
   version: "Version %{version}"
