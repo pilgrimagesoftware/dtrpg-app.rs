@@ -8,7 +8,7 @@ on:
   # no timezone support, so this drifts to 11pm Pacific Standard Time for
   # roughly November-March.
   schedule:
-    - cron: "0 7 * * *"
+    - cron: "0 8 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -24,4 +24,5 @@ jobs:
     with:
       tag: nightly
       prerelease: true
+      ref: develop
     secrets: inherit
