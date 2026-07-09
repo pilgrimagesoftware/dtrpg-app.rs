@@ -39,7 +39,7 @@ anyhow = "1"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe", features = ["font-kit"] }
-gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
 cocoa = "=0.26.0"
 cocoa-foundation = "=0.2.0"
 const_format = "0.2"
@@ -48,7 +48,7 @@ core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.5.2", features = ["metal"] }
 metal = "0.33"
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
 md5 = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
