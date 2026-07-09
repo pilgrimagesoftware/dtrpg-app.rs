@@ -164,20 +164,25 @@ fn render_entry_row(entry: &AlertEntry, text_color: gpui::Hsla, text_tertiary: g
          .child(render_copyable_message(entry.id, message, text_tertiary))
 }
 
-/// Renders an alert entry's error message with an appear-on-hover copy
-/// button, following the same hover-group pattern used for copyable fields in
-/// the detail panel (`detail_panel_view::copyable_value`).
+/// Renders an alert entry's full (word-wrapped, not truncated) error message
+/// alongside an always-visible copy button.
+///
+/// `min_w_0()` on the message text is required for it to wrap within the
+/// panel's fixed width instead of overflowing past it — a flex item's default
+/// min-width is its content's intrinsic width, which for a long unwrapped
+/// error string is wider than the 340px panel.
 fn render_copyable_message(entry_id: u64, message: String, text_tertiary: gpui::Hsla)
                            -> impl IntoElement + 'static {
-    let group_id = SharedString::from(format!("alert-msg-{entry_id}"));
-
     div().id(("alert-history-message-row", entry_id))
-         .group(group_id.clone())
          .flex()
          .items_start()
          .gap(px(6.0))
-         .child(div().text_xs().text_color(text_tertiary).flex_1().child(message.clone()))
-         .child(div().invisible().group_hover(group_id.clone(), |d| d.visible()).child(
+         .child(div().text_xs()
+                     .text_color(text_tertiary)
+                     .min_w_0()
+                     .flex_1()
+                     .child(message.clone()))
+         .child(div().flex_none().child(
              Clipboard::new(SharedString::from(format!("alert-msg-{entry_id}-copy")))
                  .value(message)
                  .tooltip(t!("alert_history.copy_tooltip").to_string()),
