@@ -32,10 +32,12 @@ struct ManageCollectionsState {
 /// Opens the Manage Collections dialog for a single catalog item.
 ///
 /// `member_id` is the item's `collection_member_id` (see `util::matching`) —
-/// the same id space `CollectionEntry::member_ids` uses.
+/// the same id space `CollectionEntry::member_ids` uses; it drives the
+/// checked state and removal. `product_id` is the item's catalog
+/// `product_id`, sent as the network add call's product identifier.
 pub fn open_manage_collections_dialog(window: &mut Window, cx: &mut App,
                                       controller: Entity<LibraryController>,
-                                      item_title: Arc<str>, member_id: u64) {
+                                      item_title: Arc<str>, member_id: u64, product_id: u64) {
     let state = Rc::new(RefCell::new(ManageCollectionsState { error: None }));
     let new_collection_input = cx.new(|cx| {
                                      InputState::new(window, cx).placeholder(
@@ -60,7 +62,8 @@ pub fn open_manage_collections_dialog(window: &mut Window, cx: &mut App,
                                  &state,
                                  &new_collection_input,
                                  &item_title,
-                                 member_id)
+                                 member_id,
+                                 product_id)
               })
               .footer(
             DialogFooter::new().px_4().pb_4().child(
@@ -116,7 +119,7 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                   controller: &Entity<LibraryController>,
                   state: &Rc<RefCell<ManageCollectionsState>>,
                   new_collection_input: &Entity<InputState>, item_title: &Arc<str>,
-                  member_id: u64)
+                  member_id: u64, product_id: u64)
                   -> DialogContent {
     let colors = cx.global::<LibriTheme>().colors.clone();
     let collections = controller.read(cx).collections.clone();
@@ -136,7 +139,8 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                     state.borrow_mut().error = None;
                     controller.update(cx, |ctrl, cx| {
                                   if *new_checked {
-                                      ctrl.add_item_to_collection(collection_id, member_id, cx);
+                                      ctrl.add_item_to_collection(collection_id, member_id,
+                                                                  product_id, cx);
                                   }
                                   else {
                                       ctrl.remove_item_from_collection(collection_id, member_id, cx);
@@ -168,7 +172,7 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                 }
                 state.borrow_mut().error = None;
                 controller.update(cx, |ctrl, cx| {
-                              ctrl.create_collection_and_add_member(name, member_id, cx);
+                              ctrl.create_collection_and_add_member(name, member_id, product_id, cx);
                           });
                 input.update(cx, |st, cx| st.set_value("", window, cx));
             },

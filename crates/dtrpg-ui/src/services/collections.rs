@@ -69,9 +69,8 @@ pub trait CollectionsService: Send + Sync + 'static {
 
     /// Adds a single item to a collection as a member.
     ///
-    /// `item_id` is the item's `order_product_id` (falling back to
-    /// `product_id`), matching the id space `CollectionEntry::member_ids`
-    /// already uses.
+    /// `item_id` must be the item's catalog `product_id` — the underlying API
+    /// rejects an `order_product_id` value with an invalid-product-id error.
     ///
     /// # Errors
     ///

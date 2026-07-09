@@ -826,12 +826,16 @@ impl LibraryController {
     /// Creates a new collection with the given name and, once the create call
     /// succeeds, immediately adds `item_id` as a member of it.
     ///
+    /// `item_id` drives local membership tracking/matching (the optimistic
+    /// `member_ids` update); `product_id` is the catalog product id sent on
+    /// the network add call. See [`Self::add_item_to_collection`].
+    ///
     /// Used by the "New collection…" affordance in the Manage Collections
     /// dialog, so a single user action both creates the collection and adds
     /// the current item to it. On create failure, only
     /// [`CollectionCreateFailed`] is emitted — no add is attempted.
     pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
-                                            cx: &mut Context<Self>) {
+                                            product_id: u64, cx: &mut Context<Self>) {
         let label = format!("Creating collection '{name}'...");
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
@@ -850,7 +854,7 @@ impl LibraryController {
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
-                              ctrl.add_item_to_collection(collection_id, item_id, cx);
+                              ctrl.add_item_to_collection(collection_id, item_id, product_id, cx);
                           })
                           .ok();
                   }
@@ -967,12 +971,19 @@ impl LibraryController {
     /// Adds `item_id` (an item's `order_product_id`/`product_id`) as a member
     /// of the collection with `collection_id`.
     ///
+    /// `item_id` drives the local optimistic `member_ids`/`collection_members`
+    /// update and its rollback-on-failure branch, matching the id space
+    /// `CollectionEntry::member_ids` already uses. `product_id` is the item's
+    /// catalog `product_id`, sent as the network add call's product
+    /// identifier — the API's `product_list_items` endpoint rejects
+    /// `order_product_id` values with an invalid-product-id error.
+    ///
     /// Updates `member_ids` (and `collection_members`, if that collection is
     /// the active filter) immediately, then confirms the change via the
     /// service. On failure the optimistic update is rolled back and
     /// [`CollectionMemberAddFailed`] is emitted so the window can show an
     /// error notification.
-    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64,
+    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64, product_id: u64,
                                   cx: &mut Context<Self>) {
         let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
         else {
@@ -994,7 +1005,7 @@ impl LibraryController {
         cx.spawn(async move |this, async_cx| {
               let result = async_cx.background_executor()
                                    .spawn(async move {
-                                       collections_service.add_member(collection_id, item_id)
+                                       collections_service.add_member(collection_id, product_id)
                                    })
                                    .await;
               if let Err(e) = result {

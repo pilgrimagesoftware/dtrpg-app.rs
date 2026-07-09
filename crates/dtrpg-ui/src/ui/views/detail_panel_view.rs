@@ -622,6 +622,7 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
                               colors: &ColorTokens, cx: &App)
                               -> impl IntoElement + 'static {
     let member_id = collection_member_id(item);
+    let product_id = item.product_id;
     let member_names: Vec<Arc<str>> = entity.read(cx)
                                             .collections
                                             .iter()
@@ -664,7 +665,8 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
             t!("detail.collections_manage_button").to_string(),
         ).on_click(move |_, window, cx| {
                        open_manage_collections_dialog(window, cx, entity.clone(),
-                                                      Arc::clone(&item_title), member_id);
+                                                      Arc::clone(&item_title), member_id,
+                                                      product_id);
                    })),
         )
 }
