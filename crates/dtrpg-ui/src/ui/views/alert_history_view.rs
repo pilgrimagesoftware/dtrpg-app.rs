@@ -10,7 +10,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
+use gpui::{AnyElement, Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
+use gpui_component::clipboard::Clipboard;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
@@ -160,5 +161,30 @@ fn render_entry_row(entry: &AlertEntry, text_color: gpui::Hsla, text_tertiary: g
                                  .tooltip(move |window, cx| {
                                      Tooltip::new(absolute_label.clone()).build(window, cx)
                                  })))
-         .child(div().text_xs().text_color(text_tertiary).child(message))
+         .child(render_copyable_message(entry.id, message, text_tertiary))
+}
+
+/// Renders an alert entry's full (word-wrapped, not truncated) error message
+/// alongside an always-visible copy button.
+///
+/// `min_w_0()` on the message text is required for it to wrap within the
+/// panel's fixed width instead of overflowing past it — a flex item's default
+/// min-width is its content's intrinsic width, which for a long unwrapped
+/// error string is wider than the 340px panel.
+fn render_copyable_message(entry_id: u64, message: String, text_tertiary: gpui::Hsla)
+                           -> impl IntoElement + 'static {
+    div().id(("alert-history-message-row", entry_id))
+         .flex()
+         .items_start()
+         .gap(px(6.0))
+         .child(div().text_xs()
+                     .text_color(text_tertiary)
+                     .min_w_0()
+                     .flex_1()
+                     .child(message.clone()))
+         .child(div().flex_none().child(
+             Clipboard::new(SharedString::from(format!("alert-msg-{entry_id}-copy")))
+                 .value(message)
+                 .tooltip(t!("alert_history.copy_tooltip").to_string()),
+         ))
 }

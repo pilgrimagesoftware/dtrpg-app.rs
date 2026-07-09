@@ -170,12 +170,14 @@ alert_history:
   empty: "Aucune alerte."
   empty_hint: "Les erreurs des opérations en arrière-plan apparaîtront ici."
   clear: "Effacer"
+  copy_tooltip: "Copier le message d'erreur"
 
 notification:
   set_up_account: "Configurer le compte"
   session_expired: "Session expirée — reconnectez-vous pour actualiser votre bibliothèque"
   sign_in_again: "Se reconnecter"
   signing_in: "Connexion à DriveThruRPG en cours…"
+  copy_tooltip: "Copier le message d'erreur"
 
 about:
   version: "Version %{version}"
@@ -251,6 +253,9 @@ date:
   days_ago:
     one: "a day ago"
     many: "%{n} days ago"
+  weeks_ago:
+    one: "a week ago"
+    many: "%{n} weeks ago"
   months_ago:
     one: "a month ago"
     many: "%{n} months ago"

@@ -95,7 +95,9 @@ pub struct AlertEntry {
 /// pass.
 pub struct AlertHistorySnapshot {
     /// Whether the alert history panel overlay is open.
-    pub open:    bool,
+    pub open:       bool,
     /// All retained alert entries, newest first.
-    pub entries: Vec<AlertEntry>,
+    pub entries:    Vec<AlertEntry>,
+    /// Whether an alert has been logged since the panel was last opened.
+    pub has_unread: bool,
 }

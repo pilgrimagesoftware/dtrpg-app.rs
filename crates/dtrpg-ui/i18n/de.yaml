@@ -170,12 +170,14 @@ alert_history:
   empty: "Keine Warnungen."
   empty_hint: "Fehler aus Hintergrundvorgängen werden hier angezeigt."
   clear: "Löschen"
+  copy_tooltip: "Fehlermeldung kopieren"
 
 notification:
   set_up_account: "Konto einrichten"
   session_expired: "Sitzung abgelaufen — melden Sie sich erneut an, um Ihre Bibliothek zu aktualisieren"
   sign_in_again: "Erneut anmelden"
   signing_in: "Bei DriveThruRPG anmelden…"
+  copy_tooltip: "Fehlermeldung kopieren"
 
 about:
   version: "Version %{version}"
@@ -251,6 +253,9 @@ date:
   days_ago:
     one: "a day ago"
     many: "%{n} days ago"
+  weeks_ago:
+    one: "a week ago"
+    many: "%{n} weeks ago"
   months_ago:
     one: "a month ago"
     many: "%{n} months ago"
