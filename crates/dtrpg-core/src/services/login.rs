@@ -1,6 +1,7 @@
 //! SDK-backed implementation of [`LoginService`].
 
-use dtrpg_sdk::{ClientError, auth_client, config::Config, credential_login};
+use dtrpg_sdk::auth::{credential_login, key_exchange};
+use dtrpg_sdk::{ClientError, config::Config};
 use dtrpg_ui::services::{LoginError, LoginService, LoginTokens};
 use tokio::runtime::{Builder, Runtime};
 
@@ -61,7 +62,7 @@ impl LoginService for SdkLoginService {
         let config = Config::with_base_url(api_key, self.config.base_url());
         let key = api_key.to_string();
         self.runtime
-            .block_on(auth_client::authenticate(&key, &config))
+            .block_on(key_exchange::authenticate(&key, &config))
             .map(|r| LoginTokens { access_token:      r.token,
                                    refresh_token:     r.refresh_token,
                                    refresh_token_ttl: r.refresh_token_ttl, })
