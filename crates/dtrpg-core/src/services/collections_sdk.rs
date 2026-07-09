@@ -394,7 +394,8 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
     fn add_product_list_item(&self, product_list_id: u64, product_id: u64)
                              -> Result<(), CollectionsServiceError> {
         self.runtime
-            .block_on(self.client.add_product_list_item(product_list_id, product_id))
+            .block_on(self.client
+                          .add_product_list_item(product_list_id, product_id))
             .map_err(map_client_error)
             .map(|_| ())
     }
@@ -482,7 +483,10 @@ fn map_client_error(error: ClientError) -> CollectionsServiceError {
             CollectionsServiceError::new(kind,
                                          format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"))
         }
-        ClientError::ApiError { url, status, message, payload } => {
+        ClientError::ApiError { url,
+                                status,
+                                message,
+                                payload, } => {
             let detail = message.unwrap_or(payload);
             // 409 on this service's endpoints means the request conflicts with
             // existing state (e.g. the item is already a member of the product
