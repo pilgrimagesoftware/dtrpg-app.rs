@@ -1294,6 +1294,7 @@ impl LibraryController {
         if collection.member_ids.contains(&item_id) {
             return;
         }
+        let collection_name = collection.name.clone();
         let mut member_ids: Vec<u64> = collection.member_ids.iter().copied().collect();
         member_ids.push(item_id);
         collection.member_ids = Arc::from(member_ids.as_slice());
@@ -1327,6 +1328,13 @@ impl LibraryController {
                               ctrl.collection_members.remove(&item_id);
                           }
                           cx.emit(LibraryChanged);
+                          ctrl.activity.update(cx, |a, cx| {
+                                           a.log_alert(format!(
+                                               "Add to collection '{collection_name}'"
+                                           ),
+                                                       e.message.clone(),
+                                                       cx);
+                                       });
                           cx.emit(CollectionMemberAddFailed { message: e.message.clone(), });
                       })
                       .ok();
@@ -1352,6 +1360,7 @@ impl LibraryController {
         if !collection.member_ids.contains(&item_id) {
             return;
         }
+        let collection_name = collection.name.clone();
         let member_ids: Vec<u64> = collection.member_ids
                                              .iter()
                                              .copied()
@@ -1388,6 +1397,13 @@ impl LibraryController {
                               ctrl.collection_members.insert(item_id);
                           }
                           cx.emit(LibraryChanged);
+                          ctrl.activity.update(cx, |a, cx| {
+                                           a.log_alert(format!(
+                                               "Remove from collection '{collection_name}'"
+                                           ),
+                                                       e.message.clone(),
+                                                       cx);
+                                       });
                           cx.emit(CollectionMemberRemoveFailed { message: e.message.clone(), });
                       })
                       .ok();

@@ -23,6 +23,7 @@ use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as 
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
+use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
 use crate::data::ui_prefs::UiPrefs;
@@ -125,6 +126,7 @@ struct CollectionsSection {
     on_toggle: CollectionsToggleFn,
     rows:      Vec<CollectionRow>,
     entity:    Entity<LibraryController>,
+    tabs:      Entity<TabsController>,
 }
 
 impl Collapsible for CollectionsSection {
@@ -147,6 +149,7 @@ impl SidebarItem for CollectionsSection {
         let suffix = (self.suffix)(window, cx);
         let open = self.open;
         let entity = self.entity.clone();
+        let tabs = self.tabs.clone();
 
         let header =
             div().id(SharedString::from(format!("{id:?}-header")))
@@ -174,14 +177,17 @@ impl SidebarItem for CollectionsSection {
                              .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
                              .child(suffix));
 
-        let rows: Vec<AnyElement> =
-            self.rows
-                .into_iter()
-                .enumerate()
-                .map(|(ix, row)| {
-                    render_collection_row(format!("{id:?}-row-{ix}"), row, entity.clone(), cx)
-                })
-                .collect();
+        let rows: Vec<AnyElement> = self.rows
+                                        .into_iter()
+                                        .enumerate()
+                                        .map(|(ix, row)| {
+                                            render_collection_row(format!("{id:?}-row-{ix}"),
+                                                                  row,
+                                                                  entity.clone(),
+                                                                  tabs.clone(),
+                                                                  cx)
+                                        })
+                                        .collect();
 
         div().id(id)
              .w_full()
@@ -207,11 +213,13 @@ impl SidebarItem for CollectionsSection {
 /// reload/delete, and drop target for [`DraggedLibraryItem`] (adds the
 /// dragged catalog item as a member of this collection).
 fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
-                         entity: Entity<LibraryController>, cx: &mut App)
+                         entity: Entity<LibraryController>, tabs: Entity<TabsController>,
+                         cx: &mut App)
                          -> AnyElement {
     let is_active = row.is_active;
     let filter = SidebarFilter::Collection(row.id, Arc::clone(&row.name));
     let click_entity = entity.clone();
+    let click_tabs = tabs;
     let reload_entity = entity.clone();
     let delete_entity = entity.clone();
     let drop_entity = entity;
@@ -241,6 +249,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
          })
          .on_click(move |_, _, cx| {
              click_entity.update(cx, |ctrl, cx| ctrl.set_filter(filter.clone(), cx));
+             click_tabs.update(cx, |ctrl, cx| ctrl.activate(TabTarget::Catalog, cx));
          })
          .child(div().flex_1()
                      .flex()
@@ -284,7 +293,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
 pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                       publishers: Vec<PublisherEntry>, collections: Vec<CollectionEntry>,
                       collections_loaded: bool, catalog_ids: HashSet<u64>,
-                      entity: Entity<LibraryController>,
+                      entity: Entity<LibraryController>, tabs: Entity<TabsController>,
                       collection_name_input: Entity<InputState>,
                       publisher_search: SidebarSectionSearch,
                       collection_search: SidebarSectionSearch)
@@ -299,22 +308,26 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                      counts.all,
                                                      active == SidebarFilter::AllTitles,
                                                      SidebarFilter::AllTitles,
-                                                     entity.clone()))
+                                                     entity.clone(),
+                                                     tabs.clone()))
                                      .child(nav_item(&t!("sidebar.recently_added"),
                                                      counts.recently_added,
                                                      active == SidebarFilter::RecentlyAdded,
                                                      SidebarFilter::RecentlyAdded,
-                                                     entity.clone()))
+                                                     entity.clone(),
+                                                     tabs.clone()))
                                      .child(nav_item(&t!("sidebar.on_this_device"),
                                                      counts.on_device,
                                                      active == SidebarFilter::OnDevice,
                                                      SidebarFilter::OnDevice,
-                                                     entity.clone()))
+                                                     entity.clone(),
+                                                     tabs.clone()))
                                      .child(nav_item(&t!("sidebar.in_the_cloud"),
                                                      counts.in_cloud,
                                                      active == SidebarFilter::InCloud,
                                                      SidebarFilter::InCloud,
-                                                     entity.clone()));
+                                                     entity.clone(),
+                                                     tabs.clone()));
 
     let publishers_count = publishers.len();
 
@@ -325,7 +338,12 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                   .map(|p| {
                       let is_active = active == SidebarFilter::Publisher(Arc::clone(&p.name));
                       let f = SidebarFilter::Publisher(Arc::clone(&p.name));
-                      nav_item(p.name.as_ref(), p.count, is_active, f, entity.clone())
+                      nav_item(p.name.as_ref(),
+                               p.count,
+                               is_active,
+                               f,
+                               entity.clone(),
+                               tabs.clone())
                   })
                   .collect();
 
@@ -526,7 +544,8 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                    suffix,
                                                    on_toggle,
                                                    rows: col_rows,
-                                                   entity: entity.clone() };
+                                                   entity: entity.clone(),
+                                                   tabs };
 
     sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
                    .child(SidebarContent::Separator)
@@ -537,7 +556,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
 // ───────────────────────────────────────────────────────────────────
 
 fn nav_item(label: &str, count: usize, is_active: bool, filter: SidebarFilter,
-            entity: Entity<LibraryController>)
+            entity: Entity<LibraryController>, tabs: Entity<TabsController>)
             -> SidebarMenuItem {
     let label = label.to_string();
     SidebarMenuItem::new(label).active(is_active)
@@ -546,6 +565,9 @@ fn nav_item(label: &str, count: usize, is_active: bool, filter: SidebarFilter,
                                    entity.update(cx, |ctrl, cx| {
                                              ctrl.set_filter(filter.clone(), cx)
                                          });
+                                   tabs.update(cx, |ctrl, cx| {
+                                           ctrl.activate(TabTarget::Catalog, cx)
+                                       });
                                })
 }
 

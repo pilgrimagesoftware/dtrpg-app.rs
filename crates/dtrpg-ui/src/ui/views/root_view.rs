@@ -2,8 +2,8 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
+    AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
 };
 use gpui_component::Root;
 use gpui_component::WindowExt as _;
@@ -12,6 +12,7 @@ use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHead
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
+use gpui_component::{IconName, Sizable as _};
 use rust_i18n::t;
 
 use crate::ui::actions::{
@@ -63,6 +64,27 @@ use crate::{
 
 /// Type-tag used to identify the startup-auth toast notification.
 struct AuthPendingNotif;
+
+/// Builds an error toast with a copy-to-clipboard action for the message
+/// text, so the user can grab the full error (URLs, status codes, decode
+/// errors) for a bug report without needing to open the alert history panel.
+fn error_notification(message: impl Into<String>) -> Notification {
+    let message = message.into();
+    Notification::new().message(message.clone())
+                       .with_type(NotificationType::Error)
+                       .autohide(false)
+                       .action(move |_notification, _window, _cx| {
+                           let message = message.clone();
+                           Button::new("copy-error-message")
+                .icon(IconName::Copy)
+                .ghost()
+                .xsmall()
+                .tooltip(t!("notification.copy_tooltip"))
+                .on_click(move |_, _, cx| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(message.clone()));
+                })
+                       })
+}
 
 /// Resolves a Window-menu/`cmd-<n>` tab position to the `TabTarget` currently
 /// open there, if any.
@@ -291,49 +313,25 @@ impl LibraryRootView {
                      })
           .detach();
 
-        cx.subscribe_in(
-                        &controller,
+        cx.subscribe_in(&controller,
                         window,
                         |_this, _ctrl, event: &CollectionCreateFailed, window, cx| {
-                            window.push_notification(
-                    Notification::new()
-                        .message(event.message.clone())
-                        .with_type(NotificationType::Error)
-                        .autohide(false),
-                    cx,
-                );
-                        },
-        )
+                            window.push_notification(error_notification(event.message.clone()), cx);
+                        })
           .detach();
 
-        cx.subscribe_in(
-                        &controller,
+        cx.subscribe_in(&controller,
                         window,
                         |_this, _ctrl, event: &CollectionMemberAddFailed, window, cx| {
-                            window.push_notification(
-                    Notification::new()
-                        .message(event.message.clone())
-                        .with_type(NotificationType::Error)
-                        .autohide(false),
-                    cx,
-                );
-                        },
-        )
+                            window.push_notification(error_notification(event.message.clone()), cx);
+                        })
           .detach();
 
-        cx.subscribe_in(
-                        &controller,
+        cx.subscribe_in(&controller,
                         window,
                         |_this, _ctrl, event: &CollectionMemberRemoveFailed, window, cx| {
-                            window.push_notification(
-                    Notification::new()
-                        .message(event.message.clone())
-                        .with_type(NotificationType::Error)
-                        .autohide(false),
-                    cx,
-                );
-                        },
-        )
+                            window.push_notification(error_notification(event.message.clone()), cx);
+                        })
           .detach();
 
         cx.subscribe(&controller, |this, ctrl, _event: &LibraryChanged, cx| {
@@ -382,20 +380,12 @@ impl LibraryRootView {
                         })
           .detach();
 
-        cx.subscribe_in(
-                        &activity,
+        cx.subscribe_in(&activity,
                         window,
                         |_this, _ctrl, event: &DownloadError, window, cx| {
                             let msg = format!("{}: {}", event.title, event.message);
-                            window.push_notification(
-                    Notification::new()
-                        .message(msg)
-                        .with_type(NotificationType::Error)
-                        .autohide(false),
-                    cx,
-                );
-                        },
-        )
+                            window.push_notification(error_notification(msg), cx);
+                        })
           .detach();
 
         // Settings now lives in its own window (see `settings_window_view`), so
@@ -616,6 +606,7 @@ impl Render for LibraryRootView {
                                      collections_loaded,
                                      catalog_ids,
                                      lib_entity.clone(),
+                                     self.tabs.clone(),
                                      self.collection_name_input.clone(),
                                      publisher_search,
                                      collection_search);

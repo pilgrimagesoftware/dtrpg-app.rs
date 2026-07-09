@@ -261,14 +261,12 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 )
                             }),
                     )
-                    .child(render_collections_section(&item, entity_collections, colors, cx))
-                    .child(if item.is_multi_item() {
-                        render_item_tier(&item, &storage_root_path, entity_item_tier.clone(),
-                                         colors, cx)
-                            .into_any_element()
-                    } else {
-                        render_metadata_table(&item, colors).into_any_element()
+                    .child(render_metadata_table(&item, colors))
+                    .when(item.is_multi_item(), |this| {
+                        this.child(render_item_tier(&item, &storage_root_path,
+                                                    entity_item_tier.clone(), colors, cx))
                     })
+                    .child(render_collections_section(&item, entity_collections, colors, cx))
                     .child(render_other_details(&item, entity_other_details, colors, cx)),
             ),
         )
