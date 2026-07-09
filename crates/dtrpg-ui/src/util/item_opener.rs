@@ -27,6 +27,21 @@ pub enum OpenError {
     MultipleFilesRequireSelection,
 }
 
+/// Launches `path` in the system's default application.
+///
+/// Isolated from [`ItemOpener::open`] so tests never trigger a real OS-level
+/// launch (which visibly opens another application, e.g. Preview for a PDF,
+/// and can steal focus) — the `#[cfg(test)]` build swaps this for a no-op.
+#[cfg(not(test))]
+fn launch(path: &Path) -> std::io::Result<()> {
+    open::that(path)
+}
+
+#[cfg(test)]
+fn launch(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 /// Service for opening files in the system's default application.
 pub struct ItemOpener;
 
@@ -46,19 +61,19 @@ impl ItemOpener {
         }
 
         // Attempt to open the file with the system's default application
-        open::that(path).map_err(|e| {
-                            let error_msg = e.to_string();
+        launch(path).map_err(|e| {
+                        let error_msg = e.to_string();
 
-                            // Try to classify the error
-                            if error_msg.contains("no default application")
-                               || error_msg.contains("no associated application")
-                            {
-                                OpenError::NoDefaultApp
-                            }
-                            else {
-                                OpenError::OsFailed(error_msg)
-                            }
-                        })
+                        // Try to classify the error
+                        if error_msg.contains("no default application")
+                           || error_msg.contains("no associated application")
+                        {
+                            OpenError::NoDefaultApp
+                        }
+                        else {
+                            OpenError::OsFailed(error_msg)
+                        }
+                    })
     }
 
     /// Opens a catalog entry's downloaded content, given its per-item file
@@ -116,18 +131,15 @@ mod tests {
         }
         drop(file);
 
-        // Try to open it - this may succeed or fail depending on the environment
-        // We just verify it doesn't return FileNotFound
+        // `launch` is a no-op in test builds (see its `#[cfg(test)]` override
+        // above), so this never actually opens the file in another
+        // application — it only exercises the existence check.
         let result = ItemOpener::open(&temp_path);
 
         // Clean up
         let _ = std::fs::remove_file(&temp_path);
 
-        // The result should either be Ok or an error other than FileNotFound
-        if let Err(e) = result {
-            assert!(!matches!(e, OpenError::FileNotFound(_)),
-                    "Should not return FileNotFound for existing file");
-        }
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
@@ -176,14 +188,13 @@ mod tests {
         drop(file);
 
         let files = vec![make_file("book.pdf")];
+        // `launch` is a no-op in test builds, so this never actually opens
+        // "book.pdf" in the system's PDF viewer.
         let result = ItemOpener::open_item(&dir, &files);
 
         let _ = std::fs::remove_file(&file_path);
         let _ = std::fs::remove_dir(&dir);
 
-        if let Err(e) = result {
-            assert!(!matches!(e, OpenError::FileNotFound(_)),
-                    "Should resolve the single file's path, not report it missing");
-        }
+        assert_eq!(result, Ok(()));
     }
 }

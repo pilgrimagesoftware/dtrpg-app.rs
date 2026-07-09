@@ -12,7 +12,8 @@
 //! let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
 //! let credential = Credential { service: KEYRING_SERVICE.into(),
 //!                               account: KEYRING_API_KEY.into(),
-//!                               secret:  "my-api-key".into(), };
+//!                               secret:  "my-api-key".into(),
+//!                               email:   None, };
 //! store.store(&credential)
 //!      .expect("failed to store credential");
 //! let loaded = store.load().expect("failed to load credential");
