@@ -9,6 +9,11 @@ pub enum CollectionsServiceErrorKind {
     Network,
     /// Request failed due to session or authentication state.
     Session,
+    /// The API rejected the request because it conflicts with existing state
+    /// (e.g. adding an item that is already a member of the collection).
+    /// Distinct from [`Self::Network`] so callers can treat it as a
+    /// non-fatal, expected outcome rather than a genuine failure.
+    Conflict,
 }
 
 /// Error returned by collections service operations.

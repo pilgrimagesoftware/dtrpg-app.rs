@@ -23,6 +23,7 @@ use crate::data::events::{
     CollectionCreateFailed, CollectionMemberAddFailed, CollectionMemberRemoveFailed,
 };
 use crate::data::theme::LibriTheme;
+use crate::util::matching::member_ids_contain;
 
 /// Transient state shared by the dialog's closures for one open session.
 struct ManageCollectionsState {
@@ -127,7 +128,7 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
 
     let mut rows = v_flex().gap_2();
     for collection in &collections {
-        let checked = collection.member_ids.contains(&member_id);
+        let checked = member_ids_contain(&collection.member_ids, member_id, product_id);
         let collection_id = collection.id;
         let controller = controller.clone();
         let state = state.clone();
@@ -143,7 +144,8 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                                                                   product_id, cx);
                                   }
                                   else {
-                                      ctrl.remove_item_from_collection(collection_id, member_id, cx);
+                                      ctrl.remove_item_from_collection(collection_id, member_id,
+                                                                       product_id, cx);
                                   }
                               });
                 },

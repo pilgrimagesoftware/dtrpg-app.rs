@@ -28,7 +28,7 @@ use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::datetime::{format_absolute, format_relative};
-use crate::util::matching::collection_member_id;
+use crate::util::matching::{collection_member_id, member_ids_contain};
 use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -624,7 +624,7 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
     let member_names: Vec<Arc<str>> = entity.read(cx)
                                             .collections
                                             .iter()
-                                            .filter(|c| c.member_ids.contains(&member_id))
+                                            .filter(|c| member_ids_contain(&c.member_ids, member_id, product_id))
                                             .map(|c| Arc::clone(&c.name))
                                             .collect();
 

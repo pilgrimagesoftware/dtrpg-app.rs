@@ -482,6 +482,23 @@ fn map_client_error(error: ClientError) -> CollectionsServiceError {
             CollectionsServiceError::new(kind,
                                          format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"))
         }
+        ClientError::ApiError { url, status, message, payload } => {
+            let detail = message.unwrap_or(payload);
+            // 409 on this service's endpoints means the request conflicts with
+            // existing state (e.g. the item is already a member of the product
+            // list) rather than a transient/network failure — surface just the
+            // server's own message, not the URL/status wrapper used for genuine
+            // failures below.
+            if status == 409 {
+                return CollectionsServiceError::new(CollectionsServiceErrorKind::Conflict, detail);
+            }
+            let kind = match status {
+                401 | 403 => CollectionsServiceErrorKind::Session,
+                _ => CollectionsServiceErrorKind::Network,
+            };
+            CollectionsServiceError::new(kind,
+                                         format!("Request to {url} failed (HTTP {status}): {detail}"))
+        }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());
             let kind = match status {
