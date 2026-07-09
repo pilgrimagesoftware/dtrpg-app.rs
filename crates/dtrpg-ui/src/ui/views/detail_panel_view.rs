@@ -28,7 +28,7 @@ use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::datetime::{format_absolute, format_relative};
-use crate::util::matching::collection_member_id;
+use crate::util::matching::{collection_member_id, member_ids_contain};
 use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -620,12 +620,14 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
                               colors: &ColorTokens, cx: &App)
                               -> impl IntoElement + 'static {
     let member_id = collection_member_id(item);
-    let member_names: Vec<Arc<str>> = entity.read(cx)
-                                            .collections
-                                            .iter()
-                                            .filter(|c| c.member_ids.contains(&member_id))
-                                            .map(|c| Arc::clone(&c.name))
-                                            .collect();
+    let product_id = item.product_id;
+    let member_names: Vec<Arc<str>> =
+        entity.read(cx)
+              .collections
+              .iter()
+              .filter(|c| member_ids_contain(&c.member_ids, member_id, product_id))
+              .map(|c| Arc::clone(&c.name))
+              .collect();
 
     let summary: AnyElement = if member_names.is_empty() {
         div().text_sm()
@@ -662,7 +664,8 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
             t!("detail.collections_manage_button").to_string(),
         ).on_click(move |_, window, cx| {
                        open_manage_collections_dialog(window, cx, entity.clone(),
-                                                      Arc::clone(&item_title), member_id);
+                                                      Arc::clone(&item_title), member_id,
+                                                      product_id);
                    })),
         )
 }

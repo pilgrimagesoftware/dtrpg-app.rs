@@ -51,9 +51,10 @@ use crate::{
         enums::CatalogPresentation,
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
-            CollectionMemberAddFailed, CollectionMemberRemoveFailed, DownloadComplete,
-            DownloadError, LibraryChanged, LogoutRequested, SettingsChanged, SignInSucceeded,
-            StartupAuthBegun, StartupAuthFailed, TabsChanged,
+            CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
+            CollectionMemberRemoveFailed, DownloadComplete, DownloadError, LibraryChanged,
+            LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
+            TabsChanged,
         },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
@@ -84,6 +85,14 @@ fn error_notification(message: impl Into<String>) -> Notification {
                     cx.write_to_clipboard(ClipboardItem::new_string(message.clone()));
                 })
                        })
+}
+
+/// Builds a low-severity, auto-hiding toast for expected/non-fatal outcomes
+/// (e.g. adding an item that is already a member of the target collection),
+/// as opposed to [`error_notification`]'s persistent error styling.
+fn warning_notification(message: impl Into<String>) -> Notification {
+    Notification::new().message(message.into())
+                       .with_type(NotificationType::Warning)
 }
 
 /// Resolves a Window-menu/`cmd-<n>` tab position to the `TabTarget` currently
@@ -331,6 +340,14 @@ impl LibraryRootView {
                         window,
                         |_this, _ctrl, event: &CollectionMemberRemoveFailed, window, cx| {
                             window.push_notification(error_notification(event.message.clone()), cx);
+                        })
+          .detach();
+
+        cx.subscribe_in(&controller,
+                        window,
+                        |_this, _ctrl, event: &CollectionMemberAlreadyPresent, window, cx| {
+                            window.push_notification(warning_notification(event.message.clone()),
+                                                     cx);
                         })
           .detach();
 

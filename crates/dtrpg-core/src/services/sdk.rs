@@ -529,6 +529,19 @@ fn map_client_error(error: ClientError) -> LibraryServiceError {
             LibraryServiceError::new(kind,
                                      format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"))
         }
+        ClientError::ApiError { url,
+                                status,
+                                message,
+                                payload, } => {
+            let kind = match status {
+                401 => LibraryServiceErrorKind::NeedsReauth,
+                403 => LibraryServiceErrorKind::Session,
+                _ => LibraryServiceErrorKind::Network,
+            };
+            let detail = message.unwrap_or(payload);
+            LibraryServiceError::new(kind,
+                                     format!("Request to {url} failed (HTTP {status}): {detail}"))
+        }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());
             let kind = match status {

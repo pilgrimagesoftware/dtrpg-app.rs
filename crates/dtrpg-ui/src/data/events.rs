@@ -140,6 +140,23 @@ pub struct CollectionMemberRemoveFailed {
 
 impl EventEmitter<CollectionMemberRemoveFailed> for LibraryController {}
 
+// ── CollectionMemberAlreadyPresent
+// ─────────────────────────────────
+
+/// Emitted by `LibraryController` when a background add-member-to-collection
+/// call finds the item is already a member server-side (`HTTP 409`).
+///
+/// Unlike [`CollectionMemberAddFailed`], this is not treated as a failure:
+/// the optimistic local `member_ids` update is left in place (it already
+/// matches server state) and the receiver should show a low-severity,
+/// auto-hiding `Notification` rather than a persistent error.
+pub struct CollectionMemberAlreadyPresent {
+    /// Human-readable message from the API describing the conflict.
+    pub message: String,
+}
+
+impl EventEmitter<CollectionMemberAlreadyPresent> for LibraryController {}
+
 // ── StartupAuthFailed
 // ─────────────────────────────────────────────────────────
 
