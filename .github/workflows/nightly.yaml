@@ -4,8 +4,11 @@ name: Nightly
 # `develop` commit. See openspec/changes/add-release-packaging-workflow.
 
 on:
+  # 07:00 UTC targets midnight Pacific Daylight Time. GitHub Actions cron has
+  # no timezone support, so this drifts to 11pm Pacific Standard Time for
+  # roughly November-March.
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 7 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package:

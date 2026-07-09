@@ -42,6 +42,7 @@ sentry = ["dep:sentry", "dep:sentry-tracing"]
 # from before resolving any relative paths in the config. Source assets:
 # pilgrimagesoftware/dtrpg-design `app-icons/`.
 [package.metadata.packager]
+name = "libri"
 product-name = "Libri"
 identifier = "com.pilgrimagesoftware.dtrpg"
 description = "DriveThruRPG desktop frontend"
