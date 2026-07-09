@@ -170,6 +170,7 @@ alert_history:
   empty: "Keine Warnungen."
   empty_hint: "Fehler aus Hintergrundvorgängen werden hier angezeigt."
   clear: "Löschen"
+  copy_tooltip: "Fehlermeldung kopieren"
 
 notification:
   set_up_account: "Konto einrichten"
