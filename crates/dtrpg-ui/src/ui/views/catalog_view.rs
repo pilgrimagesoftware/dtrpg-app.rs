@@ -1,6 +1,6 @@
 //! Catalog view: list, thumbs, and grid layouts with grouping and empty state.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -85,7 +85,10 @@ pub(crate) fn open_item_or_focus_detail_tab(entry_dir: &Path, item: &LibraryItem
             let id = Arc::clone(&item.id);
             let title = item.title.to_string();
             tabs.update(cx, |t, cx| t.open_detail_tab(Arc::clone(&id), title, cx));
-            controller.update(cx, |ctrl, cx| ctrl.clear_item_selection(&id, cx));
+            controller.update(cx, |ctrl, cx| {
+                          ctrl.clear_item_selection(&id, cx);
+                          ctrl.maybe_check_item(Arc::clone(&id), cx);
+                      });
         }
         Err(OpenError::FileNotFound(path)) => {
             tracing::warn!("open: file not found: {path}");
@@ -222,6 +225,43 @@ fn render_item_count_badge(item: &LibraryItem, colors: &ColorTokens)
               .child(count.to_string()))
 }
 
+/// Renders a small "unavailable" badge for catalog items no longer returned
+/// by the server (`is_available == false`, see `catalog-availability-flag`),
+/// following the same small-pill visual pattern as
+/// [`render_item_count_badge`]. Returns `None` for available items — callers
+/// should render nothing.
+fn render_unavailable_badge(item: &LibraryItem, colors: &ColorTokens)
+                            -> Option<impl IntoElement + 'static + use<>> {
+    if item.is_available {
+        return None;
+    }
+    let badge_id: Arc<str> = Arc::from(format!("unavailable-badge-{}", &*item.id));
+    let tooltip_text = t!("catalog.unavailable_badge_tooltip").to_string();
+    Some(div().id(badge_id)
+              .flex_none()
+              .text_xs()
+              .font_weight(FontWeight::SEMIBOLD)
+              .text_color(colors.warning_text)
+              .px(px(4.0))
+              .py(px(1.0))
+              .rounded(px(3.0))
+              .bg(colors.warning_bg)
+              .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+              .child(t!("catalog.unavailable_badge").to_string()))
+}
+
+/// Renders a small spinner overlay for a catalog entry with an availability
+/// check currently in flight (`LibraryController::is_checking`, see
+/// `catalog-item-level-reconciliation`). Returns `None` when no check is in
+/// flight — callers should render nothing.
+pub(crate) fn render_checking_indicator(is_checking: bool)
+                                        -> Option<impl IntoElement + 'static + use<>> {
+    if !is_checking {
+        return None;
+    }
+    Some(Spinner::new().with_size(Size::XSmall))
+}
+
 /// Renders a single data cell (column `col_ix`) for `item`. Shared between
 /// the ungrouped `CatalogListDelegate` and the grouped
 /// `GroupedCatalogListDelegate` so grouped and ungrouped list rows stay
@@ -232,7 +272,8 @@ fn render_item_count_badge(item: &LibraryItem, colors: &ColorTokens)
 #[allow(clippy::too_many_arguments)]
 fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens,
                          storage_root: &Path, controller: &Entity<LibraryController>,
-                         tabs: &Entity<TabsController>, column_width: Pixels, window: &Window)
+                         tabs: &Entity<TabsController>, column_width: Pixels, window: &Window,
+                         is_checking: bool)
                          -> AnyElement {
     match col_ix {
         0 => {
@@ -273,6 +314,8 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                              .bg(colors.hover)
                              .child(badge))
                  .children(render_item_count_badge(item, colors))
+                 .children(render_unavailable_badge(item, colors))
+                 .children(render_checking_indicator(is_checking))
                  .into_any_element()
         }
 
@@ -527,6 +570,7 @@ impl TableDelegate for CatalogListDelegate {
         };
         let colors = cx.global::<LibriTheme>().colors.clone();
         let column_width = self.column(col_ix, cx).width;
+        let is_checking = self.controller.read(cx).is_checking(&item.id);
         render_list_item_cell(&item,
                               col_ix,
                               &colors,
@@ -534,7 +578,8 @@ impl TableDelegate for CatalogListDelegate {
                               &self.controller,
                               &self.tabs,
                               column_width,
-                              window)
+                              window,
+                              is_checking)
     }
 
     fn render_th(&mut self, col_ix: usize, _window: &mut Window,
@@ -701,6 +746,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
             Some(GroupedRow::Header { .. }) => div().h_full().into_any_element(),
             Some(GroupedRow::Item(item)) => {
                 let column_width = self.column(col_ix, cx).width;
+                let is_checking = self.controller.read(cx).is_checking(&item.id);
                 render_list_item_cell(item,
                                       col_ix,
                                       &colors,
@@ -708,7 +754,8 @@ impl TableDelegate for GroupedCatalogListDelegate {
                                       &self.controller,
                                       &self.tabs,
                                       column_width,
-                                      window)
+                                      window,
+                                      is_checking)
             }
             None => div().into_any_element(),
         }
@@ -844,6 +891,7 @@ impl CatalogView {
                                  this.controller.update(cx, |ctrl, cx| {
                                                     ctrl.clear_selection(cx);
                                                     ctrl.clear_item_selection(&id, cx);
+                                                    ctrl.maybe_check_item(Arc::clone(&id), cx);
                                                 });
                              }
                          }
@@ -897,6 +945,7 @@ impl CatalogView {
                                  this.controller.update(cx, |ctrl, cx| {
                                                     ctrl.clear_selection(cx);
                                                     ctrl.clear_item_selection(&id, cx);
+                                                    ctrl.maybe_check_item(Arc::clone(&id), cx);
                                                 });
                              }
                          }
@@ -1049,12 +1098,11 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement =
-            match (snap.presentation, snap.grouped) {
-                // ── List, ungrouped — DataTable (handles header/row alignment) ──
-                (CatalogPresentation::List, false) => {
-                    use gpui_component::Size;
-                    root.px(pad_side)
+        let content: AnyElement = match (snap.presentation, snap.grouped) {
+            // ── List, ungrouped — DataTable (handles header/row alignment) ──
+            (CatalogPresentation::List, false) => {
+                use gpui_component::Size;
+                root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1062,15 +1110,15 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-                }
+            }
 
-                // ── List, grouped — DataTable over a flattened header/item row
-                // list, so it gets the same virtualization as the ungrouped
-                // branch instead of hand-rolled, fully-materialized rows ──
-                (CatalogPresentation::List, true) => {
-                    use gpui_component::Size;
-                    self.grouped_items(cx);
-                    root.px(pad_side)
+            // ── List, grouped — DataTable over a flattened header/item row
+            // list, so it gets the same virtualization as the ungrouped
+            // branch instead of hand-rolled, fully-materialized rows ──
+            (CatalogPresentation::List, true) => {
+                use gpui_component::Size;
+                self.grouped_items(cx);
+                root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_grouped_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1078,92 +1126,114 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-                }
+            }
 
-                // ── Thumbs, ungrouped — virtualized ───────────────────────────
-                (CatalogPresentation::Thumbs, false) => {
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let s = storage_root.clone();
-                    let t = tabs_entity.clone();
-                    root.px(pad_side)
-                        .child(
-                               div().relative()
-                                    .flex_1()
-                                    .min_h_0()
-                                    .child(
-                        uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
-                            let items = ctrl.read(cx).visible_items_slice(range);
-                            let covers: Vec<Option<Arc<Image>>> = {
-                                let cache = cx.global::<CoverCache>();
-                                items.iter().map(|item| cache.get(&item.id)).collect()
-                            };
-                            items.iter()
-                                 .zip(covers)
-                                 .map(|(item, cover)| {
-                                     render_thumb_row(item,
+            // ── Thumbs, ungrouped — virtualized ───────────────────────────
+            (CatalogPresentation::Thumbs, false) => {
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                let t = tabs_entity.clone();
+                root.px(pad_side)
+                    .child(div().relative()
+                                .flex_1()
+                                .min_h_0()
+                                .child(uniform_list("catalog-thumbs",
+                                                    item_count,
+                                                    move |range, window, cx| {
+                                                        let items = ctrl.read(cx)
+                                                                        .visible_items_slice(range);
+                                                        let covers: Vec<Option<Arc<Image>>> = {
+                                                            let cache = cx.global::<CoverCache>();
+                                                            items.iter()
+                                                                 .map(|item| cache.get(&item.id))
+                                                                 .collect()
+                                                        };
+                                                        let checking: Vec<bool> = {
+                                                            let ctrl_ref = ctrl.read(cx);
+                                                            items.iter()
+                                                                 .map(|item| {
+                                                                     ctrl_ref.is_checking(&item.id)
+                                                                 })
+                                                                 .collect()
+                                                        };
+                                                        items.iter()
+                                                             .zip(covers)
+                                                             .zip(checking)
+                                                             .map(|((item, cover), is_checking)| {
+                                                                 render_thumb_row(item,
                                                       cover,
                                                       &c,
                                                       &d,
                                                       ctrl.clone(),
                                                       t.clone(),
                                                       s.clone(),
-                                                      window).into_any_element()
-                                 })
-                                 .collect()
-                        }).track_scroll(&scroll_handle)
-                          .size_full(),
-                    )
-                                    .vertical_scrollbar(&scroll_handle),
-                    )
-                        .into_any_element()
-                }
+                                                      window,
+                                                      is_checking).into_any_element()
+                                                             })
+                                                             .collect()
+                                                    }).track_scroll(&scroll_handle)
+                                                      .size_full())
+                                .vertical_scrollbar(&scroll_handle))
+                    .into_any_element()
+            }
 
-                // ── Thumbs, grouped — non-virtualized ─────────────────────────
-                (CatalogPresentation::Thumbs, true) => {
-                    let groups = self.grouped_items(cx);
-                    let cover_cache = {
-                        let cache = cx.global::<CoverCache>();
-                        cache.images.clone()
-                    };
-                    root.overflow_y_scrollbar()
-                        .px(pad_side)
-                        .children(groups.into_iter().map(|g| {
-                            let c = colors.clone();
-                            let d = density.clone();
-                            let e = self.controller.clone();
-                            let t = tabs_entity.clone();
-                            let s = storage_root.clone();
-                            let cc = cover_cache.clone();
-                            // Reborrow as `&Window` (Copy) so the nested
-                            // `move` closure can capture it on every
-                            // outer iteration without moving `window`.
-                            let window: &Window = &*window;
-                            div().child(render_group_header(&g.publisher, g.items.len(), &c))
-                                 .children(g.items.into_iter().map(move |item| {
-                                                                  let cover =
-                                                                      cc.get(&item.id).cloned();
-                                                                  render_thumb_row(&item,
+            // ── Thumbs, grouped — non-virtualized ─────────────────────────
+            (CatalogPresentation::Thumbs, true) => {
+                let groups = self.grouped_items(cx);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
+                let checking_items = self.controller.read(cx).checking_items_snapshot();
+                root.overflow_y_scrollbar()
+                    .px(pad_side)
+                    .children(groups.into_iter().map(|g| {
+                                                    let c = colors.clone();
+                                                    let d = density.clone();
+                                                    let e = self.controller.clone();
+                                                    let t = tabs_entity.clone();
+                                                    let s = storage_root.clone();
+                                                    let cc = cover_cache.clone();
+                                                    let checking_items = checking_items.clone();
+                                                    // Reborrow as `&Window` (Copy) so the nested
+                                                    // `move` closure can capture it on every
+                                                    // outer iteration without moving `window`.
+                                                    let window: &Window = &*window;
+                                                    div().child(render_group_header(&g.publisher,
+                                                                                    g.items.len(),
+                                                                                    &c))
+                                                         .children(g.items
+                                                                    .into_iter()
+                                                                    .map(move |item| {
+                                                                        let cover =
+                                                                            cc.get(&item.id)
+                                                                              .cloned();
+                                                                        let is_checking =
+                                                                      checking_items
+                                                                          .contains(&item.id);
+                                                                        render_thumb_row(&item,
                                                                                    cover,
                                                                                    &c,
                                                                                    &d,
                                                                                    e.clone(),
                                                                                    t.clone(),
                                                                                    s.clone(),
-                                                                                   window)
-                                                              }))
-                        }))
-                        .into_any_element()
-                }
+                                                                                   window,
+                                                                                   is_checking)
+                                                                    }))
+                                                }))
+                    .into_any_element()
+            }
 
-                // ── Grid, ungrouped — row-virtualized ─────────────────────────
-                (CatalogPresentation::Grid, false) => {
-                    let row_count = item_count.div_ceil(items_per_row);
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let s = storage_root.clone();
-                    let t = tabs_entity.clone();
-                    root.px(pad_side)
+            // ── Grid, ungrouped — row-virtualized ─────────────────────────
+            (CatalogPresentation::Grid, false) => {
+                let row_count = item_count.div_ceil(items_per_row);
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                let t = tabs_entity.clone();
+                root.px(pad_side)
                         .child(
                                div().relative()
                                     .flex_1()
@@ -1178,17 +1248,23 @@ impl Render for CatalogView {
                                 let cache = cx.global::<CoverCache>();
                                 items.iter().map(|item| cache.get(&item.id)).collect()
                             };
+                            let checking: Vec<bool> = {
+                                let ctrl_ref = ctrl.read(cx);
+                                items.iter().map(|item| ctrl_ref.is_checking(&item.id)).collect()
+                            };
                             row_range.map(|row| {
                                          let offset = (row - range_start) * items_per_row;
                                          let row_end = (offset + items_per_row).min(items.len());
                                          let row_items = &items[offset..row_end];
                                          let row_covers = &covers[offset..row_end];
+                                         let row_checking = &checking[offset..row_end];
                                          div().flex()
                                               .gap(d.card_gap_x)
                                               .mb(d.card_gap_y)
                                               .children(row_items.iter()
                                                                  .zip(row_covers.iter())
-                                                                 .map(|(item, cover)| {
+                                                                 .zip(row_checking.iter())
+                                                                 .map(|((item, cover), &is_checking)| {
                                                                      render_grid_card(
                                                                     item,
                                                                     cover.clone(),
@@ -1198,6 +1274,7 @@ impl Render for CatalogView {
                                                                     t.clone(),
                                                                     s.clone(),
                                                                     window,
+                                                                    is_checking,
                                                                 )
                                                                  }))
                                               .into_any_element()
@@ -1209,30 +1286,35 @@ impl Render for CatalogView {
                                     .vertical_scrollbar(&scroll_handle),
                     )
                         .into_any_element()
-                }
+            }
 
-                // ── Grid, grouped — non-virtualized ───────────────────────────
-                (CatalogPresentation::Grid, true) => {
-                    let groups = self.grouped_items(cx);
-                    let cover_cache = {
-                        let cache = cx.global::<CoverCache>();
-                        cache.images.clone()
-                    };
-                    root.overflow_y_scrollbar()
-                        .px(pad_side)
-                        .children(groups.into_iter().map(|g| {
-                            let c = colors.clone();
-                            let d = density.clone();
-                            let e = self.controller.clone();
-                            let t = tabs_entity.clone();
-                            let s = storage_root.clone();
-                            let cc = cover_cache.clone();
-                            div().child(render_group_header(&g.publisher, g.items.len(), &c))
-                                 .child(render_grid(g.items, cc, c, d, e, t, s, &*window))
-                        }))
-                        .into_any_element()
-                }
-            };
+            // ── Grid, grouped — non-virtualized ───────────────────────────
+            (CatalogPresentation::Grid, true) => {
+                let groups = self.grouped_items(cx);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
+                let checking_items = self.controller.read(cx).checking_items_snapshot();
+                root.overflow_y_scrollbar()
+                    .px(pad_side)
+                    .children(groups.into_iter().map(|g| {
+                                                    let c = colors.clone();
+                                                    let d = density.clone();
+                                                    let e = self.controller.clone();
+                                                    let t = tabs_entity.clone();
+                                                    let s = storage_root.clone();
+                                                    let cc = cover_cache.clone();
+                                                    let ci = checking_items.clone();
+                                                    div().child(render_group_header(&g.publisher,
+                                                                                    g.items.len(),
+                                                                                    &c))
+                                                         .child(render_grid(g.items, cc, ci, c, d,
+                                                                            e, t, s, &*window))
+                                                }))
+                    .into_any_element()
+            }
+        };
 
         let mut result =
             outer.relative()
@@ -1253,11 +1335,13 @@ impl Render for CatalogView {
                                               px(ITEM_POPOVER_WIDTH),
                                               px(ITEM_POPOVER_MARGIN),
                                               window.viewport_size().width);
+            let is_checking = self.controller.read(cx).is_checking(&item.id);
             result = result.child(render_item_popover(item,
                                                       anchor,
                                                       self.controller.clone(),
                                                       tabs_entity.clone(),
-                                                      &colors));
+                                                      &colors,
+                                                      is_checking));
         }
 
         result.into_any_element()
@@ -1392,7 +1476,8 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 #[allow(clippy::too_many_arguments)]
 fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     density: &DensityConstants, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
+                    is_checking: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1517,7 +1602,9 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                               .child(div().text_xs().text_color(colors.text_tertiary).child(kind))
                               .child(div().text_xs()
                                           .text_color(colors.text_tertiary)
-                                          .child(format!("{pages} pp · {size_mb:.0} MB · {year}"))))
+                                          .child(format!("{pages} pp · {size_mb:.0} MB · {year}")))
+                              .children(render_unavailable_badge(item, &colors))
+                              .children(render_checking_indicator(is_checking)))
          })
          .child(render_status(status, &colors))
          .child(ctx_menu)
@@ -1610,9 +1697,9 @@ fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem,
 // delegates' own parameter lists.
 #[allow(clippy::too_many_arguments)]
 fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image>>,
-               colors: ColorTokens, density: DensityConstants,
-               entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-               storage_root_path: PathBuf, window: &Window)
+               checking_items: HashSet<Arc<str>>, colors: ColorTokens,
+               density: DensityConstants, entity: Entity<LibraryController>,
+               tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
                -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -1624,6 +1711,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
          .mb(gap_y)
          .children(items.into_iter().map(|item| {
                                         let cover = cover_cache.get(&item.id).cloned();
+                                        let is_checking = checking_items.contains(&item.id);
                                         render_grid_card(&item,
                                                          cover,
                                                          &colors,
@@ -1631,7 +1719,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
                                                          entity.clone(),
                                                          tabs.clone(),
                                                          storage_root_path.clone(),
-                                                         window)
+                                                         window,
+                                                         is_checking)
                                     }))
 }
 
@@ -1640,7 +1729,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
 #[allow(clippy::too_many_arguments)]
 fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     card_w: f32, entity: Entity<LibraryController>,
-                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
+                    tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
+                    is_checking: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1709,6 +1799,12 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
         let mut inner = div().relative().child(cover);
         if let Some(badge) = render_item_count_badge(item, &colors) {
             inner = inner.child(div().absolute().bottom(px(2.0)).right(px(2.0)).child(badge));
+        }
+        if let Some(badge) = render_unavailable_badge(item, &colors) {
+            inner = inner.child(div().absolute().top(px(2.0)).left(px(2.0)).child(badge));
+        }
+        if let Some(spinner) = render_checking_indicator(is_checking) {
+            inner = inner.child(div().absolute().top(px(2.0)).right(px(2.0)).child(spinner));
         }
         if status == ItemStatus::Downloaded {
             Badge::new().dot()

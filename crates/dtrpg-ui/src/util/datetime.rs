@@ -113,6 +113,23 @@ pub fn parse_rfc3339_to_epoch(input: &str) -> Option<i64> {
                                        .map(|dt| dt.timestamp())
 }
 
+/// Formats a Unix timestamp as an RFC 3339 / ISO 8601 string in UTC (e.g.
+/// `2024-07-16T15:45:52+00:00`), the inverse of [`parse_rfc3339_to_epoch`].
+///
+/// Returns `None` if `epoch` is out of chrono's representable timestamp
+/// range.
+///
+/// # Examples
+///
+/// ```
+/// let iso = dtrpg_ui::util::datetime::epoch_to_rfc3339(1_721_144_752);
+/// assert_eq!(iso, Some("2024-07-16T15:45:52+00:00".to_string()));
+/// ```
+#[must_use]
+pub fn epoch_to_rfc3339(epoch: i64) -> Option<String> {
+    DateTime::from_timestamp(epoch, 0).map(|dt| dt.to_rfc3339())
+}
+
 /// Formats a Unix timestamp as a full absolute date/time string.
 ///
 /// Output format: "Month D, YYYY at H:MM AM/PM" (e.g. "January 5, 2024 at 3:42

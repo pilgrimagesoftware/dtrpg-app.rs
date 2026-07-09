@@ -295,6 +295,10 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                 t!("menu.catalog_refresh_thumbnails").to_string(),
                 RefreshThumbnails,
             ),
+            MenuItem::action(
+                t!("menu.catalog_check_availability").to_string(),
+                CheckItemAvailability,
+            ),
         ]),
         Menu::new(t!("menu.edit_title").to_string()).items([
             MenuItem::os_action(t!("menu.edit_undo").to_string(), Undo, OsAction::Undo),

@@ -26,6 +26,7 @@ use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::{cover_style, render_generative_cover};
+use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::matching::{collection_member_id, member_ids_contain};
@@ -51,6 +52,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let text_secondary = colors.text_secondary;
 
     let item = item.clone();
+    let is_checking = entity.read(cx).is_checking(&item.id);
     let entity_download = entity.clone();
     let entity_refresh_thumbnail = entity.clone();
     let entity_other_details = entity.clone();
@@ -144,7 +146,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                             .text_color(text_primary)
                                             .child(item.title.to_string()),
                                     )
-                                    .child(render_status_icon(is_downloaded, text_secondary)),
+                                    .child(render_status_icon(is_downloaded, text_secondary))
+                                    .children(render_checking_indicator(is_checking)),
                             )
                             .child(
                                 div()

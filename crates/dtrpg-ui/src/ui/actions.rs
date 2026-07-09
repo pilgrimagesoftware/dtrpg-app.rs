@@ -17,7 +17,11 @@ actions!(libri,
 actions!(libri, [Minimize, Zoom, ToggleFullscreen]);
 
 // Catalog menu actions
-actions!(libri, [AddCollection, ReloadCatalog, RefreshThumbnails]);
+actions!(libri,
+         [AddCollection,
+          ReloadCatalog,
+          RefreshThumbnails,
+          CheckItemAvailability]);
 
 // Collection context menu actions
 #[derive(Clone, Debug, PartialEq, Deserialize, JsonSchema, gpui::Action)]

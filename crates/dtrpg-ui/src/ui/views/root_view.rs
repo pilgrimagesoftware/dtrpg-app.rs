@@ -16,11 +16,11 @@ use gpui_component::{IconName, Sizable as _};
 use rust_i18n::t;
 
 use crate::ui::actions::{
-    About, AddCollection, FocusSearch, RefreshThumbnails, ReloadCatalog, SelectTab0, SelectTab1,
-    SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6, SelectTab7, SelectTab8, SelectTab9,
-    ShowActivity, ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded, SortByPages,
-    SortByPublisher, SortByTitle, SortDescending, ToggleGroupByPublisher, ViewAsGrid, ViewAsList,
-    ViewAsThumbs,
+    About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
+    SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6, SelectTab7,
+    SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending,
+    SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
+    ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
@@ -719,6 +719,7 @@ impl Render for LibraryRootView {
         let this_entity = cx.entity();
         let controller_for_reload = self.controller.clone();
         let controller_for_refresh_thumbnails = self.controller.clone();
+        let controller_for_check_availability = self.controller.clone();
         let controller_for_add = self.controller.clone();
         let collection_input_for_add = self.collection_name_input.clone();
         let activity_for_show = self.activity.clone();
@@ -818,6 +819,10 @@ impl Render for LibraryRootView {
             .on_action(move |_: &RefreshThumbnails, _, cx| {
                 controller_for_refresh_thumbnails
                     .update(cx, |ctrl, cx| ctrl.refresh_all_thumbnails(cx));
+            })
+            .on_action(move |_: &CheckItemAvailability, _, cx| {
+                controller_for_check_availability
+                    .update(cx, |ctrl, cx| ctrl.request_check_batch(cx));
             })
             .on_action(move |_: &ViewAsList, _, cx| {
                 controller_for_view_list.update(cx, |ctrl, cx| {

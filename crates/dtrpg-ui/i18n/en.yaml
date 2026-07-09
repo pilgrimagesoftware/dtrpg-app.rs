@@ -64,6 +64,8 @@ catalog:
   action_show_in_explorer: "Show in Explorer"
   action_show_in_files: "Show in Files"
   action_manage_collections: "Manage collections…"
+  unavailable_badge: "Unavailable"
+  unavailable_badge_tooltip: "This item was not returned by the server on the most recent sync. It stays in your library, but availability could not be confirmed."
 
 detail:
   read_button: "Read"
@@ -164,6 +166,7 @@ activity:
   loading_library_collections: "Loading library: getting collections…"
   loading_library_count: "Loading library: getting count of items…"
   loading_library_page: "Loading library: page %{page}…"
+  loading_library_partial: "Loading library: checking for updates…"
   loading_collections: "Loading collections…"
 
 alert_history:
@@ -197,6 +200,7 @@ menu:
   catalog_add_collection: "Add Collection…"
   catalog_reload: "Reload"
   catalog_refresh_thumbnails: "Refresh Thumbnails"
+  catalog_check_availability: "Check for Updates"
   edit_title: "Edit"
   edit_undo: "Undo"
   edit_redo: "Redo"

@@ -39,7 +39,7 @@ use crate::util::datetime::{format_absolute, format_relative};
 /// catalog entry rather than over it.
 pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                            entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-                           colors: &ColorTokens)
+                           colors: &ColorTokens, is_checking: bool)
                            -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
@@ -105,6 +105,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                                 .child(publisher),
                         ),
                 )
+                .children(crate::ui::views::catalog_view::render_checking_indicator(is_checking))
                 .child(
                     Button::new("item-popover-close")
                         .ghost()
@@ -204,8 +205,10 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                             // Reopening a detail tab must show no pre-selected
                             // item (selection is ephemeral, see
                             // `catalog-entry-detail-view`).
-                            entity_open_detail
-                                .update(cx, |ctrl, cx| ctrl.clear_item_selection(&id, cx));
+                            entity_open_detail.update(cx, |ctrl, cx| {
+                                                  ctrl.clear_item_selection(&id, cx);
+                                                  ctrl.maybe_check_item(Arc::clone(&id), cx);
+                                              });
                         }),
                 ),
         );

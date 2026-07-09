@@ -30,6 +30,41 @@ pub const CATALOG_CACHE_TMP: &str = "catalog_cache.json.tmp";
 pub const CATALOG_CACHE_METADATA_FILE: &str = "catalog_cache_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
+/// Minimum interval between user-requested full catalog reloads ("Catalog >
+/// Reload"), keyed off `CacheMetadata::saved_at_secs`.
+///
+/// Distinct from the on-disk cache's 7-day passive staleness window (see
+/// `catalog_cache::STALE_SECS`): that constant answers "is the cached data
+/// old enough that a *passive* load should refresh it," while this one
+/// answers "was a *manual* reload already attempted moments ago." 60 seconds
+/// is long enough to absorb accidental double-invocations (a stuck keybinding
+/// or an impatient double-click) without meaningfully delaying a deliberate
+/// second reload.
+pub const FORCE_RELOAD_COOLDOWN_SECS: u64 = 60;
+
+/// Minimum interval between re-checking the same catalog item's availability
+/// against the server (on-demand, via viewing its details).
+///
+/// Short enough that a check still feels "fresh" relative to a browsing
+/// session; long enough to absorb a user repeatedly reopening the same
+/// item's detail view without issuing a redundant network call each time.
+pub const ITEM_CHECK_COOLDOWN_SECS: u64 = 300;
+
+/// Minimum interval between per-item availability check batches, whether
+/// triggered manually or by the automatic periodic timer. Shared by both
+/// triggers so neither can flood the API by stacking on top of the other.
+pub const ITEM_CHECK_BATCH_COOLDOWN_SECS: u64 = 900;
+
+/// Maximum number of items selected into a single availability check batch.
+pub const ITEM_CHECK_BATCH_SIZE: usize = 50;
+
+/// Interval between wake-ups of the automatic periodic check-batch timer
+/// loop. Independent of `ITEM_CHECK_BATCH_COOLDOWN_SECS` — this is how often
+/// the loop *wakes up to ask*, not how often a batch is actually allowed to
+/// run; each wake calls `request_check_batch`, which applies the real
+/// cooldown gate.
+pub const ITEM_CHECK_BATCH_TIMER_SECS: u64 = 300;
+
 /// Reverse-DNS service namespace used for all keyring entries.
 pub const KEYRING_SERVICE: &str = MACOS_BUNDLE_ID;
 

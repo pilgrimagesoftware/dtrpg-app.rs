@@ -8,6 +8,15 @@ against the server response, not overwritten by it — new items get added, item
 returned by the server get flagged instead of deleted, and previously-flagged items that
 reappear get un-flagged.
 
+This behavior is not Rust-specific: `dtrpg-app/openspec/changes/catalog-remote-sync-reconciliation`
+defines it as a shared, language-neutral capability
+(`shared-catalog-remote-sync-reconciliation`) that both the Rust and Swift frontends must
+satisfy. This change is the Rust-specific child implementation of that shared capability —
+the reconciliation model, availability flag, load-trigger cooldowns, item-level checks, and
+startup fetch-strategy decision below are all constrained by the parent's outcome-oriented
+scenarios; the concrete data structures, field names, constants, and gpui-specific mechanics
+are this repository's own implementation choices.
+
 ## What Changes
 
 - Add an `is_available` flag (default `true`) to `LibraryItem`, persisted in the disk cache.
