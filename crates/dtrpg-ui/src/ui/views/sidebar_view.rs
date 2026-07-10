@@ -19,7 +19,9 @@ use gpui_component::menu::{ContextMenuExt, PopupMenuItem};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
-use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as _, WindowExt as _};
+use gpui_component::{
+    ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as _, WindowExt as _,
+};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -283,9 +285,8 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                            let collection_name = row_name_for_delete.clone();
                            move |_, window, cx| {
                                let entity = entity.clone();
-                               let title =
-                                   t!("collections.delete_confirm_title",
-                                      name = collection_name).to_string();
+                               let title = t!("collections.delete_confirm_title",
+                                              name = collection_name).to_string();
                                window.open_alert_dialog(cx, move |alert, _, _| {
                                          let entity = entity.clone();
                                          alert.confirm()
