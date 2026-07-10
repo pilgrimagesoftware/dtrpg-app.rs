@@ -323,10 +323,12 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let mut item = make_item("b1");
         item.files = vec![LibraryItemFile { id:      "1234".into(),
+                                            index:   0,
                                             name:    "Moria Rulebook".into(),
                                             format:  "PDF".into(),
                                             size_mb: 1.0, },
                           LibraryItemFile { id:      "1234".into(),
+                                            index:   0,
                                             name:    "Moria Rulebook".into(),
                                             format:  "PDF".into(),
                                             size_mb: 1.0, },];

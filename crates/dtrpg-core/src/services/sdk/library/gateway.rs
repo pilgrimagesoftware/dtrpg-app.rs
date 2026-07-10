@@ -28,6 +28,16 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// Returns [`LibraryServiceError`] on network, session, or not-found
     /// failures.
     fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError>;
+
+    /// Prepares a download for the given ordered product's file, returning
+    /// the raw API response (see [`SdkLibraryClient::prepare_download`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LibraryServiceError`] on network or session failures.
+    fn prepare_download(&self, order_product_id: u64,
+                        index: u32)
+                        -> Result<serde_json::Value, LibraryServiceError>;
 }
 
 pub(super) struct HttpSdkLibraryGateway {
@@ -66,6 +76,14 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
             .block_on(self.client.get_order_product(id))
             .map_err(map_client_error)
     }
+
+    fn prepare_download(&self, order_product_id: u64,
+                        index: u32)
+                        -> Result<serde_json::Value, LibraryServiceError> {
+        self.runtime
+            .block_on(self.client.prepare_download(order_product_id, index))
+            .map_err(map_client_error)
+    }
 }
 
 pub(super) struct UnavailableSdkGateway {
@@ -85,6 +103,12 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
     }
 
     fn get_order_product(&self, _id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
+        Err(self.error.clone())
+    }
+
+    fn prepare_download(&self, _order_product_id: u64,
+                        _index: u32)
+                        -> Result<serde_json::Value, LibraryServiceError> {
         Err(self.error.clone())
     }
 }

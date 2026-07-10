@@ -1,5 +1,6 @@
 //! Rust SDK-backed implementation of [`LibraryService`].
 
+mod download;
 mod errors;
 mod gateway;
 mod mapping;
@@ -237,6 +238,12 @@ impl LibraryService for RustSdkLibraryService {
                  Ok(())
              })())
     }
+
+    fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
+                     cancel: &std::sync::atomic::AtomicBool)
+                     -> Result<(), LibraryServiceError> {
+        download::download_item(self.gateway.as_ref(), order_product_id, index, dest, cancel)
+    }
 }
 
 #[cfg(test)]
@@ -294,6 +301,12 @@ mod tests {
                              -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
         }
+
+        fn prepare_download(&self, _order_product_id: u64,
+                            _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
+        }
     }
 
     /// Returns pages in order: first call gets page 1 with a `next` link,
@@ -328,6 +341,12 @@ mod tests {
 
         fn get_order_product(&self, _id: u64)
                              -> Result<OrderProductItemResponse, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
+        }
+
+        fn prepare_download(&self, _order_product_id: u64,
+                            _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
             Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
     }

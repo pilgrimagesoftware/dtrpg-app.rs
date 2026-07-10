@@ -154,6 +154,7 @@ fn map_files(files: &[OrderProductFile]) -> Vec<LibraryItemFile> {
     files.iter()
          .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
          .map(|f| LibraryItemFile { id:      f.order_product_download_id.to_string().into(),
+                                    index:   f.index,
                                     name:    f.title.as_str().into(),
                                     format:
                                         file_extension_label(&f.filename).unwrap_or_else(|| {
@@ -276,6 +277,13 @@ mod tests {
         fn get_order_product(&self, _id: u64)
                              -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
+        }
+
+        fn prepare_download(&self, _order_product_id: u64,
+                            _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            Err(LibraryServiceError::new(dtrpg_ui::services::LibraryServiceErrorKind::NotFound,
+                                         "not used"))
         }
     }
 

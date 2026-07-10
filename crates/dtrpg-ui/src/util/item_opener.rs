@@ -157,6 +157,7 @@ mod tests {
 
     fn make_file(name: &str) -> LibraryItemFile {
         LibraryItemFile { id:      name.into(),
+                          index:   0,
                           name:    name.into(),
                           format:  "PDF".into(),
                           size_mb: 1.0, }

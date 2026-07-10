@@ -150,6 +150,28 @@ pub trait LibraryService: Send + Sync + 'static {
         let _ = (since_iso8601, on_page);
         None
     }
+
+    /// Downloads a single file to `dest`, writing to a `{dest}.part` temp
+    /// path and renaming to `dest` only once the transfer completes in full.
+    ///
+    /// `order_product_id` and `index` identify the file per the download
+    /// preparation API (`index` is the file's position within its entry's
+    /// file list, i.e. [`crate::data::library::LibraryItemFile::index`]).
+    ///
+    /// `cancel` is polled during the transfer; once set, the transfer stops
+    /// promptly, `{dest}.part` is deleted, and an error is returned. Callers
+    /// that already track cancellation via the same flag (see
+    /// `download-queue`) can treat any error alongside an already-set `cancel`
+    /// as an expected cancellation rather than a real failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LibraryServiceError`] on any preparation, network, or I/O
+    /// failure, or if the transfer is cancelled. `dest` is left untouched
+    /// (never partially written) on any error path.
+    fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
+                     cancel: &std::sync::atomic::AtomicBool)
+                     -> Result<(), LibraryServiceError>;
 }
 
 // ── LoginService

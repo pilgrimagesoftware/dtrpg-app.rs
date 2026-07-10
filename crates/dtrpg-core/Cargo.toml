@@ -38,6 +38,7 @@ rust-embed = { workspace = true }
 sentry = { workspace = true, optional = true }
 sentry-tracing = { workspace = true, optional = true }
 serde_json = { workspace = true }
+reqwest = { workspace = true }
 
 [features]
 # Enables Sentry crash/error reporting. Compiled in only for CI-built release
