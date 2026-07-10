@@ -48,11 +48,15 @@ The Rust desktop app MUST provide an account button menu or equivalent compact p
 - **THEN** no dropdown menu with identity information is shown
 
 ### Requirement: Rust sync and thumbnail loading MUST be non-blocking
-The Rust desktop app MUST keep background library sync and thumbnail loading from blocking main-window interaction.
+The Rust desktop app MUST keep background library sync and thumbnail loading from blocking main-window interaction. The number of concurrent background fetch operations (thumbnail loads and file downloads combined) MUST be bounded by a user-configurable limit, defaulting to 3, so that aggressive fetching does not degrade UI responsiveness.
 
 #### Scenario: Syncing or loading thumbnails in Rust
 - **WHEN** the Rust app syncs library metadata or resolves grid thumbnails
 - **THEN** the user can continue interacting with library controls and visible title/size metadata
+
+#### Scenario: Concurrency limit enforced during heavy load
+- **WHEN** more thumbnail fetches or downloads are pending than the configured limit allows
+- **THEN** the excess requests wait in their respective queues and the main window remains responsive
 
 ### Requirement: Catalog pane fills remaining horizontal space without a resize handle
 The catalog pane SHALL occupy all horizontal space between the sidebar and the right window edge. There SHALL be no resize splitter between the catalog and the detail panel. The detail panel SHALL be an overlay or fixed-width panel that does not reduce catalog width.
