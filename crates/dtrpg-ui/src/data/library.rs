@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
+use crate::data::constants::{RECENTLY_ADDED_THRESHOLD, THUMBNAIL_COOLDOWN_SECS};
 use crate::data::enums::ItemStatus;
 
 // ── LibraryItem
@@ -203,8 +203,6 @@ pub fn section_counts(catalog: &[LibraryItem]) -> SectionCounts {
 
 // ── Thumbnail cooldown
 // ────────────────────────────────────────────────────────
-
-const THUMBNAIL_COOLDOWN_SECS: u64 = 300;
 
 /// Returns `true` if no thumbnail fetch has been attempted, or the last attempt
 /// was more than 5 minutes ago.

@@ -14,15 +14,9 @@ use gpui_component::input::{Input, InputState};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
+use crate::data::constants::MONOSPACE_FONT;
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
-
-#[cfg(target_os = "macos")]
-const MONOSPACE_FONT: &str = "Menlo";
-#[cfg(target_os = "windows")]
-const MONOSPACE_FONT: &str = "Consolas";
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-const MONOSPACE_FONT: &str = "Liberation Mono";
 
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]

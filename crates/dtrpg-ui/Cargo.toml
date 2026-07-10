@@ -46,9 +46,14 @@ foreign-types = "0.5"
 # log.workspace = true
 # media.workspace = true
 # objc.workspace = true
-# objc2 = { version = "0.6", optional = true }
 # objc2-metal = { version = "0.3", optional = true }
 # mach2.workspace = true
 #TODO: replace with "objc2"
 metal.workspace = true
 gpui-component-assets.workspace = true
+# Used for OS-locale-aware absolute timestamp formatting (NSDateFormatter)
+# in `util::datetime::format_absolute` — already present in the dependency
+# tree at this exact version via `gpui-component`, so this adds no new
+# duplicate resolution.
+objc2 = "0.6"
+objc2-foundation = "0.3"

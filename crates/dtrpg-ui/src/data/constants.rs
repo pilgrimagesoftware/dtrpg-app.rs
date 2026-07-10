@@ -30,16 +30,19 @@ pub const CATALOG_CACHE_TMP: &str = "catalog_cache.json.tmp";
 pub const CATALOG_CACHE_METADATA_FILE: &str = "catalog_cache_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
+/// 7 days in seconds — caches older than this are considered stale.
+pub const STALE_SECS: u64 = 7 * 24 * 60 * 60;
+
 /// Minimum interval between user-requested full catalog reloads ("Catalog >
 /// Reload"), keyed off `CacheMetadata::saved_at_secs`.
 ///
 /// Distinct from the on-disk cache's 7-day passive staleness window (see
-/// `catalog_cache::STALE_SECS`): that constant answers "is the cached data
-/// old enough that a *passive* load should refresh it," while this one
-/// answers "was a *manual* reload already attempted moments ago." 60 seconds
-/// is long enough to absorb accidental double-invocations (a stuck keybinding
-/// or an impatient double-click) without meaningfully delaying a deliberate
-/// second reload.
+/// [`STALE_SECS`]): that constant answers "is the cached data old enough
+/// that a *passive* load should refresh it," while this one answers "was a
+/// *manual* reload already attempted moments ago." 60 seconds is long enough
+/// to absorb accidental double-invocations (a stuck keybinding or an
+/// impatient double-click) without meaningfully delaying a deliberate second
+/// reload.
 pub const FORCE_RELOAD_COOLDOWN_SECS: u64 = 60;
 
 /// Minimum interval between re-checking the same catalog item's availability
@@ -64,6 +67,13 @@ pub const ITEM_CHECK_BATCH_SIZE: usize = 50;
 /// run; each wake calls `request_check_batch`, which applies the real
 /// cooldown gate.
 pub const ITEM_CHECK_BATCH_TIMER_SECS: u64 = 300;
+
+/// Minimum interval between cover thumbnail fetch attempts for the same item.
+///
+/// Absorbs re-render churn (e.g. scrolling an item back into view) without
+/// hammering the thumbnail source on every frame the item happens to be
+/// visible.
+pub const THUMBNAIL_COOLDOWN_SECS: u64 = 300;
 
 /// Reverse-DNS service namespace used for all keyring entries.
 pub const KEYRING_SERVICE: &str = MACOS_BUNDLE_ID;
@@ -109,3 +119,36 @@ pub const DETAIL_TAB_TITLE_MAX_CHARS: usize = 40;
 pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
 /// Gap between the item popover and the catalog entry it's anchored beside.
 pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
+
+/// Platform-appropriate sans-serif font, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the app's
+/// default serif body font (`Hoefler Text`, set in `app::setup`).
+///
+/// Optima rather than a geometric sans like Helvetica Neue: its flared,
+/// slightly calligraphic stroke terminals read as a companion to Hoefler
+/// Text's old-style serif warmth instead of a jarring stylistic clash.
+#[cfg(target_os = "macos")]
+pub const VALUE_FONT: &str = "Optima";
+/// Platform-appropriate sans-serif font, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the app's
+/// default serif body font (`Hoefler Text`, set in `app::setup`).
+#[cfg(target_os = "windows")]
+pub const VALUE_FONT: &str = "Segoe UI";
+/// Platform-appropriate sans-serif font, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the app's
+/// default serif body font (`Hoefler Text`, set in `app::setup`).
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const VALUE_FONT: &str = "DejaVu Sans";
+
+/// Platform-appropriate monospace font, used for fixed-width data such as
+/// the masked API key hint.
+#[cfg(target_os = "macos")]
+pub const MONOSPACE_FONT: &str = "Menlo";
+/// Platform-appropriate monospace font, used for fixed-width data such as
+/// the masked API key hint.
+#[cfg(target_os = "windows")]
+pub const MONOSPACE_FONT: &str = "Consolas";
+/// Platform-appropriate monospace font, used for fixed-width data such as
+/// the masked API key hint.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const MONOSPACE_FONT: &str = "Liberation Mono";

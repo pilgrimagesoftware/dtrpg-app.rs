@@ -1679,6 +1679,8 @@ dependencies = [
  "keyring",
  "md5",
  "metal",
+ "objc2 0.6.4",
+ "objc2-foundation 0.3.2",
  "open",
  "pretty_assertions",
  "reqwest 0.12.28",

@@ -7,16 +7,37 @@ use gpui::{Context, Entity, EventEmitter};
 use gpui_component::input::InputState;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
-use crate::data::avatar::fetch_avatar_bytes;
+use crate::data::avatar::{avatar_cached, fetch_avatar_bytes};
+use crate::data::catalog_cache::load_cache_metadata;
 use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::events::{
     CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun,
     StartupAuthFailed,
 };
 use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use crate::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use crate::data::profile::ProfileConfig;
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 use crate::services::LoginService;
+
+/// Per-type counts of regenerable app cache data, computed on demand from
+/// disk — see [`SettingsController::cache_counts`].
+#[derive(Clone, Copy, Default)]
+pub struct CacheCounts {
+    /// Number of items in the cached catalog/collections metadata.
+    pub metadata_items:             usize,
+    /// Number of cached cover thumbnail files.
+    pub cover_thumbnails:           usize,
+    /// `true` if an avatar image is currently cached.
+    pub avatar_cached:              bool,
+    /// Unix timestamp (seconds) when the catalog/collections metadata cache
+    /// was last written. `None` when no cache metadata exists yet.
+    pub metadata_saved_at_secs:     Option<i64>,
+    /// Unix timestamp (seconds) of the last per-item availability check
+    /// batch (manual or automatic). `None` when no batch has run yet, or
+    /// predates the field being tracked.
+    pub last_item_check_batch_secs: Option<i64>,
+}
 
 // ── AuthState
 // ─────────────────────────────────────────────────────────────────
@@ -93,6 +114,9 @@ pub struct SettingsSnapshot {
     pub pending_file_opener: Option<PathBuf>,
     /// Index of the currently active settings page.
     pub active_page_ix:      usize,
+    /// Current per-type counts of cached data, for the Advanced section's
+    /// "Cache details" area.
+    pub cache_counts:        CacheCounts,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -358,13 +382,51 @@ impl SettingsController {
     ///
     /// Does not touch downloaded content, credentials, or preferences.
     pub fn clear_cache(&self, cx: &mut Context<Self>) {
-        let dir = crate::data::paths::app_cache_dir();
+        let dir = app_cache_dir();
         if let Err(e) = std::fs::remove_dir_all(&dir)
            && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
         }
         cx.emit(CacheCleared);
+    }
+
+    /// Computes current per-type cache counts by reading the cache metadata
+    /// sidecar, listing the covers directory, and checking for a cached
+    /// avatar file.
+    ///
+    /// Cheap enough to call on every render pass: a JSON sidecar read (no
+    /// full catalog parse), one `read_dir`, and one `exists()` check, all
+    /// against local app-managed paths.
+    pub fn cache_counts(&self) -> CacheCounts {
+        let metadata = load_cache_metadata(&cache_dir());
+        let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
+        let metadata_saved_at_secs =
+            metadata.as_ref()
+                    .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
+        let last_item_check_batch_secs =
+            metadata.as_ref()
+                    .and_then(|m| m.last_item_check_batch_secs)
+                    .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
+        let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
+                                                              .unwrap_or(0);
+        CacheCounts { metadata_items,
+                      cover_thumbnails,
+                      avatar_cached: avatar_cached(),
+                      metadata_saved_at_secs,
+                      last_item_check_batch_secs }
+    }
+
+    /// Opens the OS file manager at the app cache directory, creating it
+    /// first if it does not exist (a fresh install may have no cache yet).
+    pub fn open_cache_folder(&self) {
+        let dir = app_cache_dir();
+        if !dir.exists() {
+            let _ = std::fs::create_dir_all(&dir);
+        }
+        if let Err(e) = crate::util::reveal::reveal_in_file_manager(&dir) {
+            tracing::warn!("reveal_in_file_manager failed: {e}");
+        }
     }
 
     // ── Panel visibility ──────────────────────────────────────────────────────
@@ -644,7 +706,8 @@ impl SettingsController {
                            storage_path_draft: self.storage_path_draft.clone(),
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone(),
-                           active_page_ix: self.active_page_ix }
+                           active_page_ix: self.active_page_ix,
+                           cache_counts: self.cache_counts() }
     }
 }
 

@@ -13,12 +13,15 @@
 use std::path::PathBuf;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled, div, px};
+use gpui::{
+    AnyElement, Entity, FocusHandle, IntoElement, MouseButton, ParentElement, Styled, div, px,
+};
 use gpui_component::input::InputState;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
-use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
+use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
 use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::{
@@ -63,7 +66,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              sign_in_error: Option<String>,
                              storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
-                             pending_file_opener: Option<PathBuf>, active_page_ix: usize)
+                             pending_file_opener: Option<PathBuf>, active_page_ix: usize,
+                             cache_counts: CacheCounts)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -100,7 +104,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        3 => render_advanced_section(entity.clone(), colors).into_any_element(),
+        3 => render_advanced_section(entity.clone(), cache_counts, colors).into_any_element(),
         4 => render_about_section(colors).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),
@@ -112,6 +116,30 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     sign_in_error),
     };
 
+    // Reserves vertical clearance for the macOS traffic light buttons, which
+    // overlay the top-left of the window when it opens with
+    // `appears_transparent: true` (see `open_settings_window`) and no
+    // titlebar row of its own — without this, the buttons sit directly on
+    // top of the sidebar's first menu item. Also renders the window title
+    // (native title text is suppressed by `appears_transparent`) and doubles
+    // as a drag handle, matching the main library window's
+    // `title_bar_view::render_title_bar`. Shorter than that view's 44px bar
+    // since there's no account button/wordmark to balance here — just the
+    // centered title.
+    let drag_region = div().id("settings-drag-region")
+                           .h(px(28.0))
+                           .flex_none()
+                           .flex()
+                           .items_center()
+                           .justify_center()
+                           .text_sm()
+                           .font_weight(gpui::FontWeight::MEDIUM)
+                           .text_color(colors.text_primary)
+                           .child(t!("settings.title").to_string())
+                           .on_mouse_down(MouseButton::Left, |_, window, _| {
+                               window.start_window_move();
+                           });
+
     div().id("settings-window-root")
          .track_focus(focus_handle)
          .on_key_down(move |event, _window, cx| {
@@ -122,12 +150,25 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
          .size_full()
          .bg(surface)
          .flex()
-         .flex_row()
-         .child(sidebar)
+         .flex_col()
+         .child(drag_region)
          .child(div().flex_1()
-                     .min_w_0()
                      .min_h_0()
-                     .overflow_hidden()
-                     .child(content))
+                     .flex()
+                     .flex_row()
+                     .child(sidebar)
+                     // `overflow_y_scrollbar()` wraps this element in
+                     // `Scrollable`, whose `render` only copies the `size`
+                     // style field onto its own outer wrapper — `flex_1()`/
+                     // `min_w_0()`/`min_h_0()` set here would be silently
+                     // dropped. Those sizing properties live on this plain
+                     // outer div instead; the inner div just needs
+                     // `size_full()` to fill it, which `Scrollable` already
+                     // applies on its own.
+                     .child(div().flex_1().min_w_0().min_h_0().child(div().flex()
+                                                                          .flex_col()
+                                                                          .size_full()
+                                                                          .overflow_y_scrollbar()
+                                                                          .child(content))))
          .into_any_element()
 }
