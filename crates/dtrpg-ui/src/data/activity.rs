@@ -53,8 +53,10 @@ impl std::fmt::Debug for ActivityItem {
 pub struct ActivitySnapshot {
     /// Number of currently in-progress operations.
     pub in_progress_count:  usize,
-    /// Number of recently-completed operations that ended with an error.
-    pub recent_error_count: usize,
+    /// Number of entries in the durable alert log (the notifications view).
+    /// The status bar's unread-error badge is present iff this is nonzero,
+    /// and clearing the notifications view (`clear_alert_log`) clears it.
+    pub alert_count:        usize,
     /// Number of items in the recent list (excludes expired items).
     pub recent_count:       usize,
     /// Whether the activity panel overlay is open.

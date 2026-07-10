@@ -187,7 +187,7 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
         &t!("status_bar.notifications_tooltip_title"),
         &t!(
             "status_bar.notifications_tooltip",
-            n = activity_snap.recent_error_count
+            n = activity_snap.alert_count
         ),
     ));
 
