@@ -199,7 +199,7 @@ menu:
   catalog_add_collection: "Ajouter une collection…"
   catalog_reload: "Actualiser"
   catalog_refresh_thumbnails: "Actualiser les vignettes"
-  catalog_check_availability: "Vérifier les mises à jour"
+  catalog_check_availability: "Vérifier la disponibilité"
   edit_title: "Édition"
   edit_undo: "Annuler"
   edit_redo: "Rétablir"

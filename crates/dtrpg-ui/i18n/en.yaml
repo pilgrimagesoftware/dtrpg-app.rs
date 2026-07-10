@@ -200,7 +200,7 @@ menu:
   catalog_add_collection: "Add Collection…"
   catalog_reload: "Reload"
   catalog_refresh_thumbnails: "Refresh Thumbnails"
-  catalog_check_availability: "Check for Updates"
+  catalog_check_availability: "Check Item Availability"
   edit_title: "Edit"
   edit_undo: "Undo"
   edit_redo: "Redo"
