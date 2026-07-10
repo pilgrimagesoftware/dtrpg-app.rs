@@ -280,16 +280,11 @@ impl ActivityController {
 
     /// Returns a snapshot of current activity state for rendering.
     pub fn snapshot(&self) -> ActivitySnapshot {
-        let recent_error_count = self.recent
-                                     .iter()
-                                     .filter(|i| matches!(i.status, ActivityStatus::Error(_)))
-                                     .count();
-
         let mut items: Vec<ActivityItem> = self.in_progress.clone();
         items.extend(self.recent.iter().cloned());
 
         ActivitySnapshot { in_progress_count: self.in_progress.len(),
-                           recent_error_count,
+                           alert_count: self.alert_log.len(),
                            recent_count: self.recent.len(),
                            panel_open: self.panel_open,
                            items,
@@ -330,5 +325,74 @@ impl ActivityController {
 impl Default for ActivityController {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Instant, SystemTime};
+
+    use super::*;
+
+    /// Directly seeds `alert_log`/`recent` rather than calling `error()`/
+    /// `expire_item()` (which require `Context<Self>`, unavailable without a
+    /// GPUI test app — no other controller in this crate exercises
+    /// `cx`-requiring methods in unit tests either). This still exercises
+    /// exactly the behavior in question: `snapshot().alert_count` must track
+    /// `alert_log`, independent of `recent`.
+    fn alert_entry(id: u64) -> AlertEntry {
+        AlertEntry { id,
+                     label: "Sync failed".into(),
+                     message: "network error".to_string(),
+                     occurred_at: SystemTime::now() }
+    }
+
+    fn error_item(id: u64) -> ActivityItem {
+        ActivityItem { id,
+                       label: "Sync".into(),
+                       status: ActivityStatus::Error("network error".to_string()),
+                       started_at: Instant::now(),
+                       elapsed_secs: Some(1),
+                       progress: None,
+                       cancel_fn: None }
+    }
+
+    #[test]
+    fn alert_count_reflects_alert_log_len_not_recent() {
+        let mut ctrl = ActivityController::new();
+        ctrl.alert_log.push_back(alert_entry(1));
+        ctrl.alert_log.push_back(alert_entry(2));
+        // `recent` has a different count of error items than `alert_log` —
+        // `alert_count` must follow `alert_log`, not this.
+        ctrl.recent.push_back(error_item(1));
+
+        assert_eq!(ctrl.snapshot().alert_count, 2);
+    }
+
+    #[test]
+    fn clearing_alert_log_zeroes_alert_count() {
+        let mut ctrl = ActivityController::new();
+        ctrl.push_alert(alert_entry(1));
+        assert_eq!(ctrl.snapshot().alert_count, 1);
+
+        ctrl.alert_log.clear();
+        ctrl.has_unread_alert = false;
+
+        assert_eq!(ctrl.snapshot().alert_count, 0);
+    }
+
+    #[test]
+    fn recent_expiry_does_not_affect_alert_count() {
+        let mut ctrl = ActivityController::new();
+        ctrl.push_alert(alert_entry(1));
+        ctrl.recent.push_back(error_item(1));
+        assert_eq!(ctrl.snapshot().alert_count, 1);
+
+        // Simulate the `recent` expiry timer removing the transient item —
+        // the durable `alert_log` entry (and thus `alert_count`) is
+        // unaffected.
+        ctrl.recent.clear();
+
+        assert_eq!(ctrl.snapshot().alert_count, 1);
     }
 }
