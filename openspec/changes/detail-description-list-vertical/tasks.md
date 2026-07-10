@@ -6,4 +6,4 @@
 
 - [x] 2.1 Run `cargo check --workspace` -- no errors
 - [x] 2.2 Run `cargo clippy --all-targets --all-features -- -D warnings` -- no new warnings
-- [ ] 2.3 Open the detail panel for any item and confirm each metadata label appears above its value
+- [x] 2.3 Open the detail panel for any item and confirm each metadata label appears above its value
