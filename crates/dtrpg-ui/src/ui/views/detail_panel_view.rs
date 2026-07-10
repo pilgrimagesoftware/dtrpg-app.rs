@@ -64,6 +64,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let reveal_item_id = Arc::clone(&item.id);
     let read_item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
+    let download_title = item.title.to_string();
 
     let cover_w = crate::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
     let cover_h = cover_w * 10.0 / 7.0;
@@ -229,7 +230,12 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     .on_click(move |_, _, cx| {
                                         let id = Arc::clone(&item_id);
                                         entity_download.update(cx, |ctrl, cx| {
-                                            ctrl.toggle_download(&id, cx);
+                                            if is_downloaded {
+                                                ctrl.remove_download(&id, cx);
+                                            }
+                                            else {
+                                                ctrl.enqueue_download(&id, download_title.clone(), cx);
+                                            }
                                         });
                                     }),
                             )

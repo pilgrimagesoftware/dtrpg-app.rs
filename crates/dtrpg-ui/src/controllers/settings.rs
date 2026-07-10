@@ -79,44 +79,46 @@ pub struct AuthStateSnapshot {
 
 /// Snapshot of settings state needed by the views for a single render pass.
 pub struct SettingsSnapshot {
-    pub is_open:             bool,
-    pub file_openers:        Vec<FileOpenerEntry>,
+    pub is_open:                  bool,
+    pub file_openers:             Vec<FileOpenerEntry>,
     /// `true` when credentials are present in the keyring.
-    pub is_authenticated:    bool,
+    pub is_authenticated:         bool,
     /// Resolved storage root path (override or platform default).
-    pub storage_root_path:   PathBuf,
+    pub storage_root_path:        PathBuf,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
-    pub storage_unavailable: bool,
+    pub storage_unavailable:      bool,
     /// `true` when the configured storage root exists on disk.
-    pub storage_path_exists: bool,
+    pub storage_path_exists:      bool,
     /// Current auth state for the toolbar avatar button.
-    pub auth:                AuthStateSnapshot,
+    pub auth:                     AuthStateSnapshot,
     /// Current value of the email draft field in the Account tab.
-    pub email_draft:         String,
+    pub email_draft:              String,
     /// Current value of the password draft field in the Account tab.
-    pub password_draft:      String,
+    pub password_draft:           String,
     /// `true` while a sign-in request is in flight.
-    pub sign_in_in_progress: bool,
+    pub sign_in_in_progress:      bool,
     /// Error message from the last failed sign-in attempt, if any.
-    pub sign_in_error:       Option<String>,
+    pub sign_in_error:            Option<String>,
     /// Shared input state for the email text field in the Account tab.
-    pub email_input:         Option<Entity<InputState>>,
+    pub email_input:              Option<Entity<InputState>>,
     /// Shared input state for the password text field in the Account tab.
-    pub password_input:      Option<Entity<InputState>>,
+    pub password_input:           Option<Entity<InputState>>,
     /// Current draft value of the storage path text field.
-    pub storage_path_draft:  String,
+    pub storage_path_draft:       String,
     /// Shared input state for the storage path text field in the Storage tab.
-    pub storage_path_input:  Option<Entity<InputState>>,
+    pub storage_path_input:       Option<Entity<InputState>>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pub pending_file_opener: Option<PathBuf>,
+    pub pending_file_opener:      Option<PathBuf>,
     /// Index of the currently active settings page.
-    pub active_page_ix:      usize,
+    pub active_page_ix:           usize,
     /// Current per-type counts of cached data, for the Advanced section's
     /// "Cache details" area.
-    pub cache_counts:        CacheCounts,
+    pub cache_counts:             CacheCounts,
+    /// Shared maximum number of concurrent thumbnail/download fetches.
+    pub max_concurrent_downloads: usize,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -344,6 +346,15 @@ impl SettingsController {
         self.check_storage_path_exists(path, cx);
         cx.emit(SettingsChanged);
         Ok(())
+    }
+
+    /// Saves `n` as the new shared thumbnail/download concurrency limit.
+    ///
+    /// Emits [`SettingsChanged`] so the library controller picks up the new
+    /// limit on its next drain.
+    pub fn set_max_concurrent_downloads(&mut self, n: usize, cx: &mut Context<Self>) {
+        self.storage.set_max_concurrent_downloads(n);
+        cx.emit(SettingsChanged);
     }
 
     /// Spawns a background task to check whether `path` exists on disk.
@@ -707,7 +718,8 @@ impl SettingsController {
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone(),
                            active_page_ix: self.active_page_ix,
-                           cache_counts: self.cache_counts() }
+                           cache_counts: self.cache_counts(),
+                           max_concurrent_downloads: self.storage.max_concurrent_downloads() }
     }
 }
 

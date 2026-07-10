@@ -173,6 +173,18 @@ fn should_enqueue_check(check_queue: &VecDeque<Arc<str>>, checking_items: &HashS
     !checking_items.contains(id) && !check_queue.contains(id)
 }
 
+/// Returns how many more thumbnail fetches and/or file downloads can be
+/// dispatched without exceeding `max_concurrent_downloads`, given the current
+/// count of each already in flight.
+///
+/// Thumbnail and download slots share one aggregate limit, so this always
+/// checks their sum rather than either count individually.
+fn remaining_slots(max_concurrent_downloads: usize, active_thumbnail_fetches: usize,
+                   active_downloads: usize)
+                   -> usize {
+    max_concurrent_downloads.saturating_sub(active_thumbnail_fetches + active_downloads)
+}
+
 /// Returns `true` if a check-batch request (manual or automatic) should be
 /// suppressed because a batch was already enqueued too recently, per
 /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `None` (no prior batch recorded) never
@@ -291,87 +303,88 @@ pub struct LibrarySnapshot {
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
-    vm:                      LibraryViewModel,
+    vm:                       LibraryViewModel,
     /// Keeps the `ActivityController` entity alive so the weak reference in
     /// background task closures remains valid for the lifetime of this
     /// controller.
     #[allow(dead_code)]
-    activity:                Entity<ActivityController>,
+    activity:                 Entity<ActivityController>,
     /// Full catalog — never filtered.
-    catalog:                 Vec<LibraryItem>,
+    catalog:                  Vec<LibraryItem>,
     /// Active sidebar filter.
-    pub filter:              SidebarFilter,
+    pub filter:               SidebarFilter,
     /// Text search query.
-    pub search_query:        String,
+    pub search_query:         String,
     /// Current sort method.
-    pub sort:                SortMethod,
+    pub sort:                 SortMethod,
     /// Current sort direction.
-    pub sort_direction:      SortDirection,
+    pub sort_direction:       SortDirection,
     /// Whether the catalog is grouped by publisher.
-    pub grouped:             bool,
+    pub grouped:              bool,
     /// Active catalog presentation mode.
-    pub presentation:        CatalogPresentation,
+    pub presentation:         CatalogPresentation,
     /// The currently selected item id (for the detail panel).
-    pub selection:           Selection,
+    pub selection:            Selection,
     /// Smart section counts derived from the full catalog.
-    pub section_counts:      SectionCounts,
+    pub section_counts:       SectionCounts,
     /// Publisher list derived from the full catalog (count desc, name asc).
-    pub publishers:          Vec<PublisherEntry>,
+    pub publishers:           Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
-    pub collections:         Vec<CollectionEntry>,
+    pub collections:          Vec<CollectionEntry>,
     /// True once the first `apply_collections` call has completed for the
     /// current session. Used by the sidebar to show a "?" placeholder for
     /// the collection count instead of a misleading `0` while the initial
     /// fetch is still in flight.
-    collections_loaded:      bool,
+    collections_loaded:       bool,
     /// Backing service for collections; stored so it can be replaced on
     /// sign-in.
-    collections_service:     Arc<dyn CollectionsService>,
+    collections_service:      Arc<dyn CollectionsService>,
     /// Set of numeric product IDs belonging to the active collection filter.
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
-    pub collection_members:  HashSet<u64>,
+    pub collection_members:   HashSet<u64>,
     /// Queue of `(item_id, cover_url, force_network)` triples pending thumbnail
     /// fetches. `force_network` skips the disk cache and always re-fetches —
     /// set for manual "Load Thumbnail"/"Refresh Thumbnails" actions, which
     /// exist specifically to bypass a stale cached image; left `false` for
     /// automatic background loads.
-    thumbnail_queue:         VecDeque<(Arc<str>, Arc<str>, bool)>,
-    /// Whether a thumbnail fetch is currently in flight.
-    thumbnail_loading:       bool,
+    thumbnail_queue:          VecDeque<(Arc<str>, Arc<str>, bool)>,
+    /// Number of thumbnail fetches currently in flight. Bounded by
+    /// [`Self::available_slots`] together with `active_downloads`.
+    active_thumbnail_fetches: usize,
     /// Activity id for the aggregated thumbnail loading entry.
-    thumbnail_activity_id:   Option<u64>,
+    thumbnail_activity_id:    Option<u64>,
     /// Number of thumbnails processed (successes and failures both count) in
     /// the current batch. Reset to `0` whenever a new aggregated activity
     /// item starts. Together with the live queue length this gives a real,
     /// monotonically advancing progress fraction — `processed / (processed
     /// + queue.len())` — instead of an indeterminate placeholder.
-    thumbnail_processed:     usize,
+    thumbnail_processed:      usize,
     /// True from startup until the first `set_catalog` call completes.
-    catalog_loading:         bool,
+    catalog_loading:          bool,
     /// Incremented each time [`start_load_inner`](Self::start_load_inner)
     /// starts a new load attempt. Background tasks from a superseded load
     /// compare their captured generation against the current value before
     /// writing catalog state, so a load started before a `clear_and_reload`
     /// cannot clobber it after the fact.
-    load_generation:         u64,
+    load_generation:          u64,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
-    items_cache:             Option<Vec<LibraryItem>>,
+    items_cache:              Option<Vec<LibraryItem>>,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
-    publisher_search_open:   bool,
+    publisher_search_open:    bool,
     /// Publishers section search filter text. Session-only; never persisted.
-    publisher_search_query:  String,
+    publisher_search_query:   String,
     /// Whether the collections section's inline search bar is expanded.
     /// Session-only; never persisted.
-    collection_search_open:  bool,
+    collection_search_open:   bool,
     /// Collections section search filter text. Session-only; never persisted.
-    collection_search_query: String,
+    collection_search_query:  String,
     /// Current width of the detail panel, in pixels. Session-only; never
     /// persisted to disk.
-    detail_panel_width:      f32,
+    detail_panel_width:       f32,
     /// On-screen bounds of every currently visible Grid card / Thumbs row,
     /// keyed by item id, continuously refreshed by each entry's own render
     /// pass (see `catalog_view::render_grid_card` / `render_thumb_row`).
@@ -384,7 +397,7 @@ pub struct LibraryController {
     /// fallback position before the popover settles into place. Entries
     /// scrolled out of view keep their last-known bounds; this is harmless
     /// since a stale entry can't be clicked again until it repaints.
-    entry_bounds:            HashMap<Arc<str>, Bounds<Pixels>>,
+    entry_bounds:             HashMap<Arc<str>, Bounds<Pixels>>,
     /// Selected item file row (its position within the entry's `files`
     /// list) within a multi-item entry's expanded detail tab, keyed by
     /// catalog entry id. Keyed by row position rather than file id because
@@ -394,27 +407,44 @@ pub struct LibraryController {
     /// unrelated rows select and deselect together. Ephemeral — never
     /// persisted, and cleared whenever the entry's detail tab is closed or
     /// reopened (see `catalog-entry-detail-view`).
-    selected_item_file:      HashMap<Arc<str>, usize>,
+    selected_item_file:       HashMap<Arc<str>, usize>,
     /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
     /// here (see `catalog-entry-detail-advanced-disclosure`).
-    other_details_open:      HashMap<Arc<str>, bool>,
+    other_details_open:       HashMap<Arc<str>, bool>,
     /// Whether a per-file "Other details" disclosure is expanded within a
     /// multi-item entry's item tier, keyed by `"{entry_id}:{row_ix}"`. Keyed
     /// by row position rather than file id for the same reason as
     /// `selected_item_file`. Ephemeral — never persisted, and defaults to
     /// collapsed.
-    file_other_details_open: HashMap<Arc<str>, bool>,
+    file_other_details_open:  HashMap<Arc<str>, bool>,
     /// Ids of catalog items with an availability check currently in flight
     /// (on-demand or queued), mirroring `CoverCache::in_flight`'s role for
     /// thumbnails. `LibraryChanged` is emitted on insertion and removal so
     /// catalog card/row rendering can query [`Self::is_checking`] and show a
     /// spinner/overlay.
-    checking_items:          HashSet<Arc<str>>,
+    checking_items:           HashSet<Arc<str>>,
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
-    check_queue:             VecDeque<Arc<str>>,
+    check_queue:              VecDeque<Arc<str>>,
+    /// Queue of `(item_id, title)` pairs pending a file download.
+    download_queue:           VecDeque<(Arc<str>, String)>,
+    /// Number of file downloads currently in flight. Bounded by
+    /// [`Self::available_slots`] together with `active_thumbnail_fetches`.
+    active_downloads:         usize,
+    /// Per-item cancellation flag for an in-flight download, set by
+    /// [`Self::cancel_download`] and polled by the download task at its next
+    /// checkpoint. Removed once the task observes it (success, error, or
+    /// cancellation) or by `cancel_download` itself for a still-queued item.
+    download_cancel_flags:    HashMap<Arc<str>, Arc<std::sync::atomic::AtomicBool>>,
+    /// Activity panel id for each in-flight (slot-holding) download, keyed by
+    /// item id. Not populated for items still waiting in `download_queue`.
+    download_activity_ids:    HashMap<Arc<str>, u64>,
+    /// Shared thumbnail/download concurrency limit. Initialized from
+    /// [`crate::data::storage::StorageConfig`] and kept in sync with the
+    /// Storage settings page via [`Self::set_max_concurrent_downloads`].
+    max_concurrent_downloads: usize,
 }
 
 impl LibraryController {
@@ -434,41 +464,47 @@ impl LibraryController {
                -> Self {
         let vm = LibraryViewModel::new(service);
 
-        let mut ctrl = Self { vm,
-                              activity,
-                              catalog: Vec::new(),
-                              filter: SidebarFilter::default(),
-                              search_query: String::new(),
-                              sort: SortMethod::default(),
-                              sort_direction: SortDirection::default(),
-                              grouped: false,
-                              presentation: CatalogPresentation::default(),
-                              selection: Selection::default(),
-                              section_counts: SectionCounts::default(),
-                              publishers: Vec::new(),
-                              collections: Vec::new(),
-                              collections_loaded: false,
-                              collections_service: Arc::from(collections_service),
-                              collection_members: HashSet::new(),
-                              thumbnail_queue: VecDeque::new(),
-                              thumbnail_loading: false,
-                              thumbnail_activity_id: None,
-                              thumbnail_processed: 0,
-                              catalog_loading: true,
-                              load_generation: 0,
-                              items_cache: None,
-                              publisher_search_open: false,
-                              publisher_search_query: String::new(),
-                              collection_search_open: false,
-                              collection_search_query: String::new(),
-                              detail_panel_width:
-                                  crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-                              entry_bounds: HashMap::new(),
-                              selected_item_file: HashMap::new(),
-                              other_details_open: HashMap::new(),
-                              file_other_details_open: HashMap::new(),
-                              checking_items: HashSet::new(),
-                              check_queue: VecDeque::new() };
+        let mut ctrl =
+            Self { vm,
+                   activity,
+                   catalog: Vec::new(),
+                   filter: SidebarFilter::default(),
+                   search_query: String::new(),
+                   sort: SortMethod::default(),
+                   sort_direction: SortDirection::default(),
+                   grouped: false,
+                   presentation: CatalogPresentation::default(),
+                   selection: Selection::default(),
+                   section_counts: SectionCounts::default(),
+                   publishers: Vec::new(),
+                   collections: Vec::new(),
+                   collections_loaded: false,
+                   collections_service: Arc::from(collections_service),
+                   collection_members: HashSet::new(),
+                   thumbnail_queue: VecDeque::new(),
+                   active_thumbnail_fetches: 0,
+                   thumbnail_activity_id: None,
+                   thumbnail_processed: 0,
+                   catalog_loading: true,
+                   load_generation: 0,
+                   items_cache: None,
+                   publisher_search_open: false,
+                   publisher_search_query: String::new(),
+                   collection_search_open: false,
+                   collection_search_query: String::new(),
+                   detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
+                   entry_bounds: HashMap::new(),
+                   selected_item_file: HashMap::new(),
+                   other_details_open: HashMap::new(),
+                   file_other_details_open: HashMap::new(),
+                   checking_items: HashSet::new(),
+                   check_queue: VecDeque::new(),
+                   download_queue: VecDeque::new(),
+                   active_downloads: 0,
+                   download_cancel_flags: HashMap::new(),
+                   download_activity_ids: HashMap::new(),
+                   max_concurrent_downloads:
+                       crate::data::storage::StorageConfig::load().max_concurrent_downloads() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl
@@ -1243,7 +1279,7 @@ impl LibraryController {
         // If nothing is currently in flight, no pending fetch completion will ever run
         // `drain_thumbnail_queue`'s empty-queue completion branch — without this, the
         // aggregated activity item would be left showing "in progress" indefinitely.
-        if !self.thumbnail_loading
+        if self.active_thumbnail_fetches == 0
            && let Some(id) = self.thumbnail_activity_id.take()
         {
             self.thumbnail_processed = 0;
@@ -1474,6 +1510,34 @@ impl LibraryController {
           .detach();
     }
 
+    // ── Shared thumbnail/download concurrency ────────────────────────────────
+
+    /// Returns how many more thumbnail fetches and/or file downloads can be
+    /// dispatched right now without exceeding `max_concurrent_downloads`.
+    ///
+    /// Thumbnail and download slots draw from the same aggregate limit (see
+    /// `thumbnail-queue-concurrency`'s "shared limit" requirement).
+    fn available_slots(&self) -> usize {
+        remaining_slots(self.max_concurrent_downloads,
+                        self.active_thumbnail_fetches,
+                        self.active_downloads)
+    }
+
+    /// Updates the shared thumbnail/download concurrency limit and drains
+    /// both queues in case the new limit freed up slots.
+    ///
+    /// Called when [`crate::controllers::settings::SettingsController`]
+    /// reports a `SettingsChanged` event, so a change made on the Storage
+    /// settings page takes effect immediately.
+    pub fn set_max_concurrent_downloads(&mut self, n: usize, cx: &mut Context<Self>) {
+        if self.max_concurrent_downloads == n {
+            return;
+        }
+        self.max_concurrent_downloads = n;
+        self.drain_thumbnail_queue(cx);
+        self.drain_download_queue(cx);
+    }
+
     // ── Thumbnail loading ──────────────────────────────────────────────────────
 
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
@@ -1513,18 +1577,23 @@ impl LibraryController {
         self.drain_thumbnail_queue(cx);
     }
 
-    /// Starts a thumbnail fetch for the next queued URL if none is in flight.
+    /// Dispatches thumbnail fetches for as many queued URLs as there are free
+    /// concurrency slots (see [`Self::available_slots`]).
     fn drain_thumbnail_queue(&mut self, cx: &mut Context<Self>) {
-        if self.thumbnail_loading || self.thumbnail_queue.is_empty() {
-            return;
+        while self.available_slots() > 0 {
+            let Some((item_id, url, force_network)) = self.thumbnail_queue.pop_front()
+            else {
+                break;
+            };
+            self.active_thumbnail_fetches += 1;
+            self.dispatch_thumbnail_fetch(item_id, url, force_network, cx);
         }
-        let Some((item_id, url, force_network)) = self.thumbnail_queue.pop_front()
-        else {
-            return;
-        };
+    }
 
-        self.thumbnail_loading = true;
-
+    /// Starts a single thumbnail fetch task. Assumes the caller has already
+    /// reserved a concurrency slot by incrementing `active_thumbnail_fetches`.
+    fn dispatch_thumbnail_fetch(&mut self, item_id: Arc<str>, url: Arc<str>,
+                                force_network: bool, cx: &mut Context<Self>) {
         let activity_id = if let Some(id) = self.thumbnail_activity_id {
             id
         }
@@ -1581,7 +1650,8 @@ impl LibraryController {
                                       Some(std::time::SystemTime::now());
                               }
                               ctrl.invalidate_cache();
-                              ctrl.thumbnail_loading = false;
+                              ctrl.active_thumbnail_fetches =
+                                  ctrl.active_thumbnail_fetches.saturating_sub(1);
                               cx.emit(LibraryChanged);
                               ctrl.drain_thumbnail_queue(cx);
                           })
@@ -1597,7 +1667,8 @@ impl LibraryController {
                                       Some(std::time::SystemTime::now());
                               }
                               ctrl.invalidate_cache();
-                              ctrl.thumbnail_loading = false;
+                              ctrl.active_thumbnail_fetches =
+                                  ctrl.active_thumbnail_fetches.saturating_sub(1);
                               ctrl.drain_thumbnail_queue(cx);
                           })
                           .ok();
@@ -2206,20 +2277,164 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Download toggle ───────────────────────────────────────────────────────
+    // ── Download queue ────────────────────────────────────────────────────────
 
-    /// Toggles the download status of the item with the given id.
-    pub fn toggle_download(&mut self, id: &str, cx: &mut Context<Self>) {
-        use crate::data::enums::ItemStatus;
-        if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id) {
-            item.status = match item.status {
-                ItemStatus::Downloaded => ItemStatus::Cloud,
-                ItemStatus::Cloud => ItemStatus::Downloaded,
-            };
+    /// Reverts a `Downloaded` item to `Cloud` status.
+    ///
+    /// This is "Remove Download" — clearing an already-downloaded item — not
+    /// a cancellation of an in-flight fetch. Use [`Self::cancel_download`] to
+    /// cancel a queued or in-progress download.
+    pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
+        if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id)
+           && item.status == ItemStatus::Downloaded
+        {
+            item.status = ItemStatus::Cloud;
             self.section_counts = section_counts(&self.catalog);
             self.invalidate_cache();
+            cx.emit(LibraryChanged);
         }
-        cx.emit(LibraryChanged);
+    }
+
+    /// Queues a file download for the item with the given id and title,
+    /// dispatching it immediately if a concurrency slot is free.
+    ///
+    /// No-op if the item does not exist, is already `Downloaded`, or is
+    /// already queued/in flight.
+    pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
+        let Some(item_id) = self.catalog
+                                .iter()
+                                .find(|i| i.id.as_ref() == id && i.status != ItemStatus::Downloaded)
+                                .map(|i| Arc::clone(&i.id))
+        else {
+            return;
+        };
+        let already_pending = self.download_queue
+                                  .iter()
+                                  .any(|(qid, _)| qid.as_ref() == id)
+                              || self.download_activity_ids.contains_key(id);
+        if already_pending {
+            return;
+        }
+        self.download_queue.push_back((item_id, title.into()));
+        self.drain_download_queue(cx);
+    }
+
+    /// Cancels a download that has not yet completed.
+    ///
+    /// If `id` is still waiting in `download_queue`, removes it — no
+    /// activity entry existed yet for a queued item. If `id` is actively
+    /// fetching (holds a concurrency slot), signals its cancellation flag
+    /// and removes its activity panel entry immediately; the in-flight
+    /// task observes the flag at its next checkpoint, skips marking the
+    /// item `Downloaded`, and frees the slot itself (see
+    /// [`Self::dispatch_download`]) — `active_downloads` is only ever
+    /// decremented there, never here, to avoid double-counting the slot.
+    ///
+    /// No-op if `id` is not queued or in flight.
+    pub fn cancel_download(&mut self, id: &str, cx: &mut Context<Self>) {
+        let before = self.download_queue.len();
+        self.download_queue.retain(|(qid, _)| qid.as_ref() != id);
+        if self.download_queue.len() != before {
+            return;
+        }
+
+        let Some(flag) = self.download_cancel_flags.remove(id)
+        else {
+            return;
+        };
+        flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Some(activity_id) = self.download_activity_ids.remove(id) {
+            self.activity
+                .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
+        }
+    }
+
+    /// Dispatches downloads for as many queued items as there are free
+    /// concurrency slots (see [`Self::available_slots`]).
+    fn drain_download_queue(&mut self, cx: &mut Context<Self>) {
+        while self.available_slots() > 0 {
+            let Some((item_id, title)) = self.download_queue.pop_front()
+            else {
+                break;
+            };
+            self.active_downloads += 1;
+            self.dispatch_download(item_id, title, cx);
+        }
+    }
+
+    /// Starts a single download task. Assumes the caller has already
+    /// reserved a concurrency slot by incrementing `active_downloads`.
+    ///
+    /// No real file-transfer service exists yet — per this change's design
+    /// doc, the actual HTTP fetch is a follow-on task once
+    /// `LibraryService` grows a `download_item` method. This dispatches
+    /// through the real background executor so multiple downloads are
+    /// genuinely concurrent in-flight slots, with named activity panel
+    /// entries and full cancel/complete/error wiring already in place —
+    /// the queue infrastructure is this change's deliverable.
+    fn dispatch_download(&mut self, item_id: Arc<str>, title: String, cx: &mut Context<Self>) {
+        let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.download_cancel_flags
+            .insert(Arc::clone(&item_id), Arc::clone(&cancel_flag));
+
+        let cancel_fn: Arc<dyn Fn() + Send + Sync> = {
+            let flag = Arc::clone(&cancel_flag);
+            Arc::new(move || flag.store(true, std::sync::atomic::Ordering::SeqCst))
+        };
+        let activity_id = self.activity
+                              .update(cx, |a, cx| a.start(&title, Some(cancel_fn), cx));
+        self.download_activity_ids
+            .insert(Arc::clone(&item_id), activity_id);
+
+        let weak_activity = self.activity.downgrade();
+        let task_item_id = Arc::clone(&item_id);
+
+        cx.spawn(async move |this, async_cx| {
+              let outcome: Result<(), String> = async_cx.background_executor()
+                                                        .spawn(async move { Ok(()) })
+                                                        .await;
+              let cancelled = cancel_flag.load(std::sync::atomic::Ordering::SeqCst);
+
+              let activity_id_after =
+                  this.update(async_cx, |ctrl, cx| {
+                          ctrl.active_downloads = ctrl.active_downloads.saturating_sub(1);
+                          ctrl.download_cancel_flags.remove(task_item_id.as_ref());
+                          let activity_id = ctrl.download_activity_ids.remove(&task_item_id);
+                          if !cancelled {
+                              let new_status = match &outcome {
+                                  Ok(()) => ItemStatus::Downloaded,
+                                  Err(_) => ItemStatus::Cloud,
+                              };
+                              if let Some(item) =
+                                  ctrl.catalog.iter_mut().find(|i| i.id == task_item_id)
+                              {
+                                  item.status = new_status;
+                              }
+                              ctrl.section_counts = section_counts(&ctrl.catalog);
+                              ctrl.invalidate_cache();
+                              cx.emit(LibraryChanged);
+                          }
+                          ctrl.drain_download_queue(cx);
+                          ctrl.drain_thumbnail_queue(cx);
+                          activity_id
+                      })
+                      .ok()
+                      .flatten();
+
+              if !cancelled && let Some(id) = activity_id_after {
+                  match &outcome {
+                      Ok(()) => {
+                          weak_activity.update(async_cx, |a, cx| a.complete(id, cx))
+                                       .ok();
+                      }
+                      Err(e) => {
+                          weak_activity.update(async_cx, |a, cx| a.error(id, e.clone(), cx))
+                                       .ok();
+                      }
+                  }
+              }
+          })
+          .detach();
     }
 
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
@@ -3300,6 +3515,64 @@ mod item_check_tests {
 
         assert!(existing.is_available);
         assert_eq!(existing.availability_last_checked, None);
+    }
+}
+
+#[cfg(test)]
+mod concurrency_tests {
+    use super::remaining_slots;
+
+    #[test]
+    fn full_limit_available_when_nothing_is_active() {
+        assert_eq!(remaining_slots(3, 0, 0), 3);
+    }
+
+    #[test]
+    fn thumbnail_and_download_activity_share_one_limit() {
+        // 1 thumbnail fetch + 1 download active against a limit of 3 leaves
+        // exactly 1 slot, not 2 — they draw from the same aggregate count.
+        assert_eq!(remaining_slots(3, 1, 1), 1);
+    }
+
+    #[test]
+    fn no_slots_available_at_the_limit() {
+        assert_eq!(remaining_slots(3, 2, 1), 0);
+    }
+
+    #[test]
+    fn never_exceeds_the_limit_even_if_active_counts_somehow_overrun_it() {
+        // Defensive: `saturating_sub` must not wrap/panic if active counts
+        // ever exceed the configured limit (e.g. a limit lowered mid-batch).
+        assert_eq!(remaining_slots(3, 4, 2), 0);
+    }
+
+    #[test]
+    fn total_active_fetches_never_exceeds_the_limit_across_repeated_dispatch() {
+        // Simulates repeatedly dispatching from both queues until neither has
+        // room, verifying the running total of "active" slots taken never
+        // exceeds `max_concurrent_downloads`.
+        let max = 3;
+        let mut active_thumbnail_fetches = 0;
+        let mut active_downloads = 0;
+        let mut thumbnail_queue_len = 5;
+        let mut download_queue_len = 5;
+
+        loop {
+            let slots = remaining_slots(max, active_thumbnail_fetches, active_downloads);
+            if slots == 0 || (thumbnail_queue_len == 0 && download_queue_len == 0) {
+                break;
+            }
+            if thumbnail_queue_len > 0 {
+                thumbnail_queue_len -= 1;
+                active_thumbnail_fetches += 1;
+            }
+            else if download_queue_len > 0 {
+                download_queue_len -= 1;
+                active_downloads += 1;
+            }
+            assert!(active_thumbnail_fetches + active_downloads <= max,
+                    "active fetches exceeded max_concurrent_downloads");
+        }
     }
 }
 
