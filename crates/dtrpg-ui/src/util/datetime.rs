@@ -130,19 +130,62 @@ pub fn epoch_to_rfc3339(epoch: i64) -> Option<String> {
     DateTime::from_timestamp(epoch, 0).map(|dt| dt.to_rfc3339())
 }
 
+/// Formats `ts` as an absolute date/time using the OS's locale-preferred
+/// date/time style (date field order, separators, and 12-/24-hour clock)
+/// via `NSDateFormatter`.
+///
+/// Deliberately keeps the *timezone* fixed at UTC — only the *style* should
+/// follow the OS locale, matching [`format_absolute`]'s existing
+/// timezone-naive behavior; changing the displayed timezone as well is a
+/// separate concern not requested here.
+///
+/// Returns `None` if formatting fails for any reason (should not happen in
+/// practice); callers fall back to [`format_absolute`]'s fixed format.
+#[cfg(target_os = "macos")]
+fn format_absolute_os_locale(ts: i64) -> Option<String> {
+    use objc2_foundation::{NSDate, NSDateFormatter, NSDateFormatterStyle, NSLocale, NSTimeZone};
+
+    let formatter = NSDateFormatter::new();
+    formatter.setDateStyle(NSDateFormatterStyle::MediumStyle);
+    formatter.setTimeStyle(NSDateFormatterStyle::ShortStyle);
+    formatter.setLocale(Some(&NSLocale::autoupdatingCurrentLocale()));
+    formatter.setTimeZone(Some(&NSTimeZone::timeZoneForSecondsFromGMT(0)));
+    let date = NSDate::dateWithTimeIntervalSince1970(ts as f64);
+    Some(formatter.stringFromDate(&date).to_string())
+}
+
+/// Fixed-format absolute date/time string: "Month D, YYYY at H:MM AM/PM"
+/// (e.g. "January 5, 2024 at 3:42 PM"), independent of OS locale.
+///
+/// Used by [`format_absolute`] on non-macOS platforms and as a fallback if
+/// the OS-locale formatter fails; also what the unit tests below assert
+/// against, since [`format_absolute`]'s OS-locale output is inherently
+/// environment-dependent and can't be pinned to a literal string.
+fn format_absolute_fixed(ts: i64) -> String {
+    from_epoch(ts).format("%B %-d, %Y at %-I:%M %p").to_string()
+}
+
 /// Formats a Unix timestamp as a full absolute date/time string.
 ///
-/// Output format: "Month D, YYYY at H:MM AM/PM" (e.g. "January 5, 2024 at 3:42
-/// PM").
+/// On macOS, the date field order, separators, and 12-/24-hour clock follow
+/// the user's OS locale/region settings (via `NSDateFormatter`). Elsewhere
+/// (and as a fallback if the OS-locale formatter fails), uses
+/// [`format_absolute_fixed`]'s fixed format.
 ///
 /// # Examples
 ///
 /// ```
+/// // Exact output varies by OS locale on macOS (date order, separators,
+/// // 12-/24-hour clock), so this only checks that formatting succeeds.
 /// let label = dtrpg_ui::util::datetime::format_absolute(0);
-/// assert_eq!(label, "January 1, 1970 at 12:00 AM");
+/// assert!(!label.is_empty());
 /// ```
 pub fn format_absolute(ts: i64) -> String {
-    from_epoch(ts).format("%B %-d, %Y at %-I:%M %p").to_string()
+    #[cfg(target_os = "macos")]
+    if let Some(localized) = format_absolute_os_locale(ts) {
+        return localized;
+    }
+    format_absolute_fixed(ts)
 }
 
 #[cfg(test)]
@@ -258,13 +301,23 @@ mod tests {
 
     #[test]
     fn absolute_epoch_zero() {
-        assert_eq!(format_absolute(0), "January 1, 1970 at 12:00 AM");
+        // Tests the deterministic fixed-format path directly — `format_absolute`
+        // itself is OS-locale-dependent on macOS and can't be pinned to a
+        // literal expected string (see `format_absolute_os_locale`).
+        assert_eq!(format_absolute_fixed(0), "January 1, 1970 at 12:00 AM");
     }
 
     #[test]
     fn absolute_known_date() {
         // 2024-01-05 15:42:00 UTC = 1704469320
-        assert_eq!(format_absolute(1_704_469_320), "January 5, 2024 at 3:42 PM");
+        assert_eq!(format_absolute_fixed(1_704_469_320),
+                   "January 5, 2024 at 3:42 PM");
+    }
+
+    #[test]
+    fn absolute_is_never_empty() {
+        assert!(!format_absolute(0).is_empty());
+        assert!(!format_absolute(1_704_469_320).is_empty());
     }
 
     #[test]

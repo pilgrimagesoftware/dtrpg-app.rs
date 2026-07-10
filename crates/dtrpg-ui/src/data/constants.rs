@@ -120,10 +120,21 @@ pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
 /// Gap between the item popover and the catalog entry it's anchored beside.
 pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
 
-/// The app's serif font, set as the global default in `app::setup`. Applied
-/// explicitly wherever a value should stay this font even if the global
-/// default ever changes, rather than relying on inheritance.
-pub const VALUE_FONT: &str = "Hoefler Text";
+/// Platform-appropriate sans-serif font, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the app's
+/// default serif body font (`Hoefler Text`, set in `app::setup`).
+#[cfg(target_os = "macos")]
+pub const VALUE_FONT: &str = "Helvetica Neue";
+/// Platform-appropriate sans-serif font, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the app's
+/// default serif body font (`Hoefler Text`, set in `app::setup`).
+#[cfg(target_os = "windows")]
+pub const VALUE_FONT: &str = "Segoe UI";
+/// Platform-appropriate sans-serif font, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the app's
+/// default serif body font (`Hoefler Text`, set in `app::setup`).
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const VALUE_FONT: &str = "DejaVu Sans";
 
 /// Platform-appropriate monospace font, used for fixed-width data such as
 /// the masked API key hint.

@@ -148,12 +148,18 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                      .flex()
                      .flex_row()
                      .child(sidebar)
-                     .child(div().flex_1()
-                                 .min_w_0()
-                                 .min_h_0()
-                                 .flex()
-                                 .flex_col()
-                                 .overflow_y_scrollbar()
-                                 .child(content)))
+                     // `overflow_y_scrollbar()` wraps this element in
+                     // `Scrollable`, whose `render` only copies the `size`
+                     // style field onto its own outer wrapper — `flex_1()`/
+                     // `min_w_0()`/`min_h_0()` set here would be silently
+                     // dropped. Those sizing properties live on this plain
+                     // outer div instead; the inner div just needs
+                     // `size_full()` to fill it, which `Scrollable` already
+                     // applies on its own.
+                     .child(div().flex_1().min_w_0().min_h_0().child(div().flex()
+                                                                          .flex_col()
+                                                                          .size_full()
+                                                                          .overflow_y_scrollbar()
+                                                                          .child(content))))
          .into_any_element()
 }

@@ -6,9 +6,13 @@
 //! in the Settings panel.
 
 use gpui::prelude::FluentBuilder as _;
-use gpui::{Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
+use gpui::{
+    Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, div, px,
+};
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::{CacheCounts, SettingsController};
@@ -19,16 +23,6 @@ use crate::data::constants::{
 use crate::data::theme::ColorTokens;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::pluralize::pluralize;
-
-/// Formats a Unix timestamp as "<human readable timestamp> (<relative
-/// duration>)", e.g. "July 10, 2026 at 6:24 AM (2 hours ago)".
-///
-/// Used as the *value* of its own key/value row (see [`render_cache_details`])
-/// rather than a tooltip, so the timestamp is visible without requiring a
-/// hover.
-fn format_timestamp(ts: i64) -> String {
-    format!("{} ({})", format_absolute(ts), format_relative(ts))
-}
 
 /// Formats a fixed duration in seconds as a human-readable, localized string
 /// ("60 seconds", "5 minutes", "7 days"), routing the noun form through
@@ -57,17 +51,14 @@ fn format_static_duration(secs: u64) -> String {
     }
 }
 
-/// Renders one "Cache details" data point: a bold label + value on one line,
-/// with a short explanatory description beneath in tertiary text.
-///
-/// Shared by every row in the section (counts, timing constants, and
-/// timestamp rows) so the three-line layout isn't repeated at each call
-/// site.
-fn stat_row(label: impl Into<SharedString>, value: impl Into<SharedString>,
-            description: impl Into<SharedString>, colors: &ColorTokens)
-            -> impl IntoElement + 'static {
+/// Renders the shared "Cache details" row frame: a bold label + value cell
+/// on one line, with a short explanatory description beneath in tertiary
+/// text. `value_el` is prebuilt so callers can supply either plain text
+/// ([`stat_row`]) or a tooltip-carrying element ([`timestamp_row`]).
+fn row_frame(label: impl Into<SharedString>, value_el: impl IntoElement,
+             description: impl Into<SharedString>, colors: &ColorTokens)
+             -> impl IntoElement + 'static {
     let label = label.into();
-    let value = value.into();
     let description = description.into();
     div().flex()
          .flex_col()
@@ -80,14 +71,45 @@ fn stat_row(label: impl Into<SharedString>, value: impl Into<SharedString>,
                                  .font_weight(gpui::FontWeight::MEDIUM)
                                  .text_color(colors.text_primary)
                                  .child(label))
-                     .child(div().text_sm()
-                                 .text_right()
-                                 .font_family(VALUE_FONT)
-                                 .text_color(colors.text_secondary)
-                                 .child(value)))
+                     .child(value_el))
          .child(div().text_xs()
                      .text_color(colors.text_tertiary)
                      .child(description))
+}
+
+/// Renders one "Cache details" data point with a plain-text value: counts
+/// and the fixed timing/cooldown constants.
+fn stat_row(label: impl Into<SharedString>, value: impl Into<SharedString>,
+            description: impl Into<SharedString>, colors: &ColorTokens)
+            -> impl IntoElement + 'static {
+    let value_el = div().text_sm()
+                        .text_right()
+                        .font_family(VALUE_FONT)
+                        .text_color(colors.text_secondary)
+                        .child(value.into());
+    row_frame(label, value_el, description, colors)
+}
+
+/// Renders a "Cache details" row for an actual recorded timestamp: the
+/// visible value is the relative time ("2 hours ago"), with the absolute
+/// timestamp available as a tooltip — matching this app's existing
+/// relative-value/absolute-tooltip convention (see
+/// `detail_panel_view::render_relative_date_value`) rather than showing
+/// both inline. `id` must be unique per row — it identifies the value
+/// element so it can carry a tooltip.
+fn timestamp_row(id: &'static str, label: impl Into<SharedString>, ts: i64,
+                 description: impl Into<SharedString>, colors: &ColorTokens)
+                 -> impl IntoElement + 'static {
+    let absolute = format_absolute(ts);
+    let value_el =
+        div().id(id)
+             .text_sm()
+             .text_right()
+             .font_family(VALUE_FONT)
+             .text_color(colors.text_secondary)
+             .child(format_relative(ts))
+             .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx));
+    row_frame(label, value_el, description, colors)
 }
 
 /// Renders the "Cache details" subsection: per-type cache counts, the
@@ -115,10 +137,11 @@ fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens)
                          t!("settings.cache_metadata_description"),
                          colors))
          .when_some(cache_counts.metadata_saved_at_secs, |this, ts| {
-             this.child(stat_row(t!("settings.cache_metadata_saved_label"),
-                                 format_timestamp(ts),
-                                 t!("settings.cache_metadata_saved_description"),
-                                 colors))
+             this.child(timestamp_row("cache-stat-metadata-saved",
+                                      t!("settings.cache_metadata_saved_label"),
+                                      ts,
+                                      t!("settings.cache_metadata_saved_description"),
+                                      colors))
          })
          .child(stat_row(t!("settings.cache_covers_label"),
                          cache_counts.cover_thumbnails.to_string(),
@@ -145,10 +168,11 @@ fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens)
                          t!("settings.cache_batch_cooldown_description"),
                          colors))
          .when_some(cache_counts.last_item_check_batch_secs, |this, ts| {
-             this.child(stat_row(t!("settings.cache_last_batch_check_label"),
-                                 format_timestamp(ts),
-                                 t!("settings.cache_last_batch_check_description"),
-                                 colors))
+             this.child(timestamp_row("cache-stat-last-batch-check",
+                                      t!("settings.cache_last_batch_check_label"),
+                                      ts,
+                                      t!("settings.cache_last_batch_check_description"),
+                                      colors))
          })
          .child(stat_row(t!("settings.cache_batch_timer_label"),
                          format_static_duration(ITEM_CHECK_BATCH_TIMER_SECS),
