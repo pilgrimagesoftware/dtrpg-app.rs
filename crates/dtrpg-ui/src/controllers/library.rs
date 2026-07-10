@@ -2396,7 +2396,7 @@ impl LibraryController {
                 .and_then(|item| {
                     item.files.first().map(|file| {
                         let dest = crate::data::storage::StorageConfig::load()
-                            .path_for_item(&item_id)
+                            .path_for_publisher(&item.publisher)
                             .join(file.name.as_ref());
                         (item.order_product_id, file.index, dest)
                     })
