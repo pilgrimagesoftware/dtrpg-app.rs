@@ -19,7 +19,7 @@ use gpui_component::menu::{ContextMenuExt, PopupMenuItem};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
-use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as _};
+use gpui_component::{ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as _, WindowExt as _};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -224,6 +224,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
     let delete_entity = entity.clone();
     let drop_entity = entity;
     let col_id = row.id;
+    let row_name_for_delete = row.name.to_string();
 
     div().id(id.into())
          .w_full()
@@ -279,8 +280,27 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                        }))
                  .item(PopupMenuItem::new(t!("collections.delete")).on_click({
                            let entity = delete_entity.clone();
-                           move |_, _, cx| {
-                               entity.update(cx, |ctrl, cx| ctrl.delete_collection(col_id, cx));
+                           let collection_name = row_name_for_delete.clone();
+                           move |_, window, cx| {
+                               let entity = entity.clone();
+                               let title =
+                                   t!("collections.delete_confirm_title",
+                                      name = collection_name).to_string();
+                               window.open_alert_dialog(cx, move |alert, _, _| {
+                                         let entity = entity.clone();
+                                         alert.confirm()
+                                              .title(title.clone())
+                                              .description(
+                                                  t!("collections.delete_confirm_description")
+                                                      .to_string(),
+                                              )
+                                              .on_ok(move |_, _, cx| {
+                                                  entity.update(cx, |ctrl, cx| {
+                                                      ctrl.delete_collection(col_id, cx);
+                                                  });
+                                                  true
+                                              })
+                                     });
                            }
                        }))
          })

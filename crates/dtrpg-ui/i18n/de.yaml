@@ -189,6 +189,8 @@ collections:
   name_placeholder: "Name der Sammlung…"
   reload: "Neu laden"
   delete: "Löschen"
+  delete_confirm_title: "„%{name}“ löschen?"
+  delete_confirm_description: "Diese Sammlung wird endgültig gelöscht. Dies kann nicht rückgängig gemacht werden."
   manage_dialog_title: "Sammlungen verwalten — %{title}"
   manage_close: "Schließen"
   manage_empty: "Noch keine Sammlungen."
