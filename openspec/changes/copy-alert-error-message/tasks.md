@@ -18,6 +18,6 @@
 - [x] 3.2 Run `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - [x] 3.3 Run `cargo fmt --all -- --check`
 - [x] 3.4 Run `cargo test --workspace`
-- [ ] 3.5 Manually trigger a failing operation (e.g. failed collection delete), open
+- [x] 3.5 Manually trigger a failing operation (e.g. failed collection delete), open
   "Window > Show Alert History", hover the resulting row, click the copy control, and paste
   to confirm the clipboard contains the exact error message text
