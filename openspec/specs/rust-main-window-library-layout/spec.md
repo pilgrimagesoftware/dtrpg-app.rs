@@ -18,11 +18,19 @@ The Rust desktop app MUST provide a low-profile disclosable search/filter area w
 - **THEN** the Rust app preserves active search, filter, view mode, grouping, and sort state
 
 ### Requirement: Rust library presentations MUST share browsing state
-The Rust desktop app MUST use one controller-facing browsing state for list, tree, and grid presentations so mode changes preserve the current filtered and sorted result set.
+The Rust desktop app MUST use one controller-facing browsing state for list, tree, and grid presentations so mode changes preserve the current filtered and sorted result set. The layout switcher SHALL present the three presentations (List, Thumbs, Grid) as icon-only tabs, each carrying a tooltip with the localized mode name instead of a visible text label.
 
 #### Scenario: Switching between Rust list, tree, and grid views
 - **WHEN** the user switches library presentation mode
 - **THEN** the same matched items, grouping, and sort order are represented in the selected GPUI presentation
+
+#### Scenario: Layout switcher shows icons instead of text
+- **WHEN** the user views the toolbar's layout switcher
+- **THEN** each of the three tabs displays an icon (list, thumbnails, grid) with no visible text label
+
+#### Scenario: Layout switcher tooltip names the mode
+- **WHEN** the user hovers a layout switcher tab
+- **THEN** a tooltip shows the localized mode name ("List", "Thumbs", or "Grid")
 
 ### Requirement: Rust account menu MUST expose account actions safely
 The Rust desktop app MUST provide an account button menu or equivalent compact popover that displays DriveThruRPG account identity or connection status, token set/reset actions, and settings navigation without passively showing raw access-token values. When a user is signed in, the account menu SHALL display the account email address as a non-interactive label at the top of the menu, followed by a separator, followed by account action items. The email address SHALL NOT reveal any credential value (API key, access token, or refresh token).
