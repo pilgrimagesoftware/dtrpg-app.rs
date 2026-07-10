@@ -14,6 +14,7 @@ use rust_i18n::t;
 use crate::controllers::settings::SettingsController;
 use crate::data::storage::validate_writable;
 use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_text;
 
 /// Renders the Storage settings section.
 ///
@@ -77,11 +78,10 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                                 .flex()
                                 .items_center()
                                 .child(
-                                    div()
+                                    selectable_text("settings-storage-path", path_display)
                                         .text_sm()
                                         .text_color(text_secondary)
-                                        .truncate()
-                                        .child(path_display),
+                                        .truncate(),
                                 )
                                 .into_any()
                         };

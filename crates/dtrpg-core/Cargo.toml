@@ -4,9 +4,21 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+# Disables the implicit `src/main.rs` binary target (which would otherwise be
+# named after `[package] name`, "dtrpg-core") so the `[[bin]]` below is the
+# only binary this package produces.
+autobins = false
 
 [lints]
 workspace = true
+
+# Named "Libri" (not the default "dtrpg-core", derived from `[package] name`)
+# so the process name macOS shows in the Application menu's bold title matches
+# the product name in dev builds too, not just packaged ones (cargo-packager
+# already sets `product-name = "Libri"` below for packaged artifacts).
+[[bin]]
+name = "Libri"
+path = "src/main.rs"
 
 [dependencies]
 tokio.workspace = true

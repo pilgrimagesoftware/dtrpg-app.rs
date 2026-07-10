@@ -18,6 +18,7 @@ use gpui_component::collapsible::Collapsible;
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::table::{Table, TableBody, TableCell, TableHeader, TableRow};
+use gpui_component::text::Text;
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
@@ -28,6 +29,7 @@ use crate::data::theme::ColorTokens;
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
+use crate::ui::widgets::selectable_text;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::matching::{collection_member_id, member_ids_contain};
 use crate::util::reveal::reveal_in_file_manager;
@@ -129,10 +131,9 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             .flex_col()
                             .gap(px(4.0))
                             .child(
-                                div()
+                                selectable_text("detail-tab-publisher", item.publisher.to_string())
                                     .text_xs()
-                                    .text_color(colors.text_tertiary)
-                                    .child(item.publisher.to_string()),
+                                    .text_color(colors.text_tertiary),
                             )
                             .child(
                                 div()
@@ -140,27 +141,24 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     .items_center()
                                     .gap(px(6.0))
                                     .child(
-                                        div()
+                                        selectable_text("detail-tab-title", item.title.to_string())
                                             .text_xl()
                                             .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .text_color(text_primary)
-                                            .child(item.title.to_string()),
+                                            .text_color(text_primary),
                                     )
                                     .child(render_status_icon(is_downloaded, text_secondary))
                                     .children(render_checking_indicator(is_checking)),
                             )
                             .child(
-                                div()
+                                selectable_text("detail-tab-line", item.line.to_string())
                                     .text_sm()
-                                    .text_color(text_secondary)
-                                    .child(item.line.to_string()),
+                                    .text_color(text_secondary),
                             ),
                     )
                     .child(
-                        div()
+                        selectable_text("detail-tab-desc", item.desc.to_string())
                             .text_sm()
-                            .text_color(text_secondary)
-                            .child(item.desc.to_string()),
+                            .text_color(text_secondary),
                     )
                     .child(
                         div()
@@ -351,15 +349,19 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                                          });
                            })
                  // File name
-                 .child(div().flex_1()
-                             .text_sm()
-                             .text_color(colors.text_primary)
-                             .child(file.name.to_string()))
+                 .child(div().flex_1().child(
+                     selectable_text(SharedString::from(format!("item-row-{row_ix}-name")),
+                                     file.name.to_string())
+                         .text_sm()
+                         .text_color(colors.text_primary),
+                 ))
                  // File type
-                 .child(div().flex_1()
-                             .text_sm()
-                             .text_color(colors.text_secondary)
-                             .child(file.format.to_string()))
+                 .child(div().flex_1().child(
+                     selectable_text(SharedString::from(format!("item-row-{row_ix}-format")),
+                                     file.format.to_string())
+                         .text_sm()
+                         .text_color(colors.text_secondary),
+                 ))
                  // Status
                  .child(div().flex_1()
                              .text_sm()
@@ -639,13 +641,13 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
              .into_any_element()
     }
     else {
-        div().text_sm()
-             .text_color(colors.text_secondary)
-             .child(member_names.iter()
-                                .map(|n| n.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", "))
-             .into_any_element()
+        selectable_text("detail-tab-collections-summary",
+                        member_names.iter()
+                                    .map(|n| n.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(", ")).text_sm()
+                                                .text_color(colors.text_secondary)
+                                                .into_any_element()
     };
 
     let item_title = Arc::clone(&item.title);
@@ -685,7 +687,7 @@ fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> Any
          .flex()
          .items_center()
          .gap(px(6.0))
-         .child(value.clone())
+         .child(selectable_text(SharedString::from(format!("{field_id}-text")), value.clone()))
          .child(
              div()
                  .invisible()
@@ -752,28 +754,34 @@ fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens)
         .bordered(false)
         .child(
             DescriptionItem::new(t!("detail.field_system").to_string())
-                .value(value_or_dash(&item.line)),
+                .value(Text::from(selectable_text("detail-field-system",
+                                                  value_or_dash(&item.line)))),
         )
         .child(
             DescriptionItem::new(t!("detail.field_released").to_string())
-                .value(item.year.to_string()),
+                .value(Text::from(selectable_text("detail-field-released",
+                                                  item.year.to_string()))),
         )
         .child(
             DescriptionItem::new(t!("detail.field_format").to_string())
-                .value(item.format.to_string()),
+                .value(Text::from(selectable_text("detail-field-format",
+                                                  item.format.to_string()))),
         )
         .child(
             DescriptionItem::new(t!("detail.field_file_size").to_string())
-                .value(format!("{:.0} MB", item.size_mb)),
+                .value(Text::from(selectable_text("detail-field-file-size",
+                                                  format!("{:.0} MB", item.size_mb)))),
         )
-        .child(DescriptionItem::new(category_label).value(item.kind.to_string()).span(2));
+        .child(DescriptionItem::new(category_label)
+                   .value(Text::from(selectable_text("detail-field-kind", item.kind.to_string())))
+                   .span(2));
 
     // The DriveThruRPG order-product API does not always report a page count; omit
     // the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
         list = list.child(
             DescriptionItem::new(t!("detail.field_pages").to_string())
-                .value(item.pages.to_string())
+                .value(Text::from(selectable_text("detail-field-pages", item.pages.to_string())))
                 .span(2),
         );
     }
@@ -804,7 +812,8 @@ fn render_relative_date_value(item_id: &str, slot: &str, ts: i64) -> AnyElement 
     let absolute = format_absolute(ts);
     let id = SharedString::from(format!("detail-{slot}-{item_id}"));
     div().id(id)
-         .child(relative)
+         .child(selectable_text(SharedString::from(format!("detail-{slot}-{item_id}-text")),
+                                relative))
          .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
          .into_any_element()
 }
