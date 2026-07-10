@@ -1,5 +1,33 @@
 //! Small text-shaping helpers shared across views.
 
+/// Escapes CommonMark punctuation in `text` so it renders as literal
+/// characters rather than Markdown syntax.
+///
+/// Used before handing raw catalog/account data (titles, descriptions, IDs)
+/// to `gpui-component`'s `TextView`, which parses its input as Markdown —
+/// without escaping, a title like `*Iron Kingdoms*` would render italicized
+/// instead of showing its literal asterisks.
+///
+/// # Examples
+///
+/// ```
+/// use dtrpg_ui::util::text::escape_markdown;
+///
+/// assert_eq!(escape_markdown("Plain text"), "Plain text");
+/// assert_eq!(escape_markdown("*Iron Kingdoms*"), "\\*Iron Kingdoms\\*");
+/// ```
+#[must_use]
+pub fn escape_markdown(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        if c.is_ascii_punctuation() {
+            escaped.push('\\');
+        }
+        escaped.push(c);
+    }
+    escaped
+}
+
 /// Truncates `text` to at most `max_chars` characters, appending an ellipsis
 /// when truncation occurs.
 ///
@@ -57,5 +85,26 @@ mod tests {
     #[test]
     fn empty_text_is_unchanged() {
         assert_eq!(truncate_with_ellipsis("", 10), "");
+    }
+
+    #[test]
+    fn escape_markdown_passes_through_plain_text() {
+        assert_eq!(escape_markdown("Plain text"), "Plain text");
+    }
+
+    #[test]
+    fn escape_markdown_escapes_emphasis_characters() {
+        assert_eq!(escape_markdown("*Iron Kingdoms*"), "\\*Iron Kingdoms\\*");
+    }
+
+    #[test]
+    fn escape_markdown_escapes_headings_and_links() {
+        assert_eq!(escape_markdown("# [Title](url)"),
+                   "\\# \\[Title\\]\\(url\\)");
+    }
+
+    #[test]
+    fn escape_markdown_leaves_unicode_untouched() {
+        assert_eq!(escape_markdown("Pathfinder — 2e"), "Pathfinder — 2e");
     }
 }

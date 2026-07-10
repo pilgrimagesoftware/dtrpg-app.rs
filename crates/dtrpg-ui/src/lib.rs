@@ -12,6 +12,7 @@ pub mod ui {
     pub mod app;
     pub mod library;
     pub mod views;
+    pub mod widgets;
     pub mod windows;
 }
 pub mod controllers;

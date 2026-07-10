@@ -16,6 +16,7 @@ use rust_i18n::t;
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::constants::MONOSPACE_FONT;
 use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_text;
 
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
@@ -83,10 +84,12 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                       .child(div().text_xs()
                                                   .text_color(colors.text_secondary)
                                                   .child(t!("settings.email_label")))
-                                      .child(div().text_xs()
-                                                  .font_family(MONOSPACE_FONT)
-                                                  .text_color(colors.text_tertiary)
-                                                  .child(email_text.clone())));
+                                      .child(
+                                          selectable_text("settings-account-email", email_text.clone())
+                                              .text_xs()
+                                              .font_family(MONOSPACE_FONT)
+                                              .text_color(colors.text_tertiary),
+                                      ));
 
                  // API Key
                  if let Some(hint) = &auth.api_key_hint {
@@ -96,10 +99,13 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                           .child(div().text_xs()
                                                       .text_color(colors.text_secondary)
                                                       .child(t!("settings.api_key_label")))
-                                          .child(div().text_xs()
-                                                      .font_family(MONOSPACE_FONT)
-                                                      .text_color(colors.text_tertiary)
-                                                      .child(hint.clone())));
+                                          .child(
+                                              selectable_text("settings-account-api-key",
+                                                              hint.clone())
+                                                  .text_xs()
+                                                  .font_family(MONOSPACE_FONT)
+                                                  .text_color(colors.text_tertiary),
+                                          ));
                  }
                  col
              }),
@@ -201,7 +207,9 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
                                                                 .into_element());
 
         if let Some(err) = sign_in_error {
-            form_section = form_section.child(div().text_xs().text_color(error_color).child(err));
+            form_section = form_section.child(
+                selectable_text("settings-sign-in-error", err).text_xs().text_color(error_color),
+            );
         }
 
         form_section =

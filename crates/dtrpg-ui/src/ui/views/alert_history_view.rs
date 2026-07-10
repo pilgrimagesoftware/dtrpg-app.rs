@@ -19,6 +19,7 @@ use rust_i18n::t;
 use crate::controllers::activity::ActivityController;
 use crate::data::activity::{AlertEntry, AlertHistorySnapshot};
 use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_text;
 use crate::util::datetime::{format_absolute, format_relative};
 
 /// Renders the alert history panel's content. The caller (the status bar's
@@ -146,13 +147,13 @@ fn render_entry_row(entry: &AlertEntry, text_color: gpui::Hsla, text_tertiary: g
                      .items_center()
                      .justify_between()
                      .gap(px(8.0))
-                     .child(div().text_xs()
-                                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                                 .text_color(text_color)
-                                 .min_w_0()
-                                 .flex_1()
-                                 .truncate()
-                                 .child(label))
+                     .child(div().min_w_0().flex_1().child(
+                         selectable_text(("alert-history-label", entry.id), label)
+                             .text_xs()
+                             .font_weight(gpui::FontWeight::SEMIBOLD)
+                             .text_color(text_color)
+                             .truncate(),
+                     ))
                      .child(div().id(("alert-history-ts", entry.id))
                                  .flex_none()
                                  .text_xs()
@@ -177,11 +178,11 @@ fn render_copyable_message(entry_id: u64, message: String, text_tertiary: gpui::
          .flex()
          .items_start()
          .gap(px(6.0))
-         .child(div().text_xs()
-                     .text_color(text_tertiary)
-                     .min_w_0()
-                     .flex_1()
-                     .child(message.clone()))
+         .child(div().min_w_0().flex_1().child(
+             selectable_text(("alert-history-message", entry_id), message.clone())
+                 .text_xs()
+                 .text_color(text_tertiary),
+         ))
          .child(div().flex_none().child(
              Clipboard::new(SharedString::from(format!("alert-msg-{entry_id}-copy")))
                  .value(message)
