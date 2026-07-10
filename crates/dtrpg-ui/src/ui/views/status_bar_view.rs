@@ -223,6 +223,8 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                     .left(Separator::vertical())
                     .left(active_tab_summary)
                     .right(theme_picker)
+                    .right(Separator::vertical())
                     .right(activity_panel)
+                    .right(Separator::vertical())
                     .right(notification_panel)
 }

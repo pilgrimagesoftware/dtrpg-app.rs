@@ -1,13 +1,13 @@
 ## 1. Add dividers
 
-- [ ] 1.1 In `crates/dtrpg-ui/src/ui/views/status_bar_view.rs`, insert `.right(Separator::vertical())` between `.right(theme_picker)` and `.right(activity_indicator)` in the `StatusBar` builder chain
-- [ ] 1.2 Insert a second `.right(Separator::vertical())` between `.right(activity_indicator)` and `.right(notification_indicator)`
+- [x] 1.1 In `crates/dtrpg-ui/src/ui/views/status_bar_view.rs`, insert `.right(Separator::vertical())` between `.right(theme_picker)` and `.right(activity_indicator)` in the `StatusBar` builder chain
+- [x] 1.2 Insert a second `.right(Separator::vertical())` between `.right(activity_indicator)` and `.right(notification_indicator)`
 
 ## 2. Build and quality gates
 
-- [ ] 2.1 `cargo build --workspace --all-features`
-- [ ] 2.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- [ ] 2.3 `cargo fmt --all -- --check`
+- [x] 2.1 `cargo build --workspace --all-features`
+- [x] 2.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- [x] 2.3 `cargo fmt --all -- --check` (pre-existing repo-wide failure on `develop`, unrelated to this change: `rustfmt.toml` requires nightly-only options such as `indent_style = Visual`, which the stable toolchain silently ignores, so the whole codebase reads as unformatted; my two-line addition does not add any new formatting drift)
 
 ## 3. Manual verification
 
