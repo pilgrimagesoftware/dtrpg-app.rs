@@ -118,15 +118,22 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
     let settings_for_close = settings.clone();
     cx.open_window(
         WindowOptions {
-            titlebar: Some(TitlebarOptions {
-                title: Some(t!("settings.title").to_string().into()),
-                ..Default::default()
-            }),
+            // `appears_transparent: true` hides the native opaque title bar
+            // and title text (same pattern as the main library window's
+            // `title_bar_view.rs`) while keeping the macOS traffic-light
+            // window controls, which `titlebar: None` removes entirely on
+            // this platform (there is no dedicated close-only chrome option
+            // in gpui). `is_minimizable: false` and `is_resizable: false`
+            // disable the minimize and zoom buttons, leaving only close —
+            // resizing is no longer needed now that the panel content
+            // scrolls (see `settings_view::render_settings_panel`).
+            titlebar: Some(TitlebarOptions { appears_transparent: true, ..Default::default() }),
             window_bounds: Some(WindowBounds::Windowed(Bounds {
                 origin: Point::default(),
                 size:   Size { width: px(720.), height: px(520.) },
             })),
-            is_resizable: true,
+            is_resizable: false,
+            is_minimizable: false,
             ..Default::default()
         },
         move |window, cx| {

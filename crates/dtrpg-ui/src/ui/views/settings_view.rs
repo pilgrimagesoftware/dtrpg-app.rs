@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::input::InputState;
+use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
@@ -128,7 +129,9 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
          .child(div().flex_1()
                      .min_w_0()
                      .min_h_0()
-                     .overflow_hidden()
+                     .flex()
+                     .flex_col()
+                     .overflow_y_scrollbar()
                      .child(content))
          .into_any_element()
 }

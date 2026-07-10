@@ -25,11 +25,18 @@ use crate::services::LoginService;
 #[derive(Clone, Copy, Default)]
 pub struct CacheCounts {
     /// Number of items in the cached catalog/collections metadata.
-    pub metadata_items:   usize,
+    pub metadata_items:             usize,
     /// Number of cached cover thumbnail files.
-    pub cover_thumbnails: usize,
+    pub cover_thumbnails:           usize,
     /// `true` if an avatar image is currently cached.
-    pub avatar_cached:    bool,
+    pub avatar_cached:              bool,
+    /// Unix timestamp (seconds) when the catalog/collections metadata cache
+    /// was last written. `None` when no cache metadata exists yet.
+    pub metadata_saved_at_secs:     Option<i64>,
+    /// Unix timestamp (seconds) of the last per-item availability check
+    /// batch (manual or automatic). `None` when no batch has run yet, or
+    /// predates the field being tracked.
+    pub last_item_check_batch_secs: Option<i64>,
 }
 
 // ── AuthState
@@ -392,12 +399,22 @@ impl SettingsController {
     /// full catalog parse), one `read_dir`, and one `exists()` check, all
     /// against local app-managed paths.
     pub fn cache_counts(&self) -> CacheCounts {
-        let metadata_items = load_cache_metadata(&cache_dir()).map_or(0, |m| m.item_count);
+        let metadata = load_cache_metadata(&cache_dir());
+        let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
+        let metadata_saved_at_secs =
+            metadata.as_ref()
+                    .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
+        let last_item_check_batch_secs =
+            metadata.as_ref()
+                    .and_then(|m| m.last_item_check_batch_secs)
+                    .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
         let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
                                                               .unwrap_or(0);
         CacheCounts { metadata_items,
                       cover_thumbnails,
-                      avatar_cached: avatar_cached() }
+                      avatar_cached: avatar_cached(),
+                      metadata_saved_at_secs,
+                      last_item_check_batch_secs }
     }
 
     /// Opens the OS file manager at the app cache directory, creating it
