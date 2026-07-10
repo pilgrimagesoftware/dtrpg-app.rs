@@ -507,6 +507,7 @@ impl TableDelegate for CatalogListDelegate {
         };
         let id = Arc::clone(&item.id);
         let status = item.status;
+        let title = item.title.to_string();
         let entity = self.controller.clone();
         let menu = match status {
             ItemStatus::Downloaded => {
@@ -544,14 +545,14 @@ impl TableDelegate for CatalogListDelegate {
                     PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
                         move |_, _, cx| {
                             entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
                         },
                     ),
                 )
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
+                    entity.update(cx, |ctrl, cx| ctrl.enqueue_download(&id, title.clone(), cx));
                 }),
             ),
         };
@@ -660,6 +661,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
         };
         let id = Arc::clone(&item.id);
         let status = item.status;
+        let title = item.title.to_string();
         let entity = self.controller.clone();
         let menu = match status {
             ItemStatus::Downloaded => {
@@ -697,14 +699,14 @@ impl TableDelegate for GroupedCatalogListDelegate {
                     PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
                         move |_, _, cx| {
                             entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
                         },
                     ),
                 )
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
+                    entity.update(cx, |ctrl, cx| ctrl.enqueue_download(&id, title.clone(), cx));
                 }),
             ),
         };
@@ -1645,17 +1647,20 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                     PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
                         move |_, _, cx| {
                             entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
                         },
                     ),
                 )
                  }
                  ItemStatus::Cloud => {
                      let dl_id = Arc::clone(&ctx_id);
+                     let dl_title = ctx_item.title.to_string();
                      let entity_dl = ctx_entity.clone();
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                     move |_, _, cx| {
-                        entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                        entity_dl.update(cx, |ctrl, cx| {
+                            ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                        });
                     },
                 ))
                  }
@@ -1907,17 +1912,20 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                     PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
                         move |_, _, cx| {
                             entity_remove
-                                .update(cx, |ctrl, cx| ctrl.toggle_download(&remove_id, cx));
+                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
                         },
                     ),
                 )
                  }
                  ItemStatus::Cloud => {
                      let dl_id = Arc::clone(&ctx_id);
+                     let dl_title = ctx_item.title.to_string();
                      let entity_dl = ctx_entity.clone();
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                     move |_, _, cx| {
-                        entity_dl.update(cx, |ctrl, cx| ctrl.toggle_download(&dl_id, cx));
+                        entity_dl.update(cx, |ctrl, cx| {
+                            ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                        });
                     },
                 ))
                  }

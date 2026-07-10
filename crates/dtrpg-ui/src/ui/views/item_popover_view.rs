@@ -62,6 +62,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
     let item_id = Arc::clone(&item.id);
     let item_id_for_detail = Arc::clone(&item.id);
     let item_title = item.title.to_string();
+    let item_title_for_download = item_title.clone();
 
     let content = div()
         .id("item-popover")
@@ -185,7 +186,14 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         })
                         .on_click(move |_, _, cx| {
                             let id = Arc::clone(&item_id);
-                            entity_download.update(cx, |ctrl, cx| ctrl.toggle_download(&id, cx));
+                            entity_download.update(cx, |ctrl, cx| {
+                                if is_downloaded {
+                                    ctrl.remove_download(&id, cx);
+                                }
+                                else {
+                                    ctrl.enqueue_download(&id, item_title_for_download.clone(), cx);
+                                }
+                            });
                         }),
                 )
                 .child(
