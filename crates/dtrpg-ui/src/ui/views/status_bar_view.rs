@@ -220,11 +220,11 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
         });
 
     StatusBar::new().left(library_summary)
-                    .left(Separator::vertical().h_2())
+                    .left(Separator::vertical().h_5())
                     .left(active_tab_summary)
                     .right(theme_picker)
-                    .right(Separator::vertical().h_2())
+                    .right(Separator::vertical().h_5())
                     .right(activity_panel)
-                    .right(Separator::vertical().h_2())
+                    .right(Separator::vertical().h_5())
                     .right(notification_panel)
 }
