@@ -5,27 +5,28 @@
 //! version, description) and shares no state with Advanced beyond both living
 //! in the Settings panel.
 
-use gpui::{
-    Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
-    StatefulInteractiveElement, Styled, div, px,
-};
+use gpui::prelude::FluentBuilder as _;
+use gpui::{Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::{CacheCounts, SettingsController};
 use crate::data::constants::{
     FORCE_RELOAD_COOLDOWN_SECS, ITEM_CHECK_BATCH_COOLDOWN_SECS, ITEM_CHECK_BATCH_TIMER_SECS,
-    ITEM_CHECK_COOLDOWN_SECS, STALE_SECS, THUMBNAIL_COOLDOWN_SECS,
+    ITEM_CHECK_COOLDOWN_SECS, STALE_SECS, THUMBNAIL_COOLDOWN_SECS, VALUE_FONT,
 };
 use crate::data::theme::ColorTokens;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::pluralize::pluralize;
 
-/// Formats a Unix timestamp for a tooltip as "<human readable timestamp>
-/// (<relative duration>)", e.g. "July 10, 2026 at 6:24 AM (2 hours ago)".
-fn timestamp_tooltip(ts: i64) -> String {
+/// Formats a Unix timestamp as "<human readable timestamp> (<relative
+/// duration>)", e.g. "July 10, 2026 at 6:24 AM (2 hours ago)".
+///
+/// Used as the *value* of its own key/value row (see [`render_cache_details`])
+/// rather than a tooltip, so the timestamp is visible without requiring a
+/// hover.
+fn format_timestamp(ts: i64) -> String {
     format!("{} ({})", format_absolute(ts), format_relative(ts))
 }
 
@@ -59,34 +60,15 @@ fn format_static_duration(secs: u64) -> String {
 /// Renders one "Cache details" data point: a bold label + value on one line,
 /// with a short explanatory description beneath in tertiary text.
 ///
-/// Shared by both the cache counts and the timing/cooldown constants so the
-/// three-line layout isn't repeated at each call site. `id` must be unique
-/// per row — it identifies the value element so it can carry a tooltip.
-/// When `value_timestamp` is `Some`, the value carries a tooltip showing
-/// "<human readable timestamp> (<relative duration>)" for that timestamp —
-/// used by data points backed by an actual recorded point in time (e.g. when
-/// the metadata cache was last saved), as opposed to fixed duration
-/// constants that have no timestamp to show.
-fn stat_row(id: &'static str, label: impl Into<SharedString>, value: impl Into<SharedString>,
-            value_timestamp: Option<i64>, description: impl Into<SharedString>,
-            colors: &ColorTokens)
+/// Shared by every row in the section (counts, timing constants, and
+/// timestamp rows) so the three-line layout isn't repeated at each call
+/// site.
+fn stat_row(label: impl Into<SharedString>, value: impl Into<SharedString>,
+            description: impl Into<SharedString>, colors: &ColorTokens)
             -> impl IntoElement + 'static {
     let label = label.into();
     let value = value.into();
     let description = description.into();
-    let value_el = div().id(id)
-                        .text_sm()
-                        .text_right()
-                        .text_color(colors.text_secondary)
-                        .child(value);
-    let value_el = match value_timestamp {
-        Some(ts) => {
-            let tooltip_text = timestamp_tooltip(ts);
-            value_el.tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
-                    .into_any_element()
-        }
-        None => value_el.into_any_element(),
-    };
     div().flex()
          .flex_col()
          .gap(px(2.0))
@@ -98,15 +80,20 @@ fn stat_row(id: &'static str, label: impl Into<SharedString>, value: impl Into<S
                                  .font_weight(gpui::FontWeight::MEDIUM)
                                  .text_color(colors.text_primary)
                                  .child(label))
-                     .child(value_el))
+                     .child(div().text_sm()
+                                 .text_right()
+                                 .font_family(VALUE_FONT)
+                                 .text_color(colors.text_secondary)
+                                 .child(value)))
          .child(div().text_xs()
                      .text_color(colors.text_tertiary)
                      .child(description))
 }
 
-/// Renders the "Cache details" subsection: per-type cache counts and the
-/// cache-related timeout/cooldown constants, each with a label and
-/// description.
+/// Renders the "Cache details" subsection: per-type cache counts, the
+/// cache-related timeout/cooldown constants, and — where a real timestamp
+/// exists — a companion row showing exactly when that data was last
+/// recorded, each with a label and description.
 fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens)
                         -> impl IntoElement + 'static + use<> {
     let avatar_value = if cache_counts.avatar_cached {
@@ -123,58 +110,52 @@ fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens)
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(colors.text_primary)
                      .child(t!("settings.cache_details_title")))
-         .child(stat_row("cache-stat-metadata",
-                         t!("settings.cache_metadata_label"),
+         .child(stat_row(t!("settings.cache_metadata_label"),
                          cache_counts.metadata_items.to_string(),
-                         cache_counts.metadata_saved_at_secs,
                          t!("settings.cache_metadata_description"),
                          colors))
-         .child(stat_row("cache-stat-covers",
-                         t!("settings.cache_covers_label"),
+         .when_some(cache_counts.metadata_saved_at_secs, |this, ts| {
+             this.child(stat_row(t!("settings.cache_metadata_saved_label"),
+                                 format_timestamp(ts),
+                                 t!("settings.cache_metadata_saved_description"),
+                                 colors))
+         })
+         .child(stat_row(t!("settings.cache_covers_label"),
                          cache_counts.cover_thumbnails.to_string(),
-                         None,
                          t!("settings.cache_covers_description"),
                          colors))
-         .child(stat_row("cache-stat-avatar",
-                         t!("settings.cache_avatar_label"),
+         .child(stat_row(t!("settings.cache_avatar_label"),
                          avatar_value,
-                         None,
                          t!("settings.cache_avatar_description"),
                          colors))
-         .child(stat_row("cache-stat-staleness",
-                         t!("settings.cache_staleness_label"),
+         .child(stat_row(t!("settings.cache_staleness_label"),
                          format_static_duration(STALE_SECS),
-                         None,
                          t!("settings.cache_staleness_description"),
                          colors))
-         .child(stat_row("cache-stat-reload-cooldown",
-                         t!("settings.cache_reload_cooldown_label"),
+         .child(stat_row(t!("settings.cache_reload_cooldown_label"),
                          format_static_duration(FORCE_RELOAD_COOLDOWN_SECS),
-                         None,
                          t!("settings.cache_reload_cooldown_description"),
                          colors))
-         .child(stat_row("cache-stat-item-check-cooldown",
-                         t!("settings.cache_item_check_cooldown_label"),
+         .child(stat_row(t!("settings.cache_item_check_cooldown_label"),
                          format_static_duration(ITEM_CHECK_COOLDOWN_SECS),
-                         None,
                          t!("settings.cache_item_check_cooldown_description"),
                          colors))
-         .child(stat_row("cache-stat-batch-cooldown",
-                         t!("settings.cache_batch_cooldown_label"),
+         .child(stat_row(t!("settings.cache_batch_cooldown_label"),
                          format_static_duration(ITEM_CHECK_BATCH_COOLDOWN_SECS),
-                         cache_counts.last_item_check_batch_secs,
                          t!("settings.cache_batch_cooldown_description"),
                          colors))
-         .child(stat_row("cache-stat-batch-timer",
-                         t!("settings.cache_batch_timer_label"),
+         .when_some(cache_counts.last_item_check_batch_secs, |this, ts| {
+             this.child(stat_row(t!("settings.cache_last_batch_check_label"),
+                                 format_timestamp(ts),
+                                 t!("settings.cache_last_batch_check_description"),
+                                 colors))
+         })
+         .child(stat_row(t!("settings.cache_batch_timer_label"),
                          format_static_duration(ITEM_CHECK_BATCH_TIMER_SECS),
-                         None,
                          t!("settings.cache_batch_timer_description"),
                          colors))
-         .child(stat_row("cache-stat-thumbnail-cooldown",
-                         t!("settings.cache_thumbnail_cooldown_label"),
+         .child(stat_row(t!("settings.cache_thumbnail_cooldown_label"),
                          format_static_duration(THUMBNAIL_COOLDOWN_SECS),
-                         None,
                          t!("settings.cache_thumbnail_cooldown_description"),
                          colors))
 }

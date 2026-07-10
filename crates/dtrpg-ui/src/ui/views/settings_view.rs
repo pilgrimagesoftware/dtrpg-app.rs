@@ -13,7 +13,9 @@
 use std::path::PathBuf;
 
 use gpui::prelude::*;
-use gpui::{AnyElement, Entity, FocusHandle, IntoElement, ParentElement, Styled, div, px};
+use gpui::{
+    AnyElement, Entity, FocusHandle, IntoElement, MouseButton, ParentElement, Styled, div, px,
+};
 use gpui_component::input::InputState;
 use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
@@ -114,6 +116,21 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     sign_in_error),
     };
 
+    // Reserves vertical clearance for the macOS traffic light buttons, which
+    // overlay the top-left of the window when it opens with
+    // `appears_transparent: true` (see `open_settings_window`) and no
+    // titlebar row of its own — without this, the buttons sit directly on
+    // top of the sidebar's first menu item. Also doubles as a drag handle,
+    // matching the main library window's `title_bar_view::render_title_bar`.
+    // Shorter than that view's 44px bar since there's no wordmark/title text
+    // to vertically center here — just enough to clear the traffic lights.
+    let drag_region = div().id("settings-drag-region")
+                           .h(px(28.0))
+                           .flex_none()
+                           .on_mouse_down(MouseButton::Left, |_, window, _| {
+                               window.start_window_move();
+                           });
+
     div().id("settings-window-root")
          .track_focus(focus_handle)
          .on_key_down(move |event, _window, cx| {
@@ -124,14 +141,19 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
          .size_full()
          .bg(surface)
          .flex()
-         .flex_row()
-         .child(sidebar)
+         .flex_col()
+         .child(drag_region)
          .child(div().flex_1()
-                     .min_w_0()
                      .min_h_0()
                      .flex()
-                     .flex_col()
-                     .overflow_y_scrollbar()
-                     .child(content))
+                     .flex_row()
+                     .child(sidebar)
+                     .child(div().flex_1()
+                                 .min_w_0()
+                                 .min_h_0()
+                                 .flex()
+                                 .flex_col()
+                                 .overflow_y_scrollbar()
+                                 .child(content)))
          .into_any_element()
 }

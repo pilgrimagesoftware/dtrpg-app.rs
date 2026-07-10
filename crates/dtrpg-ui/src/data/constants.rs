@@ -119,3 +119,21 @@ pub const DETAIL_TAB_TITLE_MAX_CHARS: usize = 40;
 pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
 /// Gap between the item popover and the catalog entry it's anchored beside.
 pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
+
+/// The app's serif font, set as the global default in `app::setup`. Applied
+/// explicitly wherever a value should stay this font even if the global
+/// default ever changes, rather than relying on inheritance.
+pub const VALUE_FONT: &str = "Hoefler Text";
+
+/// Platform-appropriate monospace font, used for fixed-width data such as
+/// the masked API key hint.
+#[cfg(target_os = "macos")]
+pub const MONOSPACE_FONT: &str = "Menlo";
+/// Platform-appropriate monospace font, used for fixed-width data such as
+/// the masked API key hint.
+#[cfg(target_os = "windows")]
+pub const MONOSPACE_FONT: &str = "Consolas";
+/// Platform-appropriate monospace font, used for fixed-width data such as
+/// the masked API key hint.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const MONOSPACE_FONT: &str = "Liberation Mono";
