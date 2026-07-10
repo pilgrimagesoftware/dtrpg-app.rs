@@ -193,6 +193,8 @@ collections:
   name_placeholder: "Nom de la collection…"
   reload: "Actualiser"
   delete: "Supprimer"
+  delete_confirm_title: "Supprimer « %{name} » ?"
+  delete_confirm_description: "Cette collection sera définitivement supprimée. Cette action est irréversible."
   manage_dialog_title: "Gérer les collections — %{title}"
   manage_close: "Fermer"
   manage_empty: "Aucune collection pour l'instant."
