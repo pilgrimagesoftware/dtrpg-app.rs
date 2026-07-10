@@ -4,11 +4,14 @@
 
 ## What Changes
 
-- Split `services/sdk.rs` into a `services/sdk/` module directory: `mod.rs` (the `RustSdkLibraryService` struct and its `LibraryService` impl), `gateway.rs` (the `SdkLibraryGateway` trait, `HttpSdkLibraryGateway`, `UnavailableSdkGateway`), `mapping.rs` (`map_order_product` and its helpers, `publisher_lookup`, `product_lookup`, `file_extension_label`, `last_page_from_links`), and `errors.rs` (`map_client_error`, `map_sdk_error`).
-- Split `services/collections_sdk.rs` the same way: `mod.rs`, `gateway.rs`, `errors.rs` (no separate `mapping.rs` — this file has no equivalent of `map_order_product`).
+- Consolidate `services/sdk.rs` and `services/collections_sdk.rs` into a single `services/sdk/` module, organized by domain rather than as two parallel top-level modules:
+  - `sdk/library/`: `mod.rs` (`RustSdkLibraryService` + `LibraryService` impl), `gateway.rs` (`SdkLibraryGateway` trait, `HttpSdkLibraryGateway`, `UnavailableSdkGateway`), `mapping.rs` (`map_order_product` and its helpers), `errors.rs` (`map_client_error`, `map_sdk_error`, `map_connection_error`).
+  - `sdk/collections/`: `mod.rs` (`RustSdkCollectionsService` + `CollectionsService` impl, plus `extract_member_id`/`extract_product_list_item_id`), `gateway.rs` (`SdkCollectionsGateway` trait, `HttpSdkCollectionsGateway`, `UnavailableCollectionsGateway`), `errors.rs` (same three-function shape as library's).
+  - `sdk/connection.rs`: a peer of `library`/`collections` holding what's genuinely shared between them — both domains are backed by the same `dtrpg_sdk::LibraryClient` and go through an identical credential-resolution (keyring/env) and connection-setup sequence. Returns a domain-agnostic `ConnectionError`; each domain's `errors.rs` translates it into its own service error type and wording via `map_connection_error`.
+  - `sdk/mod.rs`: re-exports `RustSdkLibraryService`/`RustSdkCollectionsService` so both keep a single public path (`crate::services::sdk::RustSdkLibraryService`, `crate::services::sdk::RustSdkCollectionsService` — the latter's path changes from the old `crate::services::collections_sdk::...`).
 - Decompose `map_order_product` (~148 lines) into named helper functions for each independent transform it currently performs inline (publisher resolution, cover-URL resolution, kind/format derivation, file list mapping, year/date parsing), each under the 50-line function guideline.
 - Move each file's `#[cfg(test)] mod tests` block to live alongside the code it actually tests, per this repo's Rust convention (unit tests colocated in the module under test) rather than one large trailing block.
-- **No behavior change**: this is a structural reorganization only. Public API surface (`RustSdkLibraryService`, `RustSdkCollectionsService`, and what they implement) is unchanged; only internal file/module layout and function decomposition change.
+- **No behavior change**: this is a structural reorganization only. `RustSdkLibraryService` and `RustSdkCollectionsService`'s behavior (and `RustSdkLibraryService`'s import path) are unchanged; `RustSdkCollectionsService`'s import path moves from `crate::services::collections_sdk::` to `crate::services::sdk::` (updated at its one call site in `app/mod.rs`).
 
 ## Capabilities
 
@@ -20,7 +23,7 @@
 
 ## Impact
 
-- Affected files: `crates/dtrpg-core/src/services/sdk.rs` (deleted, replaced by `sdk/mod.rs`, `sdk/gateway.rs`, `sdk/mapping.rs`, `sdk/errors.rs`), `crates/dtrpg-core/src/services/collections_sdk.rs` (deleted, replaced by `collections_sdk/mod.rs`, `collections_sdk/gateway.rs`, `collections_sdk/errors.rs`), `crates/dtrpg-core/src/services/mod.rs` (module declarations, if paths change).
+- Affected files: `crates/dtrpg-core/src/services/sdk.rs` and `crates/dtrpg-core/src/services/collections_sdk.rs` (both deleted), replaced by `sdk/{mod.rs,connection.rs}`, `sdk/library/{mod,gateway,mapping,errors}.rs`, `sdk/collections/{mod,gateway,errors}.rs`; `crates/dtrpg-core/src/services/mod.rs` (drops the `collections_sdk` module declaration); `crates/dtrpg-core/src/app/mod.rs` (its one `crate::services::collections_sdk::RustSdkCollectionsService` reference updated to `crate::services::sdk::RustSdkCollectionsService`).
 - `login.rs` (105 lines) is unaffected — already well within size limits.
-- No changes to `dtrpg-ui`, `dtrpg-sdk`, or any other crate; nothing outside `dtrpg-core/src/services/` imports these files' private items, only the public `RustSdkLibraryService`/`RustSdkCollectionsService` types and their trait impls, which keep their existing paths (`crate::services::sdk::RustSdkLibraryService`, `crate::services::collections_sdk::RustSdkCollectionsService`).
-- Risk is limited to compile-time breakage (missed `use` after moving items) and accidental behavior drift while decomposing `map_order_product`; both are caught by `cargo check`/`clippy`/existing test suite, which this change must keep green with zero test behavior changes.
+- No changes to `dtrpg-ui`, `dtrpg-sdk`, or any other crate.
+- Risk is limited to compile-time breakage (missed `use` after moving items) and accidental behavior drift while decomposing `map_order_product` or extracting the shared `connection.rs`; both are caught by `cargo check`/`clippy`/existing test suite, which this change must keep green with zero test behavior changes.

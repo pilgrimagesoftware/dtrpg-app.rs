@@ -1,66 +1,65 @@
 ## 1. Pre-flight
 
-- [ ] 1.1 Grep the workspace for any external references to private/internal items in `sdk.rs`
+- [x] 1.1 Grep the workspace for any external references to private/internal items in `sdk.rs`
   and `collections_sdk.rs` (not `RustSdkLibraryService`/`RustSdkCollectionsService` themselves)
   to confirm nothing outside these two files depends on them.
-- [ ] 1.2 Record the current `cargo test --workspace` pass count (unit + doc tests) as a
+  - Confirmed: only `RustSdkLibraryService::{from_keyring_with_tokens,unauthenticated}` and
+    `RustSdkCollectionsService::{from_keyring_with_tokens,unauthenticated}` are referenced
+    externally, both from `dtrpg-core/src/app/mod.rs`.
+- [x] 1.2 Record the current `cargo test --workspace` pass count (unit + doc tests) as a
   baseline to diff against after the split.
+  - Baseline: dtrpg-core 36 unit tests, dtrpg-ui 189 unit tests + 10 doc-tests.
 
-## 2. Split services/sdk.rs
+## 2. First pass: two parallel top-level modules (superseded)
 
-- [ ] 2.1 Create `crates/dtrpg-core/src/services/sdk/` directory.
-- [ ] 2.2 Create `sdk/gateway.rs`: move the `SdkLibraryGateway` trait, `HttpSdkLibraryGateway`
-  (struct + impls), and `UnavailableSdkGateway` (struct + impls), plus their imports.
-- [ ] 2.3 Create `sdk/errors.rs`: move `map_client_error` and `map_sdk_error`, plus their
-  imports.
-- [ ] 2.4 Create `sdk/mapping.rs`: move `last_page_from_links`, `publisher_lookup`,
-  `product_lookup`, `file_extension_label`, and `map_order_product`, plus their imports.
-- [ ] 2.5 In `sdk/mapping.rs`, decompose `map_order_product` into `resolve_publisher`,
-  `resolve_cover_url` (or a `resolve_product_info`/`resolve_cover_url` pair), `resolve_kind`,
-  `resolve_format`, `map_files`, and `resolve_year` helper functions, per design.md's
-  decomposition boundaries; `map_order_product` becomes an orchestrator under ~50 lines.
-- [ ] 2.6 Create `sdk/mod.rs`: keep the `RustSdkLibraryService` struct and its `LibraryService`
-  impl (currently lines ~48-268 of the original `sdk.rs`), plus `pub(crate) use` / `mod`
-  declarations wiring up `gateway`, `errors`, `mapping` as needed.
-- [ ] 2.7 Move each moved item's existing tests into a `#[cfg(test)] mod tests` colocated in
-  the new file that owns the code under test (mapping tests -> `sdk/mapping.rs`; gateway/service
-  tests -> `sdk/mod.rs` or `sdk/gateway.rs`, whichever owns the tested code; pagination
-  (`last_page_from_links_*`) tests -> `sdk/mapping.rs`). Move shared test helpers (stub
-  gateways, `seeded()`/`order_product_item()`/`pagination_links()` builders) alongside the
-  tests that use them, duplicating into more than one file only if genuinely needed by tests
-  in more than one new file.
-- [ ] 2.8 Delete the original `crates/dtrpg-core/src/services/sdk.rs`.
+- [x] 2.1 Split `sdk.rs` into `services/sdk/{mod,gateway,mapping,errors}.rs` and
+  `collections_sdk.rs` into `services/collections_sdk/{mod,gateway,errors}.rs`, each with
+  `map_order_product` decomposed into helpers and tests colocated per file.
+  - Superseded by section 3: after implementing and verifying this layout, feedback was to
+    consolidate everything SDK-related under a single `sdk` module organized by domain, with
+    genuinely shared code (the connection-building logic, which turned out to be duplicated
+    verbatim between the two gateways) hoisted to a peer module. Reworked before merging;
+    the intermediate two-top-level-module state was never committed as final.
 
-## 3. Split services/collections_sdk.rs
+## 3. Consolidate into a single `sdk` module organized by domain
 
-- [ ] 3.1 Create `crates/dtrpg-core/src/services/collections_sdk/` directory.
-- [ ] 3.2 Create `collections_sdk/gateway.rs`: move the `SdkCollectionsGateway` trait,
-  `HttpSdkCollectionsGateway` (struct + impls), and `UnavailableCollectionsGateway`
-  (struct + impls), plus their imports.
-- [ ] 3.3 Create `collections_sdk/errors.rs`: move `map_client_error` and `map_sdk_error`
-  (this file's versions, distinct from `sdk/errors.rs`'s), plus their imports.
-- [ ] 3.4 Create `collections_sdk/mod.rs`: keep the `RustSdkCollectionsService` struct and its
-  `CollectionsService` impl, plus `mod` declarations for `gateway` and `errors`.
-- [ ] 3.5 Move each moved item's existing tests into a `#[cfg(test)] mod tests` colocated in
-  the new file that owns the code under test, same approach as task 2.7.
-- [ ] 3.6 Delete the original `crates/dtrpg-core/src/services/collections_sdk.rs`.
+- [x] 3.1 Restructure into `services/sdk/{mod.rs,connection.rs,library/,collections/}`:
+  `library/{mod,gateway,mapping,errors}.rs` (moved from the section-2 `sdk/` layout, gateway
+  slimmed to use `connection.rs`) and `collections/{mod,gateway,errors}.rs` (moved from the
+  section-2 `collections_sdk/` layout, same gateway slimming). `sdk/mod.rs` re-exports
+  `RustSdkLibraryService` and `RustSdkCollectionsService`.
+- [x] 3.2 Extract `sdk/connection.rs`: `SdkConnection { client, runtime }`, a domain-agnostic
+  `ConnectionError` enum, `connect_from_keyring_with_tokens`/`connect_from_environment`
+  builders, and the shared `build_connection` helper — replacing the near-identical
+  `HttpSdkLibraryGateway`/`HttpSdkCollectionsGateway` `from_keyring_with_tokens`/
+  `from_environment`/`build` bodies (~90 lines each) with thin per-domain wrappers.
+- [x] 3.3 Add `map_connection_error` to `library/errors.rs` and `collections/errors.rs`,
+  translating `ConnectionError` into each domain's own error type and exact wording
+  (verified against the original inline messages, including the "library"/"collections"
+  word difference and identical kind classification).
+- [x] 3.4 Remove `crates/dtrpg-core/src/services/collections_sdk.rs`/`collections_sdk/` and
+  the old flat `services/sdk/{gateway,errors}.rs`; drop `pub mod collections_sdk;` from
+  `services/mod.rs`.
+- [x] 3.5 Update the one external call site: `app/mod.rs`'s
+  `crate::services::collections_sdk::RustSdkCollectionsService` -> `crate::services::sdk::
+  RustSdkCollectionsService`. `RustSdkLibraryService`'s path is unchanged.
 
-## 4. Update module wiring
+## 4. Verify
 
-- [ ] 4.1 Update `crates/dtrpg-core/src/services/mod.rs` if its `mod sdk;`/`mod collections_sdk;`
-  declarations or any re-exports need adjustment for the new directory layout (typically
-  unchanged, since `sdk.rs` -> `sdk/mod.rs` keeps the same module path).
-- [ ] 4.2 Grep for any `use crate::services::sdk::...` / `use crate::services::collections_sdk::...`
-  imports elsewhere in the workspace and confirm they still resolve unchanged.
-
-## 5. Verify
-
-- [ ] 5.1 Run `cargo check --workspace --all-targets`.
-- [ ] 5.2 Run `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-- [ ] 5.3 Run `cargo fmt --all -- --check` and note whether any new diffs are introduced by
-  this change specifically (vs. pre-existing repo-wide drift).
-- [ ] 5.4 Run `cargo test --workspace` and confirm the pass count matches the task 1.2 baseline
-  exactly (same tests, same outcomes) — zero behavior change is the acceptance bar for this
-  change.
-- [ ] 5.5 Confirm every new file under `services/sdk/` and `services/collections_sdk/` is at or
-  under 700 lines, and `map_order_product`'s extracted helpers are each at or under 50 lines.
+- [x] 4.1 Run `cargo check --workspace --all-targets`. — Passes clean.
+- [x] 4.2 Run `cargo clippy --workspace --all-targets --all-features -- -D warnings`. — Passes
+  clean, zero warnings.
+- [x] 4.3 Run `cargo +nightly fmt --all -- --check`. — This repo's `rustfmt.toml` sets
+  `unstable_features = true` (per `docs/rust.md`, formatting requires `+nightly`, not stable
+  `cargo fmt`). Ran `cargo +nightly fmt --all`, then `-- --check` passes clean, zero diffs.
+- [x] 4.4 Run `cargo test --workspace` and confirm the pass count matches the task 1.2
+  baseline exactly.
+  - dtrpg-core: 36 passed, 0 failed. dtrpg-ui: 189 passed + 10 doc-tests, 0 failed. Matches
+    baseline exactly.
+- [x] 4.5 Confirm every file is at or under 700 lines, and `map_order_product`'s extracted
+  helpers are each at or under 50 lines.
+  - `sdk/connection.rs` 105, `sdk/mod.rs` 14, `library/errors.rs` 99, `library/gateway.rs` 90
+    (down from 157 pre-consolidation), `library/mapping.rs` 640 (mostly tests),
+    `library/mod.rs` 473, `collections/errors.rs` 96, `collections/gateway.rs` 228 (down from
+    295), `collections/mod.rs` 405 — all under 700. Extracted `map_order_product` helpers all
+    under 50 lines; `map_order_product` itself is 54 (see design.md's noted exception).
