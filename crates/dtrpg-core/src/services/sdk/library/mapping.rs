@@ -29,11 +29,23 @@ pub(super) fn last_page_from_links(links: &PaginationLinks) -> Option<u32> {
     digits.parse::<u32>().ok().filter(|&n| n > 0)
 }
 
-pub(super) fn publisher_lookup(included: &[IncludedItem]) -> HashMap<u64, String> {
+/// Builds a lookup from JSON:API resource id (e.g.
+/// `"/api/vBeta/publishers/117"`) to publisher display name, from one page's
+/// `included` array.
+///
+/// Keyed by resource id — not `royalty_publisher_id` — because the live API
+/// has been observed to return an ordered product whose `royaltyPublisherId`
+/// does not match the id referenced by its own `relationships.publisher`
+/// (e.g. a reprint/white-label arrangement): matching on `royalty_publisher_id`
+/// silently resolves to the wrong publisher's entry (or no entry at all) in
+/// that case. Each ordered product's `relationships.publisher.data.id` is the
+/// correct key into this map — see [`resolve_publisher`].
+pub(super) fn publisher_lookup(included: &[IncludedItem]) -> HashMap<String, String> {
     included.iter()
-            .filter_map(IncludedItem::as_publisher)
-            .filter(|publisher| publisher.publisher_id > 0)
-            .map(|publisher| (publisher.publisher_id, publisher.name))
+            .filter_map(|entry| {
+                entry.as_publisher()
+                     .map(|publisher| (entry.id.clone(), publisher.name))
+            })
             .collect()
 }
 
@@ -65,14 +77,23 @@ fn file_extension_label(filename: &str) -> Option<String> {
 
 // Prefer the publisher name embedded directly on `attributes.publisher`
 // (present on newer API responses); fall back to the sideloaded `included`
-// publisher lookup, then a placeholder.
-fn resolve_publisher(attributes: &OrderProductAttributes, publishers: &HashMap<u64, String>)
-                     -> String {
-    attributes.publisher
-              .as_ref()
-              .map(|p| p.name.clone())
-              .or_else(|| publishers.get(&attributes.royalty_publisher_id).cloned())
-              .unwrap_or_else(|| format!("Publisher {}", attributes.royalty_publisher_id))
+// publisher lookup resolved via `relationships.publisher.data.id` (see
+// `publisher_lookup`'s doc comment for why this must be relationship-based
+// rather than keyed by `royalty_publisher_id`); finally fall back to a
+// placeholder if neither source resolves.
+fn resolve_publisher(item: &OrderProductItem, publishers: &HashMap<String, String>) -> String {
+    item.attributes
+        .publisher
+        .as_ref()
+        .map(|p| p.name.clone())
+        .or_else(|| {
+            item.relationships
+                .as_ref()
+                .and_then(|r| r.publisher.as_ref())
+                .and_then(|r| r.data.as_ref())
+                .and_then(|d| publishers.get(&d.id).cloned())
+        })
+        .unwrap_or_else(|| format!("Publisher {}", item.attributes.royalty_publisher_id))
 }
 
 // The live API resolves `Product` metadata (cover images) via
@@ -174,7 +195,7 @@ fn resolve_year(attributes: &OrderProductAttributes) -> u32 {
               .unwrap_or(0)
 }
 
-pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u64, String>,
+pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<String, String>,
                                 products: &HashMap<String, OrderProductInfo>, order: u32)
                                 -> LibraryItem {
     let attributes = &item.attributes;
@@ -183,7 +204,7 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<u6
                                .max(item.id.parse::<u64>().unwrap_or_default())
                                .max(attributes.product_id);
 
-    let publisher = resolve_publisher(attributes, publishers);
+    let publisher = resolve_publisher(item, publishers);
     let product_info = resolve_product_info(item, products);
     let cover_url = resolve_cover_url(product_info);
     let kind = resolve_kind(attributes);
@@ -540,7 +561,12 @@ mod tests {
         let mut item = order_product_item(515_276, "The Wellspring");
         item.attributes.royalty_publisher_id = 4952;
         item.relationships = Some(OrderProductRelationships {
-            publisher: None,
+            publisher: Some(RelationshipRef {
+                data: Some(RelationshipData {
+                    resource_type: "Publisher".to_string(),
+                    id: "/api/vBeta/publishers/4952".to_string(),
+                }),
+            }),
             product: Some(RelationshipRef {
                 data: Some(RelationshipData {
                     resource_type: "Product".to_string(),
@@ -566,7 +592,7 @@ mod tests {
                                            filesize:      Some(24.13), });
 
         let mut publishers = HashMap::new();
-        publishers.insert(4952, "Monte Cook Games".to_string());
+        publishers.insert("/api/vBeta/publishers/4952".to_string(), "Monte Cook Games".to_string());
 
         let mapped = map_order_product(&item, &publishers, &products, 0);
 
@@ -606,14 +632,61 @@ mod tests {
 
     #[test]
     fn map_order_product_falls_back_to_publisher_lookup_when_not_embedded() {
-        let item = order_product_item(7, "No Embedded Publisher");
+        let mut item = order_product_item(7, "No Embedded Publisher");
+        item.relationships = Some(OrderProductRelationships {
+            publisher: Some(RelationshipRef {
+                data: Some(RelationshipData {
+                    resource_type: "Publisher".to_string(),
+                    id: "/api/vBeta/publishers/7".to_string(),
+                }),
+            }),
+            product: None,
+            order: None,
+        });
         let mut publishers = HashMap::new();
-        publishers.insert(7, "Lantern Press".to_string());
+        publishers.insert("/api/vBeta/publishers/7".to_string(), "Lantern Press".to_string());
 
         let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
 
         assert_eq!(mapped.publisher.as_ref(), "Lantern Press");
         assert!(mapped.cover_url.is_none());
+    }
+
+    #[test]
+    fn map_order_product_resolves_publisher_by_relationship_id_not_royalty_publisher_id() {
+        // Confirmed live against a real account: an ordered product's
+        // `royaltyPublisherId` does not always match the id referenced by its
+        // own `relationships.publisher` (e.g. a reprint/white-label deal).
+        // Matching on `royalty_publisher_id` alone silently resolves to the
+        // wrong publisher entry (or none at all) in that case.
+        let mut item = order_product_item(9_988_031, "Some Reprinted Title");
+        item.attributes.royalty_publisher_id = 526;
+        item.relationships = Some(OrderProductRelationships {
+            publisher: Some(RelationshipRef {
+                data: Some(RelationshipData {
+                    resource_type: "Publisher".to_string(),
+                    id: "/api/vBeta/publishers/342".to_string(),
+                }),
+            }),
+            product: None,
+            order: None,
+        });
+
+        let mut publishers = HashMap::new();
+        publishers.insert("/api/vBeta/publishers/342".to_string(), "RPGnet".to_string());
+
+        let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
+
+        assert_eq!(mapped.publisher.as_ref(), "RPGnet");
+    }
+
+    #[test]
+    fn map_order_product_falls_back_to_placeholder_when_publisher_unresolvable() {
+        let item = order_product_item(7, "No Publisher Anywhere");
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        assert_eq!(mapped.publisher.as_ref(), "Publisher 7");
     }
 
     #[test]

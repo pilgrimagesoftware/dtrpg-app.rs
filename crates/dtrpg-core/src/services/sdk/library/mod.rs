@@ -253,7 +253,8 @@ mod tests {
 
     use dtrpg_sdk::{
         FileChecksum, OrderProductAttributes, OrderProductFile, OrderProductItem,
-        OrderProductItemResponse, OrderProductListResponse, PaginationLinks, PaginationMeta,
+        OrderProductItemResponse, OrderProductListResponse, OrderProductRelationships,
+        PaginationLinks, PaginationMeta, RelationshipData, RelationshipRef,
     };
 
     use super::*;
@@ -265,7 +266,17 @@ mod tests {
 
     impl FakeSdkGateway {
         fn seeded() -> Self {
-            let item = order_product_item(42, "A Better Dungeon");
+            let mut item = order_product_item(42, "A Better Dungeon");
+            item.relationships = Some(OrderProductRelationships {
+                publisher: Some(RelationshipRef {
+                    data: Some(RelationshipData {
+                        resource_type: "Publisher".to_string(),
+                        id: "/api/vBeta/publishers/7".to_string(),
+                    }),
+                }),
+                product: None,
+                order: None,
+            });
             Self { list_result:
                        Ok(OrderProductListResponse { links:    pagination_links(None),
                                                      meta:     PaginationMeta { items_per_page: 100,

@@ -221,11 +221,12 @@ pub fn publisher_dir(root: &Path, publisher: &str) -> PathBuf {
     root.join("items").join(sanitize_path_component(publisher))
 }
 
-/// Strips a leading path separator and replaces any remaining ones, so the
-/// result can never be (or contain) an absolute path component when joined
-/// onto another path.
+/// Strips a leading path separator, replaces any remaining path separators,
+/// and converts spaces to underscores, so the result can never be (or
+/// contain) an absolute path component when joined onto another path and
+/// reads as a single filesystem-friendly token.
 fn sanitize_path_component(value: &str) -> String {
-    value.trim_start_matches('/').replace('/', "_")
+    value.trim_start_matches('/').replace(['/', ' '], "_")
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -271,6 +272,14 @@ mod tests {
                                   max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         let publisher_path = cfg.path_for_publisher("/Evil/Publisher");
         assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Evil_Publisher"));
+    }
+
+    #[test]
+    fn path_for_publisher_converts_spaces_to_underscores() {
+        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+        let publisher_path = cfg.path_for_publisher("The Forge Studios");
+        assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
     }
 
     #[test]

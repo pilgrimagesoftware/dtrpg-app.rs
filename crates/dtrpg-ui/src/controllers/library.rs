@@ -2379,8 +2379,9 @@ impl LibraryController {
             let flag = Arc::clone(&cancel_flag);
             Arc::new(move || flag.store(true, std::sync::atomic::Ordering::SeqCst))
         };
+        let label = format!("Downloading {title}...");
         let activity_id = self.activity
-                              .update(cx, |a, cx| a.start(&title, Some(cancel_fn), cx));
+                              .update(cx, |a, cx| a.start(&label, Some(cancel_fn), cx));
         self.download_activity_ids
             .insert(Arc::clone(&item_id), activity_id);
 
