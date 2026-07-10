@@ -123,8 +123,12 @@ pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
 /// Platform-appropriate sans-serif font, used to visually distinguish data
 /// values (e.g. Advanced settings' "Cache details" rows) from the app's
 /// default serif body font (`Hoefler Text`, set in `app::setup`).
+///
+/// Optima rather than a geometric sans like Helvetica Neue: its flared,
+/// slightly calligraphic stroke terminals read as a companion to Hoefler
+/// Text's old-style serif warmth instead of a jarring stylistic clash.
 #[cfg(target_os = "macos")]
-pub const VALUE_FONT: &str = "Helvetica Neue";
+pub const VALUE_FONT: &str = "Optima";
 /// Platform-appropriate sans-serif font, used to visually distinguish data
 /// values (e.g. Advanced settings' "Cache details" rows) from the app's
 /// default serif body font (`Hoefler Text`, set in `app::setup`).
