@@ -537,6 +537,104 @@ impl LibraryRootView {
                collection_search_input,
                last_menu_state: None }
     }
+
+    /// Opens the Settings window, or brings an already-open one to front.
+    ///
+    /// Extracted so both the `ShowSettings` action bound on this view's root
+    /// element and the app-level fallback in `ui::app::setup` (which fires
+    /// when no element in the window's dispatch path currently owns focus)
+    /// share one implementation.
+    pub(crate) fn show_settings(&mut self, cx: &mut Context<Self>) {
+        let already_open = self.settings_window
+                               .map(|handle| {
+                                   handle.update(cx, |_, window, _| window.activate_window())
+                                         .is_ok()
+                               })
+                               .unwrap_or(false);
+        if !already_open {
+            self.settings.update(cx, |ctrl, cx| ctrl.open(cx));
+            let handle = open_settings_window(self.settings.clone(),
+                                              self.file_opener_extension_input.clone(),
+                                              cx);
+            self.settings_window = Some(handle);
+        }
+    }
+
+    /// Toggles the Activity panel. See [`Self::show_settings`] for why this
+    /// is a method rather than inline closure logic.
+    pub(crate) fn show_activity(&mut self, cx: &mut Context<Self>) {
+        self.activity.update(cx, |a, cx| a.toggle_panel(cx));
+    }
+
+    /// Toggles the Alert History panel. See [`Self::show_settings`] for why
+    /// this is a method rather than inline closure logic.
+    pub(crate) fn show_alert_history(&mut self, cx: &mut Context<Self>) {
+        self.activity.update(cx, |a, cx| a.toggle_alert_panel(cx));
+    }
+
+    /// Opens the "Add Collection" dialog. See [`Self::show_settings`] for why
+    /// this is a method rather than inline closure logic.
+    pub(crate) fn show_add_collection_dialog(&mut self, window: &mut gpui::Window,
+                                             cx: &mut Context<Self>) {
+        let ctrl = self.controller.clone();
+        let input = self.collection_name_input.clone();
+        window.open_dialog(cx, move |dialog, _window, _cx| {
+                  let ctrl = ctrl.clone();
+                  let input = input.clone();
+                  dialog
+                .close_button(false)
+                .overlay_closable(true)
+                .w(px(320.))
+                // Visible Cancel/Create buttons are rendered via `.footer(...)`
+                // below (wrapped in `DialogClose`/`DialogAction`, which dispatch
+                // the same `CancelDialog`/`ConfirmDialog` actions Escape/Enter
+                // use), so the callbacks registered here run regardless of
+                // whether the user clicks a button or uses the keyboard.
+                .on_ok({
+                    let input = input.clone();
+                    let ctrl = ctrl.clone();
+                    move |_, _, cx| {
+                        let name = input.read(cx).value().trim().to_string();
+                        if name.is_empty() {
+                            return false;
+                        }
+                        ctrl.update(cx, |c, cx| c.create_collection(name, cx));
+                        true
+                    }
+                })
+                .on_cancel(|_, _, _| true)
+                .content({
+                    let input = input.clone();
+                    move |content, _, _| {
+                        content
+                            .child(
+                                DialogHeader::new().px_4().pt_4().child(
+                                    DialogTitle::new().child(t!("collections.add_dialog_title")),
+                                ),
+                            )
+                            .child(div().px_4().py_2().child(Input::new(&input)))
+                    }
+                })
+                .footer(
+                    DialogFooter::new()
+                        .px_4()
+                        .pb_4()
+                        .child(
+                            DialogClose::new().child(
+                                Button::new("cancel-collection")
+                                    .label(t!("collections.add_dialog_cancel")),
+                            ),
+                        )
+                        .child(
+                            DialogAction::new().child(
+                                Button::new("confirm-collection")
+                                    .primary()
+                                    .label(t!("collections.add_dialog_confirm")),
+                            ),
+                        ),
+                )
+              });
+    }
 }
 
 impl Focusable for LibraryRootView {
@@ -714,16 +812,13 @@ impl Render for LibraryRootView {
 
         let sidebar_col = div().size_full().relative().child(sidebar);
 
-        let settings_for_action = self.settings.clone();
-        let file_opener_input_for_settings_window = self.file_opener_extension_input.clone();
         let this_entity = cx.entity();
+        let this_entity_for_add = this_entity.clone();
+        let this_entity_for_activity = this_entity.clone();
+        let this_entity_for_alert_history = this_entity.clone();
         let controller_for_reload = self.controller.clone();
         let controller_for_refresh_thumbnails = self.controller.clone();
         let controller_for_check_availability = self.controller.clone();
-        let controller_for_add = self.controller.clone();
-        let collection_input_for_add = self.collection_name_input.clone();
-        let activity_for_show = self.activity.clone();
-        let activity_for_alert_history = self.activity.clone();
         let controller_for_view_list = self.controller.clone();
         let controller_for_view_thumbs = self.controller.clone();
         let controller_for_view_grid = self.controller.clone();
@@ -754,25 +849,7 @@ impl Render for LibraryRootView {
             .relative()
             .track_focus(&self.root_focus)
             .on_action(move |_: &ShowSettings, _, cx| {
-                let already_open = this_entity.read(cx)
-                                              .settings_window
-                                              .map(|handle| {
-                                                  handle.update(cx, |_, window, _| {
-                                                            window.activate_window();
-                                                        })
-                                                        .is_ok()
-                                              })
-                                              .unwrap_or(false);
-                if !already_open {
-                    settings_for_action.update(cx, |ctrl, cx| ctrl.open(cx));
-                    let handle =
-                        open_settings_window(settings_for_action.clone(),
-                                             file_opener_input_for_settings_window.clone(),
-                                             cx);
-                    this_entity.update(cx, |view, _cx| {
-                                   view.settings_window = Some(handle);
-                               });
-                }
+                this_entity.update(cx, |view, cx| view.show_settings(cx));
             })
             .on_action(move |_: &About, window, cx| {
                 window.open_dialog(cx, move |dialog, _window, _cx| {
@@ -875,71 +952,15 @@ impl Render for LibraryRootView {
                 search_input_for_focus.update(cx, |input, cx| input.focus(window, cx));
             })
             .on_action(move |_: &AddCollection, window, cx| {
-                let ctrl = controller_for_add.clone();
-                let input = collection_input_for_add.clone();
-                window.open_dialog(cx, move |dialog, _window, _cx| {
-                    let ctrl = ctrl.clone();
-                    let input = input.clone();
-                    dialog
-                        .close_button(false)
-                        .overlay_closable(true)
-                        .w(px(320.))
-                        // Visible Cancel/Create buttons are rendered via `.footer(...)`
-                        // below (wrapped in `DialogClose`/`DialogAction`, which dispatch
-                        // the same `CancelDialog`/`ConfirmDialog` actions Escape/Enter
-                        // use), so the callbacks registered here run regardless of
-                        // whether the user clicks a button or uses the keyboard.
-                        .on_ok({
-                            let input = input.clone();
-                            let ctrl = ctrl.clone();
-                            move |_, _, cx| {
-                                let name = input.read(cx).value().trim().to_string();
-                                if name.is_empty() {
-                                    return false;
-                                }
-                                ctrl.update(cx, |c, cx| c.create_collection(name, cx));
-                                true
-                            }
-                        })
-                        .on_cancel(|_, _, _| true)
-                        .content({
-                            let input = input.clone();
-                            move |content, _, _| {
-                                content
-                                    .child(
-                                        DialogHeader::new().px_4().pt_4().child(
-                                            DialogTitle::new()
-                                                .child(t!("collections.add_dialog_title")),
-                                        ),
-                                    )
-                                    .child(div().px_4().py_2().child(Input::new(&input)))
-                            }
-                        })
-                        .footer(
-                            DialogFooter::new()
-                                .px_4()
-                                .pb_4()
-                                .child(
-                                    DialogClose::new().child(
-                                        Button::new("cancel-collection")
-                                            .label(t!("collections.add_dialog_cancel")),
-                                    ),
-                                )
-                                .child(
-                                    DialogAction::new().child(
-                                        Button::new("confirm-collection")
-                                            .primary()
-                                            .label(t!("collections.add_dialog_confirm")),
-                                    ),
-                                ),
-                        )
-                });
+                this_entity_for_add.update(cx, |view, cx| {
+                                       view.show_add_collection_dialog(window, cx);
+                                   });
             })
             .on_action(move |_: &ShowActivity, _, cx| {
-                activity_for_show.update(cx, |a, cx| a.toggle_panel(cx));
+                this_entity_for_activity.update(cx, |view, cx| view.show_activity(cx));
             })
             .on_action(move |_: &ShowAlertHistory, _, cx| {
-                activity_for_alert_history.update(cx, |a, cx| a.toggle_alert_panel(cx));
+                this_entity_for_alert_history.update(cx, |view, cx| view.show_alert_history(cx));
             })
             .when(tab_target_at(&tabs_snap, 0).is_some(), |this| {
                 this.on_action(move |_: &SelectTab0, _, cx| {

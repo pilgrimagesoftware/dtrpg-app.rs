@@ -202,7 +202,7 @@ menu:
   catalog_add_collection: "Sammlung hinzufügen…"
   catalog_reload: "Neu laden"
   catalog_refresh_thumbnails: "Miniaturansichten aktualisieren"
-  catalog_check_availability: "Auf Updates prüfen"
+  catalog_check_availability: "Verfügbarkeit prüfen"
   edit_title: "Bearbeiten"
   edit_undo: "Rückgängig"
   edit_redo: "Wiederholen"

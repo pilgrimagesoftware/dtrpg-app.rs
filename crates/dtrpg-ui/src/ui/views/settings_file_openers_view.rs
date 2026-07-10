@@ -12,6 +12,7 @@ use rust_i18n::t;
 use crate::controllers::settings::SettingsController;
 use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_text;
 
 /// Renders the File Openers settings section.
 ///
@@ -129,12 +130,11 @@ fn render_pending_row(app_path: &std::path::Path, extension_input: Entity<InputS
          // ── Extension input ───────────────────────────────────────────────
          .child(div().w(px(90.0)).child(Input::new(&extension_input)))
          // ── App name ──────────────────────────────────────────────────────
-         .child(div().flex_1()
-                     .min_w_0()
-                     .text_sm()
-                     .text_color(text_secondary)
-                     .truncate()
-                     .child(app_name))
+         .child(div().flex_1().min_w_0().child(
+             selectable_text("file-opener-pending-app-name", app_name).text_sm()
+                                                                       .text_color(text_secondary)
+                                                                       .truncate(),
+         ))
          // ── Cancel button ─────────────────────────────────────────────────
          .child(div().id("cancel-pending-file-opener")
                      .size(px(28.0))
@@ -197,10 +197,12 @@ fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<Sett
                      .flex()
                      .items_center()
                      .gap(px(6.0))
-                     .child(div().text_sm()
-                                 .text_color(text_secondary)
-                                 .truncate()
-                                 .child(app_name))
+                     .child(
+                         selectable_text(format!("file-opener-app-name-{extension}"), app_name)
+                             .text_sm()
+                             .text_color(text_secondary)
+                             .truncate(),
+                     )
                      .when(is_stale, |el| {
                          el.child(div().text_xs()
                                        .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0)) // amber warning

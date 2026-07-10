@@ -67,6 +67,21 @@ pub struct LoginServiceFactory(pub Box<dyn Fn() -> Box<dyn LoginService> + Send 
 
 impl Global for LoginServiceFactory {}
 
+/// Handle to the library window and its root view, set once the window opens.
+///
+/// Lets app-level action fallbacks in [`setup`] (registered via `cx.on_action`,
+/// which fire regardless of which element currently has keyboard focus) reach
+/// the library window's state even when no element in its focus/dispatch path
+/// owns the relevant `on_action` handler — see the
+/// `ShowSettings`/`ShowActivity`/ `ShowAlertHistory`/`AddCollection` fallbacks
+/// below.
+struct LibraryWindowHandle {
+    view:   Entity<LibraryRootView>,
+    window: WindowHandle<Root>,
+}
+
+impl Global for LibraryWindowHandle {}
+
 /// Opens the library window in the unauthenticated state.
 ///
 /// The window opens immediately. If `startup_api_key` is `Some`, the root view
@@ -81,7 +96,8 @@ impl Global for LoginServiceFactory {}
 pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(None);
     let collections_service = (cx.global::<CollectionsServiceFactory>().0)(None);
-    cx.open_window(
+    let mut library_view = None;
+    let window = cx.open_window(
         WindowOptions {
             titlebar: Some(TitlebarOptions {
                 title: Some(t!("sidebar.app_name").to_string().into()),
@@ -90,14 +106,18 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
             }),
             ..Default::default()
         },
-        move |window, cx| {
+        |window, cx| {
             let view = cx.new(|cx| {
                 LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
             });
+            library_view = Some(view.clone());
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
     )
     .expect("failed to open library window");
+    if let Some(view) = library_view {
+        cx.set_global(LibraryWindowHandle { view, window });
+    }
 }
 
 /// Opens the settings window as a separate, non-modal window.
@@ -205,6 +225,49 @@ pub fn setup(cx: &mut App) {
               win.update(cx, |_, window, _| window.toggle_fullscreen())
                  .ok();
           }
+      });
+    // The following fallbacks always keep Settings/Activity/Alert
+    // History/Add Collection enabled in the native menu, regardless of which
+    // element in the library window currently owns keyboard focus (native
+    // menu-item enablement is resolved by walking up from the focused
+    // dispatch node — see `LibraryWindowHandle`'s doc comment). The element-
+    // level `on_action` handlers on `LibraryRootView`'s root div remain the
+    // primary path and run first; these only fire when nothing in the
+    // window's dispatch path claims the action.
+    cx.on_action::<ShowSettings>(|_, cx| {
+          let Some(view) = cx.try_global::<LibraryWindowHandle>()
+                             .map(|h| h.view.clone())
+          else {
+              return;
+          };
+          view.update(cx, |view, cx| view.show_settings(cx));
+      });
+    cx.on_action::<ShowActivity>(|_, cx| {
+          let Some(view) = cx.try_global::<LibraryWindowHandle>()
+                             .map(|h| h.view.clone())
+          else {
+              return;
+          };
+          view.update(cx, |view, cx| view.show_activity(cx));
+      });
+    cx.on_action::<ShowAlertHistory>(|_, cx| {
+          let Some(view) = cx.try_global::<LibraryWindowHandle>()
+                             .map(|h| h.view.clone())
+          else {
+              return;
+          };
+          view.update(cx, |view, cx| view.show_alert_history(cx));
+      });
+    cx.on_action::<AddCollection>(|_, cx| {
+          let Some((view, window)) = cx.try_global::<LibraryWindowHandle>()
+                                       .map(|h| (h.view.clone(), h.window))
+          else {
+              return;
+          };
+          window.update(cx, |_, window, cx| {
+                    view.update(cx, |view, cx| view.show_add_collection_dialog(window, cx));
+                })
+                .ok();
       });
 
     // Menu bar
