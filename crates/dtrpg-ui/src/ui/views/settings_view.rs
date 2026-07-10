@@ -120,13 +120,22 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
     // overlay the top-left of the window when it opens with
     // `appears_transparent: true` (see `open_settings_window`) and no
     // titlebar row of its own — without this, the buttons sit directly on
-    // top of the sidebar's first menu item. Also doubles as a drag handle,
-    // matching the main library window's `title_bar_view::render_title_bar`.
-    // Shorter than that view's 44px bar since there's no wordmark/title text
-    // to vertically center here — just enough to clear the traffic lights.
+    // top of the sidebar's first menu item. Also renders the window title
+    // (native title text is suppressed by `appears_transparent`) and doubles
+    // as a drag handle, matching the main library window's
+    // `title_bar_view::render_title_bar`. Shorter than that view's 44px bar
+    // since there's no account button/wordmark to balance here — just the
+    // centered title.
     let drag_region = div().id("settings-drag-region")
                            .h(px(28.0))
                            .flex_none()
+                           .flex()
+                           .items_center()
+                           .justify_center()
+                           .text_sm()
+                           .font_weight(gpui::FontWeight::MEDIUM)
+                           .text_color(colors.text_primary)
+                           .child(t!("settings.title").to_string())
                            .on_mouse_down(MouseButton::Left, |_, window, _| {
                                window.start_window_move();
                            });
