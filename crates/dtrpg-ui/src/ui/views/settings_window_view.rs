@@ -80,7 +80,8 @@ impl Render for SettingsWindowView {
                                           snap.storage_path_input,
                                           self.file_opener_extension_input.clone(),
                                           snap.pending_file_opener,
-                                          snap.active_page_ix);
+                                          snap.active_page_ix,
+                                          snap.cache_counts);
 
         div().size_full()
              .child(panel)

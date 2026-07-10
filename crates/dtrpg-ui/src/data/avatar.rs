@@ -10,6 +10,12 @@ fn avatar_cache_path() -> PathBuf {
     app_cache_dir().join(AVATAR_CACHE_FILE)
 }
 
+/// Returns `true` if an avatar image is currently cached on disk.
+#[must_use]
+pub fn avatar_cached() -> bool {
+    avatar_cache_path().exists()
+}
+
 fn load_cached_avatar() -> Option<Vec<u8>> {
     let bytes = std::fs::read(avatar_cache_path()).ok()?;
     if bytes.is_empty() { None } else { Some(bytes) }

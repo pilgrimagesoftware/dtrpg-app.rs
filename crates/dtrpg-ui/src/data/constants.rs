@@ -30,16 +30,19 @@ pub const CATALOG_CACHE_TMP: &str = "catalog_cache.json.tmp";
 pub const CATALOG_CACHE_METADATA_FILE: &str = "catalog_cache_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
+/// 7 days in seconds — caches older than this are considered stale.
+pub const STALE_SECS: u64 = 7 * 24 * 60 * 60;
+
 /// Minimum interval between user-requested full catalog reloads ("Catalog >
 /// Reload"), keyed off `CacheMetadata::saved_at_secs`.
 ///
 /// Distinct from the on-disk cache's 7-day passive staleness window (see
-/// `catalog_cache::STALE_SECS`): that constant answers "is the cached data
-/// old enough that a *passive* load should refresh it," while this one
-/// answers "was a *manual* reload already attempted moments ago." 60 seconds
-/// is long enough to absorb accidental double-invocations (a stuck keybinding
-/// or an impatient double-click) without meaningfully delaying a deliberate
-/// second reload.
+/// [`STALE_SECS`]): that constant answers "is the cached data old enough
+/// that a *passive* load should refresh it," while this one answers "was a
+/// *manual* reload already attempted moments ago." 60 seconds is long enough
+/// to absorb accidental double-invocations (a stuck keybinding or an
+/// impatient double-click) without meaningfully delaying a deliberate second
+/// reload.
 pub const FORCE_RELOAD_COOLDOWN_SECS: u64 = 60;
 
 /// Minimum interval between re-checking the same catalog item's availability
@@ -64,6 +67,13 @@ pub const ITEM_CHECK_BATCH_SIZE: usize = 50;
 /// run; each wake calls `request_check_batch`, which applies the real
 /// cooldown gate.
 pub const ITEM_CHECK_BATCH_TIMER_SECS: u64 = 300;
+
+/// Minimum interval between cover thumbnail fetch attempts for the same item.
+///
+/// Absorbs re-render churn (e.g. scrolling an item back into view) without
+/// hammering the thumbnail source on every frame the item happens to be
+/// visible.
+pub const THUMBNAIL_COOLDOWN_SECS: u64 = 300;
 
 /// Reverse-DNS service namespace used for all keyring entries.
 pub const KEYRING_SERVICE: &str = MACOS_BUNDLE_ID;

@@ -18,7 +18,7 @@ use gpui_component::input::InputState;
 use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
-use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
+use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
 use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::{
@@ -63,7 +63,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              sign_in_error: Option<String>,
                              storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
-                             pending_file_opener: Option<PathBuf>, active_page_ix: usize)
+                             pending_file_opener: Option<PathBuf>, active_page_ix: usize,
+                             cache_counts: CacheCounts)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -100,7 +101,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        3 => render_advanced_section(entity.clone(), colors).into_any_element(),
+        3 => render_advanced_section(entity.clone(), cache_counts, colors).into_any_element(),
         4 => render_about_section(colors).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),

@@ -8,11 +8,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
-use crate::data::constants::{CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, CATALOG_CACHE_TMP};
+use crate::data::constants::{
+    CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, CATALOG_CACHE_TMP, STALE_SECS,
+};
 use crate::data::library::LibraryItem;
-
-/// 7 days in seconds — caches older than this are considered stale.
-const STALE_SECS: u64 = 7 * 24 * 60 * 60;
 
 /// Bump whenever a change to `LibraryItem`'s cached fields means existing
 /// on-disk caches must be treated as stale (forcing a live refetch) rather
