@@ -69,7 +69,7 @@ fn default_max_concurrent_downloads() -> usize {
 
 #[derive(Serialize, Deserialize)]
 struct StorageConfigFile {
-    root_path: Option<String>,
+    root_path:                Option<String>,
     #[serde(default = "default_max_concurrent_downloads")]
     max_concurrent_downloads: usize,
 }
@@ -77,12 +77,13 @@ struct StorageConfigFile {
 /// Manages the root directory where downloaded catalog files are stored, and
 /// the shared thumbnail/download concurrency limit.
 ///
-/// Persists the user's chosen overrides in `{app_preferences_dir}/storage.toml`.
-/// Falls back to the platform default download directory (e.g.
-/// `~/Downloads/dtrpg`) when no root path override is set, and to
-/// [`DEFAULT_MAX_CONCURRENT_DOWNLOADS`] when no concurrency override is set.
+/// Persists the user's chosen overrides in
+/// `{app_preferences_dir}/storage.toml`. Falls back to the platform default
+/// download directory (e.g. `~/Downloads/dtrpg`) when no root path override is
+/// set, and to [`DEFAULT_MAX_CONCURRENT_DOWNLOADS`] when no concurrency
+/// override is set.
 pub struct StorageConfig {
-    override_path: Option<PathBuf>,
+    override_path:            Option<PathBuf>,
     max_concurrent_downloads: usize,
 }
 
@@ -91,11 +92,15 @@ impl StorageConfig {
     /// error.
     pub fn load() -> Self {
         let file = config_path().and_then(|p| std::fs::read_to_string(p).ok())
-                                 .and_then(|text| toml::from_str::<StorageConfigFile>(&text).ok());
-        let override_path = file.as_ref().and_then(|cfg| cfg.root_path.clone()).map(PathBuf::from);
-        let max_concurrent_downloads =
-            file.map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS, |cfg| cfg.max_concurrent_downloads);
-        Self { override_path, max_concurrent_downloads }
+                                .and_then(|text| toml::from_str::<StorageConfigFile>(&text).ok());
+        let override_path = file.as_ref()
+                                .and_then(|cfg| cfg.root_path.clone())
+                                .map(PathBuf::from);
+        let max_concurrent_downloads = file.map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS, |cfg| {
+                                               cfg.max_concurrent_downloads
+                                           });
+        Self { override_path,
+               max_concurrent_downloads }
     }
 
     /// Returns the resolved download root (saved override, or platform
@@ -173,14 +178,17 @@ impl StorageConfig {
         self.save();
     }
 
-    /// Writes the current in-memory state to `{app_preferences_dir}/storage.toml`.
-    /// Silently ignores I/O errors (the state remains applied in memory).
+    /// Writes the current in-memory state to
+    /// `{app_preferences_dir}/storage.toml`. Silently ignores I/O errors
+    /// (the state remains applied in memory).
     fn save(&self) {
-        let cfg = StorageConfigFile { root_path: self.override_path
-                                                      .as_ref()
-                                                      .map(|p| p.to_string_lossy().into_owned()),
-                                       max_concurrent_downloads: self.max_concurrent_downloads };
-        let Some(config_file) = config_path() else {
+        let cfg = StorageConfigFile { root_path:
+                                          self.override_path
+                                              .as_ref()
+                                              .map(|p| p.to_string_lossy().into_owned()),
+                                      max_concurrent_downloads: self.max_concurrent_downloads, };
+        let Some(config_file) = config_path()
+        else {
             return;
         };
         if let Some(parent) = config_file.parent() {
@@ -210,7 +218,8 @@ mod tests {
 
     #[test]
     fn default_path_is_non_empty() {
-        let cfg = StorageConfig { override_path: None, max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            None,
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         let path = cfg.root_path();
         assert!(path.components().count() > 0);
         assert!(path.ends_with("dtrpg"));
@@ -219,13 +228,15 @@ mod tests {
     #[test]
     fn override_path_is_returned_when_set() {
         let custom = PathBuf::from("/tmp/custom-storage");
-        let cfg = StorageConfig { override_path: Some(custom.clone()), max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            Some(custom.clone()),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         assert_eq!(cfg.root_path(), custom);
     }
 
     #[test]
     fn path_for_item_is_under_root() {
-        let cfg = StorageConfig { override_path: Some(PathBuf::from("/tmp/dtrpg")), max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         let item_path = cfg.path_for_item("b42");
         assert_eq!(item_path, Path::new("/tmp/dtrpg/items/b42"));
     }
@@ -245,13 +256,15 @@ mod tests {
 
     #[test]
     fn is_default_true_without_override() {
-        let cfg = StorageConfig { override_path: None, max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            None,
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         assert!(cfg.is_default());
     }
 
     #[test]
     fn is_default_false_with_override() {
-        let cfg = StorageConfig { override_path: Some(PathBuf::from("/tmp/custom-storage")), max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/custom-storage")),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         assert!(!cfg.is_default());
     }
 
@@ -260,7 +273,8 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("dtrpg-test-ensure-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let cfg = StorageConfig { override_path: Some(root.clone()), max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            Some(root.clone()),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         assert!(!cfg.is_accessible());
         cfg.ensure_root_exists().unwrap();
         assert!(cfg.is_accessible());
@@ -270,20 +284,23 @@ mod tests {
     #[test]
     fn ensure_root_exists_is_idempotent_on_existing_directory() {
         let dir = std::env::temp_dir();
-        let cfg = StorageConfig { override_path: Some(dir), max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            Some(dir),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         assert!(cfg.ensure_root_exists().is_ok());
         assert!(cfg.ensure_root_exists().is_ok());
     }
 
     #[test]
     fn max_concurrent_downloads_defaults_to_three() {
-        let cfg = StorageConfig { override_path: None, max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS };
+        let cfg = StorageConfig { override_path:            None,
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         assert_eq!(cfg.max_concurrent_downloads(), 3);
     }
 
     #[test]
     fn missing_max_concurrent_downloads_field_deserializes_to_default() {
         let file: StorageConfigFile = toml::from_str("").unwrap();
-        assert_eq!(file.max_concurrent_downloads, DEFAULT_MAX_CONCURRENT_DOWNLOADS);
+        assert_eq!(file.max_concurrent_downloads,
+                   DEFAULT_MAX_CONCURRENT_DOWNLOADS);
     }
 }

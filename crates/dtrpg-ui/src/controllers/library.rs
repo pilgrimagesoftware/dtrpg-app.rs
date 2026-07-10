@@ -303,88 +303,88 @@ pub struct LibrarySnapshot {
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
-    vm:                      LibraryViewModel,
+    vm:                       LibraryViewModel,
     /// Keeps the `ActivityController` entity alive so the weak reference in
     /// background task closures remains valid for the lifetime of this
     /// controller.
     #[allow(dead_code)]
-    activity:                Entity<ActivityController>,
+    activity:                 Entity<ActivityController>,
     /// Full catalog — never filtered.
-    catalog:                 Vec<LibraryItem>,
+    catalog:                  Vec<LibraryItem>,
     /// Active sidebar filter.
-    pub filter:              SidebarFilter,
+    pub filter:               SidebarFilter,
     /// Text search query.
-    pub search_query:        String,
+    pub search_query:         String,
     /// Current sort method.
-    pub sort:                SortMethod,
+    pub sort:                 SortMethod,
     /// Current sort direction.
-    pub sort_direction:      SortDirection,
+    pub sort_direction:       SortDirection,
     /// Whether the catalog is grouped by publisher.
-    pub grouped:             bool,
+    pub grouped:              bool,
     /// Active catalog presentation mode.
-    pub presentation:        CatalogPresentation,
+    pub presentation:         CatalogPresentation,
     /// The currently selected item id (for the detail panel).
-    pub selection:           Selection,
+    pub selection:            Selection,
     /// Smart section counts derived from the full catalog.
-    pub section_counts:      SectionCounts,
+    pub section_counts:       SectionCounts,
     /// Publisher list derived from the full catalog (count desc, name asc).
-    pub publishers:          Vec<PublisherEntry>,
+    pub publishers:           Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
-    pub collections:         Vec<CollectionEntry>,
+    pub collections:          Vec<CollectionEntry>,
     /// True once the first `apply_collections` call has completed for the
     /// current session. Used by the sidebar to show a "?" placeholder for
     /// the collection count instead of a misleading `0` while the initial
     /// fetch is still in flight.
-    collections_loaded:      bool,
+    collections_loaded:       bool,
     /// Backing service for collections; stored so it can be replaced on
     /// sign-in.
-    collections_service:     Arc<dyn CollectionsService>,
+    collections_service:      Arc<dyn CollectionsService>,
     /// Set of numeric product IDs belonging to the active collection filter.
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
-    pub collection_members:  HashSet<u64>,
+    pub collection_members:   HashSet<u64>,
     /// Queue of `(item_id, cover_url, force_network)` triples pending thumbnail
     /// fetches. `force_network` skips the disk cache and always re-fetches —
     /// set for manual "Load Thumbnail"/"Refresh Thumbnails" actions, which
     /// exist specifically to bypass a stale cached image; left `false` for
     /// automatic background loads.
-    thumbnail_queue:         VecDeque<(Arc<str>, Arc<str>, bool)>,
+    thumbnail_queue:          VecDeque<(Arc<str>, Arc<str>, bool)>,
     /// Number of thumbnail fetches currently in flight. Bounded by
     /// [`Self::available_slots`] together with `active_downloads`.
     active_thumbnail_fetches: usize,
     /// Activity id for the aggregated thumbnail loading entry.
-    thumbnail_activity_id:   Option<u64>,
+    thumbnail_activity_id:    Option<u64>,
     /// Number of thumbnails processed (successes and failures both count) in
     /// the current batch. Reset to `0` whenever a new aggregated activity
     /// item starts. Together with the live queue length this gives a real,
     /// monotonically advancing progress fraction — `processed / (processed
     /// + queue.len())` — instead of an indeterminate placeholder.
-    thumbnail_processed:     usize,
+    thumbnail_processed:      usize,
     /// True from startup until the first `set_catalog` call completes.
-    catalog_loading:         bool,
+    catalog_loading:          bool,
     /// Incremented each time [`start_load_inner`](Self::start_load_inner)
     /// starts a new load attempt. Background tasks from a superseded load
     /// compare their captured generation against the current value before
     /// writing catalog state, so a load started before a `clear_and_reload`
     /// cannot clobber it after the fact.
-    load_generation:         u64,
+    load_generation:          u64,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
-    items_cache:             Option<Vec<LibraryItem>>,
+    items_cache:              Option<Vec<LibraryItem>>,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
-    publisher_search_open:   bool,
+    publisher_search_open:    bool,
     /// Publishers section search filter text. Session-only; never persisted.
-    publisher_search_query:  String,
+    publisher_search_query:   String,
     /// Whether the collections section's inline search bar is expanded.
     /// Session-only; never persisted.
-    collection_search_open:  bool,
+    collection_search_open:   bool,
     /// Collections section search filter text. Session-only; never persisted.
-    collection_search_query: String,
+    collection_search_query:  String,
     /// Current width of the detail panel, in pixels. Session-only; never
     /// persisted to disk.
-    detail_panel_width:      f32,
+    detail_panel_width:       f32,
     /// On-screen bounds of every currently visible Grid card / Thumbs row,
     /// keyed by item id, continuously refreshed by each entry's own render
     /// pass (see `catalog_view::render_grid_card` / `render_thumb_row`).
@@ -397,7 +397,7 @@ pub struct LibraryController {
     /// fallback position before the popover settles into place. Entries
     /// scrolled out of view keep their last-known bounds; this is harmless
     /// since a stale entry can't be clicked again until it repaints.
-    entry_bounds:            HashMap<Arc<str>, Bounds<Pixels>>,
+    entry_bounds:             HashMap<Arc<str>, Bounds<Pixels>>,
     /// Selected item file row (its position within the entry's `files`
     /// list) within a multi-item entry's expanded detail tab, keyed by
     /// catalog entry id. Keyed by row position rather than file id because
@@ -407,40 +407,40 @@ pub struct LibraryController {
     /// unrelated rows select and deselect together. Ephemeral — never
     /// persisted, and cleared whenever the entry's detail tab is closed or
     /// reopened (see `catalog-entry-detail-view`).
-    selected_item_file:      HashMap<Arc<str>, usize>,
+    selected_item_file:       HashMap<Arc<str>, usize>,
     /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
     /// here (see `catalog-entry-detail-advanced-disclosure`).
-    other_details_open:      HashMap<Arc<str>, bool>,
+    other_details_open:       HashMap<Arc<str>, bool>,
     /// Whether a per-file "Other details" disclosure is expanded within a
     /// multi-item entry's item tier, keyed by `"{entry_id}:{row_ix}"`. Keyed
     /// by row position rather than file id for the same reason as
     /// `selected_item_file`. Ephemeral — never persisted, and defaults to
     /// collapsed.
-    file_other_details_open: HashMap<Arc<str>, bool>,
+    file_other_details_open:  HashMap<Arc<str>, bool>,
     /// Ids of catalog items with an availability check currently in flight
     /// (on-demand or queued), mirroring `CoverCache::in_flight`'s role for
     /// thumbnails. `LibraryChanged` is emitted on insertion and removal so
     /// catalog card/row rendering can query [`Self::is_checking`] and show a
     /// spinner/overlay.
-    checking_items:          HashSet<Arc<str>>,
+    checking_items:           HashSet<Arc<str>>,
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
-    check_queue:             VecDeque<Arc<str>>,
+    check_queue:              VecDeque<Arc<str>>,
     /// Queue of `(item_id, title)` pairs pending a file download.
-    download_queue:          VecDeque<(Arc<str>, String)>,
+    download_queue:           VecDeque<(Arc<str>, String)>,
     /// Number of file downloads currently in flight. Bounded by
     /// [`Self::available_slots`] together with `active_thumbnail_fetches`.
-    active_downloads:        usize,
+    active_downloads:         usize,
     /// Per-item cancellation flag for an in-flight download, set by
     /// [`Self::cancel_download`] and polled by the download task at its next
     /// checkpoint. Removed once the task observes it (success, error, or
     /// cancellation) or by `cancel_download` itself for a still-queued item.
-    download_cancel_flags:   HashMap<Arc<str>, Arc<std::sync::atomic::AtomicBool>>,
+    download_cancel_flags:    HashMap<Arc<str>, Arc<std::sync::atomic::AtomicBool>>,
     /// Activity panel id for each in-flight (slot-holding) download, keyed by
     /// item id. Not populated for items still waiting in `download_queue`.
-    download_activity_ids:   HashMap<Arc<str>, u64>,
+    download_activity_ids:    HashMap<Arc<str>, u64>,
     /// Shared thumbnail/download concurrency limit. Initialized from
     /// [`crate::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].
@@ -464,48 +464,47 @@ impl LibraryController {
                -> Self {
         let vm = LibraryViewModel::new(service);
 
-        let mut ctrl = Self { vm,
-                              activity,
-                              catalog: Vec::new(),
-                              filter: SidebarFilter::default(),
-                              search_query: String::new(),
-                              sort: SortMethod::default(),
-                              sort_direction: SortDirection::default(),
-                              grouped: false,
-                              presentation: CatalogPresentation::default(),
-                              selection: Selection::default(),
-                              section_counts: SectionCounts::default(),
-                              publishers: Vec::new(),
-                              collections: Vec::new(),
-                              collections_loaded: false,
-                              collections_service: Arc::from(collections_service),
-                              collection_members: HashSet::new(),
-                              thumbnail_queue: VecDeque::new(),
-                              active_thumbnail_fetches: 0,
-                              thumbnail_activity_id: None,
-                              thumbnail_processed: 0,
-                              catalog_loading: true,
-                              load_generation: 0,
-                              items_cache: None,
-                              publisher_search_open: false,
-                              publisher_search_query: String::new(),
-                              collection_search_open: false,
-                              collection_search_query: String::new(),
-                              detail_panel_width:
-                                  crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-                              entry_bounds: HashMap::new(),
-                              selected_item_file: HashMap::new(),
-                              other_details_open: HashMap::new(),
-                              file_other_details_open: HashMap::new(),
-                              checking_items: HashSet::new(),
-                              check_queue: VecDeque::new(),
-                              download_queue: VecDeque::new(),
-                              active_downloads: 0,
-                              download_cancel_flags: HashMap::new(),
-                              download_activity_ids: HashMap::new(),
-                              max_concurrent_downloads:
-                                  crate::data::storage::StorageConfig::load()
-                                      .max_concurrent_downloads() };
+        let mut ctrl =
+            Self { vm,
+                   activity,
+                   catalog: Vec::new(),
+                   filter: SidebarFilter::default(),
+                   search_query: String::new(),
+                   sort: SortMethod::default(),
+                   sort_direction: SortDirection::default(),
+                   grouped: false,
+                   presentation: CatalogPresentation::default(),
+                   selection: Selection::default(),
+                   section_counts: SectionCounts::default(),
+                   publishers: Vec::new(),
+                   collections: Vec::new(),
+                   collections_loaded: false,
+                   collections_service: Arc::from(collections_service),
+                   collection_members: HashSet::new(),
+                   thumbnail_queue: VecDeque::new(),
+                   active_thumbnail_fetches: 0,
+                   thumbnail_activity_id: None,
+                   thumbnail_processed: 0,
+                   catalog_loading: true,
+                   load_generation: 0,
+                   items_cache: None,
+                   publisher_search_open: false,
+                   publisher_search_query: String::new(),
+                   collection_search_open: false,
+                   collection_search_query: String::new(),
+                   detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
+                   entry_bounds: HashMap::new(),
+                   selected_item_file: HashMap::new(),
+                   other_details_open: HashMap::new(),
+                   file_other_details_open: HashMap::new(),
+                   checking_items: HashSet::new(),
+                   check_queue: VecDeque::new(),
+                   download_queue: VecDeque::new(),
+                   active_downloads: 0,
+                   download_cancel_flags: HashMap::new(),
+                   download_activity_ids: HashMap::new(),
+                   max_concurrent_downloads:
+                       crate::data::storage::StorageConfig::load().max_concurrent_downloads() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl
@@ -1593,8 +1592,8 @@ impl LibraryController {
 
     /// Starts a single thumbnail fetch task. Assumes the caller has already
     /// reserved a concurrency slot by incrementing `active_thumbnail_fetches`.
-    fn dispatch_thumbnail_fetch(&mut self, item_id: Arc<str>, url: Arc<str>, force_network: bool,
-                                cx: &mut Context<Self>) {
+    fn dispatch_thumbnail_fetch(&mut self, item_id: Arc<str>, url: Arc<str>,
+                                force_network: bool, cx: &mut Context<Self>) {
         let activity_id = if let Some(id) = self.thumbnail_activity_id {
             id
         }
@@ -1651,7 +1650,8 @@ impl LibraryController {
                                       Some(std::time::SystemTime::now());
                               }
                               ctrl.invalidate_cache();
-                              ctrl.active_thumbnail_fetches = ctrl.active_thumbnail_fetches.saturating_sub(1);
+                              ctrl.active_thumbnail_fetches =
+                                  ctrl.active_thumbnail_fetches.saturating_sub(1);
                               cx.emit(LibraryChanged);
                               ctrl.drain_thumbnail_queue(cx);
                           })
@@ -1667,7 +1667,8 @@ impl LibraryController {
                                       Some(std::time::SystemTime::now());
                               }
                               ctrl.invalidate_cache();
-                              ctrl.active_thumbnail_fetches = ctrl.active_thumbnail_fetches.saturating_sub(1);
+                              ctrl.active_thumbnail_fetches =
+                                  ctrl.active_thumbnail_fetches.saturating_sub(1);
                               ctrl.drain_thumbnail_queue(cx);
                           })
                           .ok();
@@ -2299,17 +2300,17 @@ impl LibraryController {
     ///
     /// No-op if the item does not exist, is already `Downloaded`, or is
     /// already queued/in flight.
-    pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>,
-                            cx: &mut Context<Self>) {
-        let Some(item_id) =
-            self.catalog
-                .iter()
-                .find(|i| i.id.as_ref() == id && i.status != ItemStatus::Downloaded)
-                .map(|i| Arc::clone(&i.id))
+    pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
+        let Some(item_id) = self.catalog
+                                .iter()
+                                .find(|i| i.id.as_ref() == id && i.status != ItemStatus::Downloaded)
+                                .map(|i| Arc::clone(&i.id))
         else {
             return;
         };
-        let already_pending = self.download_queue.iter().any(|(qid, _)| qid.as_ref() == id)
+        let already_pending = self.download_queue
+                                  .iter()
+                                  .any(|(qid, _)| qid.as_ref() == id)
                               || self.download_activity_ids.contains_key(id);
         if already_pending {
             return;
@@ -2343,7 +2344,8 @@ impl LibraryController {
         };
         flag.store(true, std::sync::atomic::Ordering::SeqCst);
         if let Some(activity_id) = self.download_activity_ids.remove(id) {
-            self.activity.update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
+            self.activity
+                .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
         }
     }
 
@@ -2372,14 +2374,17 @@ impl LibraryController {
     /// the queue infrastructure is this change's deliverable.
     fn dispatch_download(&mut self, item_id: Arc<str>, title: String, cx: &mut Context<Self>) {
         let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        self.download_cancel_flags.insert(Arc::clone(&item_id), Arc::clone(&cancel_flag));
+        self.download_cancel_flags
+            .insert(Arc::clone(&item_id), Arc::clone(&cancel_flag));
 
         let cancel_fn: Arc<dyn Fn() + Send + Sync> = {
             let flag = Arc::clone(&cancel_flag);
             Arc::new(move || flag.store(true, std::sync::atomic::Ordering::SeqCst))
         };
-        let activity_id = self.activity.update(cx, |a, cx| a.start(&title, Some(cancel_fn), cx));
-        self.download_activity_ids.insert(Arc::clone(&item_id), activity_id);
+        let activity_id = self.activity
+                              .update(cx, |a, cx| a.start(&title, Some(cancel_fn), cx));
+        self.download_activity_ids
+            .insert(Arc::clone(&item_id), activity_id);
 
         let weak_activity = self.activity.downgrade();
         let task_item_id = Arc::clone(&item_id);
@@ -2419,10 +2424,12 @@ impl LibraryController {
               if !cancelled && let Some(id) = activity_id_after {
                   match &outcome {
                       Ok(()) => {
-                          weak_activity.update(async_cx, |a, cx| a.complete(id, cx)).ok();
+                          weak_activity.update(async_cx, |a, cx| a.complete(id, cx))
+                                       .ok();
                       }
                       Err(e) => {
-                          weak_activity.update(async_cx, |a, cx| a.error(id, e.clone(), cx)).ok();
+                          weak_activity.update(async_cx, |a, cx| a.error(id, e.clone(), cx))
+                                       .ok();
                       }
                   }
               }

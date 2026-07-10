@@ -186,8 +186,8 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
 /// Renders the "Max concurrent downloads" stepper row: a label/note pair and
 /// a minus/value/plus control, matching the icon-button style used for the
 /// "Change…"/reveal actions above.
-fn render_concurrency_stepper(max_concurrent_downloads: usize, entity: Entity<SettingsController>,
-                              colors: &ColorTokens)
+fn render_concurrency_stepper(max_concurrent_downloads: usize,
+                              entity: Entity<SettingsController>, colors: &ColorTokens)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
