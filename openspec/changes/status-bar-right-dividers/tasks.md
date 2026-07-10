@@ -11,5 +11,5 @@
 
 ## 3. Manual verification
 
-- [ ] 3.1 Launch the app and confirm the status bar's right side shows: theme picker, divider, activity indicator, divider, notifications button
-- [ ] 3.2 Confirm the new dividers visually match the existing left-side divider (same height, color, spacing)
+- [x] 3.1 Launch the app and confirm the status bar's right side shows: theme picker, divider, activity indicator, divider, notifications button
+- [x] 3.2 Confirm the new dividers visually match the existing left-side divider (same height, color, spacing) — user verified visually, iterated divider height from default to `h_3` to `h_2` to `h_5`
