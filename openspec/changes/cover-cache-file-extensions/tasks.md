@@ -27,5 +27,5 @@
 
 ## 5. Manual verification
 
-- [ ] 5.1 Delete the local covers cache directory, launch the app, let thumbnails load, and confirm `~/Library/Caches/com.pilgrimagesoftware.dtrpg/covers/` now contains files with real extensions (`.jpg`/`.png`/etc.) instead of `.cover`
-- [ ] 5.2 Relaunch and confirm those thumbnails load from disk (no network activity) and display correctly
+- [x] 5.1 Delete the local covers cache directory, launch the app, let thumbnails load, and confirm `~/Library/Caches/com.pilgrimagesoftware.dtrpg/covers/` now contains files with real extensions (`.jpg`/`.png`/etc.) instead of `.cover`
+- [x] 5.2 Relaunch and confirm those thumbnails load from disk (no network activity) and display correctly

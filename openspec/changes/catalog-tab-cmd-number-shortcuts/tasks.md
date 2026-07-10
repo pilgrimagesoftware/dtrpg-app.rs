@@ -37,11 +37,11 @@
 
 ## 8. Manual verification
 
-- [ ] 8.1 Launch the app, open two catalog items as detail tabs (three tabs total: Catalog, detail 1, detail 2)
-- [ ] 8.2 Press `cmd-0` from a detail tab and confirm the Catalog tab activates
-- [ ] 8.3 Press `cmd-1` and confirm the Catalog tab activates
-- [ ] 8.4 Press `cmd-2` and `cmd-3` and confirm each activates the corresponding detail tab
-- [ ] 8.5 Press `cmd-4` (no tab at that position) and confirm nothing happens
-- [ ] 8.6 Open the Window menu and confirm items for positions 0-3 are enabled and labeled with the correct tab titles, and positions 4-9 are visibly disabled
-- [ ] 8.7 Close one detail tab, reopen the Window menu, and confirm the corresponding position's item is now disabled and the following positions have not shifted incorrectly
-- [ ] 8.8 Click an enabled Window-menu tab-selection item directly and confirm it activates the same tab as its `cmd-<n>` shortcut
+- [x] 8.1 Launch the app, open two catalog items as detail tabs (three tabs total: Catalog, detail 1, detail 2)
+- [x] 8.2 Press `cmd-0` from a detail tab and confirm the Catalog tab activates
+- [x] 8.3 Press `cmd-1` and confirm the Catalog tab activates
+- [x] 8.4 Press `cmd-2` and `cmd-3` and confirm each activates the corresponding detail tab
+- [x] 8.5 Press `cmd-4` (no tab at that position) and confirm nothing happens
+- [x] 8.6 Open the Window menu and confirm items for positions 0-3 are enabled and labeled with the correct tab titles, and positions 4-9 are visibly disabled
+- [x] 8.7 Close one detail tab, reopen the Window menu, and confirm the corresponding position's item is now disabled and the following positions have not shifted incorrectly
+- [x] 8.8 Click an enabled Window-menu tab-selection item directly and confirm it activates the same tab as its `cmd-<n>` shortcut

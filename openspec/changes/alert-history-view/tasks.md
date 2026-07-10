@@ -35,4 +35,4 @@
 
 - [x] 6.1 Run `cargo check --workspace --all-targets` and confirm no compile errors or warnings
 - [x] 6.2 Run `cargo test --workspace` and confirm all tests and doctests pass (88 unit tests + 4 doctests, 0 failures) — `cargo clippy --workspace --all-targets --all-features -- -D warnings` and `cargo fmt --all -- --check` also pass
-- [ ] 6.3 Trigger an error activity (e.g. a failed collection delete) and confirm it appears in both the activity panel (until it expires) and the alert history panel (persists) — requires a manual run against a live or stubbed error path; not exercised by an automated test in this codebase (no existing precedent for GPUI `Context`-based controller tests here — see `ActivityController`, `LibraryController`)
+- [x] 6.3 Trigger an error activity (e.g. a failed collection delete) and confirm it appears in both the activity panel (until it expires) and the alert history panel (persists) — requires a manual run against a live or stubbed error path; not exercised by an automated test in this codebase (no existing precedent for GPUI `Context`-based controller tests here — see `ActivityController`, `LibraryController`)
