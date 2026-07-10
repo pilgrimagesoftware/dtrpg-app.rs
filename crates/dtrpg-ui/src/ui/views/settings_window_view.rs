@@ -81,7 +81,8 @@ impl Render for SettingsWindowView {
                                           self.file_opener_extension_input.clone(),
                                           snap.pending_file_opener,
                                           snap.active_page_ix,
-                                          snap.cache_counts);
+                                          snap.cache_counts,
+                                          snap.max_concurrent_downloads);
 
         div().size_full()
              .child(panel)

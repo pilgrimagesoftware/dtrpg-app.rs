@@ -116,7 +116,9 @@ pub struct SettingsSnapshot {
     pub active_page_ix:      usize,
     /// Current per-type counts of cached data, for the Advanced section's
     /// "Cache details" area.
-    pub cache_counts:        CacheCounts,
+    pub cache_counts:            CacheCounts,
+    /// Shared maximum number of concurrent thumbnail/download fetches.
+    pub max_concurrent_downloads: usize,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -344,6 +346,15 @@ impl SettingsController {
         self.check_storage_path_exists(path, cx);
         cx.emit(SettingsChanged);
         Ok(())
+    }
+
+    /// Saves `n` as the new shared thumbnail/download concurrency limit.
+    ///
+    /// Emits [`SettingsChanged`] so the library controller picks up the new
+    /// limit on its next drain.
+    pub fn set_max_concurrent_downloads(&mut self, n: usize, cx: &mut Context<Self>) {
+        self.storage.set_max_concurrent_downloads(n);
+        cx.emit(SettingsChanged);
     }
 
     /// Spawns a background task to check whether `path` exists on disk.
@@ -707,7 +718,8 @@ impl SettingsController {
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone(),
                            active_page_ix: self.active_page_ix,
-                           cache_counts: self.cache_counts() }
+                           cache_counts: self.cache_counts(),
+                           max_concurrent_downloads: self.storage.max_concurrent_downloads() }
     }
 }
 
