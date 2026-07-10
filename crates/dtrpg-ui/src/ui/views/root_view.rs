@@ -413,6 +413,19 @@ impl LibraryRootView {
           })
           .detach();
 
+        // Propagate a `max_concurrent_downloads` change from the Storage
+        // settings page to the controller that actually enforces it, so it
+        // takes effect immediately rather than only on next app launch.
+        let controller_for_settings = controller.clone();
+        let settings_for_concurrency = settings.clone();
+        cx.subscribe(&settings, move |_this, _ctrl, _event: &SettingsChanged, cx| {
+              let n = settings_for_concurrency.read(cx).snapshot().max_concurrent_downloads;
+              controller_for_settings.update(cx, |ctrl, cx| {
+                                          ctrl.set_max_concurrent_downloads(n, cx);
+                                      });
+          })
+          .detach();
+
         cx.subscribe(&auth_state,
                      |_this, _ctrl, _event: &AuthStateChanged, cx| {
                          cx.notify();

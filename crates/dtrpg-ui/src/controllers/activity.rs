@@ -168,6 +168,23 @@ impl ActivityController {
         cx.emit(ActivityChanged);
     }
 
+    /// Removes an in-progress item without resolving it to complete or error.
+    ///
+    /// Used when a cancelled operation must disappear from the panel entirely
+    /// rather than linger as a completed/errored entry (see the
+    /// `download-queue` capability's in-progress cancellation requirement).
+    /// No-op if `id` is not found in the in-progress list.
+    pub fn remove_in_progress(&mut self, id: u64, cx: &mut Context<Self>) {
+        let before = self.in_progress.len();
+        self.in_progress.retain(|i| i.id != id);
+        if self.in_progress.len() != before {
+            if self.selected_id == Some(id) {
+                self.selected_id = None;
+            }
+            cx.emit(ActivityChanged);
+        }
+    }
+
     /// Removes an expired item from the recent list by id.
     ///
     /// No-op if the item was already evicted by the cap or a prior expiry.
