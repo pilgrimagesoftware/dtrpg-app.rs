@@ -3,10 +3,12 @@
 
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
+use gpui_component::Icon;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_component::tab::{Tab, TabBar};
+use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -235,9 +237,28 @@ fn render_layout_switcher(current: CatalogPresentation, entity: Entity<LibraryCo
     };
     TabBar::new("layout-switcher").segmented()
                                   .selected_index(selected)
-                                  .child(Tab::new().label(t!("toolbar.view_list")))
-                                  .child(Tab::new().label(t!("toolbar.view_thumbs")))
-                                  .child(Tab::new().label(t!("toolbar.view_grid")))
+                                  .child(Tab::new()
+                                             .icon(Icon::empty().path("icons/list.svg"))
+                                             .tooltip(|window, cx| {
+                                                 Tooltip::new(t!("toolbar.view_list")
+                                                     .to_string())
+                                                     .build(window, cx)
+                                             }))
+                                  .child(Tab::new()
+                                             .icon(Icon::empty()
+                                                       .path("icons/gallery-thumbnails.svg"))
+                                             .tooltip(|window, cx| {
+                                                 Tooltip::new(t!("toolbar.view_thumbs")
+                                                     .to_string())
+                                                     .build(window, cx)
+                                             }))
+                                  .child(Tab::new()
+                                             .icon(Icon::empty().path("icons/layout-grid.svg"))
+                                             .tooltip(|window, cx| {
+                                                 Tooltip::new(t!("toolbar.view_grid")
+                                                     .to_string())
+                                                     .build(window, cx)
+                                             }))
                                   .on_click(move |ix, _, cx| {
                                       let mode = match ix {
                                           0 => CatalogPresentation::List,
