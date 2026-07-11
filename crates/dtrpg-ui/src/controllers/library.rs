@@ -2487,7 +2487,8 @@ impl LibraryController {
         // Captured up front for the failure log below — `fetch_target` itself
         // is moved into the spawned task and consumed by `download_item`.
         let order_product_id_for_log = fetch_target.as_ref().map(|(id, _)| *id);
-        let dest_for_log = fetch_target.as_ref().map(|(_, dest)| dest.display().to_string());
+        let dest_for_log = fetch_target.as_ref()
+                                       .map(|(_, dest)| dest.display().to_string());
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
