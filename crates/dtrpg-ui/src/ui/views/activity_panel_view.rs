@@ -219,11 +219,17 @@ fn render_item_row(item_id: u64, label: &str, status: &ActivityStatus, selected_
                      .children(has_cancel.then(|| {
                                              div().id(format!("activity-cancel-{item_id}"))
                                                   .flex_none()
+                                                  .px(px(4.0))
                                                   .text_xs()
-                                                  .text_color(text_tertiary)
+                                                  .text_color(text_color)
                                                   .cursor_pointer()
                                                   .child("x")
+                                                  // Stop propagation so clicking cancel doesn't
+                                                  // also fire the row's own on_click (which
+                                                  // selects/expands the item) — same class of
+                                                  // bug as the sidebar's suffix buttons.
                                                   .on_click(move |_, _, cx| {
+                                                      cx.stop_propagation();
                                                       cancel_entity.update(cx, |a, cx| {
                                                                        a.cancel_activity(item_id,
                                                                                          cx)

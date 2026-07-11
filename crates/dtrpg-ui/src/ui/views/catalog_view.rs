@@ -370,7 +370,8 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
 
         7 => {
             if item.status == ItemStatus::Downloaded {
-                let item_open_path = storage_root.join("items").join(&*item.id);
+                let item_open_path =
+                    crate::data::storage::publisher_dir(storage_root, &item.publisher);
                 let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
                 let item_for_open = item.clone();
                 let tabs_for_open = tabs.clone();
@@ -511,7 +512,8 @@ impl TableDelegate for CatalogListDelegate {
         let entity = self.controller.clone();
         let menu = match status {
             ItemStatus::Downloaded => {
-                let item_path = self.storage_root.join("items").join(&*id);
+                let item_path =
+                    crate::data::storage::publisher_dir(&self.storage_root, &item.publisher);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
                 let item_path_reveal = item_path.clone();
@@ -665,7 +667,8 @@ impl TableDelegate for GroupedCatalogListDelegate {
         let entity = self.controller.clone();
         let menu = match status {
             ItemStatus::Downloaded => {
-                let item_path = self.storage_root.join("items").join(&*id);
+                let item_path =
+                    crate::data::storage::publisher_dir(&self.storage_root, &item.publisher);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
                 let item_path_reveal = item_path.clone();
@@ -1517,7 +1520,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                              text_sm_size(window),
                                              FontWeight::MEDIUM,
                                              title_available_w);
-    let ctx_path = storage_root_path.join("items").join(&*id);
+    let ctx_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
 
     let cover: AnyElement = if let Some(image) = cover_image {
         img(image).w(px(thumb_w))
@@ -1768,13 +1771,13 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_tabs = tabs.clone();
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
-    let ctx_path = storage_root_path.join("items").join(&*id);
+    let ctx_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
     let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
                                             member_id:  collection_member_id(item),
                                             product_id: item.product_id, };
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
-        let item_reveal_path = storage_root_path.join("items").join(&*reveal_item_id);
+        let item_reveal_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
         let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-grid-{}", &*reveal_item_id));
         div().id(reveal_elem_id)
              .mt(px(2.0))

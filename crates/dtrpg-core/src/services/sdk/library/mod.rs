@@ -1,5 +1,6 @@
 //! Rust SDK-backed implementation of [`LibraryService`].
 
+mod download;
 mod errors;
 mod gateway;
 mod mapping;
@@ -237,6 +238,12 @@ impl LibraryService for RustSdkLibraryService {
                  Ok(())
              })())
     }
+
+    fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
+                     cancel: &std::sync::atomic::AtomicBool)
+                     -> Result<(), LibraryServiceError> {
+        download::download_item(self.gateway.as_ref(), order_product_id, index, dest, cancel)
+    }
 }
 
 #[cfg(test)]
@@ -246,7 +253,8 @@ mod tests {
 
     use dtrpg_sdk::{
         FileChecksum, OrderProductAttributes, OrderProductFile, OrderProductItem,
-        OrderProductItemResponse, OrderProductListResponse, PaginationLinks, PaginationMeta,
+        OrderProductItemResponse, OrderProductListResponse, OrderProductRelationships,
+        PaginationLinks, PaginationMeta, RelationshipData, RelationshipRef,
     };
 
     use super::*;
@@ -258,7 +266,17 @@ mod tests {
 
     impl FakeSdkGateway {
         fn seeded() -> Self {
-            let item = order_product_item(42, "A Better Dungeon");
+            let mut item = order_product_item(42, "A Better Dungeon");
+            item.relationships = Some(OrderProductRelationships {
+                publisher: Some(RelationshipRef {
+                    data: Some(RelationshipData {
+                        resource_type: "Publisher".to_string(),
+                        id: "/api/vBeta/publishers/7".to_string(),
+                    }),
+                }),
+                product: None,
+                order: None,
+            });
             Self { list_result:
                        Ok(OrderProductListResponse { links:    pagination_links(None),
                                                      meta:     PaginationMeta { items_per_page: 100,
@@ -294,6 +312,11 @@ mod tests {
                              -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
         }
+
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
+        }
     }
 
     /// Returns pages in order: first call gets page 1 with a `next` link,
@@ -328,6 +351,11 @@ mod tests {
 
         fn get_order_product(&self, _id: u64)
                              -> Result<OrderProductItemResponse, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
+        }
+
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
             Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
     }

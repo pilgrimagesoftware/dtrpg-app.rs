@@ -61,8 +61,6 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let entity_collections = entity.clone();
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
-    let reveal_item_id = Arc::clone(&item.id);
-    let read_item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
     let download_title = item.title.to_string();
 
@@ -168,7 +166,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             .gap(px(8.0))
                             .child({
                                 let read_path =
-                                    storage_root_path.join("items").join(read_item_id.as_ref());
+                                    crate::data::storage::publisher_dir(&storage_root_path,
+                                                                        &item.publisher);
                                 Button::new("detail-tab-read")
                                     .primary()
                                     .icon(IconName::BookOpen)
@@ -241,7 +240,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             )
                             .when(is_downloaded, |row| {
                                 let item_path =
-                                    storage_root_path.join("items").join(reveal_item_id.as_ref());
+                                    crate::data::storage::publisher_dir(&storage_root_path,
+                                                                        &item.publisher);
                                 row.child(
                                     Button::new("detail-tab-reveal")
                                         .ghost()
@@ -455,6 +455,7 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
          .gap(px(12.0))
          .child(metadata)
          .child(render_file_other_details(FileOtherDetailsContext { entry_id: &item.id,
+                                                                    publisher: &item.publisher,
                                                                     row_ix,
                                                                     is_downloaded:
                                                                         item.status
@@ -476,6 +477,7 @@ fn file_other_details_key(entry_id: &str, row_ix: usize) -> Arc<str> {
 /// preferred argument count.
 struct FileOtherDetailsContext<'a> {
     entry_id:          &'a str,
+    publisher:         &'a str,
     row_ix:            usize,
     is_downloaded:     bool,
     storage_root_path: &'a Path,
@@ -492,6 +494,7 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                              entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App)
                              -> impl IntoElement + 'static {
     let FileOtherDetailsContext { entry_id,
+                                  publisher,
                                   row_ix,
                                   is_downloaded,
                                   storage_root_path, } = ctx;
@@ -523,10 +526,8 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                       .child(t!("detail.other_details_heading").to_string());
 
     let path_value = if is_downloaded {
-        storage_root_path.join("items")
-                         .join(entry_id)
-                         .display()
-                         .to_string()
+        crate::data::storage::publisher_dir(storage_root_path, publisher).display()
+                                                                         .to_string()
     }
     else {
         value_or_dash("")

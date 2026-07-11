@@ -140,11 +140,12 @@ impl StorageConfig {
         std::fs::create_dir_all(self.root_path())
     }
 
-    /// Derives a stable per-item subdirectory under the downloads directory.
+    /// Derives the directory an item's files are stored in, grouped by
+    /// publisher.
     ///
-    /// Maps to `{root}/items/{item_id}/`.
-    pub fn path_for_item(&self, item_id: &str) -> PathBuf {
-        self.root_path().join("items").join(item_id)
+    /// Maps to `{root}/items/{sanitized publisher}/` — see [`publisher_dir`].
+    pub fn path_for_publisher(&self, publisher: &str) -> PathBuf {
+        publisher_dir(&self.root_path(), publisher)
     }
 
     /// Saves `path` as the new storage root override and updates the in-memory
@@ -207,6 +208,27 @@ fn config_path() -> Option<PathBuf> {
     Some(app_preferences_dir().join("storage.toml"))
 }
 
+/// Derives the directory a downloaded item's files live in:
+/// `{root}/items/{sanitized publisher}/`, grouping every item from the same
+/// publisher together under a common `items/` directory.
+///
+/// Sanitizes `publisher` first so a name containing a path separator can
+/// never escape `root` or be (mis)treated as an absolute path component —
+/// see [`sanitize_path_component`]. Every call site that needs an item's
+/// on-disk directory (downloads, "Open", "Reveal in Finder") must go through
+/// this function rather than reimplementing the join inline.
+pub fn publisher_dir(root: &Path, publisher: &str) -> PathBuf {
+    root.join("items").join(sanitize_path_component(publisher))
+}
+
+/// Strips a leading path separator, replaces any remaining path separators,
+/// and converts spaces to underscores, so the result can never be (or
+/// contain) an absolute path component when joined onto another path and
+/// reads as a single filesystem-friendly token.
+fn sanitize_path_component(value: &str) -> String {
+    value.trim_start_matches('/').replace(['/', ' '], "_")
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -234,11 +256,37 @@ mod tests {
     }
 
     #[test]
-    fn path_for_item_is_under_root() {
+    fn path_for_publisher_is_under_root() {
         let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
                                   max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
-        let item_path = cfg.path_for_item("b42");
-        assert_eq!(item_path, Path::new("/tmp/dtrpg/items/b42"));
+        let publisher_path = cfg.path_for_publisher("Chaosium");
+        assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Chaosium"));
+    }
+
+    #[test]
+    fn path_for_publisher_sanitizes_a_name_containing_a_path_separator() {
+        // A publisher name is untrusted display text from the API; if it ever
+        // contained a path separator, `PathBuf::join` would otherwise let it
+        // escape `root` (or discard it entirely if the name looked absolute).
+        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+        let publisher_path = cfg.path_for_publisher("/Evil/Publisher");
+        assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Evil_Publisher"));
+    }
+
+    #[test]
+    fn path_for_publisher_converts_spaces_to_underscores() {
+        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+        let publisher_path = cfg.path_for_publisher("The Forge Studios");
+        assert_eq!(publisher_path,
+                   Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
+    }
+
+    #[test]
+    fn publisher_dir_never_escapes_root_for_an_absolute_looking_name() {
+        let dir = publisher_dir(Path::new("/tmp/dtrpg"), "/Evil/Publisher");
+        assert!(dir.starts_with("/tmp/dtrpg"));
     }
 
     #[test]

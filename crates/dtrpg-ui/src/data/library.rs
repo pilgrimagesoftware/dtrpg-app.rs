@@ -164,6 +164,11 @@ pub struct LibraryItemFile {
     /// Stable identifier for this file within its entry (the SDK's
     /// `orderProductDownloadId`).
     pub id:      Arc<str>,
+    /// This file's position within the entry's file list (the SDK's
+    /// `OrderProductFile::index`). Required by the download-preparation API
+    /// alongside the entry's `order_product_id` — see
+    /// `real-file-download-transfer`.
+    pub index:   u32,
     /// Display name of the file (the SDK file's `title`, e.g.
     /// `"Player's Handbook.pdf"`).
     pub name:    Arc<str>,
@@ -237,6 +242,7 @@ mod tests {
 
     fn file(id: &str, name: &str) -> LibraryItemFile {
         LibraryItemFile { id:      id.into(),
+                          index:   0,
                           name:    name.into(),
                           format:  "PDF".into(),
                           size_mb: 1.0, }
