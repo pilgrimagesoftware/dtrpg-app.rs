@@ -103,6 +103,8 @@ detail:
   item_list_column_status: "Status"
   item_status_cloud: "In the cloud"
   item_status_local: "On this device"
+  item_status_downloading: "Downloading…"
+  item_download_button: "Download this item"
   item_prompt_select: "Select an item from the list to view its details"
   item_count_badge_tooltip: "%{count} items in this entry"
   other_details_heading: "Other details"

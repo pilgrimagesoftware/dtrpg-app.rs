@@ -95,6 +95,32 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
     reconciled
 }
 
+/// Returns the positions of every not-yet-downloaded file in `files`, in
+/// order.
+///
+/// Used by [`LibraryController::enqueue_download`] to determine which files
+/// of a (possibly multi-item) entry to queue: an already-downloaded file is
+/// never re-enqueued, so a bundle with some items already present only
+/// queues the missing ones.
+fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
+    files.iter()
+         .enumerate()
+         .filter(|(_, f)| !f.downloaded)
+         .map(|(idx, _)| idx as u32)
+         .collect()
+}
+
+/// Removes the queued download for `(id, index)` from `queue`, if present.
+///
+/// Returns `true` if an entry was removed. Only the matching `(id, index)`
+/// pair is removed — other queued files for the same entry (different
+/// index) or for other entries are left untouched.
+fn dequeue_file(queue: &mut VecDeque<(Arc<str>, u32, String)>, id: &str, index: u32) -> bool {
+    let before = queue.len();
+    queue.retain(|(qid, qidx, _)| !(qid.as_ref() == id && *qidx == index));
+    queue.len() != before
+}
+
 /// Returns `true` if a user-requested full reload should be suppressed
 /// because the cache was written too recently, per
 /// `FORCE_RELOAD_COOLDOWN_SECS`.
@@ -428,19 +454,23 @@ pub struct LibraryController {
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
     check_queue:              VecDeque<Arc<str>>,
-    /// Queue of `(item_id, title)` pairs pending a file download.
-    download_queue:           VecDeque<(Arc<str>, String)>,
+    /// Queue of `(item_id, file_index, title)` triples pending a file
+    /// download. Keyed per file (not per entry) so a multi-item entry can
+    /// have more than one of its files queued or active independently.
+    download_queue:           VecDeque<(Arc<str>, u32, String)>,
     /// Number of file downloads currently in flight. Bounded by
     /// [`Self::available_slots`] together with `active_thumbnail_fetches`.
     active_downloads:         usize,
-    /// Per-item cancellation flag for an in-flight download, set by
-    /// [`Self::cancel_download`] and polled by the download task at its next
-    /// checkpoint. Removed once the task observes it (success, error, or
-    /// cancellation) or by `cancel_download` itself for a still-queued item.
-    download_cancel_flags:    HashMap<Arc<str>, Arc<std::sync::atomic::AtomicBool>>,
+    /// Per-file cancellation flag for an in-flight download, keyed by
+    /// `(item_id, file_index)`, set by [`Self::cancel_download`] and polled by
+    /// the download task at its next checkpoint. Removed once the task
+    /// observes it (success, error, or cancellation) or by `cancel_download`
+    /// itself for a still-queued item.
+    download_cancel_flags:    HashMap<(Arc<str>, u32), Arc<std::sync::atomic::AtomicBool>>,
     /// Activity panel id for each in-flight (slot-holding) download, keyed by
-    /// item id. Not populated for items still waiting in `download_queue`.
-    download_activity_ids:    HashMap<Arc<str>, u64>,
+    /// `(item_id, file_index)`. Not populated for files still waiting in
+    /// `download_queue`.
+    download_activity_ids:    HashMap<(Arc<str>, u32), u64>,
     /// Shared thumbnail/download concurrency limit. Initialized from
     /// [`crate::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].
@@ -2279,133 +2309,186 @@ impl LibraryController {
 
     // ── Download queue ────────────────────────────────────────────────────────
 
-    /// Reverts a `Downloaded` item to `Cloud` status.
+    /// Reverts a `Downloaded` entry to `Cloud` status.
     ///
-    /// This is "Remove Download" — clearing an already-downloaded item — not
-    /// a cancellation of an in-flight fetch. Use [`Self::cancel_download`] to
-    /// cancel a queued or in-progress download.
+    /// This is "Remove Download" — clearing every already-downloaded item in
+    /// the entry — not a cancellation of an in-flight fetch. Use
+    /// [`Self::cancel_download`] to cancel a queued or in-progress download.
+    /// Entry status is never set directly (see `LibraryItem::recompute_status`):
+    /// every file's `downloaded` flag is cleared first, then the entry status
+    /// is re-derived.
     pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
         if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id)
            && item.status == ItemStatus::Downloaded
         {
-            item.status = ItemStatus::Cloud;
+            for file in &mut item.files {
+                file.downloaded = false;
+            }
+            item.recompute_status();
             self.section_counts = section_counts(&self.catalog);
             self.invalidate_cache();
             cx.emit(LibraryChanged);
         }
     }
 
-    /// Queues a file download for the item with the given id and title,
-    /// dispatching it immediately if a concurrency slot is free.
+    /// Queues a download for every not-yet-downloaded file in the entry with
+    /// the given id, dispatching as many as there are free concurrency
+    /// slots. For a single-item entry this enqueues its one file, matching
+    /// prior behavior; for a multi-item entry it enqueues each missing item
+    /// as an independent download.
     ///
-    /// No-op if the item does not exist, is already `Downloaded`, or is
-    /// already queued/in flight.
+    /// No-op for files that are already `Downloaded` or already
+    /// queued/in flight — see [`Self::enqueue_item_download`].
     pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
-        let Some(item_id) = self.catalog
-                                .iter()
-                                .find(|i| i.id.as_ref() == id && i.status != ItemStatus::Downloaded)
-                                .map(|i| Arc::clone(&i.id))
+        let title = title.into();
+        let Some(indices) =
+            self.catalog
+                .iter()
+                .find(|i| i.id.as_ref() == id)
+                .map(|item| missing_file_indices(&item.files))
         else {
             return;
         };
+        for index in indices {
+            self.enqueue_item_download(id, index, title.clone(), cx);
+        }
+    }
+
+    /// Queues a single file's download, dispatching it immediately if a
+    /// concurrency slot is free.
+    ///
+    /// No-op if the item/file does not exist, the file is already
+    /// downloaded, or that specific file is already queued/in flight.
+    pub fn enqueue_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
+                                 cx: &mut Context<Self>) {
+        let Some(item_id) =
+            self.catalog
+                .iter()
+                .find(|i| {
+                    i.id.as_ref() == id && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
+                })
+                .map(|i| Arc::clone(&i.id))
+        else {
+            return;
+        };
+        let key = (Arc::clone(&item_id), index);
         let already_pending = self.download_queue
                                   .iter()
-                                  .any(|(qid, _)| qid.as_ref() == id)
-                              || self.download_activity_ids.contains_key(id);
+                                  .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
+                              || self.download_activity_ids.contains_key(&key);
         if already_pending {
             return;
         }
-        self.download_queue.push_back((item_id, title.into()));
+        self.download_queue.push_back((item_id, index, title.into()));
         self.drain_download_queue(cx);
     }
 
-    /// Cancels a download that has not yet completed.
+    /// Cancels a single file's download that has not yet completed.
     ///
-    /// If `id` is still waiting in `download_queue`, removes it — no
-    /// activity entry existed yet for a queued item. If `id` is actively
+    /// If `(id, index)` is still waiting in `download_queue`, removes it —
+    /// no activity entry existed yet for a queued item. If it is actively
     /// fetching (holds a concurrency slot), signals its cancellation flag
     /// and removes its activity panel entry immediately; the in-flight
     /// task observes the flag at its next checkpoint, skips marking the
-    /// item `Downloaded`, and frees the slot itself (see
+    /// file `downloaded`, and frees the slot itself (see
     /// [`Self::dispatch_download`]) — `active_downloads` is only ever
     /// decremented there, never here, to avoid double-counting the slot.
+    /// Other files queued or in flight for the same entry are unaffected.
     ///
-    /// No-op if `id` is not queued or in flight.
-    pub fn cancel_download(&mut self, id: &str, cx: &mut Context<Self>) {
-        let before = self.download_queue.len();
-        self.download_queue.retain(|(qid, _)| qid.as_ref() != id);
-        if self.download_queue.len() != before {
+    /// No-op if `(id, index)` is not queued or in flight.
+    pub fn cancel_download(&mut self, id: &str, index: u32, cx: &mut Context<Self>) {
+        if dequeue_file(&mut self.download_queue, id, index) {
             return;
         }
 
-        let Some(flag) = self.download_cancel_flags.remove(id)
+        let key = (Arc::<str>::from(id), index);
+        let Some(flag) = self.download_cancel_flags.remove(&key)
         else {
             return;
         };
         flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        if let Some(activity_id) = self.download_activity_ids.remove(id) {
+        if let Some(activity_id) = self.download_activity_ids.remove(&key) {
             self.activity
                 .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
         }
     }
 
-    /// Dispatches downloads for as many queued items as there are free
+    /// Returns `true` if the file at `(id, index)` is currently queued or
+    /// actively downloading.
+    ///
+    /// Used by the detail tab's per-item list to show an in-progress
+    /// indicator on a row instead of its download/downloaded affordance.
+    #[must_use]
+    pub fn is_file_queued_or_active(&self, id: &str, index: u32) -> bool {
+        self.download_queue
+            .iter()
+            .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
+            || self.download_activity_ids
+                   .keys()
+                   .any(|(aid, aidx)| aid.as_ref() == id && *aidx == index)
+    }
+
+    /// Dispatches downloads for as many queued files as there are free
     /// concurrency slots (see [`Self::available_slots`]).
     fn drain_download_queue(&mut self, cx: &mut Context<Self>) {
         while self.available_slots() > 0 {
-            let Some((item_id, title)) = self.download_queue.pop_front()
+            let Some((item_id, index, title)) = self.download_queue.pop_front()
             else {
                 break;
             };
             self.active_downloads += 1;
-            self.dispatch_download(item_id, title, cx);
+            self.dispatch_download(item_id, index, title, cx);
         }
     }
 
-    /// Starts a single download task. Assumes the caller has already
+    /// Starts a single file's download task. Assumes the caller has already
     /// reserved a concurrency slot by incrementing `active_downloads`.
     ///
-    /// Resolves the item's first file (multi-file entries have no UI for
-    /// picking a specific file to download yet — this downloads the same
-    /// file `render_item_metadata`/`ItemOpener` would show/open first) to a
-    /// destination under the configured storage root, then calls
-    /// [`LibraryService::download_item`] on the background executor.
-    fn dispatch_download(&mut self, item_id: Arc<str>, title: String, cx: &mut Context<Self>) {
+    /// Resolves `item.files[index]` to a destination under the configured
+    /// storage root, then calls [`LibraryService::download_item`] on the
+    /// background executor.
+    fn dispatch_download(&mut self, item_id: Arc<str>, index: u32, title: String,
+                         cx: &mut Context<Self>) {
+        let key = (Arc::clone(&item_id), index);
         let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
         self.download_cancel_flags
-            .insert(Arc::clone(&item_id), Arc::clone(&cancel_flag));
+            .insert(key.clone(), Arc::clone(&cancel_flag));
 
         let cancel_fn: Arc<dyn Fn() + Send + Sync> = {
             let flag = Arc::clone(&cancel_flag);
             Arc::new(move || flag.store(true, std::sync::atomic::Ordering::SeqCst))
         };
-        let label = format!("Downloading {title}...");
+        // Catalog data isn't `Send` and must stay on this thread; resolve
+        // what to fetch (and the file name for the activity label) into
+        // owned, Send-safe values before spawning.
+        let found = self.catalog
+                        .iter()
+                        .find(|i| i.id == item_id)
+                        .and_then(|item| {
+                            item.files.get(index as usize).map(|file| {
+                                let dest = crate::data::storage::StorageConfig::load()
+                                    .path_for_publisher(&item.publisher)
+                                    .join(file.name.as_ref());
+                                (item.order_product_id, file.name.to_string(), dest)
+                            })
+                        });
+
+        let label = match &found {
+            Some((_, file_name, _)) => format!("Downloading {title} — {file_name}..."),
+            None => format!("Downloading {title}..."),
+        };
         let activity_id = self.activity
                               .update(cx, |a, cx| a.start(&label, Some(cancel_fn), cx));
-        self.download_activity_ids
-            .insert(Arc::clone(&item_id), activity_id);
+        self.download_activity_ids.insert(key.clone(), activity_id);
 
         let weak_activity = self.activity.downgrade();
         let task_item_id = Arc::clone(&item_id);
-
-        // Catalog data isn't `Send` and must stay on this thread; resolve
-        // what to fetch into owned, Send-safe values before spawning.
-        let fetch_target = self.catalog
-                               .iter()
-                               .find(|i| i.id == item_id)
-                               .and_then(|item| {
-                                   item.files.first().map(|file| {
-                        let dest = crate::data::storage::StorageConfig::load()
-                            .path_for_publisher(&item.publisher)
-                            .join(file.name.as_ref());
-                        (item.order_product_id, file.index, dest)
-                    })
-                               });
+        let fetch_target = found.map(|(order_product_id, _, dest)| (order_product_id, dest));
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
               let outcome: Result<(), String> = match fetch_target {
-                  Some((order_product_id, index, dest)) => {
+                  Some((order_product_id, dest)) => {
                       let cancel_for_fetch = Arc::clone(&cancel_flag);
                       async_cx.background_executor()
                               .spawn(async move {
@@ -2424,17 +2507,19 @@ impl LibraryController {
               let activity_id_after =
                   this.update(async_cx, |ctrl, cx| {
                           ctrl.active_downloads = ctrl.active_downloads.saturating_sub(1);
-                          ctrl.download_cancel_flags.remove(task_item_id.as_ref());
-                          let activity_id = ctrl.download_activity_ids.remove(&task_item_id);
+                          let key = (task_item_id.clone(), index);
+                          ctrl.download_cancel_flags.remove(&key);
+                          let activity_id = ctrl.download_activity_ids.remove(&key);
                           if !cancelled {
-                              let new_status = match &outcome {
-                                  Ok(()) => ItemStatus::Downloaded,
-                                  Err(_) => ItemStatus::Cloud,
-                              };
                               if let Some(item) =
                                   ctrl.catalog.iter_mut().find(|i| i.id == task_item_id)
                               {
-                                  item.status = new_status;
+                                  if outcome.is_ok()
+                                     && let Some(file) = item.files.get_mut(index as usize)
+                                  {
+                                      file.downloaded = true;
+                                  }
+                                  item.recompute_status();
                               }
                               ctrl.section_counts = section_counts(&ctrl.catalog);
                               ctrl.invalidate_cache();
@@ -3312,6 +3397,81 @@ mod item_row_selection_tests {
 
         assert_eq!(map.get("entry-a").copied(), Some(0));
         assert_eq!(map.get("entry-b").copied(), Some(0));
+    }
+}
+
+#[cfg(test)]
+mod download_queue_tests {
+    use std::collections::VecDeque;
+    use std::sync::Arc;
+
+    use super::{dequeue_file, missing_file_indices};
+    use crate::data::library::LibraryItemFile;
+
+    fn file(downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: "f".into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded }
+    }
+
+    #[test]
+    fn missing_file_indices_returns_every_index_when_none_downloaded() {
+        let files = vec![file(false), file(false), file(false)];
+
+        assert_eq!(missing_file_indices(&files), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn missing_file_indices_skips_already_downloaded_files() {
+        let files = vec![file(true), file(false), file(true), file(false)];
+
+        assert_eq!(missing_file_indices(&files), vec![1, 3]);
+    }
+
+    #[test]
+    fn missing_file_indices_is_empty_when_all_downloaded() {
+        let files = vec![file(true), file(true)];
+
+        assert!(missing_file_indices(&files).is_empty());
+    }
+
+    #[test]
+    fn dequeue_file_removes_only_the_matching_entry() {
+        let mut queue: VecDeque<(Arc<str>, u32, String)> =
+            VecDeque::from([(Arc::from("entry-a"), 0, "File 0".to_string()),
+                            (Arc::from("entry-a"), 1, "File 1".to_string())]);
+
+        let removed = dequeue_file(&mut queue, "entry-a", 0);
+
+        assert!(removed);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].1, 1);
+    }
+
+    #[test]
+    fn dequeue_file_leaves_other_entries_untouched() {
+        let mut queue: VecDeque<(Arc<str>, u32, String)> =
+            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string()),
+                            (Arc::from("entry-b"), 0, "B".to_string())]);
+
+        dequeue_file(&mut queue, "entry-a", 0);
+
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].0.as_ref(), "entry-b");
+    }
+
+    #[test]
+    fn dequeue_file_returns_false_when_nothing_matches() {
+        let mut queue: VecDeque<(Arc<str>, u32, String)> =
+            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string())]);
+
+        let removed = dequeue_file(&mut queue, "entry-a", 5);
+
+        assert!(!removed);
+        assert_eq!(queue.len(), 1);
     }
 }
 

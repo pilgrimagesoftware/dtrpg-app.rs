@@ -287,6 +287,7 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
+    let download_title = item.title.to_string();
 
     let mut header_row = TableRow::new().child(
         TableCell::new().child(
@@ -368,14 +369,63 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                          .text_sm()
                          .text_color(colors.text_secondary),
                  ))
-                 // Status
-                 .child(div().flex_1()
-                             .text_sm()
-                             .text_color(colors.text_secondary)
-                             .child(t!("detail.item_status_").to_string() /* TODO: replace
-                                                                           * with cloud/
-                                                                           * downloaded icon
-                                                                           * and tooltip */));
+                 // Status: downloaded checkmark, in-progress indicator, or a
+                 // download action for this specific item — independent of
+                 // sibling rows and of the entry-level download button (see
+                 // `queue-per-item-downloads`). Cancelling an in-progress
+                 // download is done from the activity panel rather than a
+                 // second cancel control here.
+                 .child({
+                     let is_downloading =
+                         entity.read(cx).is_file_queued_or_active(&entry_id, row_ix as u32);
+
+                     if file.downloaded {
+                         div().id(SharedString::from(format!("item-row-{row_ix}-status")))
+                              .flex_1()
+                              .tooltip(move |window, cx| {
+                                  Tooltip::new(t!("detail.item_status_local").to_string())
+                                      .build(window, cx)
+                              })
+                              .child(Icon::new(IconName::CircleCheck)
+                                         .text_color(colors.text_secondary))
+                              .into_any_element()
+                     }
+                     else if is_downloading {
+                         div().id(SharedString::from(format!("item-row-{row_ix}-status")))
+                              .flex_1()
+                              .text_sm()
+                              .text_color(colors.text_tertiary)
+                              .child(t!("detail.item_status_downloading").to_string())
+                              .into_any_element()
+                     }
+                     else {
+                         let entity_download = entity.clone();
+                         let entry_id_download = Arc::clone(&entry_id);
+                         let download_title_row = download_title.clone();
+                         div().id(SharedString::from(format!("item-row-{row_ix}-download")))
+                              .flex_1()
+                              .cursor_pointer()
+                              .tooltip(move |window, cx| {
+                                  Tooltip::new(t!("detail.item_download_button").to_string())
+                                      .build(window, cx)
+                              })
+                              .child(Icon::new(IconName::ArrowDown)
+                                         .text_color(colors.text_secondary))
+                              // Stop propagation so clicking download doesn't also fire the
+                              // row's own on_click (which selects this item) — same class of
+                              // bug fixed in the activity panel's cancel button.
+                              .on_click(move |_, _, cx| {
+                                  cx.stop_propagation();
+                                  entity_download.update(cx, |ctrl, cx| {
+                                      ctrl.enqueue_item_download(&entry_id_download,
+                                                                 row_ix as u32,
+                                                                 download_title_row.clone(),
+                                                                 cx);
+                                  });
+                              })
+                              .into_any_element()
+                     }
+                 });
 
         let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
                                  .child(TableCell::new().col_span(2).child(row_content));
