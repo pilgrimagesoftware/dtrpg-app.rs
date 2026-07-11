@@ -67,11 +67,10 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
                                        })?;
     }
 
-    let mut response =
-        reqwest::blocking::get(url).map_err(|e| {
-            LibraryServiceError::new(LibraryServiceErrorKind::Network,
-                                     format!("download request failed: {e}"))
-        })?;
+    let mut response = reqwest::blocking::get(url).map_err(|e| {
+                           LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                                    format!("download request failed: {e}"))
+                       })?;
     if !response.status().is_success() {
         return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
                                             format!("download failed: HTTP {}",
