@@ -174,15 +174,15 @@ fn map_files(files: &[OrderProductFile]) -> Vec<LibraryItemFile> {
     let mut seen_files: HashSet<(u64, &str)> = HashSet::new();
     files.iter()
          .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
-         .map(|f| LibraryItemFile { id:      f.order_product_download_id.to_string().into(),
-                                    index:   f.index,
-                                    name:    f.title.as_str().into(),
+         .map(|f| LibraryItemFile { id:         f.order_product_download_id.to_string().into(),
+                                    index:      f.index,
+                                    name:       f.title.as_str().into(),
                                     format:
                                         file_extension_label(&f.filename).unwrap_or_else(|| {
                                                                              "FILE".to_string()
                                                                          })
                                                                          .into(),
-                                    size_mb: f.size as f64 / BYTES_PER_MB,
+                                    size_mb:    f.size as f64 / BYTES_PER_MB,
                                     downloaded: false, })
          .collect()
 }

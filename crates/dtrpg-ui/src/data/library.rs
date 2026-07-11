@@ -179,25 +179,26 @@ impl LibraryItem {
 pub struct LibraryItemFile {
     /// Stable identifier for this file within its entry (the SDK's
     /// `orderProductDownloadId`).
-    pub id:      Arc<str>,
+    pub id:         Arc<str>,
     /// This file's position within the entry's file list (the SDK's
     /// `OrderProductFile::index`). Required by the download-preparation API
     /// alongside the entry's `order_product_id` — see
     /// `real-file-download-transfer`.
-    pub index:   u32,
+    pub index:      u32,
     /// Display name of the file (the SDK file's `title`, e.g.
     /// `"Player's Handbook.pdf"`).
-    pub name:    Arc<str>,
+    pub name:       Arc<str>,
     /// Uppercase format label derived from the filename extension (e.g.
     /// `"PDF"`).
-    pub format:  Arc<str>,
+    pub format:     Arc<str>,
     /// File size in megabytes.
-    pub size_mb: f64,
+    pub size_mb:    f64,
     /// Whether this specific file has been downloaded to disk.
     ///
-    /// The entry's aggregate `LibraryItem::status` is derived from this per-file
-    /// flag (see `recompute_entry_status`) rather than being set independently —
-    /// an entry is `Downloaded` only once every one of its files is.
+    /// The entry's aggregate `LibraryItem::status` is derived from this
+    /// per-file flag (see `recompute_entry_status`) rather than being set
+    /// independently — an entry is `Downloaded` only once every one of its
+    /// files is.
     #[serde(default)]
     pub downloaded: bool,
 }
@@ -264,11 +265,11 @@ mod tests {
     use super::*;
 
     fn file(id: &str, name: &str) -> LibraryItemFile {
-        LibraryItemFile { id:        id.into(),
-                          index:     0,
-                          name:      name.into(),
-                          format:    "PDF".into(),
-                          size_mb:   1.0,
+        LibraryItemFile { id:         id.into(),
+                          index:      0,
+                          name:       name.into(),
+                          format:     "PDF".into(),
+                          size_mb:    1.0,
                           downloaded: false, }
     }
 
@@ -298,8 +299,20 @@ mod tests {
     }
 
     fn item_with_files(files: Vec<LibraryItemFile>) -> LibraryItem {
-        let mut item = LibraryItem::new("e1", "Moria", "Free League", "", "", "", 0, 0.0, 0, 0,
-                                        ItemStatus::Cloud, "#000000", "", None);
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
         item.files = files;
         item
     }

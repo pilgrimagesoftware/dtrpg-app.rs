@@ -2314,9 +2314,9 @@ impl LibraryController {
     /// This is "Remove Download" — clearing every already-downloaded item in
     /// the entry — not a cancellation of an in-flight fetch. Use
     /// [`Self::cancel_download`] to cancel a queued or in-progress download.
-    /// Entry status is never set directly (see `LibraryItem::recompute_status`):
-    /// every file's `downloaded` flag is cleared first, then the entry status
-    /// is re-derived.
+    /// Entry status is never set directly (see
+    /// `LibraryItem::recompute_status`): every file's `downloaded` flag is
+    /// cleared first, then the entry status is re-derived.
     pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
         if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id)
            && item.status == ItemStatus::Downloaded
@@ -2341,11 +2341,10 @@ impl LibraryController {
     /// queued/in flight — see [`Self::enqueue_item_download`].
     pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(indices) =
-            self.catalog
-                .iter()
-                .find(|i| i.id.as_ref() == id)
-                .map(|item| missing_file_indices(&item.files))
+        let Some(indices) = self.catalog
+                                .iter()
+                                .find(|i| i.id.as_ref() == id)
+                                .map(|item| missing_file_indices(&item.files))
         else {
             return;
         };
@@ -2361,13 +2360,13 @@ impl LibraryController {
     /// downloaded, or that specific file is already queued/in flight.
     pub fn enqueue_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
-        let Some(item_id) =
-            self.catalog
-                .iter()
-                .find(|i| {
-                    i.id.as_ref() == id && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
-                })
-                .map(|i| Arc::clone(&i.id))
+        let Some(item_id) = self.catalog
+                                .iter()
+                                .find(|i| {
+                                    i.id.as_ref() == id
+                                    && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
+                                })
+                                .map(|i| Arc::clone(&i.id))
         else {
             return;
         };
@@ -2379,7 +2378,8 @@ impl LibraryController {
         if already_pending {
             return;
         }
-        self.download_queue.push_back((item_id, index, title.into()));
+        self.download_queue
+            .push_back((item_id, index, title.into()));
         self.drain_download_queue(cx);
     }
 
@@ -2423,9 +2423,9 @@ impl LibraryController {
         self.download_queue
             .iter()
             .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
-            || self.download_activity_ids
-                   .keys()
-                   .any(|(aid, aidx)| aid.as_ref() == id && *aidx == index)
+        || self.download_activity_ids
+               .keys()
+               .any(|(aid, aidx)| aid.as_ref() == id && *aidx == index)
     }
 
     /// Dispatches downloads for as many queued files as there are free
