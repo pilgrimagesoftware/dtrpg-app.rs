@@ -35,8 +35,7 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] on network or session failures.
-    fn prepare_download(&self, order_product_id: u64,
-                        index: u32)
+    fn prepare_download(&self, order_product_id: u64, index: u32)
                         -> Result<serde_json::Value, LibraryServiceError>;
 }
 
@@ -77,8 +76,7 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
             .map_err(map_client_error)
     }
 
-    fn prepare_download(&self, order_product_id: u64,
-                        index: u32)
+    fn prepare_download(&self, order_product_id: u64, index: u32)
                         -> Result<serde_json::Value, LibraryServiceError> {
         self.runtime
             .block_on(self.client.prepare_download(order_product_id, index))
@@ -106,8 +104,7 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
         Err(self.error.clone())
     }
 
-    fn prepare_download(&self, _order_product_id: u64,
-                        _index: u32)
+    fn prepare_download(&self, _order_product_id: u64, _index: u32)
                         -> Result<serde_json::Value, LibraryServiceError> {
         Err(self.error.clone())
     }

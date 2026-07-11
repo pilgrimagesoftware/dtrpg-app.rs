@@ -279,7 +279,8 @@ mod tests {
         let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
                                   max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
         let publisher_path = cfg.path_for_publisher("The Forge Studios");
-        assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
+        assert_eq!(publisher_path,
+                   Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
     }
 
     #[test]

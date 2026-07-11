@@ -1777,8 +1777,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                             product_id: item.product_id, };
 
     let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
-        let item_reveal_path =
-            crate::data::storage::publisher_dir(&storage_root_path, &publisher);
+        let item_reveal_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
         let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-grid-{}", &*reveal_item_id));
         div().id(reveal_elem_id)
              .mt(px(2.0))

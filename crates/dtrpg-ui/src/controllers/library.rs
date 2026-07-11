@@ -2390,18 +2390,17 @@ impl LibraryController {
 
         // Catalog data isn't `Send` and must stay on this thread; resolve
         // what to fetch into owned, Send-safe values before spawning.
-        let fetch_target =
-            self.catalog
-                .iter()
-                .find(|i| i.id == item_id)
-                .and_then(|item| {
-                    item.files.first().map(|file| {
+        let fetch_target = self.catalog
+                               .iter()
+                               .find(|i| i.id == item_id)
+                               .and_then(|item| {
+                                   item.files.first().map(|file| {
                         let dest = crate::data::storage::StorageConfig::load()
                             .path_for_publisher(&item.publisher)
                             .join(file.name.as_ref());
                         (item.order_product_id, file.index, dest)
                     })
-                });
+                               });
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {

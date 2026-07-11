@@ -35,10 +35,10 @@ pub(super) fn download_item(gateway: &dyn SdkLibraryGateway, order_product_id: u
     let part_path = part_path_for(dest);
     match stream_to_file(url, &part_path, cancel) {
         Ok(()) => std::fs::rename(&part_path, dest).map_err(|e| {
-            LibraryServiceError::new(LibraryServiceErrorKind::Network,
-                                     format!("failed to finalize download at {}: {e}",
-                                             dest.display()))
-        }),
+                      LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                               format!("failed to finalize download at {}: {e}",
+                                                       dest.display()))
+                  }),
         Err(e) => {
             let _ = std::fs::remove_file(&part_path);
             Err(e)
@@ -49,7 +49,9 @@ pub(super) fn download_item(gateway: &dyn SdkLibraryGateway, order_product_id: u
 /// Derives `{dest}.part` — appends rather than replaces `dest`'s extension,
 /// so `Foo.pdf` becomes `Foo.pdf.part`, not `Foo.part`.
 fn part_path_for(dest: &Path) -> PathBuf {
-    let mut name = dest.file_name().map(std::ffi::OsStr::to_os_string).unwrap_or_default();
+    let mut name = dest.file_name()
+                       .map(std::ffi::OsStr::to_os_string)
+                       .unwrap_or_default();
     name.push(".part");
     dest.with_file_name(name)
 }
@@ -58,19 +60,18 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
                   -> Result<(), LibraryServiceError> {
     if let Some(parent) = part_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
-                                            LibraryServiceError::new(
+                                           LibraryServiceError::new(
                 LibraryServiceErrorKind::Network,
                 format!("failed to create download directory {}: {e}", parent.display()),
             )
-                                        })?;
+                                       })?;
     }
 
-    let mut response = reqwest::blocking::get(url).map_err(|e| {
-                                                        LibraryServiceError::new(
-            LibraryServiceErrorKind::Network,
-            format!("download request failed: {e}"),
-        )
-                                                    })?;
+    let mut response =
+        reqwest::blocking::get(url).map_err(|e| {
+            LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                     format!("download request failed: {e}"))
+        })?;
     if !response.status().is_success() {
         return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
                                             format!("download failed: HTTP {}",
@@ -78,11 +79,11 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
     }
 
     let mut file = std::fs::File::create(part_path).map_err(|e| {
-                                                        LibraryServiceError::new(
+                                                       LibraryServiceError::new(
             LibraryServiceErrorKind::Network,
             format!("failed to create {}: {e}", part_path.display()),
         )
-                                                    })?;
+                                                   })?;
 
     let mut buf = [0u8; CHUNK_SIZE];
     loop {
@@ -91,11 +92,11 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
                                                 "download cancelled"));
         }
         let n = response.read(&mut buf).map_err(|e| {
-                                             LibraryServiceError::new(
+                                            LibraryServiceError::new(
                 LibraryServiceErrorKind::Network,
                 format!("download read failed: {e}"),
             )
-                                         })?;
+                                        })?;
         if n == 0 {
             break;
         }
@@ -116,7 +117,8 @@ mod tests {
     #[test]
     fn part_path_appends_extension() {
         let dest = Path::new("/tmp/items/b1/Book.pdf");
-        assert_eq!(part_path_for(dest), Path::new("/tmp/items/b1/Book.pdf.part"));
+        assert_eq!(part_path_for(dest),
+                   Path::new("/tmp/items/b1/Book.pdf.part"));
     }
 
     #[test]

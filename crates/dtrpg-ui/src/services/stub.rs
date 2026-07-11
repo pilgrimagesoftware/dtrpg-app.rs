@@ -79,14 +79,14 @@ impl LibraryService for StubLibraryService {
                                                      dest.display()))
                 })
             }
-            StubMode::NetworkError => Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Network,
-                "stub: simulated network error",
-            )),
-            StubMode::SessionError => Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Session,
-                "stub: simulated session error",
-            )),
+            StubMode::NetworkError => {
+                Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                             "stub: simulated network error"))
+            }
+            StubMode::SessionError => {
+                Err(LibraryServiceError::new(LibraryServiceErrorKind::Session,
+                                             "stub: simulated session error"))
+            }
         }
     }
 }

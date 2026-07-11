@@ -300,8 +300,7 @@ mod tests {
             self.detail_result.clone()
         }
 
-        fn prepare_download(&self, _order_product_id: u64,
-                            _index: u32)
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
                             -> Result<serde_json::Value, LibraryServiceError> {
             Err(LibraryServiceError::new(dtrpg_ui::services::LibraryServiceErrorKind::NotFound,
                                          "not used"))
@@ -592,7 +591,8 @@ mod tests {
                                            filesize:      Some(24.13), });
 
         let mut publishers = HashMap::new();
-        publishers.insert("/api/vBeta/publishers/4952".to_string(), "Monte Cook Games".to_string());
+        publishers.insert("/api/vBeta/publishers/4952".to_string(),
+                          "Monte Cook Games".to_string());
 
         let mapped = map_order_product(&item, &publishers, &products, 0);
 
@@ -644,7 +644,8 @@ mod tests {
             order: None,
         });
         let mut publishers = HashMap::new();
-        publishers.insert("/api/vBeta/publishers/7".to_string(), "Lantern Press".to_string());
+        publishers.insert("/api/vBeta/publishers/7".to_string(),
+                          "Lantern Press".to_string());
 
         let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
 
@@ -673,7 +674,8 @@ mod tests {
         });
 
         let mut publishers = HashMap::new();
-        publishers.insert("/api/vBeta/publishers/342".to_string(), "RPGnet".to_string());
+        publishers.insert("/api/vBeta/publishers/342".to_string(),
+                          "RPGnet".to_string());
 
         let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
 

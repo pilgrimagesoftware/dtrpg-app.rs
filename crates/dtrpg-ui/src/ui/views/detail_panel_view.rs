@@ -526,7 +526,8 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                       .child(t!("detail.other_details_heading").to_string());
 
     let path_value = if is_downloaded {
-        crate::data::storage::publisher_dir(storage_root_path, publisher).display().to_string()
+        crate::data::storage::publisher_dir(storage_root_path, publisher).display()
+                                                                         .to_string()
     }
     else {
         value_or_dash("")

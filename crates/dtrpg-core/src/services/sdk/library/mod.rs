@@ -313,8 +313,7 @@ mod tests {
             self.detail_result.clone()
         }
 
-        fn prepare_download(&self, _order_product_id: u64,
-                            _index: u32)
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
                             -> Result<serde_json::Value, LibraryServiceError> {
             Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
@@ -355,8 +354,7 @@ mod tests {
             Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
 
-        fn prepare_download(&self, _order_product_id: u64,
-                            _index: u32)
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
                             -> Result<serde_json::Value, LibraryServiceError> {
             Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
