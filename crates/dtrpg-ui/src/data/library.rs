@@ -152,6 +152,22 @@ impl LibraryItem {
         self.files
             .retain(|f| seen.insert((Arc::clone(&f.id), Arc::clone(&f.name))));
     }
+
+    /// Sets `status` from the aggregate of `files[*].downloaded`: `Downloaded`
+    /// only once every file is downloaded, `Cloud` otherwise.
+    ///
+    /// `status` is never set directly by download completion/removal — callers
+    /// update the relevant file's `downloaded` flag first, then call this to
+    /// keep the entry-level status in sync. An entry with no files (should not
+    /// occur in practice) is treated as `Cloud`.
+    pub fn recompute_status(&mut self) {
+        self.status = if !self.files.is_empty() && self.files.iter().all(|f| f.downloaded) {
+            ItemStatus::Downloaded
+        }
+        else {
+            ItemStatus::Cloud
+        };
+    }
 }
 
 // ── LibraryItemFile
@@ -163,20 +179,28 @@ impl LibraryItem {
 pub struct LibraryItemFile {
     /// Stable identifier for this file within its entry (the SDK's
     /// `orderProductDownloadId`).
-    pub id:      Arc<str>,
+    pub id:         Arc<str>,
     /// This file's position within the entry's file list (the SDK's
     /// `OrderProductFile::index`). Required by the download-preparation API
     /// alongside the entry's `order_product_id` — see
     /// `real-file-download-transfer`.
-    pub index:   u32,
+    pub index:      u32,
     /// Display name of the file (the SDK file's `title`, e.g.
     /// `"Player's Handbook.pdf"`).
-    pub name:    Arc<str>,
+    pub name:       Arc<str>,
     /// Uppercase format label derived from the filename extension (e.g.
     /// `"PDF"`).
-    pub format:  Arc<str>,
+    pub format:     Arc<str>,
     /// File size in megabytes.
-    pub size_mb: f64,
+    pub size_mb:    f64,
+    /// Whether this specific file has been downloaded to disk.
+    ///
+    /// The entry's aggregate `LibraryItem::status` is derived from this
+    /// per-file flag (see `recompute_entry_status`) rather than being set
+    /// independently — an entry is `Downloaded` only once every one of its
+    /// files is.
+    #[serde(default)]
+    pub downloaded: bool,
 }
 
 // ── Smart section counts
@@ -241,11 +265,12 @@ mod tests {
     use super::*;
 
     fn file(id: &str, name: &str) -> LibraryItemFile {
-        LibraryItemFile { id:      id.into(),
-                          index:   0,
-                          name:    name.into(),
-                          format:  "PDF".into(),
-                          size_mb: 1.0, }
+        LibraryItemFile { id:         id.into(),
+                          index:      0,
+                          name:       name.into(),
+                          format:     "PDF".into(),
+                          size_mb:    1.0,
+                          downloaded: false, }
     }
 
     #[test]
@@ -271,6 +296,79 @@ mod tests {
 
         assert_eq!(item.files.len(), 1);
         assert!(!item.is_multi_item());
+    }
+
+    fn item_with_files(files: Vec<LibraryItemFile>) -> LibraryItem {
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.files = files;
+        item
+    }
+
+    fn downloaded_file(id: &str, name: &str) -> LibraryItemFile {
+        let mut f = file(id, name);
+        f.downloaded = true;
+        f
+    }
+
+    #[test]
+    fn recompute_status_is_cloud_when_no_files_downloaded() {
+        let mut item = item_with_files(vec![file("1", "A"), file("2", "B")]);
+
+        item.recompute_status();
+
+        assert_eq!(item.status, ItemStatus::Cloud);
+    }
+
+    #[test]
+    fn recompute_status_is_cloud_when_only_some_files_downloaded() {
+        let mut item = item_with_files(vec![downloaded_file("1", "A"), file("2", "B")]);
+
+        item.recompute_status();
+
+        assert_eq!(item.status, ItemStatus::Cloud);
+    }
+
+    #[test]
+    fn recompute_status_is_downloaded_once_every_file_is_downloaded() {
+        let mut item = item_with_files(vec![downloaded_file("1", "A"), downloaded_file("2", "B")]);
+
+        item.recompute_status();
+
+        assert_eq!(item.status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn recompute_status_completing_the_last_file_flips_cloud_to_downloaded() {
+        let mut item = item_with_files(vec![downloaded_file("1", "A"), file("2", "B")]);
+        item.recompute_status();
+        assert_eq!(item.status, ItemStatus::Cloud);
+
+        item.files[1].downloaded = true;
+        item.recompute_status();
+
+        assert_eq!(item.status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn recompute_status_is_cloud_for_an_entry_with_no_files() {
+        let mut item = item_with_files(vec![]);
+
+        item.recompute_status();
+
+        assert_eq!(item.status, ItemStatus::Cloud);
     }
 
     #[test]

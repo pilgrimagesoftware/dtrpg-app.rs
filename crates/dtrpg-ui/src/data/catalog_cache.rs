@@ -322,16 +322,18 @@ mod tests {
         let dir = test_dir("dedupe_on_load");
         fs::create_dir_all(&dir).unwrap();
         let mut item = make_item("b1");
-        item.files = vec![LibraryItemFile { id:      "1234".into(),
-                                            index:   0,
-                                            name:    "Moria Rulebook".into(),
-                                            format:  "PDF".into(),
-                                            size_mb: 1.0, },
-                          LibraryItemFile { id:      "1234".into(),
-                                            index:   0,
-                                            name:    "Moria Rulebook".into(),
-                                            format:  "PDF".into(),
-                                            size_mb: 1.0, },];
+        item.files = vec![LibraryItemFile { id:         "1234".into(),
+                                            index:      0,
+                                            name:       "Moria Rulebook".into(),
+                                            format:     "PDF".into(),
+                                            size_mb:    1.0,
+                                            downloaded: false, },
+                          LibraryItemFile { id:         "1234".into(),
+                                            index:      0,
+                                            name:       "Moria Rulebook".into(),
+                                            format:     "PDF".into(),
+                                            size_mb:    1.0,
+                                            downloaded: false, },];
         // Bypass `save_catalog_cache` (which would go through the current,
         // already-deduped write path) to simulate JSON written by an older
         // build that had not yet deduplicated file records.
