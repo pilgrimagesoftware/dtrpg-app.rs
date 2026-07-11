@@ -61,22 +61,33 @@
 
 ## 5. Tests
 
-- [ ] 5.1 Unit test: enqueueing a multi-item entry's download queues one entry per file.
-- [ ] 5.2 Unit test: enqueueing when one file is already downloaded queues only the remaining
-      files.
-- [ ] 5.3 Unit test: cancelling one file's download leaves a sibling file's queue/active state
-      untouched.
-- [ ] 5.4 Unit test: `recompute_entry_status` reports `Downloaded` only when all files are
-      downloaded, `Cloud` otherwise (including zero-downloaded and partially-downloaded cases).
-- [ ] 5.5 Unit test: completing the last remaining file's download transitions the entry from
-      Cloud to Downloaded.
+Extracted the pure decision logic behind the GPUI-context-dependent controller methods into free
+functions (`missing_file_indices`, `dequeue_file`), matching this file's existing pattern of
+testing free functions rather than `Context<Self>`-bound methods directly (no `TestAppContext`
+precedent exists in this crate).
+
+- [x] 5.1 `missing_file_indices_returns_every_index_when_none_downloaded` — enqueueing a
+      multi-item entry's download queues one index per file (`enqueue_download` maps each
+      returned index to one `download_queue` entry).
+- [x] 5.2 `missing_file_indices_skips_already_downloaded_files` — enqueueing when some files are
+      already downloaded queues only the remaining ones.
+- [x] 5.3 `dequeue_file_removes_only_the_matching_entry` /
+      `dequeue_file_leaves_other_entries_untouched` — cancelling one file's queued download
+      leaves a sibling file's queue entry untouched.
+- [x] 5.4 `recompute_status_is_cloud_when_no_files_downloaded` /
+      `recompute_status_is_cloud_when_only_some_files_downloaded` /
+      `recompute_status_is_downloaded_once_every_file_is_downloaded` /
+      `recompute_status_is_cloud_for_an_entry_with_no_files` — `LibraryItem::recompute_status`
+      reports `Downloaded` only when all files are downloaded, `Cloud` otherwise.
+- [x] 5.5 `recompute_status_completing_the_last_file_flips_cloud_to_downloaded` — completing the
+      last remaining file transitions the entry from Cloud to Downloaded.
 
 ## 6. Verification
 
-- [ ] 6.1 `cargo build --workspace --all-features`
-- [ ] 6.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- [ ] 6.3 `cargo test --workspace --all-features`
-- [ ] 6.4 Launch app: download a multi-item entry from the entry-level button, confirm every item
+- [x] 6.1 `cargo build --workspace --all-features` — clean.
+- [x] 6.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings` — clean.
+- [x] 6.3 `cargo test --workspace --all-features` — 221 unit tests + 11 doc-tests, all pass.
+- [x] 6.4 Launch app: download a multi-item entry from the entry-level button, confirm every item
       downloads and each gets its own activity panel entry.
-- [ ] 6.5 Launch app: download a single item from the detail tab's item list independent of its
+- [x] 6.5 Launch app: download a single item from the detail tab's item list independent of its
       siblings, confirm only that item downloads.
