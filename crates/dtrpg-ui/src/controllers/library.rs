@@ -2365,13 +2365,11 @@ impl LibraryController {
     /// Starts a single download task. Assumes the caller has already
     /// reserved a concurrency slot by incrementing `active_downloads`.
     ///
-    /// No real file-transfer service exists yet — per this change's design
-    /// doc, the actual HTTP fetch is a follow-on task once
-    /// `LibraryService` grows a `download_item` method. This dispatches
-    /// through the real background executor so multiple downloads are
-    /// genuinely concurrent in-flight slots, with named activity panel
-    /// entries and full cancel/complete/error wiring already in place —
-    /// the queue infrastructure is this change's deliverable.
+    /// Resolves the item's first file (multi-file entries have no UI for
+    /// picking a specific file to download yet — this downloads the same
+    /// file `render_item_metadata`/`ItemOpener` would show/open first) to a
+    /// destination under the configured storage root, then calls
+    /// [`LibraryService::download_item`] on the background executor.
     fn dispatch_download(&mut self, item_id: Arc<str>, title: String, cx: &mut Context<Self>) {
         let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
         self.download_cancel_flags
@@ -2381,18 +2379,46 @@ impl LibraryController {
             let flag = Arc::clone(&cancel_flag);
             Arc::new(move || flag.store(true, std::sync::atomic::Ordering::SeqCst))
         };
+        let label = format!("Downloading {title}...");
         let activity_id = self.activity
-                              .update(cx, |a, cx| a.start(&title, Some(cancel_fn), cx));
+                              .update(cx, |a, cx| a.start(&label, Some(cancel_fn), cx));
         self.download_activity_ids
             .insert(Arc::clone(&item_id), activity_id);
 
         let weak_activity = self.activity.downgrade();
         let task_item_id = Arc::clone(&item_id);
 
+        // Catalog data isn't `Send` and must stay on this thread; resolve
+        // what to fetch into owned, Send-safe values before spawning.
+        let fetch_target = self.catalog
+                               .iter()
+                               .find(|i| i.id == item_id)
+                               .and_then(|item| {
+                                   item.files.first().map(|file| {
+                        let dest = crate::data::storage::StorageConfig::load()
+                            .path_for_publisher(&item.publisher)
+                            .join(file.name.as_ref());
+                        (item.order_product_id, file.index, dest)
+                    })
+                               });
+        let service_arc = self.vm.service_arc();
+
         cx.spawn(async move |this, async_cx| {
-              let outcome: Result<(), String> = async_cx.background_executor()
-                                                        .spawn(async move { Ok(()) })
-                                                        .await;
+              let outcome: Result<(), String> = match fetch_target {
+                  Some((order_product_id, index, dest)) => {
+                      let cancel_for_fetch = Arc::clone(&cancel_flag);
+                      async_cx.background_executor()
+                              .spawn(async move {
+                                  service_arc.download_item(order_product_id,
+                                                            index,
+                                                            &dest,
+                                                            &cancel_for_fetch)
+                                             .map_err(|e| e.to_string())
+                              })
+                              .await
+                  }
+                  None => Err("no downloadable file found for this item".to_string()),
+              };
               let cancelled = cancel_flag.load(std::sync::atomic::Ordering::SeqCst);
 
               let activity_id_after =

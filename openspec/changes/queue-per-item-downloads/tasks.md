@@ -7,52 +7,57 @@
 
 ## 2. Controller: re-key the download queue per file
 
-- [ ] 2.1 Change `download_queue: VecDeque<(Arc<str>, String)>` to
+- [x] 2.1 Change `download_queue: VecDeque<(Arc<str>, String)>` to
       `VecDeque<(Arc<str>, u32, String)>` (entry id, file index, label) in
       `crates/dtrpg-ui/src/controllers/library.rs`.
-- [ ] 2.2 Change `download_cancel_flags: HashMap<Arc<str>, Arc<AtomicBool>>` to key on
+- [x] 2.2 Change `download_cancel_flags: HashMap<Arc<str>, Arc<AtomicBool>>` to key on
       `(Arc<str>, u32)`.
-- [ ] 2.3 Change `download_activity_ids: HashMap<Arc<str>, u64>` to key on `(Arc<str>, u32)`.
-- [ ] 2.4 Update `enqueue_download` to accept a file index, dedupe against the queue/active maps
-      using the `(entry_id, index)` key, and skip enqueueing if that specific file is already
-      downloaded.
-- [ ] 2.5 Update `remove_download`/cancel path to take `(entry_id, index)`, only touching that
-      file's queue entry, cancel flag, and activity id.
-- [ ] 2.6 Update `dispatch_download` to take the file index, resolve `item.files[index]` (not
-      `.first()`) for the SDK `download_item` call, and label the activity entry with both entry
-      title and file name.
-- [ ] 2.7 On successful completion, set `item.files[index].downloaded = true` and call
-      `recompute_entry_status`; on failure/cancellation leave it false and recompute.
-- [ ] 2.8 Update `drain_download_queue` for the new tuple shape; concurrency slot accounting
+- [x] 2.3 Change `download_activity_ids: HashMap<Arc<str>, u64>` to key on `(Arc<str>, u32)`.
+- [x] 2.4 Added a new `enqueue_item_download(id, index, title, cx)` taking a file index, deduping
+      against the queue/active maps using the `(entry_id, index)` key, skipping if that specific
+      file is already downloaded. `enqueue_download(id, title, cx)` keeps its original signature
+      (all 6 existing call sites unchanged) and now loops every not-yet-downloaded file, calling
+      `enqueue_item_download` per file — this doubles as task 3.1's entry-level "enqueue all
+      missing items" behavior.
+- [x] 2.5 `cancel_download` now takes `(id, index)`, only touching that file's queue entry,
+      cancel flag, and activity id. `remove_download` (entry-level "remove all downloads") clears
+      every file's `downloaded` flag then calls `recompute_status` rather than setting
+      `item.status` directly.
+- [x] 2.6 `dispatch_download` now takes the file index, resolves `item.files[index]` (not
+      `.first()`) for the SDK `download_item` call, and labels the activity entry with both entry
+      title and file name (`"Downloading {title} — {file_name}..."`).
+- [x] 2.7 On successful completion, sets `item.files[index].downloaded = true` and calls
+      `item.recompute_status()`; on failure/cancellation leaves it false and still recomputes.
+- [x] 2.8 `drain_download_queue` updated for the new tuple shape; concurrency slot accounting
       (`active_downloads`, `available_slots`) stays entry-agnostic (design's stated non-goal).
 
 ## 3. Entry-level download action enqueues all missing items
 
-- [ ] 3.1 Update the entry-level download button's click handler
-      (`crates/dtrpg-ui/src/ui/views/detail_panel_view.rs`, `detail-tab-download`) to iterate
-      `item.files`, enqueueing every file where `!downloaded` via the updated
-      `enqueue_download(entry_id, index, label, cx)`.
-- [ ] 3.2 Update the button's label/icon/enabled state to reflect aggregate status per
-      design.md's "Rust entry-level download status MUST reflect aggregate per-item state"
-      (fully downloaded only when every file is downloaded).
-- [ ] 3.3 Update `catalog_view.rs`'s entry-level status affordances (list row badge, grid tile
-      badge, context menu Download/Downloaded items) that read `item.status` directly — confirm
-      they still read the (now-derived) `item.status` and require no further change, or adjust
-      if any read `item.files` directly.
+- [x] 3.1 No click-handler change needed: `detail-tab-download`'s existing call to
+      `enqueue_download(&id, download_title.clone(), cx)` (`detail_panel_view.rs`) already
+      enqueues every not-yet-downloaded file now that `enqueue_download` loops `item.files`
+      internally (see 2.4) — the view didn't need to know about indices.
+- [x] 3.2 No further change needed: the button's `is_downloaded = item.status ==
+      ItemStatus::Downloaded` check already reflects the design's aggregate rule, since
+      `item.status` is now derived by `recompute_status` (all files downloaded) rather than set
+      directly.
+- [x] 3.3 Confirmed: `catalog_view.rs`'s list row badge, grid tile badge, and context menu
+      Download/Downloaded items all read `item.status` directly and need no change — they
+      automatically reflect the new aggregate-derived status.
 
 ## 4. Per-item download button in the detail tab item list
 
-- [ ] 4.1 In `render_item_tier`'s per-row `Status` column (currently a `TODO` placeholder),
-      replace it with a download action/status affordance: download icon when
-      `!file.downloaded` and not queued/active, checkmark when `file.downloaded`, a neutral
-      in-progress indicator when queued/active (no duplicate cancel control on the row — cancel
-      stays in the activity panel).
-- [ ] 4.2 Wire the row's download icon's `on_click` to `enqueue_download(entry_id, row_ix, ...)`
-      with `cx.stop_propagation()` so it doesn't also fire the row's existing
+- [x] 4.1 `render_item_tier`'s per-row `Status` column (previously a `TODO` placeholder) now
+      shows a download icon when `!file.downloaded` and not queued/active, a checkmark when
+      `file.downloaded`, or a neutral "Downloading…" text indicator when queued/active (no
+      duplicate cancel control on the row — cancel stays in the activity panel).
+- [x] 4.2 Wired the row's download icon's `on_click` to `enqueue_item_download(entry_id, row_ix,
+      title, cx)` with `cx.stop_propagation()` so it doesn't also fire the row's existing
       `select_item_file` click handler (same class of bug fixed in `activity_panel_view.rs`'s
       cancel button — see prior session).
-- [ ] 4.3 Determine each row's queued/active state by checking the controller's
-      `download_queue`/`download_cancel_flags` for `(entry_id, row_ix)` membership.
+- [x] 4.3 Added `LibraryController::is_file_queued_or_active(id, index)`, checking
+      `download_queue` and `download_activity_ids` for `(entry_id, row_ix)` membership; used by
+      the row to pick its downloaded/downloading/download-action state.
 
 ## 5. Tests
 
