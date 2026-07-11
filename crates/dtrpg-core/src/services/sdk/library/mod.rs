@@ -297,15 +297,15 @@ mod tests {
                                    }), },
                 ]), }),
                    detail_result: Ok(OrderProductItemResponse { data:     item,
-                                                                 included: Some(vec![
-                    IncludedItem { id:            "/api/vBeta/publishers/7".to_string(),
-                                   resource_type: "Publisher".to_string(),
-                                   attributes:    serde_json::json!({
-                                       "name": "Lantern Press",
-                                       "publisherId": 7,
-                                       "slug": "lantern-press",
-                                   }), },
-                ]), }), }
+                                                                included: Some(vec![
+                IncludedItem { id:            "/api/vBeta/publishers/7".to_string(),
+                               resource_type: "Publisher".to_string(),
+                               attributes:    serde_json::json!({
+                                   "name": "Lantern Press",
+                                   "publisherId": 7,
+                                   "slug": "lantern-press",
+                               }), },
+            ]), }), }
         }
 
         fn session_error() -> Self {

@@ -285,7 +285,8 @@ mod tests {
                                        "slug": "lantern-press",
                                    }), },
                 ]), }),
-                   detail_result: Ok(OrderProductItemResponse { data: item, included: None }), }
+                   detail_result: Ok(OrderProductItemResponse { data:     item,
+                                                                included: None, }), }
         }
     }
 
