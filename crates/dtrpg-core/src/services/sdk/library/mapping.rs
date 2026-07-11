@@ -263,7 +263,7 @@ mod tests {
                                        "slug": "lantern-press",
                                    }), },
                 ]), }),
-                   detail_result: Ok(OrderProductItemResponse { data: item }), }
+                   detail_result: Ok(OrderProductItemResponse { data: item, included: None }), }
         }
     }
 
