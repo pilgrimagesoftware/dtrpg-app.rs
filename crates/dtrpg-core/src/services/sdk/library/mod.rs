@@ -5,8 +5,6 @@ mod errors;
 mod gateway;
 mod mapping;
 
-use std::collections::HashMap;
-
 use dtrpg_sdk::{IncludedItem, LibraryItemsParams};
 use dtrpg_ui::{
     data::library::LibraryItem,
@@ -146,12 +144,19 @@ impl LibraryService for RustSdkLibraryService {
 
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {
         let response = self.gateway.get_order_product(id)?;
-        // The single-item detail endpoint has no `included` sideload array to resolve
-        // `relationships` against; falls back to `attributes.product` if ever embedded.
-        Ok(map_order_product(&response.data,
-                             &HashMap::new(),
-                             &HashMap::new(),
-                             0))
+        // The detail endpoint sideloads the same Publisher/Product `included` array as
+        // the list endpoint; resolve it the same way rather than falling back to
+        // `attributes.product` embedding alone.
+        let products = response.included
+                               .as_deref()
+                               .map(product_lookup)
+                               .unwrap_or_default();
+        let publishers = response.included
+                                 .as_deref()
+                                 .map(publisher_lookup)
+                                 .unwrap_or_default();
+
+        Ok(map_order_product(&response.data, &publishers, &products, 0))
     }
 
     fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
@@ -291,7 +296,16 @@ mod tests {
                                        "slug": "lantern-press",
                                    }), },
                 ]), }),
-                   detail_result: Ok(OrderProductItemResponse { data: item }), }
+                   detail_result: Ok(OrderProductItemResponse { data:     item,
+                                                                included: Some(vec![
+                IncludedItem { id:            "/api/vBeta/publishers/7".to_string(),
+                               resource_type: "Publisher".to_string(),
+                               attributes:    serde_json::json!({
+                                   "name": "Lantern Press",
+                                   "publisherId": 7,
+                                   "slug": "lantern-press",
+                               }), },
+            ]), }), }
         }
 
         fn session_error() -> Self {
@@ -371,6 +385,15 @@ mod tests {
         assert_eq!(items[0].title.as_ref(), "A Better Dungeon");
         assert_eq!(items[0].publisher.as_ref(), "Lantern Press");
         assert_eq!(items[0].kind.as_ref(), "Adventure");
+    }
+
+    #[test]
+    fn get_item_resolves_publisher_from_included() {
+        let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+
+        let item = service.get_item(42).expect("get item");
+
+        assert_eq!(item.publisher.as_ref(), "Lantern Press");
     }
 
     #[test]
