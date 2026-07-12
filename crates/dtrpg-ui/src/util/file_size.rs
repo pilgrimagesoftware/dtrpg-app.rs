@@ -40,6 +40,19 @@ pub fn with_on_disk_suffix(catalog_size: String, on_disk_bytes: Option<u64>) -> 
     }
 }
 
+/// Returns the on-disk size when known, otherwise `catalog_size` unchanged.
+///
+/// Unlike [`with_on_disk_suffix`], this replaces rather than supplements —
+/// for a single file (not a multi-file aggregate) there's no "partially
+/// downloaded" state to show both sizes for: it's either on disk (show the
+/// real size) or still only in the cloud (show the catalog estimate).
+pub fn prefer_on_disk_size(catalog_size: String, on_disk_bytes: Option<u64>) -> String {
+    match on_disk_bytes {
+        Some(bytes) => format_bytes(bytes),
+        None => catalog_size,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -96,6 +109,18 @@ mod tests {
     #[test]
     fn with_on_disk_suffix_returns_catalog_size_unchanged_when_unknown() {
         let result = with_on_disk_suffix("12.0 MB".to_string(), None);
+        assert_eq!(result, "12.0 MB");
+    }
+
+    #[test]
+    fn prefer_on_disk_size_returns_local_size_when_known() {
+        let result = prefer_on_disk_size("12.0 MB".to_string(), Some(1_572_864));
+        assert_eq!(result, "1.5 MB");
+    }
+
+    #[test]
+    fn prefer_on_disk_size_returns_catalog_size_when_unknown() {
+        let result = prefer_on_disk_size("12.0 MB".to_string(), None);
         assert_eq!(result, "12.0 MB");
     }
 }
