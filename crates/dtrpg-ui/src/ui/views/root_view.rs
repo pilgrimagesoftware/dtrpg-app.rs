@@ -571,6 +571,7 @@ impl LibraryRootView {
         if !already_open {
             self.settings.update(cx, |ctrl, cx| ctrl.open(cx));
             let handle = open_settings_window(self.settings.clone(),
+                                              self.controller.clone(),
                                               self.file_opener_extension_input.clone(),
                                               cx);
             self.settings_window = Some(handle);

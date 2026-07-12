@@ -2568,7 +2568,9 @@ impl LibraryController {
 
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
 
-    /// Applies a new theme key (updates the GPUI global).
+    /// Applies a new theme key (updates the GPUI global) and persists it via
+    /// [`crate::data::ui_prefs::UiPrefs`] so it survives a restart instead of
+    /// always resetting to Parchment.
     ///
     /// Also re-syncs `gpui_component::Theme`'s table colors (see
     /// [`crate::data::theme::apply_table_colors`]) so the catalog `DataTable`
@@ -2576,20 +2578,78 @@ impl LibraryController {
     /// palette was active at startup.
     pub fn set_theme(&self, key: ThemeKey, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
-        let new_theme = LibriTheme::new(key, current.density);
+        let new_theme = LibriTheme::new(key,
+                                        current.density,
+                                        current.body_font,
+                                        current.value_font,
+                                        current.mono_font);
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
               apply_table_colors(theme, &colors);
           });
+        crate::data::ui_prefs::UiPrefs::load().save_theme_key(key.as_str());
         cx.notify();
     }
 
     /// Applies a new density (updates the GPUI global).
     pub fn set_density(&self, density: Density, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
-        let new_theme = LibriTheme::new(current.key, density);
+        let new_theme = LibriTheme::new(current.key,
+                                        density,
+                                        current.body_font,
+                                        current.value_font,
+                                        current.mono_font);
         cx.set_global(new_theme);
+        cx.notify();
+    }
+
+    /// Applies a new body font (updates the GPUI global, `gpui_component`'s
+    /// `Theme.font_family`, and persists the selection via
+    /// [`crate::data::ui_prefs::UiPrefs`]).
+    pub fn set_body_font(&self, font: &'static crate::data::constants::FontOption,
+                         cx: &mut Context<Self>) {
+        let current = cx.global::<LibriTheme>();
+        let new_theme = LibriTheme::new(current.key,
+                                        current.density,
+                                        font,
+                                        current.value_font,
+                                        current.mono_font);
+        cx.set_global(new_theme);
+        cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+              theme.font_family = font.family.into();
+          });
+        crate::data::ui_prefs::UiPrefs::load().save_body_font_id(font.id);
+        cx.notify();
+    }
+
+    /// Applies a new value font (updates the GPUI global and persists the
+    /// selection via [`crate::data::ui_prefs::UiPrefs`]).
+    pub fn set_value_font(&self, font: &'static crate::data::constants::FontOption,
+                          cx: &mut Context<Self>) {
+        let current = cx.global::<LibriTheme>();
+        let new_theme = LibriTheme::new(current.key,
+                                        current.density,
+                                        current.body_font,
+                                        font,
+                                        current.mono_font);
+        cx.set_global(new_theme);
+        crate::data::ui_prefs::UiPrefs::load().save_value_font_id(font.id);
+        cx.notify();
+    }
+
+    /// Applies a new monospace font (updates the GPUI global and persists the
+    /// selection via [`crate::data::ui_prefs::UiPrefs`]).
+    pub fn set_mono_font(&self, font: &'static crate::data::constants::FontOption,
+                         cx: &mut Context<Self>) {
+        let current = cx.global::<LibriTheme>();
+        let new_theme = LibriTheme::new(current.key,
+                                        current.density,
+                                        current.body_font,
+                                        current.value_font,
+                                        font);
+        cx.set_global(new_theme);
+        crate::data::ui_prefs::UiPrefs::load().save_mono_font_id(font.id);
         cx.notify();
     }
 

@@ -21,20 +21,22 @@ use gpui_component::scroll::ScrollableElement as _;
 use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
+use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
 use crate::data::file_openers::FileOpenerEntry;
-use crate::data::theme::ColorTokens;
+use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
     settings_advanced_view::{render_about_section, render_advanced_section},
+    settings_appearance_view::render_appearance_section,
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
 
 /// Number of settings pages (Account, Downloads Location, File Openers,
-/// Advanced, About); see [`page_title`] and the `match` in
+/// Advanced, Appearance, About); see [`page_title`] and the `match` in
 /// [`render_settings_panel`].
-const PAGE_COUNT: usize = 5;
+const PAGE_COUNT: usize = 6;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
 /// is out of range (defensive default for a persisted index from a prior app
@@ -45,6 +47,7 @@ fn page_title(ix: usize) -> String {
         2 => t!("settings.file_openers_title").to_string(),
         3 => t!("settings.advanced_title").to_string(),
         4 => t!("settings.about_title").to_string(),
+        5 => t!("settings.appearance_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -59,8 +62,10 @@ fn page_title(ix: usize) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage_root_path: PathBuf, storage_path_exists: bool,
-                             entity: Entity<SettingsController>, focus_handle: &FocusHandle,
-                             colors: &ColorTokens, email_input: Option<Entity<InputState>>,
+                             entity: Entity<SettingsController>,
+                             library: Entity<LibraryController>, focus_handle: &FocusHandle,
+                             colors: &ColorTokens, theme: &LibriTheme,
+                             email_input: Option<Entity<InputState>>,
                              password_input: Option<Entity<InputState>>,
                              sign_in_in_progress: bool, sign_in_enabled: bool,
                              sign_in_error: Option<String>,
@@ -105,8 +110,12 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        3 => render_advanced_section(entity.clone(), cache_counts, colors).into_any_element(),
+        3 => render_advanced_section(entity.clone(),
+                                     cache_counts,
+                                     colors,
+                                     theme.value_font.family).into_any_element(),
         4 => render_about_section(colors).into_any_element(),
+        5 => render_appearance_section(library, colors, theme).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),
                                     colors,
@@ -114,7 +123,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     password_input,
                                     sign_in_in_progress,
                                     sign_in_enabled,
-                                    sign_in_error),
+                                    sign_in_error,
+                                    theme.mono_font.family),
     };
 
     // Reserves vertical clearance for the macOS traffic light buttons, which

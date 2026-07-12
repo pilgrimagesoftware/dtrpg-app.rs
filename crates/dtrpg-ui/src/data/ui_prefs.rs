@@ -20,6 +20,16 @@ pub struct UiPrefsFile {
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
     pub settings_page_ix: Option<usize>,
+    /// Persisted key of the active color theme (`ThemeKey`'s variant name,
+    /// lowercased). `None` before this preference existed, or if never
+    /// changed from the default.
+    pub theme_key:        Option<String>,
+    /// Persisted `FontOption::id` of the active body font.
+    pub body_font_id:     Option<String>,
+    /// Persisted `FontOption::id` of the active value font.
+    pub value_font_id:    Option<String>,
+    /// Persisted `FontOption::id` of the active monospace font.
+    pub mono_font_id:     Option<String>,
 }
 
 /// Persists and restores small UI preferences.
@@ -94,6 +104,53 @@ impl UiPrefs {
     /// Persist the active settings page index.
     pub fn save_settings_page_ix(&mut self, ix: usize) {
         self.data.settings_page_ix = Some(ix);
+        self.flush();
+    }
+
+    /// Persisted key of the active color theme, or `None` if never saved.
+    pub fn theme_key(&self) -> Option<&str> {
+        self.data.theme_key.as_deref()
+    }
+
+    /// Persist the active color theme's key.
+    pub fn save_theme_key(&mut self, key: &str) {
+        self.data.theme_key = Some(key.to_string());
+        self.flush();
+    }
+
+    /// Persisted `FontOption::id` of the active body font, or `None` if never
+    /// saved.
+    pub fn body_font_id(&self) -> Option<&str> {
+        self.data.body_font_id.as_deref()
+    }
+
+    /// Persist the active body font's `FontOption::id`.
+    pub fn save_body_font_id(&mut self, id: &str) {
+        self.data.body_font_id = Some(id.to_string());
+        self.flush();
+    }
+
+    /// Persisted `FontOption::id` of the active value font, or `None` if never
+    /// saved.
+    pub fn value_font_id(&self) -> Option<&str> {
+        self.data.value_font_id.as_deref()
+    }
+
+    /// Persist the active value font's `FontOption::id`.
+    pub fn save_value_font_id(&mut self, id: &str) {
+        self.data.value_font_id = Some(id.to_string());
+        self.flush();
+    }
+
+    /// Persisted `FontOption::id` of the active monospace font, or `None` if
+    /// never saved.
+    pub fn mono_font_id(&self) -> Option<&str> {
+        self.data.mono_font_id.as_deref()
+    }
+
+    /// Persist the active monospace font's `FontOption::id`.
+    pub fn save_mono_font_id(&mut self, id: &str) {
+        self.data.mono_font_id = Some(id.to_string());
         self.flush();
     }
 

@@ -123,8 +123,9 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 
 /// Opens the settings window as a separate, non-modal window.
 ///
-/// Shares `settings` with the caller's `LibraryRootView` rather than
-/// constructing a new controller, so drafts/tab state persist across
+/// Shares `settings` and `library` with the caller's `LibraryRootView` rather
+/// than constructing new controllers, so drafts/tab state (and, for
+/// `library`, the Appearance page's font/theme setters) persist across
 /// close/reopen. Wires the window's close event to `SettingsController::close`
 /// so the panel-visibility state stays in sync even when the user closes the
 /// window via its native close control rather than Escape.
@@ -134,6 +135,7 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 /// Panics if the window cannot be opened.
 #[allow(clippy::expect_used)]
 pub fn open_settings_window(settings: Entity<SettingsController>,
+                            library: Entity<crate::controllers::library::LibraryController>,
                             file_opener_extension_input: Entity<InputState>, cx: &mut App)
                             -> WindowHandle<Root> {
     let settings_for_close = settings.clone();
@@ -169,7 +171,7 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
                 true
             });
             let view = cx.new(|cx| {
-                SettingsWindowView::new(window, cx, settings, file_opener_extension_input)
+                SettingsWindowView::new(window, cx, settings, library, file_opener_extension_input)
             });
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
@@ -183,17 +185,16 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
 /// when credentials are found; falls back to the login window otherwise.
 pub fn setup(cx: &mut App) {
     init(cx);
-    cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-          theme.font_family = "Hoefler Text".into();
-      });
     init_globals(cx);
 
-    // Sync gpui-component's table colors (DataTable/Table) with the active Libri
-    // theme; otherwise the catalog list view renders with gpui-component's default
-    // light table colors regardless of which Libri theme is active.
-    let initial_colors = cx.global::<crate::data::theme::LibriTheme>().colors.clone();
+    // Apply the persisted (or default) body font and sync gpui-component's table
+    // colors (DataTable/Table) with the active Libri theme; otherwise the catalog
+    // list view renders with gpui-component's default light table colors
+    // regardless of which Libri theme is active.
+    let initial_theme = cx.global::<crate::data::theme::LibriTheme>().clone();
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-          crate::data::theme::apply_table_colors(theme, &initial_colors);
+          theme.font_family = initial_theme.body_font.family.into();
+          crate::data::theme::apply_table_colors(theme, &initial_theme.colors);
       });
 
     // Key bindings
