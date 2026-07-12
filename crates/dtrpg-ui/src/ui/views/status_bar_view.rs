@@ -67,6 +67,8 @@ fn theme_label(key: ThemeKey) -> String {
         ThemeKey::Slate => t!("theme.slate").to_string(),
         ThemeKey::Sage => t!("theme.sage").to_string(),
         ThemeKey::Ink => t!("theme.ink").to_string(),
+        ThemeKey::Moss => t!("theme.moss").to_string(),
+        ThemeKey::Rosewood => t!("theme.rosewood").to_string(),
     }
 }
 
@@ -108,7 +110,9 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                                            for key in [ThemeKey::Parchment,
                                                        ThemeKey::Slate,
                                                        ThemeKey::Sage,
-                                                       ThemeKey::Ink]
+                                                       ThemeKey::Ink,
+                                                       ThemeKey::Moss,
+                                                       ThemeKey::Rosewood]
                                            {
                                                let e = entity.clone();
                                                m = m.item(

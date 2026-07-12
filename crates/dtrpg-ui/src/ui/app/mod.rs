@@ -123,8 +123,9 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 
 /// Opens the settings window as a separate, non-modal window.
 ///
-/// Shares `settings` with the caller's `LibraryRootView` rather than
-/// constructing a new controller, so drafts/tab state persist across
+/// Shares `settings` and `library` with the caller's `LibraryRootView` rather
+/// than constructing new controllers, so drafts/tab state (and, for
+/// `library`, the Appearance page's font/theme setters) persist across
 /// close/reopen. Wires the window's close event to `SettingsController::close`
 /// so the panel-visibility state stays in sync even when the user closes the
 /// window via its native close control rather than Escape.
@@ -134,47 +135,45 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 /// Panics if the window cannot be opened.
 #[allow(clippy::expect_used)]
 pub fn open_settings_window(settings: Entity<SettingsController>,
+                            library: Entity<crate::controllers::library::LibraryController>,
                             file_opener_extension_input: Entity<InputState>, cx: &mut App)
                             -> WindowHandle<Root> {
     let settings_for_close = settings.clone();
-    cx.open_window(
-        WindowOptions {
-            // `appears_transparent: true` hides the native opaque title bar
-            // and title text (same pattern as the main library window's
-            // `title_bar_view.rs`) while keeping the macOS traffic-light
-            // window controls, which `titlebar: None` removes entirely on
-            // this platform (there is no dedicated close-only chrome option
-            // in gpui). `is_minimizable: false` and `is_resizable: false`
-            // disable the minimize and zoom buttons, leaving only close —
-            // resizing is no longer needed now that the panel content
-            // scrolls (see `settings_view::render_settings_panel`).
-            titlebar: Some(TitlebarOptions {
-                appears_transparent: true,
-                ..Default::default()
-            }),
-            window_bounds: Some(WindowBounds::Windowed(Bounds {
-                origin: Point::default(),
-                size: Size {
-                    width: px(720.),
-                    height: px(520.),
-                },
-            })),
-            is_resizable: false,
-            is_minimizable: false,
-            ..Default::default()
-        },
-        move |window, cx| {
-            window.on_window_should_close(cx, move |_window, cx| {
-                settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
-                true
-            });
-            let view = cx.new(|cx| {
-                SettingsWindowView::new(window, cx, settings, file_opener_extension_input)
-            });
-            cx.new(|cx| Root::new(view, window, cx).bordered(false))
-        },
-    )
-    .expect("failed to open settings window")
+    let window_size = Size { width:  px(720.),
+                             height: px(520.), };
+    cx.open_window(WindowOptions { // `appears_transparent: true` hides the native opaque title
+                                   // bar and title text (same
+                                   // pattern as the main library window's
+                                   // `title_bar_view.rs`) while keeping the macOS traffic-light
+                                   // window controls, which `titlebar: None` removes entirely on
+                                   // this platform (there is no dedicated close-only chrome
+                                   // option
+                                   // in gpui). `is_minimizable: false` and `is_resizable: false`
+                                   // disable the minimize and zoom buttons, leaving only close —
+                                   // resizing is no longer needed now that the panel content
+                                   // scrolls (see `settings_view::render_settings_panel`).
+                                   titlebar: Some(TitlebarOptions { appears_transparent:
+                                                                        true,
+                                                                    ..Default::default() }),
+                                   window_bounds: Some(WindowBounds::centered(window_size, cx)),
+                                   is_resizable: false,
+                                   is_minimizable: false,
+                                   ..Default::default() },
+                   move |window, cx| {
+                       window.on_window_should_close(cx, move |_window, cx| {
+                                 settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
+                                 true
+                             });
+                       let view = cx.new(|cx| {
+                                        SettingsWindowView::new(window,
+                                                                cx,
+                                                                settings,
+                                                                library,
+                                                                file_opener_extension_input)
+                                    });
+                       cx.new(|cx| Root::new(view, window, cx).bordered(false))
+                   })
+      .expect("failed to open settings window")
 }
 
 /// Initializes the GPUI application and routes to the login or library window.
@@ -183,17 +182,16 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
 /// when credentials are found; falls back to the login window otherwise.
 pub fn setup(cx: &mut App) {
     init(cx);
-    cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-          theme.font_family = "Hoefler Text".into();
-      });
     init_globals(cx);
 
-    // Sync gpui-component's table colors (DataTable/Table) with the active Libri
-    // theme; otherwise the catalog list view renders with gpui-component's default
-    // light table colors regardless of which Libri theme is active.
-    let initial_colors = cx.global::<crate::data::theme::LibriTheme>().colors.clone();
+    // Apply the persisted (or default) body font and sync gpui-component's table
+    // colors (DataTable/Table) with the active Libri theme; otherwise the catalog
+    // list view renders with gpui-component's default light table colors
+    // regardless of which Libri theme is active.
+    let initial_theme = cx.global::<crate::data::theme::LibriTheme>().clone();
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-          crate::data::theme::apply_table_colors(theme, &initial_colors);
+          theme.font_family = initial_theme.fonts.body_font.clone();
+          crate::data::theme::apply_table_colors(theme, &initial_theme.colors);
       });
 
     // Key bindings

@@ -1,6 +1,12 @@
-//! Libri theme system: four color themes and two density variants.
+//! Libri theme system: six color themes, two density variants, four
+//! user-selectable font-family roles, and one shared UI text size.
 
-use gpui::{Hsla, Pixels, px}; // Pixels kept for GPUI layout fields
+use gpui::{Hsla, Pixels, SharedString, px}; // Pixels kept for GPUI layout fields
+
+use crate::data::constants::{
+    DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
+    DEFAULT_VALUE_FONT,
+};
 
 // ── Color tokens
 // ──────────────────────────────────────────────────────────────
@@ -105,7 +111,7 @@ impl DensityConstants {
 // ── Theme key
 // ─────────────────────────────────────────────────────────────────
 
-/// Identifies one of the four named themes.
+/// Identifies one of the six named themes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ThemeKey {
     #[default]
@@ -113,30 +119,104 @@ pub enum ThemeKey {
     Slate,
     Sage,
     Ink,
+    Moss,
+    Rosewood,
+}
+
+impl ThemeKey {
+    /// Stable, lowercase identifier used for persistence — independent of the
+    /// enum variant name so a future rename doesn't silently invalidate saved
+    /// preferences.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ThemeKey::Parchment => "parchment",
+            ThemeKey::Slate => "slate",
+            ThemeKey::Sage => "sage",
+            ThemeKey::Ink => "ink",
+            ThemeKey::Moss => "moss",
+            ThemeKey::Rosewood => "rosewood",
+        }
+    }
+
+    /// Resolves a persisted key back to a `ThemeKey`, or `None` if it doesn't
+    /// match any known theme (e.g. a prefs file from a version with fewer
+    /// themes, or written after this one removes one).
+    pub fn from_persisted_key(key: &str) -> Option<Self> {
+        match key {
+            "parchment" => Some(ThemeKey::Parchment),
+            "slate" => Some(ThemeKey::Slate),
+            "sage" => Some(ThemeKey::Sage),
+            "ink" => Some(ThemeKey::Ink),
+            "moss" => Some(ThemeKey::Moss),
+            "rosewood" => Some(ThemeKey::Rosewood),
+            _ => None,
+        }
+    }
 }
 
 // ── LibriTheme
 // ────────────────────────────────────────────────────────────────
 
-/// GPUI app-level global containing the active Libri theme and density.
+/// Font-family and size selections for a [`LibriTheme`], grouped into one
+/// struct rather than threaded as separate constructor arguments (see
+/// `docs/rust.md`'s guidance against many-argument functions).
+///
+/// Family choices are free-form: any font name the user's system reports via
+/// `cx.text_system().all_font_names()` is valid, not a curated list — see
+/// `settings_appearance_view`. `ui_text_size` is shared across all roles
+/// except monospace, which renders at [`MONO_SIZE_RATIO`] of it.
+#[derive(Debug, Clone)]
+pub struct FontSelections {
+    /// Active body-font family; also applied to `gpui_component::Theme`'s
+    /// `font_family` by whichever call site changes it (see
+    /// `LibraryController::set_body_font`).
+    pub body_font:    SharedString,
+    /// Active value-font family (e.g. Advanced settings' "Cache details"
+    /// rows).
+    pub value_font:   SharedString,
+    /// Active label-font family (e.g. the detail tab's metadata labels).
+    pub label_font:   SharedString,
+    /// Active monospace-font family (e.g. the masked API key hint).
+    pub mono_font:    SharedString,
+    /// Shared UI text size, applied via `Window::set_rem_size` so every
+    /// `rems(...)`-based size utility (`.text_sm()`, `.text_xs()`, etc.)
+    /// scales together, like zooming a page.
+    pub ui_text_size: Pixels,
+}
+
+impl Default for FontSelections {
+    fn default() -> Self {
+        Self { body_font:    SharedString::from(DEFAULT_BODY_FONT),
+               value_font:   SharedString::from(DEFAULT_VALUE_FONT),
+               label_font:   SharedString::from(DEFAULT_LABEL_FONT),
+               mono_font:    SharedString::from(DEFAULT_MONO_FONT),
+               ui_text_size: px(DEFAULT_UI_TEXT_SIZE), }
+    }
+}
+
+/// GPUI app-level global containing the active Libri theme, density, and
+/// font selections.
 #[derive(Debug, Clone)]
 pub struct LibriTheme {
     pub key:               ThemeKey,
     pub colors:            ColorTokens,
     pub density:           Density,
     pub density_constants: DensityConstants,
+    pub fonts:             FontSelections,
 }
 
 impl gpui::Global for LibriTheme {}
 
 impl LibriTheme {
-    /// Constructs the theme for `key` and `density`.
-    pub fn new(key: ThemeKey, density: Density) -> Self {
+    /// Constructs the theme for `key`, `density`, and `fonts`.
+    pub fn new(key: ThemeKey, density: Density, fonts: FontSelections) -> Self {
         let colors = match key {
             ThemeKey::Parchment => parchment_colors(),
             ThemeKey::Slate => slate_colors(),
             ThemeKey::Sage => sage_colors(),
             ThemeKey::Ink => ink_colors(),
+            ThemeKey::Moss => moss_colors(),
+            ThemeKey::Rosewood => rosewood_colors(),
         };
         let density_constants = match density {
             Density::Comfortable => DensityConstants::comfortable(),
@@ -145,12 +225,15 @@ impl LibriTheme {
         Self { key,
                colors,
                density,
-               density_constants }
+               density_constants,
+               fonts }
     }
 
-    /// Returns the default theme (parchment, comfortable).
+    /// Returns the default theme (parchment, comfortable, default fonts).
     pub fn default_theme() -> Self {
-        Self::new(ThemeKey::Parchment, Density::Comfortable)
+        Self::new(ThemeKey::Parchment,
+                  Density::Comfortable,
+                  FontSelections::default())
     }
 }
 
@@ -317,4 +400,63 @@ fn ink_colors() -> ColorTokens {
                   error:          hex(0xE0, 0x58, 0x58),
                   warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.10),
                   warning_text:   gpui::hsla(0.10, 0.90, 0.65, 1.0), }
+}
+
+// ── Moss ──────────────────────────────────────────────────────────────────────
+// A second dark theme alongside Ink, distinguished by a cool forest-green
+// cast rather than Ink's warm brown-black.
+// --bg:#0F1712  --surface:#16201A  --surface-2:#1C2720  --hover:#243028
+// --text:#E4ECDD  --text-2:#A9B8A0  --text-3:#7A8A74
+// --line:#28332B  --line-2:#344036  --accent-on:#16201A
+// --shadow:rgba(0,0,0,0.5)  --scrim:rgba(0,0,0,0.45)
+// accent: muted gold-green ≈ #9CB06A
+
+fn moss_colors() -> ColorTokens {
+    ColorTokens { desktop_bg:     hex(0x0F, 0x17, 0x12),
+                  surface:        hex(0x16, 0x20, 0x1A),
+                  surface_alt:    hex(0x1C, 0x27, 0x20),
+                  hover:          hex(0x24, 0x30, 0x28),
+                  text_primary:   hex(0xE4, 0xEC, 0xDD),
+                  text_secondary: hex(0xA9, 0xB8, 0xA0),
+                  text_tertiary:  hex(0x7A, 0x8A, 0x74),
+                  border:         hex(0x28, 0x33, 0x2B),
+                  border_strong:  hex(0x34, 0x40, 0x36),
+                  accent:         hex(0x9C, 0xB0, 0x6A),
+                  accent_soft:    hex_a(0x9C, 0xB0, 0x6A, 0.13),
+                  accent_on:      hex(0x16, 0x20, 0x1A),
+                  shadow:         hex_a(0x00, 0x00, 0x00, 0.50),
+                  scrim:          hex_a(0x00, 0x00, 0x00, 0.45),
+                  error:          hex(0xE0, 0x58, 0x58),
+                  warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.10),
+                  warning_text:   gpui::hsla(0.10, 0.90, 0.65, 1.0), }
+}
+
+// ── Rosewood
+// ──────────────────────────────────────────────────────────────────
+// A second light theme alongside Parchment, distinguished by a warm
+// burgundy/wine cast rather than Parchment's tan/cream.
+// --bg:#C9A8A0  --surface:#FBF3F1  --surface-2:#F0E0DC  --hover:#EAD5D0
+// --text:#2A1816  --text-2:#634540  --text-3:#937872
+// --line:#E8D5D0  --line-2:#DBC2BC  --accent-on:#FBF3F1
+// --shadow:rgba(58,26,24,0.18)  --scrim:rgba(32,14,12,0.26)
+// accent: deep wine red ≈ #7A2C2C
+
+fn rosewood_colors() -> ColorTokens {
+    ColorTokens { desktop_bg:     hex(0xC9, 0xA8, 0xA0),
+                  surface:        hex(0xFB, 0xF3, 0xF1),
+                  surface_alt:    hex(0xF0, 0xE0, 0xDC),
+                  hover:          hex(0xEA, 0xD5, 0xD0),
+                  text_primary:   hex(0x2A, 0x18, 0x16),
+                  text_secondary: hex(0x63, 0x45, 0x40),
+                  text_tertiary:  hex(0x93, 0x78, 0x72),
+                  border:         hex(0xE8, 0xD5, 0xD0),
+                  border_strong:  hex(0xDB, 0xC2, 0xBC),
+                  accent:         hex(0x7A, 0x2C, 0x2C),
+                  accent_soft:    hex_a(0x7A, 0x2C, 0x2C, 0.13),
+                  accent_on:      hex(0xFB, 0xF3, 0xF1),
+                  shadow:         hex_a(0x3A, 0x1A, 0x18, 0.18),
+                  scrim:          hex_a(0x20, 0x0E, 0x0C, 0.26),
+                  error:          hex(0xB0, 0x30, 0x28),
+                  warning_bg:     gpui::hsla(0.11, 0.9, 0.5, 0.12),
+                  warning_text:   gpui::hsla(0.08, 0.85, 0.35, 1.0), }
 }

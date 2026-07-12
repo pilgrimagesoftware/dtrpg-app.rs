@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels};
+use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -2568,7 +2568,9 @@ impl LibraryController {
 
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
 
-    /// Applies a new theme key (updates the GPUI global).
+    /// Applies a new theme key (updates the GPUI global) and persists it via
+    /// [`crate::data::ui_prefs::UiPrefs`] so it survives a restart instead of
+    /// always resetting to Parchment.
     ///
     /// Also re-syncs `gpui_component::Theme`'s table colors (see
     /// [`crate::data::theme::apply_table_colors`]) so the catalog `DataTable`
@@ -2576,20 +2578,93 @@ impl LibraryController {
     /// palette was active at startup.
     pub fn set_theme(&self, key: ThemeKey, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
-        let new_theme = LibriTheme::new(key, current.density);
+        let new_theme = LibriTheme::new(key, current.density, current.fonts.clone());
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
               apply_table_colors(theme, &colors);
           });
+        crate::data::ui_prefs::UiPrefs::load().save_theme_key(key.as_str());
         cx.notify();
     }
 
     /// Applies a new density (updates the GPUI global).
     pub fn set_density(&self, density: Density, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
-        let new_theme = LibriTheme::new(current.key, density);
+        let new_theme = LibriTheme::new(current.key, density, current.fonts.clone());
         cx.set_global(new_theme);
+        cx.notify();
+    }
+
+    /// Applies a new body font family (any font installed on the user's
+    /// system, not a curated list — see `settings_appearance_view`), updating
+    /// the GPUI global, `gpui_component`'s `Theme.font_family`, and
+    /// persisting the selection via [`crate::data::ui_prefs::UiPrefs`].
+    pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let font = font.into();
+        let current = cx.global::<LibriTheme>();
+        let mut fonts = current.fonts.clone();
+        fonts.body_font = font.clone();
+        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        cx.set_global(new_theme);
+        cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+              theme.font_family = font.clone();
+          });
+        crate::data::ui_prefs::UiPrefs::load().save_body_font_name(&font);
+        cx.notify();
+    }
+
+    /// Applies a new value font family and persists the selection via
+    /// [`crate::data::ui_prefs::UiPrefs`].
+    pub fn set_value_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let font = font.into();
+        let current = cx.global::<LibriTheme>();
+        let mut fonts = current.fonts.clone();
+        fonts.value_font = font.clone();
+        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        cx.set_global(new_theme);
+        crate::data::ui_prefs::UiPrefs::load().save_value_font_name(&font);
+        cx.notify();
+    }
+
+    /// Applies a new label font family and persists the selection via
+    /// [`crate::data::ui_prefs::UiPrefs`].
+    pub fn set_label_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let font = font.into();
+        let current = cx.global::<LibriTheme>();
+        let mut fonts = current.fonts.clone();
+        fonts.label_font = font.clone();
+        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        cx.set_global(new_theme);
+        crate::data::ui_prefs::UiPrefs::load().save_label_font_name(&font);
+        cx.notify();
+    }
+
+    /// Applies a new monospace font family and persists the selection via
+    /// [`crate::data::ui_prefs::UiPrefs`].
+    pub fn set_mono_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
+        let font = font.into();
+        let current = cx.global::<LibriTheme>();
+        let mut fonts = current.fonts.clone();
+        fonts.mono_font = font.clone();
+        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        cx.set_global(new_theme);
+        crate::data::ui_prefs::UiPrefs::load().save_mono_font_name(&font);
+        cx.notify();
+    }
+
+    /// Applies a new shared UI text size (see [`FontSelections::ui_text_size`])
+    /// and persists it via [`crate::data::ui_prefs::UiPrefs`]. Applied to each
+    /// window via `Window::set_rem_size` in `LibraryRootView::render` and
+    /// `SettingsWindowView::render`, so every `rems(...)`-based size utility
+    /// scales together, like zooming a page.
+    pub fn set_ui_text_size(&self, size: Pixels, cx: &mut Context<Self>) {
+        let current = cx.global::<LibriTheme>();
+        let mut fonts = current.fonts.clone();
+        fonts.ui_text_size = size;
+        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        cx.set_global(new_theme);
+        crate::data::ui_prefs::UiPrefs::load().save_ui_text_size(size.as_f32());
         cx.notify();
     }
 

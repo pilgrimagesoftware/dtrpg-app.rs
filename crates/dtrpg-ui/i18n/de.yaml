@@ -191,6 +191,17 @@ settings:
   cache_thumbnail_cooldown_label: "Abklingzeit für Miniaturbild-Wiederholung"
   cache_thumbnail_cooldown_description: "Mindestzeit zwischen erneuten Versuchen, ein fehlgeschlagenes Cover-Miniaturbild für denselben Artikel abzurufen."
   open_cache_folder_button: "Cache-Ordner öffnen"
+  appearance_title: "Erscheinungsbild"
+  appearance_body_font_label: "Textschrift"
+  appearance_value_font_label: "Wertschrift"
+  appearance_label_font_label: "Beschriftungsschrift"
+  appearance_mono_font_label: "Monospace-Schrift"
+  appearance_theme_label: "Thema"
+  appearance_font_placeholder: "Schriftart auswählen…"
+  appearance_font_search_placeholder: "Schriftarten suchen…"
+  appearance_text_size_label: "Textgröße"
+  appearance_text_size_decrement_tooltip: "Verkleinern"
+  appearance_text_size_increment_tooltip: "Vergrößern"
 
 collections:
   add_tooltip: "Neue Sammlung"
@@ -326,3 +337,5 @@ theme:
   ink: "Tinte"
   sage: "Salbei"
   slate: "Schiefer"
+  moss: "Moos"
+  rosewood: "Rosenholz"
