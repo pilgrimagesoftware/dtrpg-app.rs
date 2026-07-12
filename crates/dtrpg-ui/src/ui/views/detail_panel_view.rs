@@ -13,6 +13,7 @@ use gpui::{
 use gpui_component::Disableable;
 use gpui_component::Icon;
 use gpui_component::IconName;
+use gpui_component::Size;
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::clipboard::Clipboard;
@@ -307,13 +308,16 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 /// Returns the column definitions used for the multi-item entry's item list.
 ///
 /// Name gets the majority of the default width (matching the previous
-/// `flex_1`-on-Name-heavy visual balance); Type and Status default narrow.
-/// All three are user-resizable — see `detail-item-list-column-resize`.
+/// `flex_1`-on-Name-heavy visual balance); Type, Size, and Status default
+/// narrow. All four are user-resizable — see `detail-item-list-column-resize`.
 pub(crate) fn item_list_columns() -> Vec<Column> {
-    vec![Column::new("name", t!("detail.item_list_column_name")).width(280.)
+    vec![Column::new("name", t!("detail.item_list_column_name")).width(240.)
                                                                 .min_width(120.)
                                                                 .resizable(true),
          Column::new("type", t!("detail.item_list_column_type")).width(90.)
+                                                                .min_width(60.)
+                                                                .resizable(true),
+         Column::new("size", t!("detail.item_list_column_size")).width(90.)
                                                                 .min_width(60.)
                                                                 .resizable(true),
          Column::new("status", t!("detail.item_list_column_status")).width(90.)
@@ -332,6 +336,10 @@ pub(crate) struct ItemListDelegate {
     /// User-adjusted column widths. `None` means use the static default from
     /// `item_list_columns()`.
     pub(crate) user_widths: Vec<Option<Pixels>>,
+    /// The entry's on-disk download directory, used to resolve each file's
+    /// on-disk size suffix in the Size column (see `render_metadata_table`'s
+    /// equivalent computation).
+    pub(crate) entry_dir:   PathBuf,
 }
 
 impl TableDelegate for ItemListDelegate {
@@ -385,6 +393,18 @@ impl TableDelegate for ItemListDelegate {
                       .child(file.format.to_string())
                       .into_any_element(),
             2 => {
+                let catalog_str = format!("{:.1} {}", file.size_mb, t!("size.mb"));
+                let on_disk =
+                    crate::util::file_size::on_disk_file_size(&self.entry_dir, file.name.as_ref());
+                div().h_full()
+                     .flex()
+                     .items_center()
+                     .text_sm()
+                     .text_color(colors.text_secondary)
+                     .child(crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk))
+                     .into_any_element()
+            }
+            3 => {
                 // Status: downloaded checkmark, in-progress indicator, or a
                 // download action for this specific item — independent of
                 // sibling rows and of the entry-level download button (see
@@ -478,10 +498,23 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
+    let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
 
-    let table = item_list_table(tabs, &entity, &entry_id, window, cx);
-    let item_list = DataTable::new(&table).bordered(false)
-                                          .scrollbar_visible(true, false);
+    let table = item_list_table(tabs, &entity, &entry_id, entry_dir, window, cx);
+
+    // `DataTable` virtualizes its rows and sizes itself to its container
+    // (`.size_full()` internally) — unlike the old stateless `Table`, it
+    // renders nothing if given an unbounded height, which is what the
+    // surrounding naturally-scrolling detail-tab content provides. Give it
+    // an explicit height sized to the row count (capped so a very large
+    // bundle scrolls internally instead of pushing the rest of the tab off
+    // screen).
+    let row_height = Size::default().table_row_height();
+    let visible_rows = item.files.len().min(8) as f32;
+    let table_height = row_height * (visible_rows + 1.0);
+    let item_list = div().h(table_height)
+                         .child(DataTable::new(&table).bordered(false)
+                                                      .scrollbar_visible(true, false));
 
     let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
@@ -815,7 +848,8 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
                     Button::new("detail-tab-manage-collections")
                         .ghost()
                         .outline()
-                        .label(t!("detail.collections_manage_button").to_string())
+                        .icon(IconName::Settings)
+                        .tooltip(t!("detail.collections_manage_button"))
                         .on_click(move |_, window, cx| {
                             open_manage_collections_dialog(
                                 window,

@@ -5,6 +5,7 @@
 //! button — see the `main-window-tabs` capability.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Window};
@@ -113,7 +114,7 @@ impl TabsController {
 /// selection once via `TableState::set_selected_row`.
 pub(crate) fn item_list_table(tabs: &Entity<TabsController>,
                               controller: &Entity<LibraryController>, entry_id: &Arc<str>,
-                              window: &mut Window, cx: &mut App)
+                              entry_dir: PathBuf, window: &mut Window, cx: &mut App)
                               -> Entity<TableState<ItemListDelegate>> {
     if let Some(table) = tabs.read(cx).item_list_tables.get(entry_id) {
         return table.clone();
@@ -121,10 +122,11 @@ pub(crate) fn item_list_table(tabs: &Entity<TabsController>,
 
     let cols = item_list_columns();
     let col_count = cols.len();
-    let delegate = ItemListDelegate { controller:  controller.clone(),
-                                      entry_id:    Arc::clone(entry_id),
-                                      columns:     cols,
-                                      user_widths: vec![None; col_count], };
+    let delegate = ItemListDelegate { controller: controller.clone(),
+                                      entry_id: Arc::clone(entry_id),
+                                      columns: cols,
+                                      user_widths: vec![None; col_count],
+                                      entry_dir };
     let table = cx.new(|cx| {
                       TableState::new(delegate, window, cx).row_selectable(true)
                                                            .col_resizable(true)

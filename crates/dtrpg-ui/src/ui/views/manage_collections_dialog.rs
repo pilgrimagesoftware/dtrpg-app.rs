@@ -13,7 +13,7 @@ use gpui::prelude::*;
 use gpui::{App, Entity, Window, div, px};
 use gpui_component::button::Button;
 use gpui_component::checkbox::Checkbox;
-use gpui_component::dialog::{DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle};
+use gpui_component::dialog::{DialogContent, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputState};
 use gpui_component::{WindowExt as _, v_flex};
 use rust_i18n::t;
@@ -52,33 +52,19 @@ pub fn open_manage_collections_dialog(window: &mut Window, cx: &mut App,
               let state = state.clone();
               let new_collection_input = new_collection_input.clone();
               let item_title = item_title.clone();
-              dialog
-            .w(px(360.))
-            .overlay_closable(true)
-            .content(move |content, window, cx| {
-                render_content(
-                    content,
-                    window,
-                    cx,
-                    &controller,
-                    &state,
-                    &new_collection_input,
-                    &item_title,
-                    member_id,
-                    product_id,
-                )
-            })
-            .footer(
-                DialogFooter::new()
-                    .px_4()
-                    .pb_4()
-                    .child(
-                        DialogClose::new().child(
-                            Button::new("manage-collections-close")
-                                .label(t!("collections.manage_close")),
-                        ),
-                    ),
-            )
+              dialog.w(px(360.))
+                    .overlay_closable(true)
+                    .content(move |content, window, cx| {
+                        render_content(content,
+                                       window,
+                                       cx,
+                                       &controller,
+                                       &state,
+                                       &new_collection_input,
+                                       &item_title,
+                                       member_id,
+                                       product_id)
+                    })
           });
 }
 
