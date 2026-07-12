@@ -126,7 +126,8 @@ pub(crate) fn item_list_table(tabs: &Entity<TabsController>,
                                       entry_id: Arc::clone(entry_id),
                                       columns: cols,
                                       user_widths: vec![None; col_count],
-                                      entry_dir };
+                                      entry_dir,
+                                      table_width: None };
     let table = cx.new(|cx| {
                       TableState::new(delegate, window, cx).row_selectable(true)
                                                            .col_resizable(true)
