@@ -4,37 +4,49 @@ use serde::{Deserialize, Serialize};
 
 use crate::data::paths::app_preferences_dir;
 
+/// Persisted position and size of the library window, in pixels.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct WindowBoundsPref {
+    pub x:      f32,
+    pub y:      f32,
+    pub width:  f32,
+    pub height: f32,
+}
+
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UiPrefsFile {
     /// Width of the sidebar panel in pixels.
-    pub sidebar_width:    Option<f32>,
+    pub sidebar_width:         Option<f32>,
     /// Width of the detail panel in pixels.
-    pub detail_width:     Option<f32>,
+    pub detail_width:          Option<f32>,
     /// Whether the Collections sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub collections_open: Option<bool>,
+    pub collections_open:      Option<bool>,
     /// Whether the Publishers sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub publishers_open:  Option<bool>,
+    pub publishers_open:       Option<bool>,
     /// Index of the last-active settings page (Account/Storage/File
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
-    pub settings_page_ix: Option<usize>,
+    pub settings_page_ix:      Option<usize>,
+    /// Position and size the library window was closed at, so it reopens
+    /// there instead of always resetting to the default placement.
+    pub library_window_bounds: Option<WindowBoundsPref>,
     /// Persisted key of the active color theme (`ThemeKey`'s variant name,
     /// lowercased). `None` before this preference existed, or if never
     /// changed from the default.
-    pub theme_key:        Option<String>,
+    pub theme_key:             Option<String>,
     /// Persisted font family name of the active body font. Any font
     /// installed on the user's system is valid, not a curated list.
-    pub body_font_name:   Option<String>,
+    pub body_font_name:        Option<String>,
     /// Persisted font family name of the active value font.
-    pub value_font_name:  Option<String>,
+    pub value_font_name:       Option<String>,
     /// Persisted font family name of the active label font.
-    pub label_font_name:  Option<String>,
+    pub label_font_name:       Option<String>,
     /// Persisted font family name of the active monospace font.
-    pub mono_font_name:   Option<String>,
+    pub mono_font_name:        Option<String>,
     /// Persisted shared UI text size, in pixels/points.
-    pub ui_text_size:     Option<f32>,
+    pub ui_text_size:          Option<f32>,
 }
 
 /// Persists and restores small UI preferences.
@@ -109,6 +121,18 @@ impl UiPrefs {
     /// Persist the active settings page index.
     pub fn save_settings_page_ix(&mut self, ix: usize) {
         self.data.settings_page_ix = Some(ix);
+        self.flush();
+    }
+
+    /// Position and size the library window was last closed at, or `None` if
+    /// never saved.
+    pub fn library_window_bounds(&self) -> Option<WindowBoundsPref> {
+        self.data.library_window_bounds
+    }
+
+    /// Persist the library window's position and size.
+    pub fn save_library_window_bounds(&mut self, bounds: WindowBoundsPref) {
+        self.data.library_window_bounds = Some(bounds);
         self.flush();
     }
 
