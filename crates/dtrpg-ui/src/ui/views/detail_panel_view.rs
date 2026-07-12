@@ -510,7 +510,7 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
         crate::util::file_size::with_on_disk_suffix(format!("{:.1} {}",
                                                             file.size_mb,
                                                             t!("size.mb")),
-                                                     on_disk)
+                                                    on_disk)
     };
 
     let metadata = DescriptionList::vertical()
@@ -849,14 +849,13 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &
 
         let on_disk_bytes = if item.status == ItemStatus::Downloaded && !item.files.is_empty() {
             let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
-            let resolved: Vec<u64> = item.files
-                                         .iter()
-                                         .filter_map(|f| {
-                                             crate::util::file_size::on_disk_file_size(&entry_dir,
-                                                                                       f.name
-                                                                                           .as_ref())
-                                         })
-                                         .collect();
+            let resolved: Vec<u64> =
+                item.files
+                    .iter()
+                    .filter_map(|f| {
+                        crate::util::file_size::on_disk_file_size(&entry_dir, f.name.as_ref())
+                    })
+                    .collect();
             if resolved.is_empty() {
                 None
             }
