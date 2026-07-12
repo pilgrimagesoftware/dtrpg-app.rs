@@ -265,7 +265,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 )
                             }),
                     )
-                    .child(render_metadata_table(&item, colors))
+                    .child(render_metadata_table(&item, &storage_root_path, colors))
                     .when(item.is_multi_item(), |this| {
                         this.child(render_item_tier(&item, &storage_root_path,
                                                     entity_item_tier.clone(), colors, cx))
@@ -481,6 +481,13 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
     let name_value = copyable_value(SharedString::from(format!("file-name-{row_ix}")),
                                     file.name.to_string());
 
+    let file_size_value = {
+        let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+        crate::util::file_size::on_disk_file_size(&entry_dir, file.name.as_ref())
+            .map(crate::util::file_size::format_bytes)
+            .unwrap_or_else(|| format!("{:.1} {}", file.size_mb, t!("size.mb")))
+    };
+
     let metadata = DescriptionList::vertical()
         .columns(2)
         .bordered(false)
@@ -490,7 +497,7 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
         .child(DescriptionItem::new(t!("detail.field_format").to_string())
                    .value(file.format.to_string()))
         .child(DescriptionItem::new(t!("detail.field_file_size").to_string())
-                   .value(format!("{:.1} MB", file.size_mb)))
+                   .value(file_size_value))
         // .child(DescriptionItem::new(t!("detail.field_status").to_string())
         //            .value(if item.status == ItemStatus::Downloaded {
         //                t!("detail.status_on_device").to_string()
@@ -797,8 +804,18 @@ fn value_or_dash(value: &str) -> String {
     }
 }
 
-fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens)
+fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &ColorTokens)
                          -> impl IntoElement + 'static + use<> {
+    let file_size_value = match (item.status, item.files.as_slice()) {
+        (ItemStatus::Downloaded, [only]) => {
+            let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+            crate::util::file_size::on_disk_file_size(&entry_dir, only.name.as_ref())
+                .map(crate::util::file_size::format_bytes)
+                .unwrap_or_else(|| format!("{:.0} {}", item.size_mb, t!("size.mb")))
+        }
+        _ => format!("{:.0} {}", item.size_mb, t!("size.mb")),
+    };
+
     let category_label = div().flex()
                               .items_center()
                               .gap(px(4.0))
@@ -827,7 +844,7 @@ fn render_metadata_table(item: &LibraryItem, colors: &ColorTokens)
         .child(
             DescriptionItem::new(t!("detail.field_file_size").to_string())
                 .value(Text::from(selectable_text("detail-field-file-size",
-                                                  format!("{:.0} MB", item.size_mb)))),
+                                                  file_size_value))),
         )
         .child(DescriptionItem::new(category_label)
                    .value(Text::from(selectable_text("detail-field-kind", item.kind.to_string())))
