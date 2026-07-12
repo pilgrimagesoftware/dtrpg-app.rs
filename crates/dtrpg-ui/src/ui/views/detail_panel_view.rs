@@ -12,6 +12,7 @@ use gpui::{
 use gpui_component::Disableable;
 use gpui_component::Icon;
 use gpui_component::IconName;
+use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::clipboard::Clipboard;
 use gpui_component::collapsible::Collapsible;
@@ -226,16 +227,36 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     } else {
                                         t!("detail.download_button")
                                     })
-                                    .on_click(move |_, _, cx| {
+                                    .on_click(move |_, window, cx| {
                                         let id = Arc::clone(&item_id);
-                                        entity_download.update(cx, |ctrl, cx| {
-                                            if is_downloaded {
-                                                ctrl.remove_download(&id, cx);
-                                            }
-                                            else {
+                                        if is_downloaded {
+                                            let entity_download = entity_download.clone();
+                                            let remove_title = download_title.clone();
+                                            window.open_alert_dialog(cx, move |alert, _, _| {
+                                                let entity_download = entity_download.clone();
+                                                let id = Arc::clone(&id);
+                                                alert
+                                                    .confirm()
+                                                    .title(t!("catalog.remove_download_confirm_title",
+                                                               title = remove_title.clone())
+                                                        .to_string())
+                                                    .description(
+                                                        t!("catalog.remove_download_confirm_description")
+                                                            .to_string(),
+                                                    )
+                                                    .on_ok(move |_, _window, cx| {
+                                                        entity_download.update(cx, |ctrl, cx| {
+                                                                          ctrl.remove_download(&id, cx)
+                                                                      });
+                                                        true
+                                                    })
+                                            });
+                                        }
+                                        else {
+                                            entity_download.update(cx, |ctrl, cx| {
                                                 ctrl.enqueue_download(&id, download_title.clone(), cx);
-                                            }
-                                        });
+                                            });
+                                        }
                                     }),
                             )
                             .when(is_downloaded, |row| {
