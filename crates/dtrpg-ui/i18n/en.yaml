@@ -192,6 +192,17 @@ settings:
   cache_thumbnail_cooldown_label: "Thumbnail Retry Cooldown"
   cache_thumbnail_cooldown_description: "Minimum time between retrying a failed cover thumbnail fetch for the same item."
   open_cache_folder_button: "Open Cache Folder"
+  appearance_title: "Appearance"
+  appearance_body_font_label: "Body Font"
+  appearance_value_font_label: "Value Font"
+  appearance_label_font_label: "Label Font"
+  appearance_mono_font_label: "Monospace Font"
+  appearance_theme_label: "Theme"
+  appearance_font_placeholder: "Select a font…"
+  appearance_font_search_placeholder: "Search fonts…"
+  appearance_text_size_label: "Text Size"
+  appearance_text_size_decrement_tooltip: "Decrease"
+  appearance_text_size_increment_tooltip: "Increase"
 
 collections:
   add_tooltip: "New collection"
@@ -327,3 +338,5 @@ theme:
   ink: "Ink"
   sage: "Sage"
   slate: "Slate"
+  moss: "Moss"
+  rosewood: "Rosewood"

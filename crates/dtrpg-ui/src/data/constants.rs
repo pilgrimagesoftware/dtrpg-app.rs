@@ -120,35 +120,74 @@ pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
 /// Gap between the item popover and the catalog entry it's anchored beside.
 pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
 
-/// Platform-appropriate sans-serif font, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the app's
-/// default serif body font (`Hoefler Text`, set in `app::setup`).
-///
-/// Optima rather than a geometric sans like Helvetica Neue: its flared,
-/// slightly calligraphic stroke terminals read as a companion to Hoefler
-/// Text's old-style serif warmth instead of a jarring stylistic clash.
+/// Default body-font family, serif-leaning to match the app's old-style body
+/// text. Only a starting point — the Appearance settings page lets the user
+/// pick any font actually installed on their system (see
+/// `cx.text_system().all_font_names()`), not just this default.
 #[cfg(target_os = "macos")]
-pub const VALUE_FONT: &str = "Optima";
-/// Platform-appropriate sans-serif font, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the app's
-/// default serif body font (`Hoefler Text`, set in `app::setup`).
+pub const DEFAULT_BODY_FONT: &str = "Hoefler Text";
+/// Default body-font family, serif-leaning to match the app's old-style body
+/// text.
 #[cfg(target_os = "windows")]
-pub const VALUE_FONT: &str = "Segoe UI";
-/// Platform-appropriate sans-serif font, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the app's
-/// default serif body font (`Hoefler Text`, set in `app::setup`).
+pub const DEFAULT_BODY_FONT: &str = "Georgia";
+/// Default body-font family, serif-leaning to match the app's old-style body
+/// text.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub const VALUE_FONT: &str = "DejaVu Sans";
+pub const DEFAULT_BODY_FONT: &str = "Liberation Serif";
 
-/// Platform-appropriate monospace font, used for fixed-width data such as
-/// the masked API key hint.
+/// Default value-font family, sans-serif, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the default
+/// serif body font.
 #[cfg(target_os = "macos")]
-pub const MONOSPACE_FONT: &str = "Menlo";
-/// Platform-appropriate monospace font, used for fixed-width data such as
-/// the masked API key hint.
+pub const DEFAULT_VALUE_FONT: &str = "Gotham";
+/// Default value-font family, sans-serif, used to visually distinguish data
+/// values from the default serif body font.
 #[cfg(target_os = "windows")]
-pub const MONOSPACE_FONT: &str = "Consolas";
-/// Platform-appropriate monospace font, used for fixed-width data such as
-/// the masked API key hint.
+pub const DEFAULT_VALUE_FONT: &str = "Segoe UI";
+/// Default value-font family, sans-serif, used to visually distinguish data
+/// values from the default serif body font.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub const MONOSPACE_FONT: &str = "Liberation Mono";
+pub const DEFAULT_VALUE_FONT: &str = "DejaVu Sans";
+
+/// Default label-font family, sans-serif, used to visually distinguish
+/// field/row labels (e.g. the detail tab's metadata labels) from the default
+/// serif body font.
+#[cfg(target_os = "macos")]
+pub const DEFAULT_LABEL_FONT: &str = "Gotham";
+/// Default label-font family, sans-serif, used to visually distinguish
+/// field/row labels from the default serif body font.
+#[cfg(target_os = "windows")]
+pub const DEFAULT_LABEL_FONT: &str = "Segoe UI";
+/// Default label-font family, sans-serif, used to visually distinguish
+/// field/row labels from the default serif body font.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const DEFAULT_LABEL_FONT: &str = "DejaVu Sans";
+
+/// Default monospace-font family, used for fixed-width data such as the
+/// masked API key hint.
+#[cfg(target_os = "macos")]
+pub const DEFAULT_MONO_FONT: &str = "Menlo";
+/// Default monospace-font family, used for fixed-width data such as the
+/// masked API key hint.
+#[cfg(target_os = "windows")]
+pub const DEFAULT_MONO_FONT: &str = "Consolas";
+/// Default monospace-font family, used for fixed-width data such as the
+/// masked API key hint.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const DEFAULT_MONO_FONT: &str = "Liberation Mono";
+
+/// Default shared UI text size, in points/pixels — matches
+/// `gpui`'s and `gpui_component`'s own stock default so nothing visibly
+/// changes until the user adjusts it in Settings > Appearance.
+pub const DEFAULT_UI_TEXT_SIZE: f32 = 16.0;
+/// Minimum shared UI text size the Appearance page's stepper allows.
+pub const MIN_UI_TEXT_SIZE: f32 = 12.0;
+/// Maximum shared UI text size the Appearance page's stepper allows —
+/// generous enough to meaningfully help low-vision users without breaking
+/// layouts sized around the default.
+pub const MAX_UI_TEXT_SIZE: f32 = 28.0;
+/// Monospace text renders at this fraction of the shared UI text size,
+/// matching `gpui_component::Theme`'s stock 13px-on-16px default ratio, so
+/// code-like content (e.g. the masked API key hint) stays visually smaller
+/// than body text even as the shared size changes.
+pub const MONO_SIZE_RATIO: f32 = 13.0 / 16.0;

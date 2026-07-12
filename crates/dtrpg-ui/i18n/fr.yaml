@@ -191,6 +191,17 @@ settings:
   cache_thumbnail_cooldown_label: "Délai de nouvelle tentative de vignette"
   cache_thumbnail_cooldown_description: "Délai minimum avant de retenter la récupération d'une vignette de couverture ayant échoué pour le même article."
   open_cache_folder_button: "Ouvrir le dossier du cache"
+  appearance_title: "Apparence"
+  appearance_body_font_label: "Police du texte"
+  appearance_value_font_label: "Police des valeurs"
+  appearance_label_font_label: "Police des libellés"
+  appearance_mono_font_label: "Police à chasse fixe"
+  appearance_theme_label: "Thème"
+  appearance_font_placeholder: "Choisir une police…"
+  appearance_font_search_placeholder: "Rechercher des polices…"
+  appearance_text_size_label: "Taille du texte"
+  appearance_text_size_decrement_tooltip: "Réduire"
+  appearance_text_size_increment_tooltip: "Agrandir"
 
 collections:
   add_tooltip: "Nouvelle collection"
@@ -326,3 +337,5 @@ theme:
   ink: "Encre"
   sage: "Sauge"
   slate: "Ardoise"
+  moss: "Mousse"
+  rosewood: "Bois de rose"

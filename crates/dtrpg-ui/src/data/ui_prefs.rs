@@ -32,6 +32,21 @@ pub struct UiPrefsFile {
     /// Position and size the library window was closed at, so it reopens
     /// there instead of always resetting to the default placement.
     pub library_window_bounds: Option<WindowBoundsPref>,
+    /// Persisted key of the active color theme (`ThemeKey`'s variant name,
+    /// lowercased). `None` before this preference existed, or if never
+    /// changed from the default.
+    pub theme_key:             Option<String>,
+    /// Persisted font family name of the active body font. Any font
+    /// installed on the user's system is valid, not a curated list.
+    pub body_font_name:        Option<String>,
+    /// Persisted font family name of the active value font.
+    pub value_font_name:       Option<String>,
+    /// Persisted font family name of the active label font.
+    pub label_font_name:       Option<String>,
+    /// Persisted font family name of the active monospace font.
+    pub mono_font_name:        Option<String>,
+    /// Persisted shared UI text size, in pixels/points.
+    pub ui_text_size:          Option<f32>,
 }
 
 /// Persists and restores small UI preferences.
@@ -118,6 +133,76 @@ impl UiPrefs {
     /// Persist the library window's position and size.
     pub fn save_library_window_bounds(&mut self, bounds: WindowBoundsPref) {
         self.data.library_window_bounds = Some(bounds);
+        self.flush();
+    }
+
+    /// Persisted key of the active color theme, or `None` if never saved.
+    pub fn theme_key(&self) -> Option<&str> {
+        self.data.theme_key.as_deref()
+    }
+
+    /// Persist the active color theme's key.
+    pub fn save_theme_key(&mut self, key: &str) {
+        self.data.theme_key = Some(key.to_string());
+        self.flush();
+    }
+
+    /// Persisted font family name of the active body font, or `None` if never
+    /// saved.
+    pub fn body_font_name(&self) -> Option<&str> {
+        self.data.body_font_name.as_deref()
+    }
+
+    /// Persist the active body font's family name.
+    pub fn save_body_font_name(&mut self, name: &str) {
+        self.data.body_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted font family name of the active value font, or `None` if
+    /// never saved.
+    pub fn value_font_name(&self) -> Option<&str> {
+        self.data.value_font_name.as_deref()
+    }
+
+    /// Persist the active value font's family name.
+    pub fn save_value_font_name(&mut self, name: &str) {
+        self.data.value_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted font family name of the active label font, or `None` if
+    /// never saved.
+    pub fn label_font_name(&self) -> Option<&str> {
+        self.data.label_font_name.as_deref()
+    }
+
+    /// Persist the active label font's family name.
+    pub fn save_label_font_name(&mut self, name: &str) {
+        self.data.label_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted font family name of the active monospace font, or `None` if
+    /// never saved.
+    pub fn mono_font_name(&self) -> Option<&str> {
+        self.data.mono_font_name.as_deref()
+    }
+
+    /// Persist the active monospace font's family name.
+    pub fn save_mono_font_name(&mut self, name: &str) {
+        self.data.mono_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted shared UI text size, or `None` if never saved.
+    pub fn ui_text_size(&self) -> Option<f32> {
+        self.data.ui_text_size
+    }
+
+    /// Persist the shared UI text size.
+    pub fn save_ui_text_size(&mut self, size: f32) {
+        self.data.ui_text_size = Some(size);
         self.flush();
     }
 
