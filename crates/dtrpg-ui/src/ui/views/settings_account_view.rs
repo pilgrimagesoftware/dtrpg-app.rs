@@ -14,7 +14,6 @@ use gpui_component::input::{Input, InputState};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
-use crate::data::constants::MONOSPACE_FONT;
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 
@@ -24,10 +23,10 @@ pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsC
                               colors: &ColorTokens, email_input: Option<Entity<InputState>>,
                               password_input: Option<Entity<InputState>>,
                               sign_in_in_progress: bool, sign_in_enabled: bool,
-                              sign_in_error: Option<String>)
+                              sign_in_error: Option<String>, mono_font_family: &str)
                               -> AnyElement {
     if auth.is_logged_in {
-        render_authenticated(auth, entity, colors).into_any_element()
+        render_authenticated(auth, entity, colors, mono_font_family).into_any_element()
     }
     else {
         render_unauthenticated(entity,
@@ -44,7 +43,7 @@ pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsC
 // ───────────────────────────────────────────────────────
 
 fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsController>,
-                        colors: &ColorTokens)
+                        colors: &ColorTokens, mono_font_family: &str)
                         -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let border = colors.border;
@@ -92,7 +91,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                 .child(
                                     selectable_text("settings-account-email", email_text.clone())
                                         .text_xs()
-                                        .font_family(MONOSPACE_FONT)
+                                        .font_family(mono_font_family.to_string())
                                         .text_color(colors.text_tertiary),
                                 ),
                         );
@@ -113,7 +112,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                     .child(
                                         selectable_text("settings-account-api-key", hint.clone())
                                             .text_xs()
-                                            .font_family(MONOSPACE_FONT)
+                                            .font_family(mono_font_family.to_string())
                                             .text_color(colors.text_tertiary),
                                     ),
                             );

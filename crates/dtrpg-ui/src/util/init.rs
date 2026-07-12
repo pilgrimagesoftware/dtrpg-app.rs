@@ -1,6 +1,11 @@
-use gpui::App;
+use gpui::{App, SharedString, px};
 
-use crate::data::theme::LibriTheme;
+use crate::data::constants::{
+    DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
+    DEFAULT_VALUE_FONT,
+};
+use crate::data::theme::{Density, FontSelections, LibriTheme, ThemeKey};
+use crate::data::ui_prefs::UiPrefs;
 use crate::i18n;
 use crate::ui::library::cover::CoverCache;
 
@@ -10,9 +15,54 @@ use crate::ui::library::cover::CoverCache;
 /// Detects the system locale and activates it, then registers GPUI app-level
 /// globals.
 ///
+/// Restores the persisted theme and font selections from [`UiPrefs`] (falling
+/// back to defaults for anything missing, unrecognized, or no longer
+/// installed — e.g. first launch, a prefs file predating this preference, or
+/// a font that was uninstalled since it was chosen), rather than always
+/// starting from [`LibriTheme::default_theme`].
+///
 /// Must be called before any view renders.
 pub fn init_globals(cx: &mut App) {
     i18n::init();
-    cx.set_global(LibriTheme::default_theme());
+    cx.set_global(initial_theme(cx));
     cx.set_global(CoverCache::new());
+}
+
+/// Resolves the persisted theme key and font selections into a [`LibriTheme`],
+/// used only at startup — subsequent changes go through
+/// `LibraryController::set_theme`/`set_body_font`/`set_value_font`/
+/// `set_label_font`/`set_mono_font`/`set_ui_text_size`, which preserve
+/// whichever selections aren't being changed.
+fn initial_theme(cx: &App) -> LibriTheme {
+    let prefs = UiPrefs::load();
+    let key = prefs.theme_key()
+                   .and_then(ThemeKey::from_persisted_key)
+                   .unwrap_or_default();
+
+    let installed = cx.text_system().all_font_names();
+    let body_font = resolve_installed_font(&installed, prefs.body_font_name(), DEFAULT_BODY_FONT);
+    let value_font =
+        resolve_installed_font(&installed, prefs.value_font_name(), DEFAULT_VALUE_FONT);
+    let label_font =
+        resolve_installed_font(&installed, prefs.label_font_name(), DEFAULT_LABEL_FONT);
+    let mono_font = resolve_installed_font(&installed, prefs.mono_font_name(), DEFAULT_MONO_FONT);
+    let ui_text_size = px(prefs.ui_text_size().unwrap_or(DEFAULT_UI_TEXT_SIZE));
+
+    let fonts = FontSelections { body_font,
+                                 value_font,
+                                 label_font,
+                                 mono_font,
+                                 ui_text_size };
+    LibriTheme::new(key, Density::default(), fonts)
+}
+
+/// Resolves a persisted font family name against `installed` (the system's
+/// actually-available font names), falling back to `default` if the
+/// persisted name is `None` or no longer installed.
+fn resolve_installed_font(installed: &[String], persisted: Option<&str>, default: &'static str)
+                          -> SharedString {
+    match persisted {
+        Some(name) if installed.iter().any(|f| f == name) => SharedString::from(name.to_string()),
+        _ => SharedString::from(default),
+    }
 }
