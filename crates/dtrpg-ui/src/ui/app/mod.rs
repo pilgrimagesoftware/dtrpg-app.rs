@@ -9,6 +9,7 @@ use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
 use crate::credentials::{CredentialStore, KeyringCredentialStore};
 use crate::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::enums::CatalogPresentation;
+use crate::data::ui_prefs::{UiPrefs, WindowBoundsPref};
 use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
@@ -97,6 +98,7 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(None);
     let collections_service = (cx.global::<CollectionsServiceFactory>().0)(None);
     let mut library_view = None;
+    let window_bounds = restore_library_window_bounds(cx);
     let window = cx
         .open_window(
             WindowOptions {
@@ -105,9 +107,14 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
                     appears_transparent: true,
                     ..Default::default()
                 }),
+                window_bounds,
                 ..Default::default()
             },
             |window, cx| {
+                window.on_window_should_close(cx, move |window, _cx| {
+                    save_library_window_bounds(window);
+                    true
+                });
                 let view = cx.new(|cx| {
                     LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
                 });
@@ -119,6 +126,37 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     if let Some(view) = library_view {
         cx.set_global(LibraryWindowHandle { view, window });
     }
+}
+
+/// Resolves the library window's persisted position/size into a
+/// `WindowBounds`, or `None` (falling back to the OS default placement) if
+/// nothing was ever saved, or the saved bounds no longer intersect any
+/// currently connected display.
+fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
+    let saved = UiPrefs::load().library_window_bounds()?;
+    let bounds = Bounds { origin: Point { x: px(saved.x),
+                                          y: px(saved.y), },
+                          size:   Size { width:  px(saved.width),
+                                         height: px(saved.height), }, };
+    let fits_a_display = cx.displays()
+                           .iter()
+                           .any(|display| bounds.intersects(&display.bounds()));
+    fits_a_display.then_some(WindowBounds::Windowed(bounds))
+}
+
+/// Saves the library window's current position/size to `UiPrefs`, called
+/// just before the window closes (mirroring `open_settings_window`'s
+/// existing `on_window_should_close` pattern).
+fn save_library_window_bounds(window: &Window) {
+    let bounds = window.bounds();
+    UiPrefs::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
+                                                                  y:      bounds.origin.y.as_f32(),
+                                                                  width:  bounds.size
+                                                                                .width
+                                                                                .as_f32(),
+                                                                  height: bounds.size
+                                                                                .height
+                                                                                .as_f32(), });
 }
 
 /// Opens the settings window as a separate, non-modal window.
