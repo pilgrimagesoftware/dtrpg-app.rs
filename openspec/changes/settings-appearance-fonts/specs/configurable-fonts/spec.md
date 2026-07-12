@@ -9,7 +9,7 @@ The app SHALL define three independent font roles — body, value, and monospace
 
 #### Scenario: Value font choices are sans-serif
 - **WHEN** the user opens the value font picker
-- **THEN** the offered choices include the current default (Optima) and other sans-serif options
+- **THEN** the offered choices include the default (Gotham) and other sans-serif options
 
 #### Scenario: Monospace font choices are fixed-width
 - **WHEN** the user opens the monospace font picker

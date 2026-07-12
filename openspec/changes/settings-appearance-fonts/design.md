@@ -43,7 +43,7 @@ pub struct FontOption {
 Curated lists (macOS names shown; Windows/Linux variants substitute the existing per-platform equivalents from the current `VALUE_FONT`/`MONOSPACE_FONT` constants where applicable):
 
 - **Body** (`BODY_FONT_OPTIONS`): Hoefler Text (default), Georgia, Palatino, New York.
-- **Value** (`VALUE_FONT_OPTIONS`): Optima (default), Helvetica Neue, Avenir, Verdana.
+- **Value** (`VALUE_FONT_OPTIONS`): Gotham (default), Helvetica Neue, Avenir, Verdana.
 - **Monospace** (`MONO_FONT_OPTIONS`): Menlo (default), SF Mono, Monaco, Courier New.
 
 Persisting `id` (not the platform-specific `family` string) means a preference saved on macOS degrades gracefully if the same prefs file is ever read on another platform (falls back to that role's default rather than requesting a font name that doesn't exist there) — same reasoning `ThemeKey` already gets for free by being an enum instead of a stored hex palette.
@@ -57,6 +57,8 @@ _Alternative considered:_ a single free-text font-name input. Rejected — no va
 `LibraryController` gains `set_body_font`, `set_value_font`, `set_mono_font` (mirroring the existing `set_theme`/`set_density` shape): each rebuilds the `LibriTheme` global with the new font resolved, updates `gpui_component::Theme.font_family` for the body-font case (the actual mechanism `app::setup` already uses), and persists via `UiPrefs`. `set_theme` gains a `UiPrefs` write it doesn't have today.
 
 Call sites in `settings_advanced_view.rs` (`stat_row`, `timestamp_row`) and `settings_account_view.rs` (API key hint) switch from `VALUE_FONT`/`MONOSPACE_FONT` constants to `cx.global::<LibriTheme>().value_font.family` / `.mono_font.family`.
+
+`detail-panel-value-font` (a separate proposal, sequenced to land after this one) is the next planned consumer of `LibriTheme.value_font.family` — it styles `detail_panel_view.rs`'s `DescriptionList` label cells. No code in this change needs to anticipate it beyond keeping the field name stable.
 
 ### Startup applies persisted appearance state instead of always defaulting
 

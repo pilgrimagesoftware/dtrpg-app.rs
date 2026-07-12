@@ -1,19 +1,28 @@
-## 1. Shared helpers
+## 0. Prerequisite
 
-- [ ] 1.1 In `detail_panel_view.rs`, import `crate::data::constants::VALUE_FONT`
-- [ ] 1.2 Add `.font_family(VALUE_FONT)` to `copyable_value`'s root `div()`
-- [ ] 1.3 Add `.font_family(VALUE_FONT)` to `render_relative_date_value`'s root `div()`
+- [x] 0.1 Confirm `settings-appearance-fonts` has landed (i.e. `LibriTheme.fonts.label_font: SharedString` exists and is resolvable via `cx.global::<LibriTheme>()`) before starting section 1 — confirmed on branch `feature/settings-appearance-fonts`
 
-## 2. New helper for plain-string values
+## 1. Label helper
 
-- [ ] 2.1 Add `fn styled_value(value: impl Into<SharedString>) -> AnyElement`, mirroring `copyable_value`'s shape without the copy affordance: `div().font_family(VALUE_FONT).child(value.into()).into_any_element()`
-- [ ] 2.2 Replace the item-tier `.value(file.format.to_string())` and `.value(format!("{:.1} MB", file.size_mb))` calls with `.value(styled_value(...))`
-- [ ] 2.3 Replace the entry-tier `render_metadata_table` plain-string `.value(...)` calls (System/`value_or_dash(&item.line)`, Released/`item.year`, Format/`item.format`, File Size/`format!("{:.0} MB", item.size_mb)`, Category/`item.kind`, Pages/`item.pages`) with `.value(styled_value(...))`
-- [ ] 2.4 Replace the "Other details" `.value(item.added_order.to_string())` call with `.value(styled_value(...))`
+- [x] 1.1 In `detail_panel_view.rs`, add `fn styled_label(label: impl Into<SharedString>, label_font_family: &str) -> AnyElement`: `div().font_family(label_font_family).child(label.into()).into_any_element()`
+- [x] 1.2 Add `.font_family(label_font_family)` directly to `render_metadata_table`'s existing `category_label` (already a `div()...into_any_element()`)
 
-## 3. Verification
+## 2. Wire the live font family through
 
-- [ ] 3.1 Run `cargo check --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo +nightly fmt -- --check`, `cargo test --all-features --workspace`
-- [ ] 3.2 Manually verify: open the expanded detail tab for a single-item entry; confirm every metadata value (System, Released, Format, File Size, Category, Pages, Added, Updated) renders in the sans-serif value font while labels stay in the serif body font
-- [ ] 3.3 Manually verify: open a multi-item entry, select a file, expand the file-detail disclosure; confirm file id and download location values use the value font, and the copy-on-hover affordance still works
-- [ ] 3.4 Manually verify: expand "Other details"; confirm stable id, numeric id, order product id, product id, added order, and cover color hex all use the value font
+- [x] 2.1 Give `render_metadata_table` a new `label_font_family: &str` parameter; update its caller (`render_detail_tab_content`) to resolve `cx.global::<LibriTheme>().fonts.label_font` and pass it down
+- [x] 2.2 `render_item_metadata`, `render_file_other_details`, and `render_other_details` already take `cx: &App` — resolve `cx.global::<LibriTheme>().fonts.label_font` locally in each rather than adding a parameter
+
+## 3. Replace label call sites
+
+- [x] 3.1 In `render_metadata_table`, replace the `t!(...).to_string()` label arguments for System, Released, Format, File Size, Pages, Added, Updated with `styled_label(..., label_font_family)`
+- [x] 3.2 In `render_item_metadata`, replace the Name, Format, File Size label arguments with `styled_label(..., label_font_family)`
+- [x] 3.3 In `render_file_other_details`, replace the File ID and Download Location label arguments with `styled_label(..., label_font_family)`
+- [x] 3.4 In `render_other_details`, replace the Stable ID, Numeric ID, Order Product ID, Product ID, Added Order, and Cover Color label arguments with `styled_label(..., label_font_family)`
+
+## 4. Verification
+
+- [x] 4.1 Run `cargo check --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo +nightly fmt -- --check`, `cargo test --all-features --workspace`
+- [ ] 4.2 Manually verify: open the expanded detail tab for a single-item entry; confirm every metadata label (System, Released, Format, File Size, Category, Pages, Added, Updated) renders in the sans-serif label font while values stay in the serif body font
+- [ ] 4.3 Manually verify: open a multi-item entry, select a file, expand the file-detail disclosure; confirm the file id and download location labels use the label font, and the copy-on-hover affordance on the values still works
+- [ ] 4.4 Manually verify: expand "Other details"; confirm the stable id, numeric id, order product id, product id, added order, and cover color labels all use the label font, and their values remain in the body font
+- [ ] 4.5 Manually verify: change the label font in Settings > Appearance; confirm detail-tab labels update live to match
