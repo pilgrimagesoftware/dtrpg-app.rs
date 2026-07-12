@@ -2484,6 +2484,11 @@ impl LibraryController {
         let weak_activity = self.activity.downgrade();
         let task_item_id = Arc::clone(&item_id);
         let fetch_target = found.map(|(order_product_id, _, dest)| (order_product_id, dest));
+        // Captured up front for the failure log below — `fetch_target` itself
+        // is moved into the spawned task and consumed by `download_item`.
+        let order_product_id_for_log = fetch_target.as_ref().map(|(id, _)| *id);
+        let dest_for_log = fetch_target.as_ref()
+                                       .map(|(_, dest)| dest.display().to_string());
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
@@ -2531,6 +2536,18 @@ impl LibraryController {
                       })
                       .ok()
                       .flatten();
+
+              if let Err(e) = &outcome
+                 && !cancelled
+              {
+                  tracing::warn!(item_id = %task_item_id,
+                                 index,
+                                 order_product_id = order_product_id_for_log,
+                                 dest = dest_for_log.as_deref().unwrap_or("<unresolved>"),
+                                 label = %label,
+                                 error = %e,
+                                 "download failed");
+              }
 
               if !cancelled && let Some(id) = activity_id_after {
                   match &outcome {
