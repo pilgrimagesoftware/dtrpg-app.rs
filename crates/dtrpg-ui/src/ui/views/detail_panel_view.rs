@@ -313,6 +313,16 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                  .child(t!("detail.item_list_column_status").to_string()),
         ),
     );
+    header_row = header_row.child(
+        TableCell::new().child(
+            div().text_xs()
+                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                 .text_color(colors.text_secondary)
+                 .child(t!("detail.item_list_column_size").to_string()),
+        ),
+    );
+
+    let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
 
     let mut body = TableBody::new();
     for (row_ix, file) in item.files.iter().enumerate() {
@@ -425,7 +435,20 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                               })
                               .into_any_element()
                      }
-                 });
+                 })
+                 // File size: catalog-reported size, with an on-disk suffix when
+                 // this row's file resolves to an actual file on disk.
+                 .child(div().flex_1().child({
+                     let catalog_str = format!("{:.1} {}", file.size_mb, t!("size.mb"));
+                     let on_disk =
+                         crate::util::file_size::on_disk_file_size(&entry_dir,
+                                                                    file.name.as_ref());
+                     selectable_text(SharedString::from(format!("item-row-{row_ix}-size")),
+                                     crate::util::file_size::with_on_disk_suffix(catalog_str,
+                                                                                 on_disk))
+                         .text_sm()
+                         .text_color(colors.text_secondary)
+                 }));
 
         let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
                                  .child(TableCell::new().col_span(2).child(row_content));
@@ -483,9 +506,11 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
 
     let file_size_value = {
         let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
-        crate::util::file_size::on_disk_file_size(&entry_dir, file.name.as_ref())
-            .map(crate::util::file_size::format_bytes)
-            .unwrap_or_else(|| format!("{:.1} {}", file.size_mb, t!("size.mb")))
+        let on_disk = crate::util::file_size::on_disk_file_size(&entry_dir, file.name.as_ref());
+        crate::util::file_size::with_on_disk_suffix(format!("{:.1} {}",
+                                                            file.size_mb,
+                                                            t!("size.mb")),
+                                                     on_disk)
     };
 
     let metadata = DescriptionList::vertical()
@@ -806,14 +831,44 @@ fn value_or_dash(value: &str) -> String {
 
 fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &ColorTokens)
                          -> impl IntoElement + 'static + use<> {
-    let file_size_value = match (item.status, item.files.as_slice()) {
-        (ItemStatus::Downloaded, [only]) => {
-            let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
-            crate::util::file_size::on_disk_file_size(&entry_dir, only.name.as_ref())
-                .map(crate::util::file_size::format_bytes)
-                .unwrap_or_else(|| format!("{:.0} {}", item.size_mb, t!("size.mb")))
+    let file_size_label = if item.files.len() > 1 {
+        t!("detail.field_total_file_size").to_string()
+    }
+    else {
+        t!("detail.field_file_size").to_string()
+    };
+
+    let file_size_value = {
+        let catalog_mb: f64 = if item.files.is_empty() {
+            item.size_mb
         }
-        _ => format!("{:.0} {}", item.size_mb, t!("size.mb")),
+        else {
+            item.files.iter().map(|f| f.size_mb).sum()
+        };
+        let catalog_str = format!("{:.0} {}", catalog_mb, t!("size.mb"));
+
+        let on_disk_bytes = if item.status == ItemStatus::Downloaded && !item.files.is_empty() {
+            let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+            let resolved: Vec<u64> = item.files
+                                         .iter()
+                                         .filter_map(|f| {
+                                             crate::util::file_size::on_disk_file_size(&entry_dir,
+                                                                                       f.name
+                                                                                           .as_ref())
+                                         })
+                                         .collect();
+            if resolved.is_empty() {
+                None
+            }
+            else {
+                Some(resolved.iter().sum())
+            }
+        }
+        else {
+            None
+        };
+
+        crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk_bytes)
     };
 
     let category_label = div().flex()
@@ -842,7 +897,7 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &
                                                   item.format.to_string()))),
         )
         .child(
-            DescriptionItem::new(t!("detail.field_file_size").to_string())
+            DescriptionItem::new(file_size_label)
                 .value(Text::from(selectable_text("detail-field-file-size",
                                                   file_size_value))),
         )

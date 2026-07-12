@@ -27,6 +27,19 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{:.1} {}", bytes as f64 / (1024.0 * 1024.0), t!("size.mb"))
 }
 
+/// Appends a localized `"(X.X MB on disk)"` suffix to `catalog_size` when
+/// `on_disk_bytes` is known, otherwise returns `catalog_size` unchanged.
+///
+/// The catalog-reported size is always shown; the on-disk size is
+/// supplementary detail, not a replacement (see `detail-file-size-on-disk`).
+pub fn with_on_disk_suffix(catalog_size: String, on_disk_bytes: Option<u64>) -> String {
+    match on_disk_bytes {
+        Some(bytes) => format!("{catalog_size} {}",
+                               t!("detail.on_disk_suffix", size = format_bytes(bytes))),
+        None => catalog_size,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -72,5 +85,17 @@ mod tests {
     fn format_bytes_matches_existing_mb_style() {
         assert_eq!(format_bytes(1024 * 1024), "1.0 MB");
         assert_eq!(format_bytes(1_572_864), "1.5 MB");
+    }
+
+    #[test]
+    fn with_on_disk_suffix_appends_suffix_when_bytes_known() {
+        let result = with_on_disk_suffix("12.0 MB".to_string(), Some(1_572_864));
+        assert_eq!(result, "12.0 MB (1.5 MB on disk)");
+    }
+
+    #[test]
+    fn with_on_disk_suffix_returns_catalog_size_unchanged_when_unknown() {
+        let result = with_on_disk_suffix("12.0 MB".to_string(), None);
+        assert_eq!(result, "12.0 MB");
     }
 }
