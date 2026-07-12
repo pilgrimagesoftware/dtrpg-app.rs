@@ -74,14 +74,13 @@ pub(super) fn connect_from_environment() -> Result<SdkConnection, ConnectionErro
 }
 
 fn resolve_keyring_api_key() -> Result<String, ConnectionError> {
-    KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
-                                                                 .ok()
-                                                                 .flatten()
-                                                                 .map(|c| c.secret)
-                                                                 .or_else(|| {
-                                                                     std::env::var(APPLICATION_KEY_ENV).ok()
-                                                                 })
-                                                                 .ok_or(ConnectionError::MissingApiKey)
+    KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
+        .load()
+        .ok()
+        .flatten()
+        .map(|c| c.secret)
+        .or_else(|| std::env::var(APPLICATION_KEY_ENV).ok())
+        .ok_or(ConnectionError::MissingApiKey)
 }
 
 fn build_connection(application_key: String, access_token: String, refresh_token: String,

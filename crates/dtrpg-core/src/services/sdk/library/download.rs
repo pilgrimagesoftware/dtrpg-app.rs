@@ -23,22 +23,24 @@ pub(super) fn download_item(gateway: &dyn SdkLibraryGateway, order_product_id: u
                             dest: &Path, cancel: &AtomicBool)
                             -> Result<(), LibraryServiceError> {
     let response = gateway.prepare_download(order_product_id, index)?;
-    let url = response.pointer("/data/attributes/url")
-                       .and_then(|v| v.as_str())
-                       .ok_or_else(|| {
-                           LibraryServiceError::new(
+    let url = response
+        .pointer("/data/attributes/url")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            LibraryServiceError::new(
                 LibraryServiceErrorKind::Network,
                 "prepare_download response missing data.attributes.url",
             )
-                       })?;
+        })?;
 
     let part_path = part_path_for(dest);
     match stream_to_file(url, &part_path, cancel) {
         Ok(()) => std::fs::rename(&part_path, dest).map_err(|e| {
-                      LibraryServiceError::new(LibraryServiceErrorKind::Network,
-                                               format!("failed to finalize download at {}: {e}",
-                                                       dest.display()))
-                  }),
+                                                       LibraryServiceError::new(
+                LibraryServiceErrorKind::Network,
+                format!("failed to finalize download at {}: {e}", dest.display()),
+            )
+                                                   }),
         Err(e) => {
             let _ = std::fs::remove_file(&part_path);
             Err(e)
@@ -62,7 +64,10 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
         std::fs::create_dir_all(parent).map_err(|e| {
                                            LibraryServiceError::new(
                 LibraryServiceErrorKind::Network,
-                format!("failed to create download directory {}: {e}", parent.display()),
+                format!(
+                    "failed to create download directory {}: {e}",
+                    parent.display()
+                ),
             )
                                        })?;
     }
@@ -100,11 +105,11 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
             break;
         }
         file.write_all(&buf[..n]).map_err(|e| {
-                                       LibraryServiceError::new(LibraryServiceErrorKind::Network,
-                                                                format!(
-                    "download write failed: {e}"
-                ))
-                                   })?;
+            LibraryServiceError::new(
+                LibraryServiceErrorKind::Network,
+                format!("download write failed: {e}"),
+            )
+        })?;
     }
     Ok(())
 }

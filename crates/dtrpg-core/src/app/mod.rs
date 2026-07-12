@@ -24,9 +24,9 @@ pub fn run() {
                 Some(t) => Box::new(
                     crate::services::sdk::RustSdkCollectionsService::from_keyring_with_tokens(t),
                 ),
-                None => Box::new(
-                    crate::services::sdk::RustSdkCollectionsService::unauthenticated(),
-                ),
+                None => {
+                    Box::new(crate::services::sdk::RustSdkCollectionsService::unauthenticated())
+                }
             }
                                       })));
                                     cx.set_global(LoginServiceFactory(Box::new(

@@ -107,7 +107,9 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                                 .child(publisher),
                         ),
                 )
-                .children(crate::ui::views::catalog_view::render_checking_indicator(is_checking))
+                .children(crate::ui::views::catalog_view::render_checking_indicator(
+                    is_checking,
+                ))
                 .child(
                     Button::new("item-popover-close")
                         .ghost()
@@ -123,11 +125,12 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                 .columns(1)
                 .bordered(false)
                 .small()
-                .when(!item.line.is_empty(), |list|
+                .when(!item.line.is_empty(), |list| {
                     list.child(
                         DescriptionItem::new(t!("detail.field_system").to_string())
                             .value(item.line.to_string()),
-                    ))
+                    )
+                })
                 .child(
                     DescriptionItem::new(t!("detail.field_format").to_string())
                         .value(item.format.to_string()),
@@ -142,19 +145,17 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                     let relative = format_relative(ts);
                     let absolute = format_absolute(ts);
                     let id = SharedString::from(format!("item-popover-added-{}", item.id));
-                    let value =
-                        div().id(id)
-                             .child(relative)
-                             .tooltip(move |window, cx| {
-                                 Tooltip::new(absolute.clone()).build(window, cx)
-                             })
-                             .into_any_element();
-                    list.child(DescriptionItem::new(t!("detail.field_added").to_string())
-                                              .value(value))
-                })
-                // .child(
-                //     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
-                // ),
+                    let value = div()
+                        .id(id)
+                        .child(relative)
+                        .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
+                        .into_any_element();
+                    list.child(
+                        DescriptionItem::new(t!("detail.field_added").to_string()).value(value),
+                    )
+                }), // .child(
+                    //     DescriptionItem::new(t!("detail.field_status").to_string()).value(status_label),
+                    // ),
         )
         .child(
             div()
@@ -167,10 +168,9 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .disabled(true)
                         .icon(if is_downloaded {
                             IconName::ArrowDown // TODO: FileCheckCorner
-                        }
-                        else {
+                        } else {
                             IconName::Globe // TODO: CloudCog
-                        })
+                        }),
                 )
                 .child(
                     Button::new("item-popover-download")
@@ -181,8 +181,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .icon(download_button_icon(is_downloaded))
                         .tooltip(if is_downloaded {
                             t!("catalog.action_remove_download")
-                        }
-                        else {
+                        } else {
                             t!("catalog.action_download")
                         })
                         .on_click(move |_, window, cx| {
@@ -198,8 +197,10 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                                         .title(t!("catalog.remove_download_confirm_title",
                                                    title = remove_title.clone())
                                             .to_string())
-                                        .description(t!("catalog.remove_download_confirm_description")
-                                            .to_string())
+                                        .description(
+                                            t!("catalog.remove_download_confirm_description")
+                                                .to_string(),
+                                        )
                                         .on_ok(move |_, _window, cx| {
                                             entity_download.update(cx, |ctrl, cx| {
                                                               ctrl.remove_download(&id, cx)
@@ -227,15 +228,15 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                             let id = Arc::clone(&item_id_for_detail);
                             let title = item_title.clone();
                             tabs.update(cx, |ctrl, cx| {
-                                    ctrl.open_detail_tab(Arc::clone(&id), title, cx);
-                                });
+                                ctrl.open_detail_tab(Arc::clone(&id), title, cx);
+                            });
                             // Reopening a detail tab must show no pre-selected
                             // item (selection is ephemeral, see
                             // `catalog-entry-detail-view`).
                             entity_open_detail.update(cx, |ctrl, cx| {
-                                                  ctrl.clear_item_selection(&id, cx);
-                                                  ctrl.maybe_check_item(Arc::clone(&id), cx);
-                                              });
+                                ctrl.clear_item_selection(&id, cx);
+                                ctrl.maybe_check_item(Arc::clone(&id), cx);
+                            });
                         }),
                 ),
         );

@@ -204,7 +204,6 @@ collections:
   delete_confirm_title: "Delete \"%{name}\"?"
   delete_confirm_description: "This collection will be permanently deleted. This cannot be undone."
   manage_dialog_title: "Manage Collections — %{title}"
-  manage_close: "Close"
   manage_empty: "No collections yet."
   manage_new_confirm: "Create"
 

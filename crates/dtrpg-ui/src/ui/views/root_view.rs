@@ -189,9 +189,10 @@ impl LibraryRootView {
         settings.update(cx, |ctrl, _cx| ctrl.set_email_input(email_input));
 
         let password_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t!("settings.password_placeholder").to_string())
-                                      .masked(true)
-        });
+                                   InputState::new(window, cx)
+                .placeholder(t!("settings.password_placeholder").to_string())
+                .masked(true)
+                               });
         let settings_for_password = settings.clone();
         cx.subscribe(&password_input,
                      move |_this, input_entity, event: &InputEvent, cx| {
@@ -623,11 +624,9 @@ impl LibraryRootView {
                     let input = input.clone();
                     move |content, _, _| {
                         content
-                            .child(
-                                DialogHeader::new().px_4().pt_4().child(
-                                    DialogTitle::new().child(t!("collections.add_dialog_title")),
-                                ),
-                            )
+                            .child(DialogHeader::new().px_4().pt_4().child(
+                                DialogTitle::new().child(t!("collections.add_dialog_title")),
+                            ))
                             .child(div().px_4().py_2().child(Input::new(&input)))
                     }
                 })
@@ -802,8 +801,10 @@ impl Render for LibraryRootView {
                         render_detail_tab_content(&item,
                                                   settings_snap.storage_root_path.clone(),
                                                   lib_entity.clone(),
+                                                  &self.tabs,
                                                   colors,
                                                   cover_image,
+                                                  window,
                                                   cx)
                     }
                     None => div().flex_1().min_h_0().into_any_element(),
@@ -969,8 +970,8 @@ impl Render for LibraryRootView {
             })
             .on_action(move |_: &AddCollection, window, cx| {
                 this_entity_for_add.update(cx, |view, cx| {
-                                       view.show_add_collection_dialog(window, cx);
-                                   });
+                    view.show_add_collection_dialog(window, cx);
+                });
             })
             .on_action(move |_: &ShowActivity, _, cx| {
                 this_entity_for_activity.update(cx, |view, cx| view.show_activity(cx));

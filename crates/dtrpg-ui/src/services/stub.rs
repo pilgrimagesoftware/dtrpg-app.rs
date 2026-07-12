@@ -74,10 +74,11 @@ impl LibraryService for StubLibraryService {
                     let _ = std::fs::create_dir_all(parent);
                 }
                 std::fs::write(dest, b"stub download content").map_err(|e| {
-                    LibraryServiceError::new(LibraryServiceErrorKind::Network,
-                                             format!("stub: failed to write {}: {e}",
-                                                     dest.display()))
-                })
+                                                                  LibraryServiceError::new(
+                        LibraryServiceErrorKind::Network,
+                        format!("stub: failed to write {}: {e}", dest.display()),
+                    )
+                                                              })
             }
             StubMode::NetworkError => {
                 Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,

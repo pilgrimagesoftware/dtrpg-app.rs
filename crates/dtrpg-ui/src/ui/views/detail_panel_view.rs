@@ -6,27 +6,30 @@ use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, Entity, Image, InteractiveElement, IntoElement, ObjectFit, ParentElement,
-    SharedString, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
+    AnyElement, App, Context, Entity, Image, InteractiveElement, IntoElement, ObjectFit,
+    ParentElement, Pixels, SharedString, StatefulInteractiveElement, Styled, StyledImage, Window,
+    div, img, px,
 };
 use gpui_component::Disableable;
 use gpui_component::Icon;
 use gpui_component::IconName;
+use gpui_component::Size;
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::clipboard::Clipboard;
 use gpui_component::collapsible::Collapsible;
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
-use gpui_component::table::{Table, TableBody, TableCell, TableHeader, TableRow};
+use gpui_component::table::{Column, DataTable, TableDelegate, TableState};
 use gpui_component::text::Text;
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
+use crate::controllers::tabs::{TabsController, item_list_table};
 use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, LibraryItemFile};
-use crate::data::theme::ColorTokens;
+use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
@@ -46,9 +49,12 @@ use crate::util::reveal::reveal_in_file_manager;
 /// item list alongside the entry tier; selecting a row updates the item
 /// metadata area in place (see `catalog-entry-detail-view`). Single-item
 /// entries keep the existing inline entry-tier metadata table.
+#[allow(clippy::too_many_arguments)]
 pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
-                                 entity: Entity<LibraryController>, colors: &ColorTokens,
-                                 cover_image: Option<Arc<Image>>, cx: &App)
+                                 entity: Entity<LibraryController>,
+                                 tabs: &Entity<TabsController>, colors: &ColorTokens,
+                                 cover_image: Option<Arc<Image>>, window: &mut Window,
+                                 cx: &mut App)
                                  -> AnyElement {
     let surface = colors.surface;
     let text_primary = colors.text_primary;
@@ -289,7 +295,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                     .child(render_metadata_table(&item, &storage_root_path, colors))
                     .when(item.is_multi_item(), |this| {
                         this.child(render_item_tier(&item, &storage_root_path,
-                                                    entity_item_tier.clone(), colors, cx))
+                                                    entity_item_tier.clone(), tabs, colors, window,
+                                                    cx))
                     })
                     .child(render_collections_section(&item, entity_collections, colors, cx))
                     .child(render_other_details(&item, entity_other_details, colors, cx)),
@@ -298,187 +305,216 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
         .into_any_element()
 }
 
+/// Returns the column definitions used for the multi-item entry's item list.
+///
+/// Name gets the majority of the default width (matching the previous
+/// `flex_1`-on-Name-heavy visual balance); Type, Size, and Status default
+/// narrow. All four are user-resizable — see `detail-item-list-column-resize`.
+pub(crate) fn item_list_columns() -> Vec<Column> {
+    vec![Column::new("name", t!("detail.item_list_column_name")).width(240.)
+                                                                .min_width(120.)
+                                                                .resizable(true),
+         Column::new("type", t!("detail.item_list_column_type")).width(90.)
+                                                                .min_width(60.)
+                                                                .resizable(true),
+         Column::new("size", t!("detail.item_list_column_size")).width(90.)
+                                                                .min_width(60.)
+                                                                .resizable(true),
+         Column::new("status", t!("detail.item_list_column_status")).width(90.)
+                                                                    .min_width(60.)
+                                                                    .resizable(true),]
+}
+
+/// `TableDelegate` for a multi-item entry's item list. Backed by
+/// `LibraryController`, reading `item.files` live via `item_by_id` rather
+/// than cloning the file list, mirroring `CatalogListDelegate`'s
+/// read-through-controller pattern.
+pub(crate) struct ItemListDelegate {
+    pub(crate) controller:  Entity<LibraryController>,
+    pub(crate) entry_id:    Arc<str>,
+    pub(crate) columns:     Vec<Column>,
+    /// User-adjusted column widths. `None` means use the static default from
+    /// `item_list_columns()`.
+    pub(crate) user_widths: Vec<Option<Pixels>>,
+    /// The entry's on-disk download directory, used to resolve each file's
+    /// on-disk size suffix in the Size column (see `render_metadata_table`'s
+    /// equivalent computation).
+    pub(crate) entry_dir:   PathBuf,
+}
+
+impl TableDelegate for ItemListDelegate {
+    fn columns_count(&self, _cx: &App) -> usize {
+        self.columns.len()
+    }
+
+    fn rows_count(&self, cx: &App) -> usize {
+        self.controller
+            .read(cx)
+            .item_by_id(&self.entry_id)
+            .map_or(0, |item| item.files.len())
+    }
+
+    fn column(&self, col_ix: usize, _cx: &App) -> Column {
+        let mut col = self.columns[col_ix].clone();
+        if let Some(Some(w)) = self.user_widths.get(col_ix) {
+            col = col.width(w.as_f32());
+        }
+        col
+    }
+
+    fn render_td(&mut self, row_ix: usize, col_ix: usize, _window: &mut Window,
+                 cx: &mut Context<TableState<Self>>)
+                 -> impl IntoElement {
+        let Some(item) = self.controller.read(cx).item_by_id(&self.entry_id).cloned()
+        else {
+            return div().into_any_element();
+        };
+        let Some(file) = item.files.get(row_ix)
+        else {
+            return div().into_any_element();
+        };
+        let colors = cx.global::<LibriTheme>().colors.clone();
+
+        match col_ix {
+            0 => div().h_full()
+                      .flex()
+                      .items_center()
+                      .text_sm()
+                      .text_color(colors.text_primary)
+                      .truncate()
+                      .child(file.name.to_string())
+                      .into_any_element(),
+            1 => div().h_full()
+                      .flex()
+                      .items_center()
+                      .text_sm()
+                      .text_color(colors.text_secondary)
+                      .truncate()
+                      .child(file.format.to_string())
+                      .into_any_element(),
+            2 => {
+                let catalog_str = format!("{:.1} {}", file.size_mb, t!("size.mb"));
+                let on_disk =
+                    crate::util::file_size::on_disk_file_size(&self.entry_dir, file.name.as_ref());
+                div().h_full()
+                     .flex()
+                     .items_center()
+                     .text_sm()
+                     .text_color(colors.text_secondary)
+                     .child(crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk))
+                     .into_any_element()
+            }
+            3 => {
+                // Status: downloaded checkmark, in-progress indicator, or a
+                // download action for this specific item — independent of
+                // sibling rows and of the entry-level download button (see
+                // `queue-per-item-downloads`). Cancelling an in-progress
+                // download is done from the activity panel rather than a
+                // second cancel control here.
+                let is_downloading = self.controller
+                                         .read(cx)
+                                         .is_file_queued_or_active(&self.entry_id, row_ix as u32);
+
+                if file.downloaded {
+                    div().h_full()
+                         .flex()
+                         .items_center()
+                         .id(SharedString::from(format!("item-row-{row_ix}-status")))
+                         .tooltip(move |window, cx| {
+                             Tooltip::new(t!("detail.item_status_local").to_string()).build(window,
+                                                                                            cx)
+                         })
+                         .child(Icon::new(IconName::CircleCheck).text_color(colors.text_secondary))
+                         .into_any_element()
+                }
+                else if is_downloading {
+                    div().h_full()
+                         .flex()
+                         .items_center()
+                         .text_sm()
+                         .text_color(colors.text_tertiary)
+                         .child(t!("detail.item_status_downloading").to_string())
+                         .into_any_element()
+                }
+                else {
+                    let controller = self.controller.clone();
+                    let entry_id = Arc::clone(&self.entry_id);
+                    let title = self.controller
+                                    .read(cx)
+                                    .item_by_id(&self.entry_id)
+                                    .map(|item| item.title.to_string())
+                                    .unwrap_or_default();
+                    div().h_full()
+                         .flex()
+                         .items_center()
+                         .id(SharedString::from(format!("item-row-{row_ix}-download")))
+                         .cursor_pointer()
+                         .tooltip(move |window, cx| {
+                             Tooltip::new(t!("detail.item_download_button").to_string())
+                                .build(window, cx)
+                         })
+                         .child(Icon::new(IconName::ArrowDown).text_color(colors.text_secondary))
+                         // Stop propagation so clicking download doesn't also fire the
+                         // row's own click (which selects this row) — same class of bug
+                         // fixed in the activity panel's cancel button.
+                         .on_click(move |_, _, cx| {
+                             cx.stop_propagation();
+                             controller.update(cx, |ctrl, cx| {
+                                           ctrl.enqueue_item_download(&entry_id,
+                                                                      row_ix as u32,
+                                                                      title.clone(),
+                                                                      cx);
+                                       });
+                         })
+                         .into_any_element()
+                }
+            }
+            _ => div().into_any_element(),
+        }
+    }
+
+    fn render_th(&mut self, col_ix: usize, _window: &mut Window,
+                 cx: &mut Context<TableState<Self>>)
+                 -> impl IntoElement {
+        let name = self.column(col_ix, cx).name;
+        div().h_full()
+             .flex()
+             .items_center()
+             .text_sm()
+             .font_weight(gpui::FontWeight::MEDIUM)
+             .child(name)
+    }
+}
+
 /// Renders the item tier for a multi-item entry: a persistent, selectable
 /// item list and an item metadata area that updates in place on selection.
 ///
 /// See `catalog-entry-detail-view`'s persistent-item-list and
 /// update-in-place requirements.
+#[allow(clippy::too_many_arguments)]
 fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
-                    entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App)
+                    entity: Entity<LibraryController>, tabs: &Entity<TabsController>,
+                    colors: &ColorTokens, window: &mut Window, cx: &mut App)
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
-    let download_title = item.title.to_string();
-
-    let mut header_row = TableRow::new().child(
-        TableCell::new().child(
-            div().text_xs()
-                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                 .text_color(colors.text_secondary)
-                 .child(t!("detail.item_list_column_name").to_string()),
-        ),
-    );
-    header_row = header_row.child(
-        TableCell::new().child(
-            div().text_xs()
-                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                 .text_color(colors.text_secondary)
-                 .child(t!("detail.item_list_column_type").to_string()),
-        ),
-    );
-    header_row = header_row.child(
-        TableCell::new().child(
-            div().text_xs()
-                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                 .text_color(colors.text_secondary)
-                 .child(t!("detail.item_list_column_status").to_string()),
-        ),
-    );
-    header_row = header_row.child(
-        TableCell::new().child(
-            div().text_xs()
-                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                 .text_color(colors.text_secondary)
-                 .child(t!("detail.item_list_column_size").to_string()),
-        ),
-    );
-
     let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
 
-    let mut body = TableBody::new();
-    for (row_ix, file) in item.files.iter().enumerate() {
-        // Selection is keyed by row position, not `file.id` — the API has
-        // been observed to reuse the same download id across genuinely
-        // distinct files within a bundle (see `LibraryItem::dedupe_files`),
-        // so comparing by id would select/deselect multiple unrelated rows
-        // together and make it impossible to pick between them.
-        let is_selected = selected_ix == Some(row_ix);
+    let table = item_list_table(tabs, &entity, &entry_id, entry_dir, window, cx);
 
-        // `TableRow` itself has no click hook, so the whole row's clickable
-        // area is a single wrapping div inside one `col_span(2)` `TableCell`
-        // (mirroring the two-column header width via its own internal flex
-        // split) rather than one on_click per column — attaching separate
-        // click listeners to adjacent sibling cells of the same logical row
-        // left later rows unresponsive after the first selection, since each
-        // sibling tracks its own independent mouse-down/mouse-up state (see
-        // this crate's `gpui-component` usage policy for why `Table` stays
-        // the base component here instead of a hand-rolled flex layout).
-        let entity_row = entity.clone();
-        let entry_id_row = Arc::clone(&entry_id);
-        // Includes `row_ix` (not just `file.id`) so that rows stay uniquely
-        // identifiable — and therefore individually clickable — even if a
-        // stale catalog cache (written before file records were deduplicated
-        // by download id, see `map_order_product`) still has two rows
-        // sharing an id; GPUI needs distinct element ids to hit-test each
-        // row separately.
-        let row_id = SharedString::from(format!("item-row-{row_ix}-{}", file.id));
-
-        let row_content =
-            div().id(row_id)
-                 .flex()
-                 .w_full()
-                 .cursor_pointer()
-                 .hover(|d| d.bg(colors.hover))
-                 .on_click(move |_: &gpui::ClickEvent, _: &mut gpui::Window, cx: &mut App| {
-                               entity_row.update(cx, |ctrl, cx| {
-                                             ctrl.select_item_file(Arc::clone(&entry_id_row),
-                                                                   row_ix,
-                                                                   cx);
-                                         });
-                           })
-                 // File name
-                 .child(div().flex_1().child(
-                     selectable_text(SharedString::from(format!("item-row-{row_ix}-name")),
-                                     file.name.to_string())
-                         .text_sm()
-                         .text_color(colors.text_primary),
-                 ))
-                 // File type
-                 .child(div().flex_1().child(
-                     selectable_text(SharedString::from(format!("item-row-{row_ix}-format")),
-                                     file.format.to_string())
-                         .text_sm()
-                         .text_color(colors.text_secondary),
-                 ))
-                 // Status: downloaded checkmark, in-progress indicator, or a
-                 // download action for this specific item — independent of
-                 // sibling rows and of the entry-level download button (see
-                 // `queue-per-item-downloads`). Cancelling an in-progress
-                 // download is done from the activity panel rather than a
-                 // second cancel control here.
-                 .child({
-                     let is_downloading =
-                         entity.read(cx).is_file_queued_or_active(&entry_id, row_ix as u32);
-
-                     if file.downloaded {
-                         div().id(SharedString::from(format!("item-row-{row_ix}-status")))
-                              .flex_1()
-                              .tooltip(move |window, cx| {
-                                  Tooltip::new(t!("detail.item_status_local").to_string())
-                                      .build(window, cx)
-                              })
-                              .child(Icon::new(IconName::CircleCheck)
-                                         .text_color(colors.text_secondary))
-                              .into_any_element()
-                     }
-                     else if is_downloading {
-                         div().id(SharedString::from(format!("item-row-{row_ix}-status")))
-                              .flex_1()
-                              .text_sm()
-                              .text_color(colors.text_tertiary)
-                              .child(t!("detail.item_status_downloading").to_string())
-                              .into_any_element()
-                     }
-                     else {
-                         let entity_download = entity.clone();
-                         let entry_id_download = Arc::clone(&entry_id);
-                         let download_title_row = download_title.clone();
-                         div().id(SharedString::from(format!("item-row-{row_ix}-download")))
-                              .flex_1()
-                              .cursor_pointer()
-                              .tooltip(move |window, cx| {
-                                  Tooltip::new(t!("detail.item_download_button").to_string())
-                                      .build(window, cx)
-                              })
-                              .child(Icon::new(IconName::ArrowDown)
-                                         .text_color(colors.text_secondary))
-                              // Stop propagation so clicking download doesn't also fire the
-                              // row's own on_click (which selects this item) — same class of
-                              // bug fixed in the activity panel's cancel button.
-                              .on_click(move |_, _, cx| {
-                                  cx.stop_propagation();
-                                  entity_download.update(cx, |ctrl, cx| {
-                                      ctrl.enqueue_item_download(&entry_id_download,
-                                                                 row_ix as u32,
-                                                                 download_title_row.clone(),
-                                                                 cx);
-                                  });
-                              })
-                              .into_any_element()
-                     }
-                 })
-                 // File size: catalog-reported size, with an on-disk suffix when
-                 // this row's file resolves to an actual file on disk.
-                 .child(div().flex_1().child({
-                     let catalog_str = format!("{:.1} {}", file.size_mb, t!("size.mb"));
-                     let on_disk =
-                         crate::util::file_size::on_disk_file_size(&entry_dir,
-                                                                    file.name.as_ref());
-                     selectable_text(SharedString::from(format!("item-row-{row_ix}-size")),
-                                     crate::util::file_size::with_on_disk_suffix(catalog_str,
-                                                                                 on_disk))
-                         .text_sm()
-                         .text_color(colors.text_secondary)
-                 }));
-
-        let row = TableRow::new().when(is_selected, |row| row.bg(colors.accent_soft))
-                                 .child(TableCell::new().col_span(2).child(row_content));
-
-        body = body.child(row);
-    }
-
-    let item_list = Table::new().child(TableHeader::new().child(header_row))
-                                .child(body);
+    // `DataTable` virtualizes its rows and sizes itself to its container
+    // (`.size_full()` internally) — unlike the old stateless `Table`, it
+    // renders nothing if given an unbounded height, which is what the
+    // surrounding naturally-scrolling detail-tab content provides. Give it
+    // an explicit height sized to the row count (capped so a very large
+    // bundle scrolls internally instead of pushing the rest of the tab off
+    // screen).
+    let row_height = Size::default().table_row_height();
+    let visible_rows = item.files.len().min(8) as f32;
+    let table_height = row_height * (visible_rows + 1.0);
+    let item_list = div().h(table_height)
+                         .child(DataTable::new(&table).bordered(false)
+                                                      .scrollbar_visible(true, false));
 
     let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
@@ -491,7 +527,6 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                      .child(t!("detail.items_heading").to_string()))
          .child(div().text_sm()
                      .text_color(colors.text_tertiary)
-                     // .py(px(12.0))
                      .child(t!("detail.item_prompt_select").to_string())
                      .into_any_element())
          .child(item_list)
@@ -639,14 +674,22 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
     let content = DescriptionList::vertical()
         .columns(2)
         .bordered(false)
-        .child(DescriptionItem::new(t!("detail.field_file_id").to_string())
-                   .value(copyable_value(SharedString::from(format!("file-id-{toggle_key}")),
-                                         file.id.to_string()))
-                   .span(2))
-        .child(DescriptionItem::new(t!("detail.field_download_location").to_string())
-                   .value(copyable_value(SharedString::from(format!("file-path-{toggle_key}")),
-                                         path_value))
-                   .span(2));
+        .child(
+            DescriptionItem::new(t!("detail.field_file_id").to_string())
+                .value(copyable_value(
+                    SharedString::from(format!("file-id-{toggle_key}")),
+                    file.id.to_string(),
+                ))
+                .span(2),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_download_location").to_string())
+                .value(copyable_value(
+                    SharedString::from(format!("file-path-{toggle_key}")),
+                    path_value,
+                ))
+                .span(2),
+        );
 
     Collapsible::new().gap(px(8.0))
                       .open(open)
@@ -695,31 +738,52 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
     let content = DescriptionList::vertical()
         .columns(2)
         .bordered(false)
-        .child(DescriptionItem::new(t!("detail.field_stable_id").to_string())
-                   .value(copyable_value(SharedString::from("other-details-stable-id"),
-                                         item.id.to_string())))
-        .child(DescriptionItem::new(t!("detail.field_numeric_id").to_string())
-                   .value(copyable_value(SharedString::from("other-details-numeric-id"),
-                                         item.numeric_id.to_string())))
-        .child(DescriptionItem::new(t!("detail.field_order_product_id").to_string())
-                   .value(copyable_value(SharedString::from("other-details-order-product-id"),
-                                         item.order_product_id.to_string())))
-        .child(DescriptionItem::new(t!("detail.field_product_id").to_string())
-                   .value(copyable_value(SharedString::from("other-details-product-id"),
-                                         item.product_id.to_string())))
-        .child(DescriptionItem::new(t!("detail.field_added_order").to_string())
-                   .value(item.added_order.to_string()))
-        .child(DescriptionItem::new(t!("detail.field_cover_color").to_string())
-                   .value(
-                       div().flex()
-                            .items_center()
-                            .gap(px(6.0))
-                            .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
-                            .child(copyable_value(SharedString::from("other-details-cover-color"),
-                                                  item.color.to_string()))
-                            .into_any_element(),
-                   )
-                   .span(2));
+        .child(
+            DescriptionItem::new(t!("detail.field_stable_id").to_string()).value(copyable_value(
+                SharedString::from("other-details-stable-id"),
+                item.id.to_string(),
+            )),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_numeric_id").to_string()).value(copyable_value(
+                SharedString::from("other-details-numeric-id"),
+                item.numeric_id.to_string(),
+            )),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_order_product_id").to_string()).value(
+                copyable_value(
+                    SharedString::from("other-details-order-product-id"),
+                    item.order_product_id.to_string(),
+                ),
+            ),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_product_id").to_string()).value(copyable_value(
+                SharedString::from("other-details-product-id"),
+                item.product_id.to_string(),
+            )),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_added_order").to_string())
+                .value(item.added_order.to_string()),
+        )
+        .child(
+            DescriptionItem::new(t!("detail.field_cover_color").to_string())
+                .value(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(6.0))
+                        .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
+                        .child(copyable_value(
+                            SharedString::from("other-details-cover-color"),
+                            item.color.to_string(),
+                        ))
+                        .into_any_element(),
+                )
+                .span(2),
+        );
 
     Collapsible::new().gap(px(8.0))
                       .open(open)
@@ -762,26 +826,41 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
 
     let item_title = Arc::clone(&item.title);
 
-    div().flex()
+    div()
+        .flex()
         .flex_col()
         .gap(px(6.0))
-        .child(div().text_sm()
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_color(colors.text_primary)
-                    .child(t!("detail.collections_heading").to_string()))
         .child(
-            div().flex()
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(colors.text_primary)
+                .child(t!("detail.collections_heading").to_string()),
+        )
+        .child(
+            div()
+                .flex()
                 .items_center()
                 .justify_between()
                 .gap(px(8.0))
                 .child(summary)
-                .child(Button::new("detail-tab-manage-collections").ghost().outline().label(
-            t!("detail.collections_manage_button").to_string(),
-        ).on_click(move |_, window, cx| {
-                       open_manage_collections_dialog(window, cx, entity.clone(),
-                                                      Arc::clone(&item_title), member_id,
-                                                      product_id);
-                   })),
+                .child(
+                    Button::new("detail-tab-manage-collections")
+                        .ghost()
+                        .outline()
+                        .icon(IconName::Settings)
+                        .tooltip(t!("detail.collections_manage_button"))
+                        .on_click(move |_, window, cx| {
+                            open_manage_collections_dialog(
+                                window,
+                                cx,
+                                entity.clone(),
+                                Arc::clone(&item_title),
+                                member_id,
+                                product_id,
+                            );
+                        }),
+                ),
         )
 }
 
@@ -792,23 +871,27 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
 fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> AnyElement {
     let value: SharedString = value.into();
 
-    div().id(SharedString::from(format!("{field_id}-row")))
-         .group(field_id.clone())
-         .flex()
-         .items_center()
-         .gap(px(6.0))
-         .child(selectable_text(SharedString::from(format!("{field_id}-text")), value.clone()))
-         .child(
-             div()
-                 .invisible()
-                 .group_hover(field_id.clone(), |d| d.visible())
-                 .child(
-                     Clipboard::new(SharedString::from(format!("{field_id}-copy")))
-                         .value(value)
-                         .tooltip(t!("detail.copy_tooltip").to_string()),
-                 ),
-         )
-         .into_any_element()
+    div()
+        .id(SharedString::from(format!("{field_id}-row")))
+        .group(field_id.clone())
+        .flex()
+        .items_center()
+        .gap(px(6.0))
+        .child(selectable_text(
+            SharedString::from(format!("{field_id}-text")),
+            value.clone(),
+        ))
+        .child(
+            div()
+                .invisible()
+                .group_hover(field_id.clone(), |d| d.visible())
+                .child(
+                    Clipboard::new(SharedString::from(format!("{field_id}-copy")))
+                        .value(value)
+                        .tooltip(t!("detail.copy_tooltip").to_string()),
+                ),
+        )
+        .into_any_element()
 }
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
@@ -902,35 +985,44 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &
         .columns(2)
         .bordered(false)
         .child(
-            DescriptionItem::new(t!("detail.field_system").to_string())
-                .value(Text::from(selectable_text("detail-field-system",
-                                                  value_or_dash(&item.line)))),
+            DescriptionItem::new(t!("detail.field_system").to_string()).value(Text::from(
+                selectable_text("detail-field-system", value_or_dash(&item.line)),
+            )),
         )
         .child(
-            DescriptionItem::new(t!("detail.field_released").to_string())
-                .value(Text::from(selectable_text("detail-field-released",
-                                                  item.year.to_string()))),
+            DescriptionItem::new(t!("detail.field_released").to_string()).value(Text::from(
+                selectable_text("detail-field-released", item.year.to_string()),
+            )),
         )
         .child(
-            DescriptionItem::new(t!("detail.field_format").to_string())
-                .value(Text::from(selectable_text("detail-field-format",
-                                                  item.format.to_string()))),
+            DescriptionItem::new(t!("detail.field_format").to_string()).value(Text::from(
+                selectable_text("detail-field-format", item.format.to_string()),
+            )),
         )
         .child(
-            DescriptionItem::new(file_size_label)
-                .value(Text::from(selectable_text("detail-field-file-size",
-                                                  file_size_value))),
+            DescriptionItem::new(file_size_label).value(Text::from(selectable_text(
+                "detail-field-file-size",
+                file_size_value,
+            ))),
         )
-        .child(DescriptionItem::new(category_label)
-                   .value(Text::from(selectable_text("detail-field-kind", item.kind.to_string())))
-                   .span(2));
+        .child(
+            DescriptionItem::new(category_label)
+                .value(Text::from(selectable_text(
+                    "detail-field-kind",
+                    item.kind.to_string(),
+                )))
+                .span(2),
+        );
 
     // The DriveThruRPG order-product API does not always report a page count; omit
     // the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
         list = list.child(
             DescriptionItem::new(t!("detail.field_pages").to_string())
-                .value(Text::from(selectable_text("detail-field-pages", item.pages.to_string())))
+                .value(Text::from(selectable_text(
+                    "detail-field-pages",
+                    item.pages.to_string(),
+                )))
                 .span(2),
         );
     }

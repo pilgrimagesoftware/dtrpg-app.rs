@@ -78,34 +78,45 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                                 .child(t!("settings.account_title")));
 
                  // Email
-                 col = col.child(div().flex()
-                                      .items_baseline()
-                                      .gap(px(6.0))
-                                      .child(div().text_xs()
-                                                  .text_color(colors.text_secondary)
-                                                  .child(t!("settings.email_label")))
-                                      .child(
-                                          selectable_text("settings-account-email", email_text.clone())
-                                              .text_xs()
-                                              .font_family(MONOSPACE_FONT)
-                                              .text_color(colors.text_tertiary),
-                                      ));
+                 col = col.child(
+                            div()
+                                .flex()
+                                .items_baseline()
+                                .gap(px(6.0))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(colors.text_secondary)
+                                        .child(t!("settings.email_label")),
+                                )
+                                .child(
+                                    selectable_text("settings-account-email", email_text.clone())
+                                        .text_xs()
+                                        .font_family(MONOSPACE_FONT)
+                                        .text_color(colors.text_tertiary),
+                                ),
+                        );
 
                  // API Key
                  if let Some(hint) = &auth.api_key_hint {
-                     col = col.child(div().flex()
-                                          .items_baseline()
-                                          .gap(px(6.0))
-                                          .child(div().text_xs()
-                                                      .text_color(colors.text_secondary)
-                                                      .child(t!("settings.api_key_label")))
-                                          .child(
-                                              selectable_text("settings-account-api-key",
-                                                              hint.clone())
-                                                  .text_xs()
-                                                  .font_family(MONOSPACE_FONT)
-                                                  .text_color(colors.text_tertiary),
-                                          ));
+                     col = col.child(
+                                div()
+                                    .flex()
+                                    .items_baseline()
+                                    .gap(px(6.0))
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(colors.text_secondary)
+                                            .child(t!("settings.api_key_label")),
+                                    )
+                                    .child(
+                                        selectable_text("settings-account-api-key", hint.clone())
+                                            .text_xs()
+                                            .font_family(MONOSPACE_FONT)
+                                            .text_color(colors.text_tertiary),
+                                    ),
+                            );
                  }
                  col
              }),
@@ -208,7 +219,9 @@ fn render_unauthenticated(entity: Entity<SettingsController>, colors: &ColorToke
 
         if let Some(err) = sign_in_error {
             form_section = form_section.child(
-                selectable_text("settings-sign-in-error", err).text_xs().text_color(error_color),
+                selectable_text("settings-sign-in-error", err)
+                    .text_xs()
+                    .text_color(error_color),
             );
         }
 

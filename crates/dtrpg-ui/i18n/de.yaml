@@ -203,7 +203,6 @@ collections:
   delete_confirm_title: "„%{name}“ löschen?"
   delete_confirm_description: "Diese Sammlung wird endgültig gelöscht. Dies kann nicht rückgängig gemacht werden."
   manage_dialog_title: "Sammlungen verwalten — %{title}"
-  manage_close: "Schließen"
   manage_empty: "Noch keine Sammlungen."
   manage_new_confirm: "Erstellen"
 

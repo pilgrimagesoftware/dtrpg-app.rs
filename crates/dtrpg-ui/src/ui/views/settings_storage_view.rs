@@ -195,76 +195,80 @@ fn render_concurrency_stepper(max_concurrent_downloads: usize,
     let entity_dec = entity.clone();
     let entity_inc = entity;
 
-    div().flex().flex_col().gap(px(6.0))
-        .child(
-            div().text_sm().font_weight(gpui::FontWeight::SEMIBOLD).text_color(text_primary)
-                 .child(t!("settings.max_concurrent_downloads_title")),
-        )
-        .child(
-            div().flex().items_center().gap(px(8.0))
-                 .child(
-                     div().id("max-concurrent-downloads-decrement")
-                          .flex_none()
-                          .size(px(32.0))
-                          .rounded(px(8.0))
-                          .border_1()
-                          .border_color(border)
-                          .flex()
-                          .items_center()
-                          .justify_center()
-                          .cursor_pointer()
-                          .tooltip(|window, cx| {
-                              Tooltip::new(t!("settings.max_concurrent_downloads_decrement_tooltip")
-                                               .to_string()).build(window, cx)
-                          })
-                          .on_click(move |_event, _window, cx| {
-                              if max_concurrent_downloads > MIN_CONCURRENT_DOWNLOADS {
-                                  entity_dec.update(cx, |ctrl, cx| {
-                                      ctrl.set_max_concurrent_downloads(
-                                          max_concurrent_downloads - 1, cx);
-                                  });
-                              }
-                          })
-                          .child(div().text_sm().text_color(text_primary).child("−")),
-                 )
-                 .child(
-                     div().w(px(32.0))
-                          .text_sm()
-                          .text_color(text_primary)
-                          .text_align(gpui::TextAlign::Center)
-                          .child(max_concurrent_downloads.to_string()),
-                 )
-                 .child(
-                     div().id("max-concurrent-downloads-increment")
-                          .flex_none()
-                          .size(px(32.0))
-                          .rounded(px(8.0))
-                          .border_1()
-                          .border_color(border)
-                          .flex()
-                          .items_center()
-                          .justify_center()
-                          .cursor_pointer()
-                          .tooltip(|window, cx| {
-                              Tooltip::new(t!("settings.max_concurrent_downloads_increment_tooltip")
-                                               .to_string()).build(window, cx)
-                          })
-                          .on_click(move |_event, _window, cx| {
-                              if max_concurrent_downloads < MAX_CONCURRENT_DOWNLOADS {
-                                  entity_inc.update(cx, |ctrl, cx| {
-                                      ctrl.set_max_concurrent_downloads(
-                                          max_concurrent_downloads + 1, cx);
-                                  });
-                              }
-                          })
-                          .child(div().text_sm().text_color(text_primary).child("+")),
-                 ),
-        )
-        .child(
-            div().text_xs()
-                 .text_color(text_secondary)
-                 .child(t!("settings.max_concurrent_downloads_note")),
-        )
+    div().flex()
+         .flex_col()
+         .gap(px(6.0))
+         .child(div().text_sm()
+                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .text_color(text_primary)
+                     .child(t!("settings.max_concurrent_downloads_title")))
+         .child(div().flex()
+                     .items_center()
+                     .gap(px(8.0))
+                     .child(div().id("max-concurrent-downloads-decrement")
+                                 .flex_none()
+                                 .size(px(32.0))
+                                 .rounded(px(8.0))
+                                 .border_1()
+                                 .border_color(border)
+                                 .flex()
+                                 .items_center()
+                                 .justify_center()
+                                 .cursor_pointer()
+                                 .tooltip(|window, cx| {
+                                     Tooltip::new(
+                                t!("settings.max_concurrent_downloads_decrement_tooltip")
+                                    .to_string(),
+                            )
+                            .build(window, cx)
+                                 })
+                                 .on_click(move |_event, _window, cx| {
+                                     if max_concurrent_downloads > MIN_CONCURRENT_DOWNLOADS {
+                                         entity_dec.update(cx, |ctrl, cx| {
+                                                       ctrl.set_max_concurrent_downloads(
+                                        max_concurrent_downloads - 1,
+                                        cx,
+                                    );
+                                                   });
+                                     }
+                                 })
+                                 .child(div().text_sm().text_color(text_primary).child("−")))
+                     .child(div().w(px(32.0))
+                                 .text_sm()
+                                 .text_color(text_primary)
+                                 .text_align(gpui::TextAlign::Center)
+                                 .child(max_concurrent_downloads.to_string()))
+                     .child(div().id("max-concurrent-downloads-increment")
+                                 .flex_none()
+                                 .size(px(32.0))
+                                 .rounded(px(8.0))
+                                 .border_1()
+                                 .border_color(border)
+                                 .flex()
+                                 .items_center()
+                                 .justify_center()
+                                 .cursor_pointer()
+                                 .tooltip(|window, cx| {
+                                     Tooltip::new(
+                                t!("settings.max_concurrent_downloads_increment_tooltip")
+                                    .to_string(),
+                            )
+                            .build(window, cx)
+                                 })
+                                 .on_click(move |_event, _window, cx| {
+                                     if max_concurrent_downloads < MAX_CONCURRENT_DOWNLOADS {
+                                         entity_inc.update(cx, |ctrl, cx| {
+                                                       ctrl.set_max_concurrent_downloads(
+                                        max_concurrent_downloads + 1,
+                                        cx,
+                                    );
+                                                   });
+                                     }
+                                 })
+                                 .child(div().text_sm().text_color(text_primary).child("+"))))
+         .child(div().text_xs()
+                     .text_color(text_secondary)
+                     .child(t!("settings.max_concurrent_downloads_note")))
 }
 
 // ── Helpers
