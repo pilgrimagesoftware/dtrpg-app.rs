@@ -66,6 +66,8 @@ catalog:
   col_added: "Added"
   action_download: "Download"
   action_remove_download: "Remove Download"
+  remove_download_confirm_title: "Remove download of \"%{title}\"?"
+  remove_download_confirm_description: "The local copy will be removed. You can download it again later."
   action_open: "Open"
   action_load_thumbnail: "Load Thumbnail"
   action_show_in_finder: "Show in Finder"
