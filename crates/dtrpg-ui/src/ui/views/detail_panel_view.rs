@@ -11,6 +11,7 @@ use gpui::{
     div, img, px,
 };
 use gpui_component::Disableable;
+use gpui_component::ElementExt as _;
 use gpui_component::Icon;
 use gpui_component::IconName;
 use gpui_component::Size;
@@ -293,8 +294,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 )
                             }),
                     )
-                    .child(render_metadata_table(&item, &storage_root_path, colors,
-                                                 &label_font_family))
+                    .child(render_metadata_table(&item, &storage_root_path, &label_font_family))
                     .when(item.is_multi_item(), |this| {
                         this.child(render_item_tier(&item, &storage_root_path,
                                                     entity_item_tier.clone(), tabs, colors, window,
@@ -309,9 +309,12 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 
 /// Returns the column definitions used for the multi-item entry's item list.
 ///
-/// Name gets the majority of the default width (matching the previous
-/// `flex_1`-on-Name-heavy visual balance); Type, Size, and Status default
-/// narrow. All four are user-resizable — see `detail-item-list-column-resize`.
+/// Name's `width(240.)` is only the fallback default before the table's
+/// rendered width is known; once known, [`ItemListDelegate::column`]
+/// recomputes it each render to fill whatever space Type/Size/Status don't
+/// use, so Name absorbs panel resizes while the other three stay narrow and
+/// right-aligned as a group. All four are still user-resizable — see
+/// `detail-item-list-column-resize`.
 pub(crate) fn item_list_columns() -> Vec<Column> {
     vec![Column::new("name", t!("detail.item_list_column_name")).width(240.)
                                                                 .min_width(120.)
@@ -342,6 +345,12 @@ pub(crate) struct ItemListDelegate {
     /// on-disk size suffix in the Size column (see `render_metadata_table`'s
     /// equivalent computation).
     pub(crate) entry_dir:   PathBuf,
+    /// Current rendered width of the item list table, captured by
+    /// `render_item_tier`'s `on_prepaint` hook. Drives the Name column's
+    /// fill-remaining-width sizing in [`Self::column`] — `gpui-component`'s
+    /// `Column` has no built-in flex/stretch behavior, so Name's width is
+    /// recomputed each time this changes rather than left fixed.
+    pub(crate) table_width: Option<Pixels>,
 }
 
 impl TableDelegate for ItemListDelegate {
@@ -360,6 +369,17 @@ impl TableDelegate for ItemListDelegate {
         let mut col = self.columns[col_ix].clone();
         if let Some(Some(w)) = self.user_widths.get(col_ix) {
             col = col.width(w.as_f32());
+        }
+        else if col_ix == 0
+                  && let Some(table_width) = self.table_width
+        {
+            // Name has no user override yet: fill whatever width Type/Size/Status
+            // don't use, so those three stay narrow and pushed to the right
+            // instead of leaving blank trailing space when the panel is wider
+            // than the four columns' fixed defaults.
+            let others: f32 = self.columns[1..].iter().map(|c| c.width.as_f32()).sum();
+            let name_width = (table_width.as_f32() - others).max(col.min_width.as_f32());
+            col = col.width(name_width);
         }
         col
     }
@@ -403,7 +423,7 @@ impl TableDelegate for ItemListDelegate {
                      .items_center()
                      .text_sm()
                      .text_color(colors.text_secondary)
-                     .child(crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk))
+                     .child(crate::util::file_size::prefer_on_disk_size(catalog_str, on_disk))
                      .into_any_element()
             }
             3 => {
@@ -421,12 +441,18 @@ impl TableDelegate for ItemListDelegate {
                     div().h_full()
                          .flex()
                          .items_center()
+                         .text_sm()
+                         .text_color(colors.text_secondary)
                          .id(SharedString::from(format!("item-row-{row_ix}-status")))
                          .tooltip(move |window, cx| {
                              Tooltip::new(t!("detail.item_status_local").to_string()).build(window,
                                                                                             cx)
                          })
-                         .child(Icon::new(IconName::CircleCheck).text_color(colors.text_secondary))
+                         // Checkmark for "on this device", matching
+                         // `render_status_icon`'s glyph convention rather than a
+                         // separate `IconName` so both status indicators read the
+                         // same way.
+                         .child("\u{2713}")
                          .into_any_element()
                 }
                 else if is_downloading {
@@ -449,13 +475,18 @@ impl TableDelegate for ItemListDelegate {
                     div().h_full()
                          .flex()
                          .items_center()
+                         .text_sm()
+                         .text_color(colors.text_secondary)
                          .id(SharedString::from(format!("item-row-{row_ix}-download")))
                          .cursor_pointer()
                          .tooltip(move |window, cx| {
                              Tooltip::new(t!("detail.item_download_button").to_string())
                                 .build(window, cx)
                          })
-                         .child(Icon::new(IconName::ArrowDown).text_color(colors.text_secondary))
+                         // Cloud glyph for "in the cloud, not yet on this device" —
+                         // an arrow-down here previously read as an already-completed
+                         // download indicator rather than a pending one.
+                         .child("\u{2601}")
                          // Stop propagation so clicking download doesn't also fire the
                          // row's own click (which selects this row) — same class of bug
                          // fixed in the activity panel's cancel button.
@@ -503,6 +534,7 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
     let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
 
     let table = item_list_table(tabs, &entity, &entry_id, entry_dir, window, cx);
+    let table_for_prepaint = table.clone();
 
     // `DataTable` virtualizes its rows and sizes itself to its container
     // (`.size_full()` internally) — unlike the old stateless `Table`, it
@@ -514,9 +546,24 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
     let row_height = Size::default().table_row_height();
     let visible_rows = item.files.len().min(8) as f32;
     let table_height = row_height * (visible_rows + 1.0);
-    let item_list = div().h(table_height)
-                         .child(DataTable::new(&table).bordered(false)
-                                                      .scrollbar_visible(true, false));
+    let item_list =
+        div().h(table_height)
+             .child(DataTable::new(&table).bordered(false)
+                                          .scrollbar_visible(true, false))
+             // Captures the table's rendered width so the Name column can
+             // fill whatever space Type/Size/Status don't use — see
+             // `ItemListDelegate::table_width`. Mirrors
+             // `LibraryController::set_entry_bounds`'s guarded-update
+             // pattern so an unchanged width doesn't re-notify every frame.
+             .on_prepaint(move |bounds, _window, cx| {
+                 table_for_prepaint.update(cx, |state, cx| {
+                                       if state.delegate().table_width != Some(bounds.size.width) {
+                                           state.delegate_mut().table_width =
+                                               Some(bounds.size.width);
+                                           cx.notify();
+                                       }
+                                   });
+             });
 
     let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
@@ -566,7 +613,7 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
     let file_size_value = {
         let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
         let on_disk = crate::util::file_size::on_disk_file_size(&entry_dir, file.name.as_ref());
-        crate::util::file_size::with_on_disk_suffix(format!("{:.1} {}",
+        crate::util::file_size::prefer_on_disk_size(format!("{:.1} {}",
                                                             file.size_mb,
                                                             t!("size.mb")),
                                                     on_disk)
@@ -602,8 +649,7 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
                                                                     publisher: &item.publisher,
                                                                     row_ix,
                                                                     is_downloaded:
-                                                                        item.status
-                                                                        == ItemStatus::Downloaded,
+                                                                        file.downloaded,
                                                                     storage_root_path },
                                           file,
                                           entity,
@@ -960,8 +1006,7 @@ fn value_or_dash(value: &str) -> String {
     }
 }
 
-fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &ColorTokens,
-                         label_font_family: &str)
+fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_font_family: &str)
                          -> impl IntoElement + 'static + use<> {
     let file_size_label = if item.files.len() > 1 {
         t!("detail.field_total_file_size").to_string()
@@ -970,6 +1015,10 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &
         t!("detail.field_file_size").to_string()
     };
 
+    // Three display modes depending on how many of the entry's files are
+    // downloaded: none → catalog (cloud) size only; all → on-disk (local)
+    // size only, since it's the exact figure once every file is present;
+    // some → both, so the user can see progress against the total.
     let file_size_value = {
         let catalog_mb: f64 = if item.files.is_empty() {
             item.size_mb
@@ -979,36 +1028,38 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &
         };
         let catalog_str = format!("{:.0} {}", catalog_mb, t!("size.mb"));
 
-        let on_disk_bytes = if item.status == ItemStatus::Downloaded && !item.files.is_empty() {
+        if item.files.is_empty() {
+            catalog_str
+        }
+        else {
             let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+            let downloaded_count = item.files.iter().filter(|f| f.downloaded).count();
             let resolved: Vec<u64> =
                 item.files
                     .iter()
+                    .filter(|f| f.downloaded)
                     .filter_map(|f| {
                         crate::util::file_size::on_disk_file_size(&entry_dir, f.name.as_ref())
                     })
                     .collect();
-            if resolved.is_empty() {
-                None
+
+            if downloaded_count == 0 {
+                catalog_str
+            }
+            else if downloaded_count == item.files.len() && resolved.len() == item.files.len() {
+                crate::util::file_size::format_bytes(resolved.iter().sum())
             }
             else {
-                Some(resolved.iter().sum())
+                let on_disk_bytes = if resolved.is_empty() {
+                    None
+                }
+                else {
+                    Some(resolved.iter().sum())
+                };
+                crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk_bytes)
             }
         }
-        else {
-            None
-        };
-
-        crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk_bytes)
     };
-
-    let category_label = div().flex()
-                              .items_center()
-                              .gap(px(4.0))
-                              .font_family(label_font_family.to_string())
-                              .child(Icon::new(IconName::Folder).text_color(colors.text_secondary))
-                              .child(t!("detail.field_category").to_string())
-                              .into_any_element();
 
     let mut list = DescriptionList::vertical()
         .columns(2)
@@ -1038,7 +1089,8 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, colors: &
             ),
         )
         .child(
-            DescriptionItem::new(category_label)
+            DescriptionItem::new(styled_label(t!("detail.field_category").to_string(),
+                                              label_font_family))
                 .value(Text::from(selectable_text(
                     "detail-field-kind",
                     item.kind.to_string(),
