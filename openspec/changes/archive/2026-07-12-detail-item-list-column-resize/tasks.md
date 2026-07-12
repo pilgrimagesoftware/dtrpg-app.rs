@@ -24,8 +24,8 @@
 ## 4. Verification
 
 - [x] 4.1 Run `cargo check --all-targets` and `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] 4.2 Launch the app; open a multi-item entry's detail tab; confirm the item list renders with Name/Type/Status columns
-- [ ] 4.3 Drag a column divider; confirm the column resizes and neighboring columns reflow
-- [ ] 4.4 Click a row; confirm it highlights and the item metadata area below updates to that file
-- [ ] 4.5 Resize a column, close the tab, reopen it for the same entry; confirm columns reset to default widths and the previously selected row (if any) is re-highlighted
-- [ ] 4.6 Open detail tabs for two different multi-item entries; confirm each has independent column widths and selection (no cross-entry state bleed)
+- [x] 4.2 Launch the app; open a multi-item entry's detail tab; confirm the item list renders with Name/Type/Status columns
+- [x] 4.3 Drag a column divider; confirm the column resizes and neighboring columns reflow
+- [x] 4.4 Click a row; confirm it highlights and the item metadata area below updates to that file
+- [x] 4.5 Resize a column, close the tab, reopen it for the same entry; confirm columns reset to default widths and the previously selected row (if any) is re-highlighted
+- [x] 4.6 Open detail tabs for two different multi-item entries; confirm each has independent column widths and selection (no cross-entry state bleed)
