@@ -82,10 +82,10 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
     let sidebar_menu = SidebarMenu::new().children((0..PAGE_COUNT).map(|ix| {
                                                        let entity = entity.clone();
                                                        SidebarMenuItem::new(page_title(ix))
-                    .active(ix == active_page_ix)
-                    .on_click(move |_, _, cx| {
-                        entity.update(cx, |ctrl, cx| ctrl.set_active_page_ix(ix, cx));
-                    })
+            .active(ix == active_page_ix)
+            .on_click(move |_, _, cx| {
+                entity.update(cx, |ctrl, cx| ctrl.set_active_page_ix(ix, cx));
+            })
                                                    }));
     let sidebar = Sidebar::new("settings-sidebar").w(px(160.0))
                                                   .border_0()

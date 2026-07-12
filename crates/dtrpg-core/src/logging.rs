@@ -124,21 +124,18 @@ pub fn init() -> LogGuards {
 fn init_sentry_client() -> (Option<sentry::ClientInitGuard>, SentryStatus) {
     let dsn = runtime_or_builtin(crate::constants::SENTRY_DSN_ENV,
                                  option_env!("DTRPG_SENTRY_DSN_BUILTIN"));
-    let environment =
-        runtime_or_builtin(crate::constants::SENTRY_ENVIRONMENT_ENV,
-                            option_env!("DTRPG_SENTRY_ENVIRONMENT_BUILTIN")).filter(|s| {
-                                                                                !s.is_empty()
-                                                                            })
-                                                                            .unwrap_or_else(|| {
-            crate::constants::SENTRY_DEFAULT_ENVIRONMENT.to_string()
-        });
-    let release = runtime_or_builtin(crate::constants::SENTRY_RELEASE_ENV,
-                                      option_env!("DTRPG_SENTRY_RELEASE_BUILTIN")).filter(|s| {
-                                                                                      !s.is_empty()
-                                                                                  })
-                                                                                  .unwrap_or_else(
-        || env!("CARGO_PKG_VERSION").to_string(),
-    );
+    let environment = runtime_or_builtin(
+        crate::constants::SENTRY_ENVIRONMENT_ENV,
+        option_env!("DTRPG_SENTRY_ENVIRONMENT_BUILTIN"),
+    )
+    .filter(|s| !s.is_empty())
+    .unwrap_or_else(|| crate::constants::SENTRY_DEFAULT_ENVIRONMENT.to_string());
+    let release = runtime_or_builtin(
+        crate::constants::SENTRY_RELEASE_ENV,
+        option_env!("DTRPG_SENTRY_RELEASE_BUILTIN"),
+    )
+    .filter(|s| !s.is_empty())
+    .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
 
     init_sentry_with(dsn.unwrap_or_default(), environment, release)
 }

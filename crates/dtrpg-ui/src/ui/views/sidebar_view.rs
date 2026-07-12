@@ -289,18 +289,16 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                                               name = collection_name).to_string();
                                window.open_alert_dialog(cx, move |alert, _, _| {
                                          let entity = entity.clone();
-                                         alert.confirm()
-                                              .title(title.clone())
-                                              .description(
-                                                  t!("collections.delete_confirm_description")
-                                                      .to_string(),
-                                              )
-                                              .on_ok(move |_, _, cx| {
-                                                  entity.update(cx, |ctrl, cx| {
-                                                      ctrl.delete_collection(col_id, cx);
-                                                  });
-                                                  true
-                                              })
+                                         alert
+                            .confirm()
+                            .title(title.clone())
+                            .description(t!("collections.delete_confirm_description").to_string())
+                            .on_ok(move |_, _, cx| {
+                                entity.update(cx, |ctrl, cx| {
+                                    ctrl.delete_collection(col_id, cx);
+                                });
+                                true
+                            })
                                      });
                            }
                        }))
@@ -462,104 +460,102 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                 let entity_for_close = entity_for_toggle.clone();
                 let search_input_for_close = search_input.clone();
                 return div()
-                            .id("collections-search-suffix")
-                            .on_click(|_, _, cx| cx.stop_propagation())
-                            .flex()
-                            .items_center()
-                            .w_full()
-                            .gap(px(4.))
-                            .child(div().flex_1().child(Input::new(&search_input).small()))
-                            .child(
-                                Button::new("collections-search-close")
-                                    .ghost()
-                                    .compact()
-                                    .icon(IconName::Close)
-                                    .on_click(move |_, window, cx| {
-                                        entity_for_close.update(cx, |ctrl, cx| {
-                                            ctrl.toggle_collection_search(cx);
-                                        });
-                                        search_input_for_close.update(cx, |st, cx| {
-                                            st.set_value("", window, cx);
-                                        });
-                                    }),
-                            )
-                            .into_any_element();
+                    .id("collections-search-suffix")
+                    .on_click(|_, _, cx| cx.stop_propagation())
+                    .flex()
+                    .items_center()
+                    .w_full()
+                    .gap(px(4.))
+                    .child(div().flex_1().child(Input::new(&search_input).small()))
+                    .child(
+                        Button::new("collections-search-close")
+                            .ghost()
+                            .compact()
+                            .icon(IconName::Close)
+                            .on_click(move |_, window, cx| {
+                                entity_for_close.update(cx, |ctrl, cx| {
+                                    ctrl.toggle_collection_search(cx);
+                                });
+                                search_input_for_close.update(cx, |st, cx| {
+                                    st.set_value("", window, cx);
+                                });
+                            }),
+                    )
+                    .into_any_element();
             }
 
             div()
-                        .id("collections-suffix")
-                        // Stop click propagation so the suffix button does not also
-                        // fire the SidebarMenuItem header's on_click (which toggles collapse).
-                        .on_click(|_, _, cx| cx.stop_propagation())
-                        .flex()
-                        .items_center()
-                        .gap(px(4.))
-                        .child(div().text_xs().child(collections_count.clone()))
-                        .child(
-                            Button::new("collections-search-open")
+                .id("collections-suffix")
+                // Stop click propagation so the suffix button does not also
+                // fire the SidebarMenuItem header's on_click (which toggles collapse).
+                .on_click(|_, _, cx| cx.stop_propagation())
+                .flex()
+                .items_center()
+                .gap(px(4.))
+                .child(div().text_xs().child(collections_count.clone()))
+                .child(
+                    Button::new("collections-search-open")
+                        .ghost()
+                        .compact()
+                        .icon(IconName::Search)
+                        .tooltip(t!("sidebar.search_tooltip").to_string())
+                        .on_click({
+                            let entity = entity_for_toggle.clone();
+                            let input = search_input.clone();
+                            move |_, window, cx| {
+                                entity.update(cx, |ctrl, cx| {
+                                    ctrl.toggle_collection_search(cx);
+                                });
+                                input.update(cx, |st, cx| st.focus(window, cx));
+                            }
+                        }),
+                )
+                .child(
+                    Dialog::new(cx)
+                        .trigger(
+                            Button::new("add-collection")
                                 .ghost()
                                 .compact()
-                                .icon(IconName::Search)
-                                .tooltip(t!("sidebar.search_tooltip").to_string())
-                                .on_click({
-                                    let entity = entity_for_toggle.clone();
-                                    let input = search_input.clone();
-                                    move |_, window, cx| {
-                                        entity.update(cx, |ctrl, cx| {
-                                            ctrl.toggle_collection_search(cx);
-                                        });
-                                        input.update(cx, |st, cx| st.focus(window, cx));
-                                    }
-                                }),
+                                .icon(IconName::Plus)
+                                .tooltip(t!("collections.add_tooltip").to_string()),
                         )
-                        .child(
-                            Dialog::new(cx)
-                                .trigger(
-                                    Button::new("add-collection")
-                                        .ghost()
-                                        .compact()
-                                        .icon(IconName::Plus)
-                                        .tooltip(t!("collections.add_tooltip").to_string()),
-                                )
-                                .w(px(320.))
-                                .close_button(false)
-                                .overlay_closable(true)
-                                .button_props(
-                                    DialogButtonProps::default()
-                                        .ok_text(t!("collections.add_dialog_confirm").to_string())
-                                        .show_cancel(true)
-                                        .cancel_text(
-                                            t!("collections.add_dialog_cancel").to_string(),
+                        .w(px(320.))
+                        .close_button(false)
+                        .overlay_closable(true)
+                        .button_props(
+                            DialogButtonProps::default()
+                                .ok_text(t!("collections.add_dialog_confirm").to_string())
+                                .show_cancel(true)
+                                .cancel_text(t!("collections.add_dialog_cancel").to_string()),
+                        )
+                        .on_ok({
+                            let input = input.clone();
+                            let ctrl = ctrl.clone();
+                            move |_, _, cx| {
+                                let name = input.read(cx).value().trim().to_string();
+                                if name.is_empty() {
+                                    return false;
+                                }
+                                ctrl.update(cx, |c, cx| c.create_collection(name, cx));
+                                true
+                            }
+                        })
+                        .on_cancel(|_, _, _| true)
+                        .content({
+                            let input = collection_name_input.clone();
+                            move |content, _, _| {
+                                content
+                                    .child(
+                                        DialogHeader::new().px_4().pt_4().child(
+                                            DialogTitle::new()
+                                                .child(t!("collections.add_dialog_title")),
                                         ),
-                                )
-                                .on_ok({
-                                    let input = input.clone();
-                                    let ctrl = ctrl.clone();
-                                    move |_, _, cx| {
-                                        let name = input.read(cx).value().trim().to_string();
-                                        if name.is_empty() {
-                                            return false;
-                                        }
-                                        ctrl.update(cx, |c, cx| c.create_collection(name, cx));
-                                        true
-                                    }
-                                })
-                                .on_cancel(|_, _, _| true)
-                                .content({
-                                    let input = collection_name_input.clone();
-                                    move |content, _, _| {
-                                        content
-                                            .child(
-                                                DialogHeader::new().px_4().pt_4().child(
-                                                    DialogTitle::new()
-                                                        .child(t!("collections.add_dialog_title")),
-                                                ),
-                                            )
-                                            .child(div().px_4().py_2().child(Input::new(&input)))
-                                    }
-                                }),
-                        )
-                        .into_any_element()
+                                    )
+                                    .child(div().px_4().py_2().child(Input::new(&input)))
+                            }
+                        }),
+                )
+                .into_any_element()
         }
     });
 

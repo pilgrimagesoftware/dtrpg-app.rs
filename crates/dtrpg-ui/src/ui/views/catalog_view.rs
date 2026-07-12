@@ -520,15 +520,17 @@ impl TableDelegate for CatalogListDelegate {
                 let item_for_open = item.clone();
                 let tabs_for_open = self.tabs.clone();
                 let controller_for_open = entity.clone();
-                menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
-                        open_item_or_focus_detail_tab(&item_path,
-                                                      &item_for_open,
-                                                      &tabs_for_open,
-                                                      &controller_for_open,
-                                                      cx);
-                    }),
-                )
+                menu.item(PopupMenuItem::new(t!("catalog.action_open")).on_click(
+                    move |_, _, cx| {
+                        open_item_or_focus_detail_tab(
+                            &item_path,
+                            &item_for_open,
+                            &tabs_for_open,
+                            &controller_for_open,
+                            cx,
+                        );
+                    },
+                ))
                 .item(
                     PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
                         if !item_path_reveal.exists() {
@@ -675,15 +677,17 @@ impl TableDelegate for GroupedCatalogListDelegate {
                 let item_for_open = item.clone();
                 let tabs_for_open = self.tabs.clone();
                 let controller_for_open = entity.clone();
-                menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
-                        open_item_or_focus_detail_tab(&item_path,
-                                                      &item_for_open,
-                                                      &tabs_for_open,
-                                                      &controller_for_open,
-                                                      cx);
-                    }),
-                )
+                menu.item(PopupMenuItem::new(t!("catalog.action_open")).on_click(
+                    move |_, _, cx| {
+                        open_item_or_focus_detail_tab(
+                            &item_path,
+                            &item_for_open,
+                            &tabs_for_open,
+                            &controller_for_open,
+                            cx,
+                        );
+                    },
+                ))
                 .item(
                     PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
                         if !item_path_reveal.exists() {
@@ -1103,11 +1107,12 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement = match (snap.presentation, snap.grouped) {
-            // ── List, ungrouped — DataTable (handles header/row alignment) ──
-            (CatalogPresentation::List, false) => {
-                use gpui_component::Size;
-                root.px(pad_side)
+        let content: AnyElement =
+            match (snap.presentation, snap.grouped) {
+                // ── List, ungrouped — DataTable (handles header/row alignment) ──
+                (CatalogPresentation::List, false) => {
+                    use gpui_component::Size;
+                    root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1115,15 +1120,15 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-            }
+                }
 
-            // ── List, grouped — DataTable over a flattened header/item row
-            // list, so it gets the same virtualization as the ungrouped
-            // branch instead of hand-rolled, fully-materialized rows ──
-            (CatalogPresentation::List, true) => {
-                use gpui_component::Size;
-                self.grouped_items(cx);
-                root.px(pad_side)
+                // ── List, grouped — DataTable over a flattened header/item row
+                // list, so it gets the same virtualization as the ungrouped
+                // branch instead of hand-rolled, fully-materialized rows ──
+                (CatalogPresentation::List, true) => {
+                    use gpui_component::Size;
+                    self.grouped_items(cx);
+                    root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_grouped_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1131,42 +1136,37 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-            }
+                }
 
-            // ── Thumbs, ungrouped — virtualized ───────────────────────────
-            (CatalogPresentation::Thumbs, false) => {
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
-                let t = tabs_entity.clone();
-                root.px(pad_side)
-                    .child(div().relative()
-                                .flex_1()
-                                .min_h_0()
-                                .child(uniform_list("catalog-thumbs",
-                                                    item_count,
-                                                    move |range, window, cx| {
-                                                        let items = ctrl.read(cx)
-                                                                        .visible_items_slice(range);
-                                                        let covers: Vec<Option<Arc<Image>>> = {
-                                                            let cache = cx.global::<CoverCache>();
-                                                            items.iter()
-                                                                 .map(|item| cache.get(&item.id))
-                                                                 .collect()
-                                                        };
-                                                        let checking: Vec<bool> = {
-                                                            let ctrl_ref = ctrl.read(cx);
-                                                            items.iter()
-                                                                 .map(|item| {
-                                                                     ctrl_ref.is_checking(&item.id)
-                                                                 })
-                                                                 .collect()
-                                                        };
-                                                        items.iter()
-                                                             .zip(covers)
-                                                             .zip(checking)
-                                                             .map(|((item, cover), is_checking)| {
-                                                                 render_thumb_row(item,
+                // ── Thumbs, ungrouped — virtualized ───────────────────────────
+                (CatalogPresentation::Thumbs, false) => {
+                    let c = colors.clone();
+                    let d = density.clone();
+                    let s = storage_root.clone();
+                    let t = tabs_entity.clone();
+                    root.px(pad_side)
+                        .child(
+                               div().relative()
+                                    .flex_1()
+                                    .min_h_0()
+                                    .child(
+                        uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
+                            let items = ctrl.read(cx).visible_items_slice(range);
+                            let covers: Vec<Option<Arc<Image>>> = {
+                                let cache = cx.global::<CoverCache>();
+                                items.iter().map(|item| cache.get(&item.id)).collect()
+                            };
+                            let checking: Vec<bool> = {
+                                let ctrl_ref = ctrl.read(cx);
+                                items.iter()
+                                     .map(|item| ctrl_ref.is_checking(&item.id))
+                                     .collect()
+                            };
+                            items.iter()
+                                 .zip(covers)
+                                 .zip(checking)
+                                 .map(|((item, cover), is_checking)| {
+                                     render_thumb_row(item,
                                                       cover,
                                                       &c,
                                                       &d,
@@ -1175,133 +1175,136 @@ impl Render for CatalogView {
                                                       s.clone(),
                                                       window,
                                                       is_checking).into_any_element()
-                                                             })
-                                                             .collect()
-                                                    }).track_scroll(&scroll_handle)
-                                                      .size_full())
-                                .vertical_scrollbar(&scroll_handle))
-                    .into_any_element()
-            }
-
-            // ── Thumbs, grouped — non-virtualized ─────────────────────────
-            (CatalogPresentation::Thumbs, true) => {
-                let groups = self.grouped_items(cx);
-                let cover_cache = {
-                    let cache = cx.global::<CoverCache>();
-                    cache.images.clone()
-                };
-                let checking_items = self.controller.read(cx).checking_items_snapshot();
-                root.overflow_y_scrollbar()
-                    .px(pad_side)
-                    .children(groups.into_iter().map(|g| {
-                                                    let c = colors.clone();
-                                                    let d = density.clone();
-                                                    let e = self.controller.clone();
-                                                    let t = tabs_entity.clone();
-                                                    let s = storage_root.clone();
-                                                    let cc = cover_cache.clone();
-                                                    let checking_items = checking_items.clone();
-                                                    // Reborrow as `&Window` (Copy) so the nested
-                                                    // `move` closure can capture it on every
-                                                    // outer iteration without moving `window`.
-                                                    let window: &Window = &*window;
-                                                    div().child(render_group_header(&g.publisher,
-                                                                                    g.items.len(),
-                                                                                    &c))
-                                                         .children(g.items
-                                                                    .into_iter()
-                                                                    .map(move |item| {
-                                                                        let cover =
-                                                                            cc.get(&item.id)
-                                                                              .cloned();
-                                                                        let is_checking =
-                                                                      checking_items
-                                                                          .contains(&item.id);
-                                                                        render_thumb_row(&item,
-                                                                                   cover,
-                                                                                   &c,
-                                                                                   &d,
-                                                                                   e.clone(),
-                                                                                   t.clone(),
-                                                                                   s.clone(),
-                                                                                   window,
-                                                                                   is_checking)
-                                                                    }))
-                                                }))
-                    .into_any_element()
-            }
-
-            // ── Grid, ungrouped — row-virtualized ─────────────────────────
-            (CatalogPresentation::Grid, false) => {
-                let row_count = item_count.div_ceil(items_per_row);
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
-                let t = tabs_entity.clone();
-                root.px(pad_side)
-                        .child(
-                               div().relative()
-                                    .flex_1()
-                                    .min_h_0()
-                                    .child(
-                        uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
-                            let range_start = row_range.start;
-                            let item_start = range_start * items_per_row;
-                            let item_end = (row_range.end * items_per_row).min(item_count);
-                            let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
-                            let covers: Vec<Option<Arc<Image>>> = {
-                                let cache = cx.global::<CoverCache>();
-                                items.iter().map(|item| cache.get(&item.id)).collect()
-                            };
-                            let checking: Vec<bool> = {
-                                let ctrl_ref = ctrl.read(cx);
-                                items.iter().map(|item| ctrl_ref.is_checking(&item.id)).collect()
-                            };
-                            row_range.map(|row| {
-                                         let offset = (row - range_start) * items_per_row;
-                                         let row_end = (offset + items_per_row).min(items.len());
-                                         let row_items = &items[offset..row_end];
-                                         let row_covers = &covers[offset..row_end];
-                                         let row_checking = &checking[offset..row_end];
-                                         div().flex()
-                                              .gap(d.card_gap_x)
-                                              .mb(d.card_gap_y)
-                                              .children(row_items.iter()
-                                                                 .zip(row_covers.iter())
-                                                                 .zip(row_checking.iter())
-                                                                 .map(|((item, cover), &is_checking)| {
-                                                                     render_grid_card(
-                                                                    item,
-                                                                    cover.clone(),
-                                                                    &c,
-                                                                    d.card_min_width,
-                                                                    ctrl.clone(),
-                                                                    t.clone(),
-                                                                    s.clone(),
-                                                                    window,
-                                                                    is_checking,
-                                                                )
-                                                                 }))
-                                              .into_any_element()
-                                     })
-                                     .collect()
+                                 })
+                                 .collect()
                         }).track_scroll(&scroll_handle)
                           .size_full(),
                     )
                                     .vertical_scrollbar(&scroll_handle),
                     )
                         .into_any_element()
-            }
+                }
 
-            // ── Grid, grouped — non-virtualized ───────────────────────────
-            (CatalogPresentation::Grid, true) => {
-                let groups = self.grouped_items(cx);
-                let cover_cache = {
-                    let cache = cx.global::<CoverCache>();
-                    cache.images.clone()
-                };
-                let checking_items = self.controller.read(cx).checking_items_snapshot();
-                root.overflow_y_scrollbar()
+                // ── Thumbs, grouped — non-virtualized ─────────────────────────
+                (CatalogPresentation::Thumbs, true) => {
+                    let groups = self.grouped_items(cx);
+                    let cover_cache = {
+                        let cache = cx.global::<CoverCache>();
+                        cache.images.clone()
+                    };
+                    let checking_items = self.controller.read(cx).checking_items_snapshot();
+                    root.overflow_y_scrollbar()
+                    .px(pad_side)
+                    .children(groups.into_iter().map(|g| {
+                        let c = colors.clone();
+                        let d = density.clone();
+                        let e = self.controller.clone();
+                        let t = tabs_entity.clone();
+                        let s = storage_root.clone();
+                        let cc = cover_cache.clone();
+                        let checking_items = checking_items.clone();
+                        // Reborrow as `&Window` (Copy) so the nested
+                        // `move` closure can capture it on every
+                        // outer iteration without moving `window`.
+                        let window: &Window = &*window;
+                        div().child(render_group_header(&g.publisher, g.items.len(), &c))
+                             .children(g.items.into_iter().map(move |item| {
+                                                              let cover = cc.get(&item.id).cloned();
+                                                              let is_checking =
+                                                                  checking_items.contains(&item.id);
+                                                              render_thumb_row(&item,
+                                                                               cover,
+                                                                               &c,
+                                                                               &d,
+                                                                               e.clone(),
+                                                                               t.clone(),
+                                                                               s.clone(),
+                                                                               window,
+                                                                               is_checking)
+                                                          }))
+                    }))
+                    .into_any_element()
+                }
+
+                // ── Grid, ungrouped — row-virtualized ─────────────────────────
+                (CatalogPresentation::Grid, false) => {
+                    let row_count = item_count.div_ceil(items_per_row);
+                    let c = colors.clone();
+                    let d = density.clone();
+                    let s = storage_root.clone();
+                    let t = tabs_entity.clone();
+                    root.px(pad_side)
+                    .child(
+                           div().relative()
+                                .flex_1()
+                                .min_h_0()
+                                .child(
+                    uniform_list("catalog-grid", row_count, move |row_range, window, cx| {
+                        let range_start = row_range.start;
+                        let item_start = range_start * items_per_row;
+                        let item_end = (row_range.end * items_per_row).min(item_count);
+                        let items = ctrl.read(cx).visible_items_slice(item_start..item_end);
+                        let covers: Vec<Option<Arc<Image>>> = {
+                            let cache = cx.global::<CoverCache>();
+                            items.iter().map(|item| cache.get(&item.id)).collect()
+                        };
+                        let checking: Vec<bool> = {
+                            let ctrl_ref = ctrl.read(cx);
+                            items.iter()
+                                 .map(|item| ctrl_ref.is_checking(&item.id))
+                                 .collect()
+                        };
+                        row_range.map(|row| {
+                                     let offset = (row - range_start) * items_per_row;
+                                     let row_end = (offset + items_per_row).min(items.len());
+                                     let row_items = &items[offset..row_end];
+                                     let row_covers = &covers[offset..row_end];
+                                     let row_checking = &checking[offset..row_end];
+                                     div()
+                                                    .flex()
+                                                    .gap(d.card_gap_x)
+                                                    .mb(d.card_gap_y)
+                                                    .children(
+                                                        row_items
+                                                            .iter()
+                                                            .zip(row_covers.iter())
+                                                            .zip(row_checking.iter())
+                                                            .map(
+                                                                |((item, cover), &is_checking)| {
+                                                                    render_grid_card(
+                                                                        item,
+                                                                        cover.clone(),
+                                                                        &c,
+                                                                        d.card_min_width,
+                                                                        ctrl.clone(),
+                                                                        t.clone(),
+                                                                        s.clone(),
+                                                                        window,
+                                                                        is_checking,
+                                                                    )
+                                                                },
+                                                            ),
+                                                    )
+                                                    .into_any_element()
+                                 })
+                                 .collect()
+                    }).track_scroll(&scroll_handle)
+                      .size_full(),
+                )
+                                .vertical_scrollbar(&scroll_handle),
+                )
+                    .into_any_element()
+                }
+
+                // ── Grid, grouped — non-virtualized ───────────────────────────
+                (CatalogPresentation::Grid, true) => {
+                    let groups = self.grouped_items(cx);
+                    let cover_cache = {
+                        let cache = cx.global::<CoverCache>();
+                        cache.images.clone()
+                    };
+                    let checking_items = self.controller.read(cx).checking_items_snapshot();
+                    root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                                                     let c = colors.clone();
@@ -1318,8 +1321,8 @@ impl Render for CatalogView {
                                                                             e, t, s, &*window))
                                                 }))
                     .into_any_element()
-            }
-        };
+                }
+            };
 
         let mut result =
             outer.relative()
@@ -1623,49 +1626,51 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      let item_for_open = ctx_item.clone();
                      let tabs_for_open = ctx_tabs.clone();
                      let controller_for_open = ctx_entity.clone();
-                     menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
-                        open_item_or_focus_detail_tab(&open_path,
-                                                      &item_for_open,
-                                                      &tabs_for_open,
-                                                      &controller_for_open,
-                                                      cx);
-                    }),
-                )
-                .item(
-                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                        if !reveal_path.exists() {
-                            tracing::warn!(
-                                path = %reveal_path.display(),
-                                "reveal: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = reveal_in_file_manager(&reveal_path) {
-                            tracing::warn!("reveal_in_file_manager failed: {e}");
-                        }
-                    }),
-                )
-                .item(
-                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                     menu.item(PopupMenuItem::new(t!("catalog.action_open")).on_click(
                         move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                            open_item_or_focus_detail_tab(
+                                &open_path,
+                                &item_for_open,
+                                &tabs_for_open,
+                                &controller_for_open,
+                                cx,
+                            );
                         },
-                    ),
-                )
+                    ))
+                    .item(
+                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                            if !reveal_path.exists() {
+                                tracing::warn!(
+                                    path = %reveal_path.display(),
+                                    "reveal: file not found"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        }),
+                    )
+                    .item(
+                        PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                            move |_, _, cx| {
+                                entity_remove
+                                    .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                            },
+                        ),
+                    )
                  }
                  ItemStatus::Cloud => {
                      let dl_id = Arc::clone(&ctx_id);
                      let dl_title = ctx_item.title.to_string();
                      let entity_dl = ctx_entity.clone();
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
-                    move |_, _, cx| {
-                        entity_dl.update(cx, |ctrl, cx| {
-                            ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
-                        });
-                    },
-                ))
+                        move |_, _, cx| {
+                            entity_dl.update(cx, |ctrl, cx| {
+                                ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                            });
+                        },
+                    ))
                  }
              };
              append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
@@ -1690,10 +1695,20 @@ fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem,
     let product_id = item.product_id;
     let entity = entity.clone();
     let item_title = Arc::clone(&item.title);
-    menu.item(PopupMenuItem::new(t!("catalog.action_manage_collections")).on_click(move |_, window, cx| {
-              open_manage_collections_dialog(window, cx, entity.clone(), Arc::clone(&item_title),
-                                             member_id, product_id);
-          }))
+    menu.item(
+        PopupMenuItem::new(t!("catalog.action_manage_collections")).on_click(
+            move |_, window, cx| {
+                open_manage_collections_dialog(
+                    window,
+                    cx,
+                    entity.clone(),
+                    Arc::clone(&item_title),
+                    member_id,
+                    product_id,
+                );
+            },
+        ),
+    )
 }
 
 // ── Grid layout
@@ -1888,49 +1903,51 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      let item_for_open = ctx_item.clone();
                      let tabs_for_open = ctx_tabs.clone();
                      let controller_for_open = ctx_entity.clone();
-                     menu.item(
-                    PopupMenuItem::new(t!("catalog.action_open")).on_click(move |_, _, cx| {
-                        open_item_or_focus_detail_tab(&open_path,
-                                                      &item_for_open,
-                                                      &tabs_for_open,
-                                                      &controller_for_open,
-                                                      cx);
-                    }),
-                )
-                .item(
-                    PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
-                        if !reveal_path.exists() {
-                            tracing::warn!(
-                                path = %reveal_path.display(),
-                                "reveal: file not found"
-                            );
-                            return;
-                        }
-                        if let Err(e) = reveal_in_file_manager(&reveal_path) {
-                            tracing::warn!("reveal_in_file_manager failed: {e}");
-                        }
-                    }),
-                )
-                .item(
-                    PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                     menu.item(PopupMenuItem::new(t!("catalog.action_open")).on_click(
                         move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                            open_item_or_focus_detail_tab(
+                                &open_path,
+                                &item_for_open,
+                                &tabs_for_open,
+                                &controller_for_open,
+                                cx,
+                            );
                         },
-                    ),
-                )
+                    ))
+                    .item(
+                        PopupMenuItem::new(platform_reveal_label()).on_click(move |_, _, _| {
+                            if !reveal_path.exists() {
+                                tracing::warn!(
+                                    path = %reveal_path.display(),
+                                    "reveal: file not found"
+                                );
+                                return;
+                            }
+                            if let Err(e) = reveal_in_file_manager(&reveal_path) {
+                                tracing::warn!("reveal_in_file_manager failed: {e}");
+                            }
+                        }),
+                    )
+                    .item(
+                        PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
+                            move |_, _, cx| {
+                                entity_remove
+                                    .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                            },
+                        ),
+                    )
                  }
                  ItemStatus::Cloud => {
                      let dl_id = Arc::clone(&ctx_id);
                      let dl_title = ctx_item.title.to_string();
                      let entity_dl = ctx_entity.clone();
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
-                    move |_, _, cx| {
-                        entity_dl.update(cx, |ctrl, cx| {
-                            ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
-                        });
-                    },
-                ))
+                        move |_, _, cx| {
+                            entity_dl.update(cx, |ctrl, cx| {
+                                ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                            });
+                        },
+                    ))
                  }
              };
              append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)

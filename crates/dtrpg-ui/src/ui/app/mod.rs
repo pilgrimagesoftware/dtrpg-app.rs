@@ -97,24 +97,25 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(None);
     let collections_service = (cx.global::<CollectionsServiceFactory>().0)(None);
     let mut library_view = None;
-    let window = cx.open_window(
-        WindowOptions {
-            titlebar: Some(TitlebarOptions {
-                title: Some(t!("sidebar.app_name").to_string().into()),
-                appears_transparent: true,
+    let window = cx
+        .open_window(
+            WindowOptions {
+                titlebar: Some(TitlebarOptions {
+                    title: Some(t!("sidebar.app_name").to_string().into()),
+                    appears_transparent: true,
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        },
-        |window, cx| {
-            let view = cx.new(|cx| {
-                LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
-            });
-            library_view = Some(view.clone());
-            cx.new(|cx| Root::new(view, window, cx).bordered(false))
-        },
-    )
-    .expect("failed to open library window");
+            },
+            |window, cx| {
+                let view = cx.new(|cx| {
+                    LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
+                });
+                library_view = Some(view.clone());
+                cx.new(|cx| Root::new(view, window, cx).bordered(false))
+            },
+        )
+        .expect("failed to open library window");
     if let Some(view) = library_view {
         cx.set_global(LibraryWindowHandle { view, window });
     }
@@ -147,10 +148,16 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
             // disable the minimize and zoom buttons, leaving only close —
             // resizing is no longer needed now that the panel content
             // scrolls (see `settings_view::render_settings_panel`).
-            titlebar: Some(TitlebarOptions { appears_transparent: true, ..Default::default() }),
+            titlebar: Some(TitlebarOptions {
+                appears_transparent: true,
+                ..Default::default()
+            }),
             window_bounds: Some(WindowBounds::Windowed(Bounds {
                 origin: Point::default(),
-                size:   Size { width: px(720.), height: px(520.) },
+                size: Size {
+                    width: px(720.),
+                    height: px(520.),
+                },
             })),
             is_resizable: false,
             is_minimizable: false,
@@ -158,12 +165,12 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
         },
         move |window, cx| {
             window.on_window_should_close(cx, move |_window, cx| {
-                      settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
-                      true
-                  });
+                settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
+                true
+            });
             let view = cx.new(|cx| {
-                            SettingsWindowView::new(window, cx, settings, file_opener_extension_input)
-                        });
+                SettingsWindowView::new(window, cx, settings, file_opener_extension_input)
+            });
             cx.new(|cx| Root::new(view, window, cx).bordered(false))
         },
     )
@@ -436,43 +443,63 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                 Menu::new(t!("menu.window_select_tab_title").to_string()).items([
                     {
                         let (label, enabled, checked) = tab_label(0);
-                        MenuItem::action(label, SelectTab0).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab0)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(1);
-                        MenuItem::action(label, SelectTab1).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab1)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(2);
-                        MenuItem::action(label, SelectTab2).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab2)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(3);
-                        MenuItem::action(label, SelectTab3).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab3)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(4);
-                        MenuItem::action(label, SelectTab4).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab4)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(5);
-                        MenuItem::action(label, SelectTab5).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab5)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(6);
-                        MenuItem::action(label, SelectTab6).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab6)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(7);
-                        MenuItem::action(label, SelectTab7).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab7)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(8);
-                        MenuItem::action(label, SelectTab8).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab8)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                     {
                         let (label, enabled, checked) = tab_label(9);
-                        MenuItem::action(label, SelectTab9).disabled(!enabled).checked(checked)
+                        MenuItem::action(label, SelectTab9)
+                            .disabled(!enabled)
+                            .checked(checked)
                     },
                 ]),
             ),

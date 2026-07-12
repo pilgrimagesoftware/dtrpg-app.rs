@@ -290,7 +290,7 @@ mod tests {
                                         "",
                                         None);
         item.files = vec![file("1234", "Moria Rulebook"),
-                          file("1234", "Moria Rulebook")];
+                          file("1234", "Moria Rulebook"),];
 
         item.dedupe_files();
 
@@ -415,7 +415,7 @@ mod tests {
                                         "",
                                         None);
         item.files = vec![file("1234", "Moria Rulebook"),
-                          file("1235", "Moria Map Sheet")];
+                          file("1235", "Moria Map Sheet"),];
 
         item.dedupe_files();
 
@@ -445,7 +445,7 @@ mod tests {
                                         "",
                                         None);
         item.files = vec![file("1234", "Moria Rulebook"),
-                          file("1234", "Moria Map Sheet")];
+                          file("1234", "Moria Map Sheet"),];
 
         item.dedupe_files();
 

@@ -114,46 +114,53 @@ fn render_pending_row(app_path: &std::path::Path, extension_input: Entity<InputS
 
     let entity_cancel = entity.clone();
 
-    div().id("file-opener-pending-row")
-         .flex()
-         .items_center()
-         .gap(px(12.0))
-         .py(px(8.0))
-         .border_b_1()
-         .border_color(border)
-         .on_key_down(move |event, _window, cx| {
-             if event.keystroke.key == "escape" {
-                 cx.stop_propagation();
-                 entity_cancel.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
-             }
-         })
-         // ── Extension input ───────────────────────────────────────────────
-         .child(div().w(px(90.0)).child(Input::new(&extension_input)))
-         // ── App name ──────────────────────────────────────────────────────
-         .child(div().flex_1().min_w_0().child(
-             selectable_text("file-opener-pending-app-name", app_name).text_sm()
-                                                                       .text_color(text_secondary)
-                                                                       .truncate(),
-         ))
-         // ── Cancel button ─────────────────────────────────────────────────
-         .child(div().id("cancel-pending-file-opener")
-                     .size(px(28.0))
-                     .rounded(px(6.0))
-                     .border_1()
-                     .border_color(border)
-                     .flex()
-                     .items_center()
-                     .justify_center()
-                     .cursor_pointer()
-                     .tooltip(|window, cx| {
-                         Tooltip::new(t!("settings.file_opener_add_cancel").to_string())
+    div()
+        .id("file-opener-pending-row")
+        .flex()
+        .items_center()
+        .gap(px(12.0))
+        .py(px(8.0))
+        .border_b_1()
+        .border_color(border)
+        .on_key_down(move |event, _window, cx| {
+            if event.keystroke.key == "escape" {
+                cx.stop_propagation();
+                entity_cancel.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
+            }
+        })
+        // ── Extension input ───────────────────────────────────────────────
+        .child(div().w(px(90.0)).child(Input::new(&extension_input)))
+        // ── App name ──────────────────────────────────────────────────────
+        .child(
+            div().flex_1().min_w_0().child(
+                selectable_text("file-opener-pending-app-name", app_name)
+                    .text_sm()
+                    .text_color(text_secondary)
+                    .truncate(),
+            ),
+        )
+        // ── Cancel button ─────────────────────────────────────────────────
+        .child(
+            div()
+                .id("cancel-pending-file-opener")
+                .size(px(28.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(border)
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("settings.file_opener_add_cancel").to_string())
                         .build(window, cx)
-                     })
-                     .on_click(move |_, _, cx| {
-                         entity.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
-                     })
-                     .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")))
-         .into_any_element()
+                })
+                .on_click(move |_, _, cx| {
+                    entity.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
+                })
+                .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")),
+        )
+        .into_any_element()
 }
 
 // ── Entry row
@@ -174,62 +181,73 @@ fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<Sett
     let entity_remove = entity.clone();
     let extension_for_remove = extension.clone();
 
-    div().id(format!("file-opener-row-{extension}"))
-         .flex()
-         .items_center()
-         .gap(px(12.0))
-         .py(px(8.0))
-         .border_b_1()
-         .border_color(border)
-         // ── Extension badge ───────────────────────────────────────────────
-         .child(div().px(px(8.0))
-                     .py(px(3.0))
-                     .rounded(px(6.0))
-                     .border_1()
-                     .border_color(border)
-                     .text_xs()
-                     .font_weight(gpui::FontWeight::MEDIUM)
-                     .text_color(text_primary)
-                     .child(ext_label))
-         // ── App name ──────────────────────────────────────────────────────
-         .child(div().flex_1()
-                     .min_w_0()
-                     .flex()
-                     .items_center()
-                     .gap(px(6.0))
-                     .child(
-                         selectable_text(format!("file-opener-app-name-{extension}"), app_name)
-                             .text_sm()
-                             .text_color(text_secondary)
-                             .truncate(),
-                     )
-                     .when(is_stale, |el| {
-                         el.child(div().text_xs()
-                                       .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0)) // amber warning
-                                       .child(format!("⚠ {}",
-                                                      t!("settings.file_opener_app_not_found"))))
-                     }))
-         // ── Remove button ─────────────────────────────────────────────────
-         .child(div().id(format!("remove-opener-{extension}"))
-                     .size(px(28.0))
-                     .rounded(px(6.0))
-                     .border_1()
-                     .border_color(border)
-                     .flex()
-                     .items_center()
-                     .justify_center()
-                     .cursor_pointer()
-                     .tooltip(|window, cx| {
-                         Tooltip::new(t!("settings.file_opener_remove_tooltip").to_string())
+    div()
+        .id(format!("file-opener-row-{extension}"))
+        .flex()
+        .items_center()
+        .gap(px(12.0))
+        .py(px(8.0))
+        .border_b_1()
+        .border_color(border)
+        // ── Extension badge ───────────────────────────────────────────────
+        .child(
+            div()
+                .px(px(8.0))
+                .py(px(3.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(border)
+                .text_xs()
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .text_color(text_primary)
+                .child(ext_label),
+        )
+        // ── App name ──────────────────────────────────────────────────────
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .child(
+                    selectable_text(format!("file-opener-app-name-{extension}"), app_name)
+                        .text_sm()
+                        .text_color(text_secondary)
+                        .truncate(),
+                )
+                .when(is_stale, |el| {
+                    el.child(
+                        div()
+                            .text_xs()
+                            .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0)) // amber warning
+                            .child(format!("⚠ {}", t!("settings.file_opener_app_not_found"))),
+                    )
+                }),
+        )
+        // ── Remove button ─────────────────────────────────────────────────
+        .child(
+            div()
+                .id(format!("remove-opener-{extension}"))
+                .size(px(28.0))
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(border)
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("settings.file_opener_remove_tooltip").to_string())
                         .build(window, cx)
-                     })
-                     .on_click(move |_, window, cx| {
-                         let ext = extension_for_remove.clone();
-                         let entity = entity_remove.clone();
-                         window.open_alert_dialog(cx, move |alert, _, _| {
-                                   let ext2 = ext.clone();
-                                   let entity2 = entity.clone();
-                                   alert
+                })
+                .on_click(move |_, window, cx| {
+                    let ext = extension_for_remove.clone();
+                    let entity = entity_remove.clone();
+                    window.open_alert_dialog(cx, move |alert, _, _| {
+                        let ext2 = ext.clone();
+                        let entity2 = entity.clone();
+                        alert
                             .confirm()
                             .title(
                                 t!("settings.file_opener_remove_confirm_title", ext = ext)
@@ -244,10 +262,11 @@ fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<Sett
                                 });
                                 true
                             })
-                               });
-                     })
-                     .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")))
-         .into_any_element()
+                    });
+                })
+                .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")),
+        )
+        .into_any_element()
 }
 
 // ── Add button

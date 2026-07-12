@@ -552,11 +552,12 @@ impl LibraryController {
     fn start_periodic_check_batch_timer(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
               loop {
-                  async_cx.background_executor()
-                          .timer(std::time::Duration::from_secs(
-                              crate::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
-                          ))
-                          .await;
+                  async_cx
+                    .background_executor()
+                    .timer(std::time::Duration::from_secs(
+                        crate::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
+                    ))
+                    .await;
                   let alive = this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
                                   .is_ok();
                   if !alive {
@@ -2466,11 +2467,11 @@ impl LibraryController {
                         .find(|i| i.id == item_id)
                         .and_then(|item| {
                             item.files.get(index as usize).map(|file| {
-                                let dest = crate::data::storage::StorageConfig::load()
-                                    .path_for_publisher(&item.publisher)
-                                    .join(file.name.as_ref());
-                                (item.order_product_id, file.name.to_string(), dest)
-                            })
+                    let dest = crate::data::storage::StorageConfig::load()
+                        .path_for_publisher(&item.publisher)
+                        .join(file.name.as_ref());
+                    (item.order_product_id, file.name.to_string(), dest)
+                })
                         });
 
         let label = match &found {

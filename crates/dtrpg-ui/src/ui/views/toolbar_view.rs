@@ -235,38 +235,38 @@ fn render_layout_switcher(current: CatalogPresentation, entity: Entity<LibraryCo
         CatalogPresentation::Thumbs => 1,
         CatalogPresentation::Grid => 2,
     };
-    TabBar::new("layout-switcher").segmented()
-                                  .selected_index(selected)
-                                  .child(Tab::new()
-                                             .icon(Icon::empty().path("icons/list.svg"))
-                                             .tooltip(|window, cx| {
-                                                 Tooltip::new(t!("toolbar.view_list")
-                                                     .to_string())
-                                                     .build(window, cx)
-                                             }))
-                                  .child(Tab::new()
-                                             .icon(Icon::empty()
-                                                       .path("icons/gallery-thumbnails.svg"))
-                                             .tooltip(|window, cx| {
-                                                 Tooltip::new(t!("toolbar.view_thumbs")
-                                                     .to_string())
-                                                     .build(window, cx)
-                                             }))
-                                  .child(Tab::new()
-                                             .icon(Icon::empty().path("icons/layout-grid.svg"))
-                                             .tooltip(|window, cx| {
-                                                 Tooltip::new(t!("toolbar.view_grid")
-                                                     .to_string())
-                                                     .build(window, cx)
-                                             }))
-                                  .on_click(move |ix, _, cx| {
-                                      let mode = match ix {
-                                          0 => CatalogPresentation::List,
-                                          1 => CatalogPresentation::Thumbs,
-                                          _ => CatalogPresentation::Grid,
-                                      };
-                                      entity.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
-                                  })
+    TabBar::new("layout-switcher")
+        .segmented()
+        .selected_index(selected)
+        .child(
+            Tab::new()
+                .icon(Icon::empty().path("icons/list.svg"))
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("toolbar.view_list").to_string()).build(window, cx)
+                }),
+        )
+        .child(
+            Tab::new()
+                .icon(Icon::empty().path("icons/gallery-thumbnails.svg"))
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("toolbar.view_thumbs").to_string()).build(window, cx)
+                }),
+        )
+        .child(
+            Tab::new()
+                .icon(Icon::empty().path("icons/layout-grid.svg"))
+                .tooltip(|window, cx| {
+                    Tooltip::new(t!("toolbar.view_grid").to_string()).build(window, cx)
+                }),
+        )
+        .on_click(move |ix, _, cx| {
+            let mode = match ix {
+                0 => CatalogPresentation::List,
+                1 => CatalogPresentation::Thumbs,
+                _ => CatalogPresentation::Grid,
+            };
+            entity.update(cx, |ctrl, cx| ctrl.set_presentation(mode, cx));
+        })
 }
 
 #[cfg(test)]
