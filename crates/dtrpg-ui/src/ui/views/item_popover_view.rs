@@ -15,6 +15,7 @@ use gpui::{
     deferred, div, px,
 };
 use gpui_component::Disableable;
+use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::tooltip::Tooltip;
@@ -183,15 +184,36 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         } else {
                             t!("catalog.action_download")
                         })
-                        .on_click(move |_, _, cx| {
+                        .on_click(move |_, window, cx| {
                             let id = Arc::clone(&item_id);
-                            entity_download.update(cx, |ctrl, cx| {
-                                if is_downloaded {
-                                    ctrl.remove_download(&id, cx);
-                                } else {
+                            if is_downloaded {
+                                let entity_download = entity_download.clone();
+                                let remove_title = item_title_for_download.clone();
+                                window.open_alert_dialog(cx, move |alert, _, _| {
+                                    let entity_download = entity_download.clone();
+                                    let id = Arc::clone(&id);
+                                    alert
+                                        .confirm()
+                                        .title(t!("catalog.remove_download_confirm_title",
+                                                   title = remove_title.clone())
+                                            .to_string())
+                                        .description(
+                                            t!("catalog.remove_download_confirm_description")
+                                                .to_string(),
+                                        )
+                                        .on_ok(move |_, _window, cx| {
+                                            entity_download.update(cx, |ctrl, cx| {
+                                                              ctrl.remove_download(&id, cx)
+                                                          });
+                                            true
+                                        })
+                                });
+                            }
+                            else {
+                                entity_download.update(cx, |ctrl, cx| {
                                     ctrl.enqueue_download(&id, item_title_for_download.clone(), cx);
-                                }
-                            });
+                                });
+                            }
                         }),
                 )
                 .child(

@@ -11,6 +11,7 @@ use gpui::{
     StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
 use gpui_component::ElementExt;
+use gpui_component::WindowExt as _;
 use gpui_component::badge::Badge;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
@@ -545,14 +546,33 @@ impl TableDelegate for CatalogListDelegate {
                         }
                     }),
                 )
-                .item(
+                .item({
+                    let title_for_remove = title.clone();
                     PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
-                        move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                        move |_, window, cx| {
+                            let entity_remove = entity_remove.clone();
+                            let remove_id = Arc::clone(&remove_id);
+                            let title_for_remove = title_for_remove.clone();
+                            window.open_alert_dialog(cx, move |alert, _, _| {
+                                let entity_remove = entity_remove.clone();
+                                let remove_id = Arc::clone(&remove_id);
+                                alert
+                                    .confirm()
+                                    .title(t!("catalog.remove_download_confirm_title",
+                                               title = title_for_remove.clone())
+                                        .to_string())
+                                    .description(t!("catalog.remove_download_confirm_description")
+                                        .to_string())
+                                    .on_ok(move |_, _window, cx| {
+                                        entity_remove.update(cx, |ctrl, cx| {
+                                                          ctrl.remove_download(&remove_id, cx)
+                                                      });
+                                        true
+                                    })
+                            });
                         },
-                    ),
-                )
+                    )
+                })
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
@@ -702,14 +722,33 @@ impl TableDelegate for GroupedCatalogListDelegate {
                         }
                     }),
                 )
-                .item(
+                .item({
+                    let title_for_remove = title.clone();
                     PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
-                        move |_, _, cx| {
-                            entity_remove
-                                .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                        move |_, window, cx| {
+                            let entity_remove = entity_remove.clone();
+                            let remove_id = Arc::clone(&remove_id);
+                            let title_for_remove = title_for_remove.clone();
+                            window.open_alert_dialog(cx, move |alert, _, _| {
+                                let entity_remove = entity_remove.clone();
+                                let remove_id = Arc::clone(&remove_id);
+                                alert
+                                    .confirm()
+                                    .title(t!("catalog.remove_download_confirm_title",
+                                               title = title_for_remove.clone())
+                                        .to_string())
+                                    .description(t!("catalog.remove_download_confirm_description")
+                                        .to_string())
+                                    .on_ok(move |_, _window, cx| {
+                                        entity_remove.update(cx, |ctrl, cx| {
+                                                          ctrl.remove_download(&remove_id, cx)
+                                                      });
+                                        true
+                                    })
+                            });
                         },
-                    ),
-                )
+                    )
+                })
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
@@ -1651,14 +1690,35 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                             }
                         }),
                     )
-                    .item(
+                    .item({
+                        let remove_title = ctx_item.title.to_string();
                         PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
-                            move |_, _, cx| {
-                                entity_remove
-                                    .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                            move |_, window, cx| {
+                                let entity_remove = entity_remove.clone();
+                                let remove_id = Arc::clone(&remove_id);
+                                let remove_title = remove_title.clone();
+                                window.open_alert_dialog(cx, move |alert, _, _| {
+                                    let entity_remove = entity_remove.clone();
+                                    let remove_id = Arc::clone(&remove_id);
+                                    alert
+                                        .confirm()
+                                        .title(t!("catalog.remove_download_confirm_title",
+                                                   title = remove_title.clone())
+                                            .to_string())
+                                        .description(
+                                            t!("catalog.remove_download_confirm_description")
+                                                .to_string(),
+                                        )
+                                        .on_ok(move |_, _window, cx| {
+                                            entity_remove.update(cx, |ctrl, cx| {
+                                                              ctrl.remove_download(&remove_id, cx)
+                                                          });
+                                            true
+                                        })
+                                });
                             },
-                        ),
-                    )
+                        )
+                    })
                  }
                  ItemStatus::Cloud => {
                      let dl_id = Arc::clone(&ctx_id);
@@ -1928,14 +1988,35 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                             }
                         }),
                     )
-                    .item(
+                    .item({
+                        let remove_title = ctx_item.title.to_string();
                         PopupMenuItem::new(t!("catalog.action_remove_download")).on_click(
-                            move |_, _, cx| {
-                                entity_remove
-                                    .update(cx, |ctrl, cx| ctrl.remove_download(&remove_id, cx));
+                            move |_, window, cx| {
+                                let entity_remove = entity_remove.clone();
+                                let remove_id = Arc::clone(&remove_id);
+                                let remove_title = remove_title.clone();
+                                window.open_alert_dialog(cx, move |alert, _, _| {
+                                    let entity_remove = entity_remove.clone();
+                                    let remove_id = Arc::clone(&remove_id);
+                                    alert
+                                        .confirm()
+                                        .title(t!("catalog.remove_download_confirm_title",
+                                                   title = remove_title.clone())
+                                            .to_string())
+                                        .description(
+                                            t!("catalog.remove_download_confirm_description")
+                                                .to_string(),
+                                        )
+                                        .on_ok(move |_, _window, cx| {
+                                            entity_remove.update(cx, |ctrl, cx| {
+                                                              ctrl.remove_download(&remove_id, cx)
+                                                          });
+                                            true
+                                        })
+                                });
                             },
-                        ),
-                    )
+                        )
+                    })
                  }
                  ItemStatus::Cloud => {
                      let dl_id = Arc::clone(&ctx_id);
