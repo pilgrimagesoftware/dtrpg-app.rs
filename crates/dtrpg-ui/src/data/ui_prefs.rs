@@ -24,12 +24,17 @@ pub struct UiPrefsFile {
     /// lowercased). `None` before this preference existed, or if never
     /// changed from the default.
     pub theme_key:        Option<String>,
-    /// Persisted `FontOption::id` of the active body font.
-    pub body_font_id:     Option<String>,
-    /// Persisted `FontOption::id` of the active value font.
-    pub value_font_id:    Option<String>,
-    /// Persisted `FontOption::id` of the active monospace font.
-    pub mono_font_id:     Option<String>,
+    /// Persisted font family name of the active body font. Any font
+    /// installed on the user's system is valid, not a curated list.
+    pub body_font_name:   Option<String>,
+    /// Persisted font family name of the active value font.
+    pub value_font_name:  Option<String>,
+    /// Persisted font family name of the active label font.
+    pub label_font_name:  Option<String>,
+    /// Persisted font family name of the active monospace font.
+    pub mono_font_name:   Option<String>,
+    /// Persisted shared UI text size, in pixels/points.
+    pub ui_text_size:     Option<f32>,
 }
 
 /// Persists and restores small UI preferences.
@@ -118,39 +123,62 @@ impl UiPrefs {
         self.flush();
     }
 
-    /// Persisted `FontOption::id` of the active body font, or `None` if never
+    /// Persisted font family name of the active body font, or `None` if never
     /// saved.
-    pub fn body_font_id(&self) -> Option<&str> {
-        self.data.body_font_id.as_deref()
+    pub fn body_font_name(&self) -> Option<&str> {
+        self.data.body_font_name.as_deref()
     }
 
-    /// Persist the active body font's `FontOption::id`.
-    pub fn save_body_font_id(&mut self, id: &str) {
-        self.data.body_font_id = Some(id.to_string());
+    /// Persist the active body font's family name.
+    pub fn save_body_font_name(&mut self, name: &str) {
+        self.data.body_font_name = Some(name.to_string());
         self.flush();
     }
 
-    /// Persisted `FontOption::id` of the active value font, or `None` if never
-    /// saved.
-    pub fn value_font_id(&self) -> Option<&str> {
-        self.data.value_font_id.as_deref()
-    }
-
-    /// Persist the active value font's `FontOption::id`.
-    pub fn save_value_font_id(&mut self, id: &str) {
-        self.data.value_font_id = Some(id.to_string());
-        self.flush();
-    }
-
-    /// Persisted `FontOption::id` of the active monospace font, or `None` if
+    /// Persisted font family name of the active value font, or `None` if
     /// never saved.
-    pub fn mono_font_id(&self) -> Option<&str> {
-        self.data.mono_font_id.as_deref()
+    pub fn value_font_name(&self) -> Option<&str> {
+        self.data.value_font_name.as_deref()
     }
 
-    /// Persist the active monospace font's `FontOption::id`.
-    pub fn save_mono_font_id(&mut self, id: &str) {
-        self.data.mono_font_id = Some(id.to_string());
+    /// Persist the active value font's family name.
+    pub fn save_value_font_name(&mut self, name: &str) {
+        self.data.value_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted font family name of the active label font, or `None` if
+    /// never saved.
+    pub fn label_font_name(&self) -> Option<&str> {
+        self.data.label_font_name.as_deref()
+    }
+
+    /// Persist the active label font's family name.
+    pub fn save_label_font_name(&mut self, name: &str) {
+        self.data.label_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted font family name of the active monospace font, or `None` if
+    /// never saved.
+    pub fn mono_font_name(&self) -> Option<&str> {
+        self.data.mono_font_name.as_deref()
+    }
+
+    /// Persist the active monospace font's family name.
+    pub fn save_mono_font_name(&mut self, name: &str) {
+        self.data.mono_font_name = Some(name.to_string());
+        self.flush();
+    }
+
+    /// Persisted shared UI text size, or `None` if never saved.
+    pub fn ui_text_size(&self) -> Option<f32> {
+        self.data.ui_text_size
+    }
+
+    /// Persist the shared UI text size.
+    pub fn save_ui_text_size(&mut self, size: f32) {
+        self.data.ui_text_size = Some(size);
         self.flush();
     }
 

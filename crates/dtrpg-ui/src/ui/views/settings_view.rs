@@ -28,14 +28,14 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
     settings_advanced_view::{render_about_section, render_advanced_section},
-    settings_appearance_view::render_appearance_section,
+    settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
 
-/// Number of settings pages (Account, Downloads Location, File Openers,
-/// Advanced, Appearance, About); see [`page_title`] and the `match` in
-/// [`render_settings_panel`].
+/// Number of settings pages (Account, Appearance, Downloads Location, File
+/// Openers, Advanced, About); see [`page_title`] and the `match` in
+/// [`render_settings_panel`]. Sidebar order matches index order.
 const PAGE_COUNT: usize = 6;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
@@ -43,11 +43,11 @@ const PAGE_COUNT: usize = 6;
 /// version with fewer pages).
 fn page_title(ix: usize) -> String {
     match ix {
-        1 => t!("settings.downloads_location").to_string(),
-        2 => t!("settings.file_openers_title").to_string(),
-        3 => t!("settings.advanced_title").to_string(),
-        4 => t!("settings.about_title").to_string(),
-        5 => t!("settings.appearance_title").to_string(),
+        1 => t!("settings.appearance_title").to_string(),
+        2 => t!("settings.downloads_location").to_string(),
+        3 => t!("settings.file_openers_title").to_string(),
+        4 => t!("settings.advanced_title").to_string(),
+        5 => t!("settings.about_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -72,7 +72,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
-                             cache_counts: CacheCounts, max_concurrent_downloads: usize)
+                             cache_counts: CacheCounts, max_concurrent_downloads: usize,
+                             font_selects: AppearanceFontSelects)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -99,23 +100,23 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                   .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
-        1 => render_storage_section(storage_root_path,
+        1 => render_appearance_section(library, colors, theme, font_selects).into_any_element(),
+        2 => render_storage_section(storage_root_path,
                                     storage_path_exists,
                                     entity.clone(),
                                     colors,
                                     storage_path_input,
                                     max_concurrent_downloads).into_any_element(),
-        2 => render_file_openers_section(file_openers,
+        3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        3 => render_advanced_section(entity.clone(),
+        4 => render_advanced_section(entity.clone(),
                                      cache_counts,
                                      colors,
-                                     theme.value_font.family).into_any_element(),
-        4 => render_about_section(colors).into_any_element(),
-        5 => render_appearance_section(library, colors, theme).into_any_element(),
+                                     &theme.fonts.value_font).into_any_element(),
+        5 => render_about_section(colors).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),
                                     colors,
@@ -124,7 +125,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     sign_in_in_progress,
                                     sign_in_enabled,
                                     sign_in_error,
-                                    theme.mono_font.family),
+                                    &theme.fonts.mono_font),
     };
 
     // Reserves vertical clearance for the macOS traffic light buttons, which

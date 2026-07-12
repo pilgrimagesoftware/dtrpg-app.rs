@@ -120,169 +120,74 @@ pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
 /// Gap between the item popover and the catalog entry it's anchored beside.
 pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
 
-/// One user-selectable choice within a font role's curated list (body, value,
-/// or monospace). Selections are persisted by `id` — stable across platforms
-/// and releases — rather than by `family`, so a preference saved on one
-/// platform degrades gracefully (falls back to the role's default) if the
-/// prefs file is ever read on another, instead of requesting a font name that
-/// doesn't exist there.
-#[derive(Debug, Clone, Copy)]
-pub struct FontOption {
-    /// Persisted, platform-stable identifier.
-    pub id:        &'static str,
-    /// i18n key for the picker's display label.
-    pub label_key: &'static str,
-    /// Actual platform font family name passed to `.font_family()`.
-    pub family:    &'static str,
-}
-
-/// Curated body-font choices, serif-leaning to complement the app's default
-/// old-style body text.
+/// Default body-font family, serif-leaning to match the app's old-style body
+/// text. Only a starting point — the Appearance settings page lets the user
+/// pick any font actually installed on their system (see
+/// `cx.text_system().all_font_names()`), not just this default.
 #[cfg(target_os = "macos")]
-pub const BODY_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "hoefler-text",
-                                                            label_key: "settings.font_body_hoefler_text",
-                                                            family:    "Hoefler Text", },
-                                               FontOption { id:        "georgia",
-                                                            label_key: "settings.font_body_georgia",
-                                                            family:    "Georgia", },
-                                               FontOption { id:        "palatino",
-                                                            label_key: "settings.font_body_palatino",
-                                                            family:    "Palatino", },
-                                               FontOption { id:        "new-york",
-                                                            label_key: "settings.font_body_new_york",
-                                                            family:    "New York", }];
-/// Curated body-font choices, serif-leaning to complement the app's default
-/// old-style body text.
+pub const DEFAULT_BODY_FONT: &str = "Hoefler Text";
+/// Default body-font family, serif-leaning to match the app's old-style body
+/// text.
 #[cfg(target_os = "windows")]
-pub const BODY_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "hoefler-text",
-                                                            label_key: "settings.font_body_hoefler_text",
-                                                            family:    "Georgia", },
-                                               FontOption { id:        "georgia",
-                                                            label_key: "settings.font_body_georgia",
-                                                            family:    "Georgia", },
-                                               FontOption { id:        "palatino",
-                                                            label_key: "settings.font_body_palatino",
-                                                            family:    "Book Antiqua", },
-                                               FontOption { id:        "new-york",
-                                                            label_key: "settings.font_body_new_york",
-                                                            family:    "Cambria", }];
-/// Curated body-font choices, serif-leaning to complement the app's default
-/// old-style body text.
+pub const DEFAULT_BODY_FONT: &str = "Georgia";
+/// Default body-font family, serif-leaning to match the app's old-style body
+/// text.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub const BODY_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "hoefler-text",
-                                                            label_key: "settings.font_body_hoefler_text",
-                                                            family:    "Liberation Serif", },
-                                               FontOption { id:        "georgia",
-                                                            label_key: "settings.font_body_georgia",
-                                                            family:    "Liberation Serif", },
-                                               FontOption { id:        "palatino",
-                                                            label_key: "settings.font_body_palatino",
-                                                            family:    "DejaVu Serif", },
-                                               FontOption { id:        "new-york",
-                                                            label_key: "settings.font_body_new_york",
-                                                            family:    "Noto Serif", }];
+pub const DEFAULT_BODY_FONT: &str = "Liberation Serif";
 
-/// Curated value-font choices, sans-serif, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the app's
-/// default serif body font.
+/// Default value-font family, sans-serif, used to visually distinguish data
+/// values (e.g. Advanced settings' "Cache details" rows) from the default
+/// serif body font.
 #[cfg(target_os = "macos")]
-pub const VALUE_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "gotham",
-                                                             label_key: "settings.font_value_gotham",
-                                                             family:    "Gotham", },
-                                                FontOption { id:        "helvetica-neue",
-                                                             label_key: "settings.font_value_helvetica_neue",
-                                                             family:    "Helvetica Neue", },
-                                                FontOption { id:        "avenir",
-                                                             label_key: "settings.font_value_avenir",
-                                                             family:    "Avenir", },
-                                                FontOption { id:        "verdana",
-                                                             label_key: "settings.font_value_verdana",
-                                                             family:    "Verdana", }];
-/// Curated value-font choices, sans-serif, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the app's
-/// default serif body font.
+pub const DEFAULT_VALUE_FONT: &str = "Gotham";
+/// Default value-font family, sans-serif, used to visually distinguish data
+/// values from the default serif body font.
 #[cfg(target_os = "windows")]
-pub const VALUE_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "gotham",
-                                                             label_key: "settings.font_value_gotham",
-                                                             family:    "Segoe UI", },
-                                                FontOption { id:        "helvetica-neue",
-                                                             label_key: "settings.font_value_helvetica_neue",
-                                                             family:    "Segoe UI", },
-                                                FontOption { id:        "avenir",
-                                                             label_key: "settings.font_value_avenir",
-                                                             family:    "Calibri", },
-                                                FontOption { id:        "verdana",
-                                                             label_key: "settings.font_value_verdana",
-                                                             family:    "Verdana", }];
-/// Curated value-font choices, sans-serif, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the app's
-/// default serif body font.
+pub const DEFAULT_VALUE_FONT: &str = "Segoe UI";
+/// Default value-font family, sans-serif, used to visually distinguish data
+/// values from the default serif body font.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub const VALUE_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "gotham",
-                                                             label_key: "settings.font_value_gotham",
-                                                             family:    "DejaVu Sans", },
-                                                FontOption { id:        "helvetica-neue",
-                                                             label_key: "settings.font_value_helvetica_neue",
-                                                             family:    "DejaVu Sans", },
-                                                FontOption { id:        "avenir",
-                                                             label_key: "settings.font_value_avenir",
-                                                             family:    "Noto Sans", },
-                                                FontOption { id:        "verdana",
-                                                             label_key: "settings.font_value_verdana",
-                                                             family:    "Verdana", }];
+pub const DEFAULT_VALUE_FONT: &str = "DejaVu Sans";
 
-/// Curated monospace-font choices, used for fixed-width data such as the
+/// Default label-font family, sans-serif, used to visually distinguish
+/// field/row labels (e.g. the detail tab's metadata labels) from the default
+/// serif body font.
+#[cfg(target_os = "macos")]
+pub const DEFAULT_LABEL_FONT: &str = "Gotham";
+/// Default label-font family, sans-serif, used to visually distinguish
+/// field/row labels from the default serif body font.
+#[cfg(target_os = "windows")]
+pub const DEFAULT_LABEL_FONT: &str = "Segoe UI";
+/// Default label-font family, sans-serif, used to visually distinguish
+/// field/row labels from the default serif body font.
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub const DEFAULT_LABEL_FONT: &str = "DejaVu Sans";
+
+/// Default monospace-font family, used for fixed-width data such as the
 /// masked API key hint.
 #[cfg(target_os = "macos")]
-pub const MONO_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "menlo",
-                                                            label_key: "settings.font_mono_menlo",
-                                                            family:    "Menlo", },
-                                               FontOption { id:        "sf-mono",
-                                                            label_key: "settings.font_mono_sf_mono",
-                                                            family:    "SF Mono", },
-                                               FontOption { id:        "monaco",
-                                                            label_key: "settings.font_mono_monaco",
-                                                            family:    "Monaco", },
-                                               FontOption { id:        "courier-new",
-                                                            label_key: "settings.font_mono_courier_new",
-                                                            family:    "Courier New", }];
-/// Curated monospace-font choices, used for fixed-width data such as the
+pub const DEFAULT_MONO_FONT: &str = "Menlo";
+/// Default monospace-font family, used for fixed-width data such as the
 /// masked API key hint.
 #[cfg(target_os = "windows")]
-pub const MONO_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "menlo",
-                                                            label_key: "settings.font_mono_menlo",
-                                                            family:    "Consolas", },
-                                               FontOption { id:        "sf-mono",
-                                                            label_key: "settings.font_mono_sf_mono",
-                                                            family:    "Cascadia Mono", },
-                                               FontOption { id:        "monaco",
-                                                            label_key: "settings.font_mono_monaco",
-                                                            family:    "Lucida Console", },
-                                               FontOption { id:        "courier-new",
-                                                            label_key: "settings.font_mono_courier_new",
-                                                            family:    "Courier New", }];
-/// Curated monospace-font choices, used for fixed-width data such as the
+pub const DEFAULT_MONO_FONT: &str = "Consolas";
+/// Default monospace-font family, used for fixed-width data such as the
 /// masked API key hint.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub const MONO_FONT_OPTIONS: &[FontOption] = &[FontOption { id:        "menlo",
-                                                            label_key: "settings.font_mono_menlo",
-                                                            family:    "Liberation Mono", },
-                                               FontOption { id:        "sf-mono",
-                                                            label_key: "settings.font_mono_sf_mono",
-                                                            family:    "Liberation Mono", },
-                                               FontOption { id:        "monaco",
-                                                            label_key: "settings.font_mono_monaco",
-                                                            family:    "DejaVu Sans Mono", },
-                                               FontOption { id:        "courier-new",
-                                                            label_key: "settings.font_mono_courier_new",
-                                                            family:    "Liberation Mono", }];
+pub const DEFAULT_MONO_FONT: &str = "Liberation Mono";
 
-/// Resolves a persisted font selection `id` against `options`, falling back
-/// to the first (default) option when `id` is `None` or does not match any
-/// entry — e.g. first launch, or a prefs file written before a role's option
-/// was added or after it was removed.
-#[must_use]
-pub fn resolve_font(options: &'static [FontOption], id: Option<&str>) -> &'static FontOption {
-    id.and_then(|id| options.iter().find(|opt| opt.id == id))
-      .unwrap_or(&options[0])
-}
+/// Default shared UI text size, in points/pixels — matches
+/// `gpui`'s and `gpui_component`'s own stock default so nothing visibly
+/// changes until the user adjusts it in Settings > Appearance.
+pub const DEFAULT_UI_TEXT_SIZE: f32 = 16.0;
+/// Minimum shared UI text size the Appearance page's stepper allows.
+pub const MIN_UI_TEXT_SIZE: f32 = 12.0;
+/// Maximum shared UI text size the Appearance page's stepper allows —
+/// generous enough to meaningfully help low-vision users without breaking
+/// layouts sized around the default.
+pub const MAX_UI_TEXT_SIZE: f32 = 28.0;
+/// Monospace text renders at this fraction of the shared UI text size,
+/// matching `gpui_component::Theme`'s stock 13px-on-16px default ratio, so
+/// code-like content (e.g. the masked API key hint) stays visually smaller
+/// than body text even as the shared size changes.
+pub const MONO_SIZE_RATIO: f32 = 13.0 / 16.0;

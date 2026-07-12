@@ -12,6 +12,7 @@ use gpui_component::input::InputState;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::LibriTheme;
+use crate::ui::views::settings_appearance_view::AppearanceFontSelects;
 use crate::ui::views::settings_view::render_settings_panel;
 
 /// Root view for the settings window.
@@ -65,10 +66,18 @@ impl Render for SettingsWindowView {
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
+        // Adjusting the shared rem size scales every `rems(...)`-based size
+        // utility (`.text_sm()`, `.text_xs()`, etc.) in this window, like
+        // zooming a page — see `LibraryController::set_ui_text_size`.
+        window.set_rem_size(theme.fonts.ui_text_size);
         let snap = self.settings.read(cx).snapshot();
         let sign_in_enabled = !snap.sign_in_in_progress
                               && !snap.email_draft.is_empty()
                               && !snap.password_draft.is_empty();
+        let font_selects = AppearanceFontSelects { body:  snap.body_font_select,
+                                                   value: snap.value_font_select,
+                                                   label: snap.label_font_select,
+                                                   mono:  snap.mono_font_select, };
 
         let panel = render_settings_panel(&snap.file_openers,
                                           snap.auth,
@@ -89,7 +98,8 @@ impl Render for SettingsWindowView {
                                           snap.pending_file_opener,
                                           snap.active_page_ix,
                                           snap.cache_counts,
-                                          snap.max_concurrent_downloads);
+                                          snap.max_concurrent_downloads,
+                                          font_selects);
 
         div().size_full()
              .child(panel)

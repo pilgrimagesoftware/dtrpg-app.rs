@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::{Context, Entity, EventEmitter};
+use gpui_component::combobox::ComboboxState;
 use gpui_component::input::InputState;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
@@ -19,6 +20,11 @@ use crate::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use crate::data::profile::ProfileConfig;
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
 use crate::services::LoginService;
+
+/// State for one Appearance-page font picker: a searchable list of every
+/// font name installed on the user's system (see
+/// `cx.text_system().all_font_names()`), not a curated list.
+pub type FontSelectState = Entity<ComboboxState<Vec<String>>>;
 
 /// Per-type counts of regenerable app cache data, computed on demand from
 /// disk — see [`SettingsController::cache_counts`].
@@ -119,6 +125,14 @@ pub struct SettingsSnapshot {
     pub cache_counts:             CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
     pub max_concurrent_downloads: usize,
+    /// Font picker state for the Appearance page's body-font row.
+    pub body_font_select:         Option<FontSelectState>,
+    /// Font picker state for the Appearance page's value-font row.
+    pub value_font_select:        Option<FontSelectState>,
+    /// Font picker state for the Appearance page's label-font row.
+    pub label_font_select:        Option<FontSelectState>,
+    /// Font picker state for the Appearance page's monospace-font row.
+    pub mono_font_select:         Option<FontSelectState>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -163,6 +177,18 @@ pub struct SettingsController {
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
     active_page_ix:      usize,
+    /// Font picker state for the Appearance page's body-font row; set by the
+    /// root view after creation.
+    body_font_select:    Option<FontSelectState>,
+    /// Font picker state for the Appearance page's value-font row; set by the
+    /// root view after creation.
+    value_font_select:   Option<FontSelectState>,
+    /// Font picker state for the Appearance page's label-font row; set by the
+    /// root view after creation.
+    label_font_select:   Option<FontSelectState>,
+    /// Font picker state for the Appearance page's monospace-font row; set by
+    /// the root view after creation.
+    mono_font_select:    Option<FontSelectState>,
 }
 
 impl SettingsController {
@@ -237,7 +263,11 @@ impl SettingsController {
                               pending_file_opener: None,
                               active_page_ix:
                                   crate::data::ui_prefs::UiPrefs::load().settings_page_ix()
-                                                                        .unwrap_or(0) };
+                                                                        .unwrap_or(0),
+                              body_font_select: None,
+                              value_font_select: None,
+                              label_font_select: None,
+                              mono_font_select: None };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
     }
@@ -255,6 +285,27 @@ impl SettingsController {
     /// Attaches the storage path input state entity created by the root view.
     pub fn set_storage_path_input(&mut self, input: Entity<InputState>) {
         self.storage_path_input = Some(input);
+    }
+
+    /// Attaches the body-font picker state entity created by the root view.
+    pub fn set_body_font_select(&mut self, state: FontSelectState) {
+        self.body_font_select = Some(state);
+    }
+
+    /// Attaches the value-font picker state entity created by the root view.
+    pub fn set_value_font_select(&mut self, state: FontSelectState) {
+        self.value_font_select = Some(state);
+    }
+
+    /// Attaches the label-font picker state entity created by the root view.
+    pub fn set_label_font_select(&mut self, state: FontSelectState) {
+        self.label_font_select = Some(state);
+    }
+
+    /// Attaches the monospace-font picker state entity created by the root
+    /// view.
+    pub fn set_mono_font_select(&mut self, state: FontSelectState) {
+        self.mono_font_select = Some(state);
     }
 
     /// Updates the storage path draft field.
@@ -719,7 +770,11 @@ impl SettingsController {
                            pending_file_opener: self.pending_file_opener.clone(),
                            active_page_ix: self.active_page_ix,
                            cache_counts: self.cache_counts(),
-                           max_concurrent_downloads: self.storage.max_concurrent_downloads() }
+                           max_concurrent_downloads: self.storage.max_concurrent_downloads(),
+                           body_font_select: self.body_font_select.clone(),
+                           value_font_select: self.value_font_select.clone(),
+                           label_font_select: self.label_font_select.clone(),
+                           mono_font_select: self.mono_font_select.clone() }
     }
 }
 

@@ -1,10 +1,11 @@
-//! Libri theme system: six color themes, two density variants, and three
-//! user-selectable font roles.
+//! Libri theme system: six color themes, two density variants, four
+//! user-selectable font-family roles, and one shared UI text size.
 
-use gpui::{Hsla, Pixels, px}; // Pixels kept for GPUI layout fields
+use gpui::{Hsla, Pixels, SharedString, px}; // Pixels kept for GPUI layout fields
 
 use crate::data::constants::{
-    BODY_FONT_OPTIONS, FontOption, MONO_FONT_OPTIONS, VALUE_FONT_OPTIONS,
+    DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
+    DEFAULT_VALUE_FONT,
 };
 
 // ── Color tokens
@@ -156,33 +157,59 @@ impl ThemeKey {
 // ── LibriTheme
 // ────────────────────────────────────────────────────────────────
 
-/// GPUI app-level global containing the active Libri theme, density, and the
-/// three user-selectable font roles.
+/// Font-family and size selections for a [`LibriTheme`], grouped into one
+/// struct rather than threaded as separate constructor arguments (see
+/// `docs/rust.md`'s guidance against many-argument functions).
+///
+/// Family choices are free-form: any font name the user's system reports via
+/// `cx.text_system().all_font_names()` is valid, not a curated list — see
+/// `settings_appearance_view`. `ui_text_size` is shared across all roles
+/// except monospace, which renders at [`MONO_SIZE_RATIO`] of it.
+#[derive(Debug, Clone)]
+pub struct FontSelections {
+    /// Active body-font family; also applied to `gpui_component::Theme`'s
+    /// `font_family` by whichever call site changes it (see
+    /// `LibraryController::set_body_font`).
+    pub body_font:    SharedString,
+    /// Active value-font family (e.g. Advanced settings' "Cache details"
+    /// rows).
+    pub value_font:   SharedString,
+    /// Active label-font family (e.g. the detail tab's metadata labels).
+    pub label_font:   SharedString,
+    /// Active monospace-font family (e.g. the masked API key hint).
+    pub mono_font:    SharedString,
+    /// Shared UI text size, applied via `Window::set_rem_size` so every
+    /// `rems(...)`-based size utility (`.text_sm()`, `.text_xs()`, etc.)
+    /// scales together, like zooming a page.
+    pub ui_text_size: Pixels,
+}
+
+impl Default for FontSelections {
+    fn default() -> Self {
+        Self { body_font:    SharedString::from(DEFAULT_BODY_FONT),
+               value_font:   SharedString::from(DEFAULT_VALUE_FONT),
+               label_font:   SharedString::from(DEFAULT_LABEL_FONT),
+               mono_font:    SharedString::from(DEFAULT_MONO_FONT),
+               ui_text_size: px(DEFAULT_UI_TEXT_SIZE), }
+    }
+}
+
+/// GPUI app-level global containing the active Libri theme, density, and
+/// font selections.
 #[derive(Debug, Clone)]
 pub struct LibriTheme {
     pub key:               ThemeKey,
     pub colors:            ColorTokens,
     pub density:           Density,
     pub density_constants: DensityConstants,
-    /// Active body-font selection; also applied to `gpui_component::Theme`'s
-    /// `font_family` by whichever call site changes it (see
-    /// `LibraryController::set_body_font`).
-    pub body_font:         &'static FontOption,
-    /// Active value-font selection (e.g. Advanced settings' "Cache details"
-    /// rows).
-    pub value_font:        &'static FontOption,
-    /// Active monospace-font selection (e.g. the masked API key hint).
-    pub mono_font:         &'static FontOption,
+    pub fonts:             FontSelections,
 }
 
 impl gpui::Global for LibriTheme {}
 
 impl LibriTheme {
-    /// Constructs the theme for `key`, `density`, and the three font role
-    /// selections.
-    pub fn new(key: ThemeKey, density: Density, body_font: &'static FontOption,
-               value_font: &'static FontOption, mono_font: &'static FontOption)
-               -> Self {
+    /// Constructs the theme for `key`, `density`, and `fonts`.
+    pub fn new(key: ThemeKey, density: Density, fonts: FontSelections) -> Self {
         let colors = match key {
             ThemeKey::Parchment => parchment_colors(),
             ThemeKey::Slate => slate_colors(),
@@ -199,18 +226,14 @@ impl LibriTheme {
                colors,
                density,
                density_constants,
-               body_font,
-               value_font,
-               mono_font }
+               fonts }
     }
 
     /// Returns the default theme (parchment, comfortable, default fonts).
     pub fn default_theme() -> Self {
         Self::new(ThemeKey::Parchment,
                   Density::Comfortable,
-                  &BODY_FONT_OPTIONS[0],
-                  &VALUE_FONT_OPTIONS[0],
-                  &MONO_FONT_OPTIONS[0])
+                  FontSelections::default())
     }
 }
 

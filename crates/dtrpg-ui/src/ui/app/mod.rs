@@ -139,44 +139,41 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
                             file_opener_extension_input: Entity<InputState>, cx: &mut App)
                             -> WindowHandle<Root> {
     let settings_for_close = settings.clone();
-    cx.open_window(
-        WindowOptions {
-            // `appears_transparent: true` hides the native opaque title bar
-            // and title text (same pattern as the main library window's
-            // `title_bar_view.rs`) while keeping the macOS traffic-light
-            // window controls, which `titlebar: None` removes entirely on
-            // this platform (there is no dedicated close-only chrome option
-            // in gpui). `is_minimizable: false` and `is_resizable: false`
-            // disable the minimize and zoom buttons, leaving only close —
-            // resizing is no longer needed now that the panel content
-            // scrolls (see `settings_view::render_settings_panel`).
-            titlebar: Some(TitlebarOptions {
-                appears_transparent: true,
-                ..Default::default()
-            }),
-            window_bounds: Some(WindowBounds::Windowed(Bounds {
-                origin: Point::default(),
-                size: Size {
-                    width: px(720.),
-                    height: px(520.),
-                },
-            })),
-            is_resizable: false,
-            is_minimizable: false,
-            ..Default::default()
-        },
-        move |window, cx| {
-            window.on_window_should_close(cx, move |_window, cx| {
-                settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
-                true
-            });
-            let view = cx.new(|cx| {
-                SettingsWindowView::new(window, cx, settings, library, file_opener_extension_input)
-            });
-            cx.new(|cx| Root::new(view, window, cx).bordered(false))
-        },
-    )
-    .expect("failed to open settings window")
+    let window_size = Size { width:  px(720.),
+                             height: px(520.), };
+    cx.open_window(WindowOptions { // `appears_transparent: true` hides the native opaque title
+                                   // bar and title text (same
+                                   // pattern as the main library window's
+                                   // `title_bar_view.rs`) while keeping the macOS traffic-light
+                                   // window controls, which `titlebar: None` removes entirely on
+                                   // this platform (there is no dedicated close-only chrome
+                                   // option
+                                   // in gpui). `is_minimizable: false` and `is_resizable: false`
+                                   // disable the minimize and zoom buttons, leaving only close —
+                                   // resizing is no longer needed now that the panel content
+                                   // scrolls (see `settings_view::render_settings_panel`).
+                                   titlebar: Some(TitlebarOptions { appears_transparent:
+                                                                        true,
+                                                                    ..Default::default() }),
+                                   window_bounds: Some(WindowBounds::centered(window_size, cx)),
+                                   is_resizable: false,
+                                   is_minimizable: false,
+                                   ..Default::default() },
+                   move |window, cx| {
+                       window.on_window_should_close(cx, move |_window, cx| {
+                                 settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
+                                 true
+                             });
+                       let view = cx.new(|cx| {
+                                        SettingsWindowView::new(window,
+                                                                cx,
+                                                                settings,
+                                                                library,
+                                                                file_opener_extension_input)
+                                    });
+                       cx.new(|cx| Root::new(view, window, cx).bordered(false))
+                   })
+      .expect("failed to open settings window")
 }
 
 /// Initializes the GPUI application and routes to the login or library window.
@@ -193,7 +190,7 @@ pub fn setup(cx: &mut App) {
     // regardless of which Libri theme is active.
     let initial_theme = cx.global::<crate::data::theme::LibriTheme>().clone();
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-          theme.font_family = initial_theme.body_font.family.into();
+          theme.font_family = initial_theme.fonts.body_font.clone();
           crate::data::theme::apply_table_colors(theme, &initial_theme.colors);
       });
 
