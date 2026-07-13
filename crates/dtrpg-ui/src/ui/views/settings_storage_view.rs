@@ -7,6 +7,8 @@ use gpui::{
     AnyElement, Element, Entity, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, div, px,
 };
+use gpui_component::IconName;
+use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
@@ -99,21 +101,11 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                     })
                     // "Change…" icon button
                     .child(
-                        div()
-                            .id("change-storage")
-                            .flex_none()
-                            .size(px(32.0))
-                            .rounded(px(8.0))
-                            .border_1()
-                            .border_color(border)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .cursor_pointer()
-                            .tooltip(|window, cx| {
-                                Tooltip::new(t!("settings.storage_change_tooltip").to_string())
-                                    .build(window, cx)
-                            })
+                        Button::new("change-storage")
+                            .ghost()
+                            .outline()
+                            .icon(IconName::Folder)
+                            .tooltip(t!("settings.storage_change_tooltip").to_string())
                             .on_click(move |_event, _window, cx| {
                                 let picked = rfd::FileDialog::new().pick_folder();
                                 if let Some(path) = picked {
@@ -128,29 +120,18 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                                         Err(e) => tracing::warn!("storage path not writable: {e}"),
                                     }
                                 }
-                            })
-                            .child(div().text_sm().text_color(text_primary).child("📂")),
+                            }),
                     )
                     // "Show in Finder/Explorer/Files" icon button
                     .child(
-                        div()
-                            .id("reveal-storage")
-                            .flex_none()
-                            .size(px(32.0))
-                            .rounded(px(8.0))
-                            .border_1()
-                            .border_color(border)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .cursor_pointer()
-                            .tooltip(move |window, cx| {
-                                Tooltip::new(reveal_label.clone()).build(window, cx)
-                            })
+                        Button::new("reveal-storage")
+                            .ghost()
+                            .outline()
+                            .icon(IconName::FolderOpen)
+                            .tooltip(reveal_label.clone())
                             .on_click(move |_event, _window, cx| {
                                 entity_reveal.read(cx).reveal_storage_location();
-                            })
-                            .child(div().text_sm().text_color(text_primary).child("↗")),
+                            }),
                     ),
             ),
         );

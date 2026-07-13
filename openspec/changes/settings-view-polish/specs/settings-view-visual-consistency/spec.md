@@ -1,15 +1,15 @@
 ## ADDED Requirements
 
-### Requirement: Account settings row values MUST be right-aligned
-The Account settings section's Email and API Key rows SHALL right-align their values against the row's right edge, matching the label/value row pattern used by Advanced settings' Cache Details rows.
+### Requirement: Account settings row values MUST be left-aligned
+The Account settings section's Email and API Key rows SHALL left-align their values immediately after the label column, with the label itself right-aligned against the label column's right edge.
 
 #### Scenario: Viewing the Email row
 - **WHEN** the user views the Account settings section while signed in
-- **THEN** the Email label sits at the left of its row and the email value is right-aligned on the same row
+- **THEN** the Email label is right-aligned within its label column and the email value is left-aligned on the same row
 
 #### Scenario: Viewing the API Key row
 - **WHEN** the user views the Account settings section while signed in with an API key configured
-- **THEN** the API Key label sits at the left of its row and the masked key value is right-aligned on the same row
+- **THEN** the API Key label is right-aligned within its label column and the masked key value is left-aligned on the same row
 
 ### Requirement: Downloads settings action buttons MUST use the shared icon set
 The Downloads settings section's "Change…" and reveal-location buttons SHALL use icons from the app's shared `gpui-component` icon set rather than raw text/emoji glyphs. Each button SHALL retain its existing tooltip and click behavior.
