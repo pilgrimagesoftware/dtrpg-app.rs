@@ -15,7 +15,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
-use crate::ui::widgets::selectable_text;
+use crate::ui::widgets::{selectable_text, small_caps_text};
 
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
@@ -83,10 +83,8 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                 .items_baseline()
                                 .gap(px(6.0))
                                 .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(colors.text_secondary)
-                                        .child(t!("settings.email_label")),
+                                    div().text_color(colors.text_secondary)
+                                        .child(small_caps_text(t!("settings.email_label"), 0.75)),
                                 )
                                 .child(
                                     selectable_text("settings-account-email", email_text.clone())
@@ -104,10 +102,9 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                     .items_baseline()
                                     .gap(px(6.0))
                                     .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(colors.text_secondary)
-                                            .child(t!("settings.api_key_label")),
+                                        div().text_color(colors.text_secondary).child(
+                                            small_caps_text(t!("settings.api_key_label"), 0.75),
+                                        ),
                                     )
                                     .child(
                                         selectable_text("settings-account-api-key", hint.clone())

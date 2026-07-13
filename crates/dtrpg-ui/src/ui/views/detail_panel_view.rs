@@ -34,7 +34,7 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::ui::widgets::selectable_text;
+use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::matching::{collection_member_id, member_ids_contain};
 use crate::util::reveal::reveal_in_file_manager;
@@ -958,12 +958,16 @@ fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> Any
         .into_any_element()
 }
 
-/// Renders a `DescriptionList` label in the app's dedicated label font,
-/// distinguishing field names from their values (which stay in the default
-/// body font).
+/// Renders a `DescriptionList` label in the app's dedicated label font and in
+/// small caps, distinguishing field names from their values (which stay in
+/// the default body font).
+///
+/// `0.875` matches `DescriptionList`'s own `.text_sm()` on the wrapping
+/// element, so the small-caps run sizes stay proportional to the size that
+/// element would otherwise cascade down unstyled.
 fn styled_label(label: impl Into<SharedString>, label_font_family: &str) -> AnyElement {
     div().font_family(label_font_family.to_string())
-         .child(label.into())
+         .child(small_caps_text(label, 0.875))
          .into_any_element()
 }
 

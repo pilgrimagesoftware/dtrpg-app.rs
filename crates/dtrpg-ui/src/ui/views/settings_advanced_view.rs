@@ -21,6 +21,7 @@ use crate::data::constants::{
     ITEM_CHECK_COOLDOWN_SECS, STALE_SECS, THUMBNAIL_COOLDOWN_SECS,
 };
 use crate::data::theme::ColorTokens;
+use crate::ui::widgets::small_caps_text;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::pluralize::pluralize;
 
@@ -67,10 +68,9 @@ fn row_frame(label: impl Into<SharedString>, value_el: impl IntoElement,
                      .justify_between()
                      .items_baseline()
                      .gap(px(12.0))
-                     .child(div().text_sm()
-                                 .font_weight(gpui::FontWeight::MEDIUM)
+                     .child(div().font_weight(gpui::FontWeight::MEDIUM)
                                  .text_color(colors.text_primary)
-                                 .child(label))
+                                 .child(small_caps_text(label, 0.875)))
                      .child(value_el))
          .child(div().text_xs()
                      .text_color(colors.text_tertiary)

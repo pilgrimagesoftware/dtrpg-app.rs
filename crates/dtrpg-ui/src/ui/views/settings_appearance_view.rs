@@ -25,6 +25,7 @@ use crate::data::constants::{
     MIN_UI_TEXT_SCALE, UI_TEXT_SCALE_STEP,
 };
 use crate::data::theme::{ColorTokens, LibriTheme, ThemeKey};
+use crate::ui::widgets::small_caps_text;
 
 /// Width of the label column shared by every row in this section, so the
 /// controls on the right all start at the same horizontal position
@@ -51,14 +52,14 @@ fn theme_label(key: ThemeKey) -> String {
 }
 
 /// Renders a row's label in the shared, fixed-width left column so every
-/// row's control starts at the same horizontal position.
+/// row's control starts at the same horizontal position. Rendered in small
+/// caps — see [`small_caps_text`].
 fn row_label(title: impl Into<gpui::SharedString>, colors: &ColorTokens) -> impl IntoElement {
     div().w(LABEL_COL_WIDTH)
          .flex_none()
-         .text_sm()
          .font_weight(gpui::FontWeight::MEDIUM)
          .text_color(colors.text_primary)
-         .child(title.into())
+         .child(small_caps_text(title, 0.875))
 }
 
 /// Renders one font-picker row: the role's label in the shared left column, a
