@@ -136,6 +136,7 @@ fn account_info_item(value_id: &'static str, label: String, value: String, color
              .into_any_element(),
     ).value(
         div().pl(ACCOUNT_INFO_COLUMN_GAP)
+             .text_right()
              .child(
                  selectable_text(value_id, value).text_xs()
                                                  .font_family(mono_font_family.to_string())

@@ -252,6 +252,10 @@ about:
   version: "Version %{version}"
   description: "Un gestionnaire de bibliothèque natif pour votre collection DriveThruRPG."
   ok: "OK"
+  version_label: "Version"
+  commit_label: "Commit"
+  build_date_label: "Date de build"
+  target_label: "Cible"
 
 menu:
   app_about: "À propos de Libri"

@@ -12,9 +12,11 @@ use gpui::{
 };
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
+use crate::build_info;
 use crate::controllers::settings::{CacheCounts, SettingsController};
 use crate::data::constants::{
     FORCE_RELOAD_COOLDOWN_SECS, ITEM_CHECK_BATCH_COOLDOWN_SECS, ITEM_CHECK_BATCH_TIMER_SECS,
@@ -288,6 +290,17 @@ pub fn render_about_section(colors: &ColorTokens) -> impl IntoElement + 'static 
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
 
+    let build_info_list = DescriptionList::horizontal()
+        .columns(1)
+        .bordered(false)
+        .child(about_info_item(t!("about.version_label").to_string(),
+                               env!("CARGO_PKG_VERSION").to_string()))
+        .child(about_info_item(t!("about.commit_label").to_string(),
+                               build_info::GIT_HASH.to_string()))
+        .child(about_info_item(t!("about.build_date_label").to_string(),
+                               build_info::BUILD_DATE.to_string()))
+        .child(about_info_item(t!("about.target_label").to_string(), build_info::TARGET.to_string()));
+
     div().flex()
          .flex_col()
          .gap(px(8.0))
@@ -296,12 +309,18 @@ pub fn render_about_section(colors: &ColorTokens) -> impl IntoElement + 'static 
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(text_primary)
                      .child(t!("sidebar.app_name")))
-         .child(div().text_sm()
-                     .text_color(text_secondary)
-                     .child(t!("about.version", version = env!("CARGO_PKG_VERSION"))))
+         .child(build_info_list)
          .child(div().text_xs()
                      .text_color(text_secondary)
                      .child(t!("about.description")))
+}
+
+/// Builds a right-aligned label/value row for the About section's build-info
+/// `DescriptionList`. `DescriptionList` doesn't right-align its value cells on
+/// its own (the value cell is a plain `flex_1` div), so the value is wrapped
+/// in a full-width, right-aligned `div()` here.
+fn about_info_item(label: String, value: String) -> DescriptionItem {
+    DescriptionItem::new(label).value(div().w_full().text_right().child(value).into_any_element())
 }
 
 #[cfg(test)]

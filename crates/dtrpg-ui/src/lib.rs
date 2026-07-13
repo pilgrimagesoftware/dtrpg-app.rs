@@ -15,6 +15,7 @@ pub mod ui {
     pub mod widgets;
     pub mod windows;
 }
+pub mod build_info;
 pub mod controllers;
 pub mod credentials;
 pub mod data;
