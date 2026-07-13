@@ -156,7 +156,7 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            .child(div().h(px(1.0)).bg(border))
            // ── Note ─────────────────────────────────────────────────────────
            .child(div().text_xs()
-                       .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0))
+                       .text_color(warning_text)
                        .child(format!("\u{26A0} {}", t!("settings.storage_note"))))
            // ── Divider ───────────────────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))

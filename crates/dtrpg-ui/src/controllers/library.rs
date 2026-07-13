@@ -2626,9 +2626,10 @@ impl LibraryController {
     /// [`crate::data::ui_prefs::UiPrefs`] so it survives a restart instead of
     /// always resetting to Parchment.
     ///
-    /// Also re-syncs `gpui_component::Theme`'s table colors (see
-    /// [`crate::data::theme::apply_table_colors`]) so the catalog `DataTable`
-    /// tracks the newly selected Libri palette instead of staying on whichever
+    /// Also re-syncs `gpui_component::Theme`'s colors (see
+    /// [`crate::data::theme::apply_theme_colors`]) so buttons, inputs,
+    /// popovers, scrollbars, the sidebar, and the catalog `DataTable` all
+    /// track the newly selected Libri palette instead of staying on whichever
     /// palette was active at startup.
     pub fn set_theme(&self, key: ThemeKey, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
@@ -2636,7 +2637,7 @@ impl LibraryController {
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-              apply_table_colors(theme, &colors);
+              apply_theme_colors(theme, &colors);
           });
         crate::data::ui_prefs::UiPrefs::load().save_theme_key(key.as_str());
         cx.notify();
