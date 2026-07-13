@@ -72,8 +72,8 @@ impl Render for SettingsWindowView {
         window.set_rem_size(theme.fonts.ui_text_size);
         let snap = self.settings.read(cx).snapshot();
         let sign_in_enabled = !snap.sign_in_in_progress
-                              && !snap.email_draft.is_empty()
-                              && !snap.password_draft.is_empty();
+                              && !snap.email_draft.trim().is_empty()
+                              && !snap.password_draft.trim().is_empty();
         let font_selects = AppearanceFontSelects { body:  snap.body_font_select,
                                                    value: snap.value_font_select,
                                                    label: snap.label_font_select,
