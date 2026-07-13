@@ -807,6 +807,8 @@ impl Render for LibraryRootView {
              matched_count,
              sort,
              sort_direction,
+             collection_sort,
+             collection_sort_direction,
              grouped,
              presentation) = (snap.filter,
                               snap.counts,
@@ -819,6 +821,8 @@ impl Render for LibraryRootView {
                               snap.matched_count,
                               snap.sort,
                               snap.sort_direction,
+                              snap.collection_sort,
+                              snap.collection_sort_direction,
                               snap.grouped,
                               snap.presentation);
 
@@ -856,6 +860,8 @@ impl Render for LibraryRootView {
                                      collections,
                                      collections_loaded,
                                      catalog_ids,
+                                     collection_sort,
+                                     collection_sort_direction,
                                      lib_entity.clone(),
                                      self.tabs.clone(),
                                      self.collection_name_input.clone(),

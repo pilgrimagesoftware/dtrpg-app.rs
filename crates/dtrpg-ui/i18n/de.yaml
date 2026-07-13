@@ -7,6 +7,12 @@ sidebar:
   collections: "Sammlungen"
   app_name: "Libri"
   search_tooltip: "Suchen"
+  collections_sort_name: "Name"
+  collections_sort_date_created: "Erstellungsdatum"
+  collections_sort_item_count: "Anzahl der Elemente"
+  collections_sort_ascending: "Aufsteigend"
+  collections_sort_descending: "Absteigend"
+  collections_sort_tooltip: "Sammlungen sortieren"
 
 toolbar:
   sort_by: "Sortieren nach"

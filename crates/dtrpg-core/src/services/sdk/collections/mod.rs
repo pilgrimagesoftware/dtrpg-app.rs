@@ -11,6 +11,7 @@ use dtrpg_ui::{
         LoginTokens,
         collections::{CollectionsService, CollectionsServiceError, CollectionsServiceErrorKind},
     },
+    util::datetime::parse_rfc3339_to_epoch,
 };
 
 pub use self::gateway::SdkCollectionsGateway;
@@ -70,6 +71,7 @@ impl CollectionsService for RustSdkCollectionsService {
         for list in all_lists {
             let id = list.attributes.product_list_id;
             let name: Arc<str> = list.attributes.name.as_str().into();
+            let created_at = parse_rfc3339_to_epoch(&list.attributes.date_created).unwrap_or(0);
 
             let mut member_ids: Vec<u64> = Vec::new();
             let mut items_page: u32 = 1;
@@ -107,7 +109,8 @@ impl CollectionsService for RustSdkCollectionsService {
 
             entries.push(CollectionEntry { id,
                                            name,
-                                           member_ids: Arc::from(member_ids.as_slice()) });
+                                           member_ids: Arc::from(member_ids.as_slice()),
+                                           created_at });
         }
 
         Ok(entries)
@@ -115,9 +118,11 @@ impl CollectionsService for RustSdkCollectionsService {
 
     fn create_collection(&self, name: &str) -> Result<CollectionEntry, CollectionsServiceError> {
         let item = self.gateway.create_product_list(name.trim())?;
-        Ok(CollectionEntry { id:         item.attributes.product_list_id,
-                             name:       Arc::from(item.attributes.name.as_str()),
-                             member_ids: Arc::from(&[][..]), })
+        let created_at = parse_rfc3339_to_epoch(&item.attributes.date_created).unwrap_or(0);
+        Ok(CollectionEntry { id: item.attributes.product_list_id,
+                             name: Arc::from(item.attributes.name.as_str()),
+                             member_ids: Arc::from(&[][..]),
+                             created_at })
     }
 
     fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError> {

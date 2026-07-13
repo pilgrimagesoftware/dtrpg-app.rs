@@ -287,130 +287,138 @@ fn should_attempt_partial_fetch(remote_count: usize, cached_count: usize) -> boo
 
 /// Snapshot of all data needed by the root view for a single render pass.
 pub struct LibrarySnapshot {
-    pub filter:                  SidebarFilter,
-    pub counts:                  SectionCounts,
-    pub publishers:              Vec<PublisherEntry>,
-    pub collections:             Vec<CollectionEntry>,
+    pub filter:                    SidebarFilter,
+    pub counts:                    SectionCounts,
+    pub publishers:                Vec<PublisherEntry>,
+    pub collections:               Vec<CollectionEntry>,
     /// True once the initial collections fetch for the current session has
     /// completed; the sidebar shows "?" for the collection count until then.
-    pub collections_loaded:      bool,
+    pub collections_loaded:        bool,
     /// All numeric product IDs in the full catalog; used by the sidebar to
     /// compute per-collection resolved item counts.
-    pub catalog_ids:             HashSet<u64>,
+    pub catalog_ids:               HashSet<u64>,
     /// Total items in the full catalog (no filter, no search).
-    pub total_count:             usize,
-    pub total_mb:                f64,
+    pub total_count:               usize,
+    pub total_mb:                  f64,
     /// Items matching the active sidebar filter but ignoring the search query.
-    pub filter_count:            usize,
+    pub filter_count:              usize,
     /// Items matching both the active sidebar filter and the search query.
-    pub matched_count:           usize,
-    pub search_query:            String,
-    pub sort:                    SortMethod,
-    pub sort_direction:          SortDirection,
-    pub grouped:                 bool,
-    pub presentation:            CatalogPresentation,
-    pub selected_item:           Option<LibraryItem>,
-    pub items:                   Vec<LibraryItem>,
-    pub catalog_loading:         bool,
+    pub matched_count:             usize,
+    pub search_query:              String,
+    pub sort:                      SortMethod,
+    pub sort_direction:            SortDirection,
+    /// Current sidebar Collections sort method.
+    pub collection_sort:           CollectionSortMethod,
+    /// Current sidebar Collections sort direction.
+    pub collection_sort_direction: SortDirection,
+    pub grouped:                   bool,
+    pub presentation:              CatalogPresentation,
+    pub selected_item:             Option<LibraryItem>,
+    pub items:                     Vec<LibraryItem>,
+    pub catalog_loading:           bool,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
-    pub publisher_search_open:   bool,
+    pub publisher_search_open:     bool,
     /// Publishers section search filter text. Session-only; never persisted.
-    pub publisher_search_query:  String,
+    pub publisher_search_query:    String,
     /// Whether the collections section's inline search bar is expanded.
     /// Session-only; never persisted.
-    pub collection_search_open:  bool,
+    pub collection_search_open:    bool,
     /// Collections section search filter text. Session-only; never persisted.
-    pub collection_search_query: String,
+    pub collection_search_query:   String,
     /// Current width of the detail panel, in pixels.
-    pub detail_panel_width:      f32,
+    pub detail_panel_width:        f32,
 }
 
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
-    vm:                       LibraryViewModel,
+    vm:                            LibraryViewModel,
     /// Keeps the `ActivityController` entity alive so the weak reference in
     /// background task closures remains valid for the lifetime of this
     /// controller.
     #[allow(dead_code)]
-    activity:                 Entity<ActivityController>,
+    activity:                      Entity<ActivityController>,
     /// Full catalog — never filtered.
-    catalog:                  Vec<LibraryItem>,
+    catalog:                       Vec<LibraryItem>,
     /// Active sidebar filter.
-    pub filter:               SidebarFilter,
+    pub filter:                    SidebarFilter,
     /// Text search query.
-    pub search_query:         String,
+    pub search_query:              String,
     /// Current sort method.
-    pub sort:                 SortMethod,
+    pub sort:                      SortMethod,
     /// Current sort direction.
-    pub sort_direction:       SortDirection,
+    pub sort_direction:            SortDirection,
+    /// Current sidebar Collections sort method, persisted via `UiPrefs`.
+    pub collection_sort:           CollectionSortMethod,
+    /// Current sidebar Collections sort direction, persisted via `UiPrefs`.
+    pub collection_sort_direction: SortDirection,
     /// Whether the catalog is grouped by publisher.
-    pub grouped:              bool,
+    pub grouped:                   bool,
     /// Active catalog presentation mode.
-    pub presentation:         CatalogPresentation,
+    pub presentation:              CatalogPresentation,
     /// The currently selected item id (for the detail panel).
-    pub selection:            Selection,
+    pub selection:                 Selection,
     /// Smart section counts derived from the full catalog.
-    pub section_counts:       SectionCounts,
+    pub section_counts:            SectionCounts,
     /// Publisher list derived from the full catalog (count desc, name asc).
-    pub publishers:           Vec<PublisherEntry>,
+    pub publishers:                Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
-    pub collections:          Vec<CollectionEntry>,
+    pub collections:               Vec<CollectionEntry>,
     /// True once the first `apply_collections` call has completed for the
     /// current session. Used by the sidebar to show a "?" placeholder for
     /// the collection count instead of a misleading `0` while the initial
     /// fetch is still in flight.
-    collections_loaded:       bool,
+    collections_loaded:            bool,
     /// Backing service for collections; stored so it can be replaced on
     /// sign-in.
-    collections_service:      Arc<dyn CollectionsService>,
+    collections_service:           Arc<dyn CollectionsService>,
     /// Set of numeric product IDs belonging to the active collection filter.
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
-    pub collection_members:   HashSet<u64>,
+    pub collection_members:        HashSet<u64>,
     /// Queue of `(item_id, cover_url, force_network)` triples pending thumbnail
     /// fetches. `force_network` skips the disk cache and always re-fetches —
     /// set for manual "Load Thumbnail"/"Refresh Thumbnails" actions, which
     /// exist specifically to bypass a stale cached image; left `false` for
     /// automatic background loads.
-    thumbnail_queue:          VecDeque<(Arc<str>, Arc<str>, bool)>,
+    thumbnail_queue:               VecDeque<(Arc<str>, Arc<str>, bool)>,
     /// Number of thumbnail fetches currently in flight. Bounded by
     /// [`Self::available_slots`] together with `active_downloads`.
-    active_thumbnail_fetches: usize,
+    active_thumbnail_fetches:      usize,
     /// Activity id for the aggregated thumbnail loading entry.
-    thumbnail_activity_id:    Option<u64>,
+    thumbnail_activity_id:         Option<u64>,
     /// Number of thumbnails processed (successes and failures both count) in
     /// the current batch. Reset to `0` whenever a new aggregated activity
     /// item starts. Together with the live queue length this gives a real,
     /// monotonically advancing progress fraction — `processed / (processed
     /// + queue.len())` — instead of an indeterminate placeholder.
-    thumbnail_processed:      usize,
+    thumbnail_processed:           usize,
     /// True from startup until the first `set_catalog` call completes.
-    catalog_loading:          bool,
+    catalog_loading:               bool,
     /// Incremented each time [`start_load_inner`](Self::start_load_inner)
     /// starts a new load attempt. Background tasks from a superseded load
     /// compare their captured generation against the current value before
     /// writing catalog state, so a load started before a `clear_and_reload`
     /// cannot clobber it after the fact.
-    load_generation:          u64,
+    load_generation:               u64,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
-    items_cache:              Option<Vec<LibraryItem>>,
+    items_cache:                   Option<Vec<LibraryItem>>,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
-    publisher_search_open:    bool,
+    publisher_search_open:         bool,
     /// Publishers section search filter text. Session-only; never persisted.
-    publisher_search_query:   String,
+    publisher_search_query:        String,
     /// Whether the collections section's inline search bar is expanded.
     /// Session-only; never persisted.
-    collection_search_open:   bool,
+    collection_search_open:        bool,
     /// Collections section search filter text. Session-only; never persisted.
-    collection_search_query:  String,
+    collection_search_query:       String,
     /// Current width of the detail panel, in pixels. Session-only; never
     /// persisted to disk.
-    detail_panel_width:       f32,
+    detail_panel_width:            f32,
     /// On-screen bounds of every currently visible Grid card / Thumbs row,
     /// keyed by item id, continuously refreshed by each entry's own render
     /// pass (see `catalog_view::render_grid_card` / `render_thumb_row`).
@@ -423,7 +431,7 @@ pub struct LibraryController {
     /// fallback position before the popover settles into place. Entries
     /// scrolled out of view keep their last-known bounds; this is harmless
     /// since a stale entry can't be clicked again until it repaints.
-    entry_bounds:             HashMap<Arc<str>, Bounds<Pixels>>,
+    entry_bounds:                  HashMap<Arc<str>, Bounds<Pixels>>,
     /// Selected item file row (its position within the entry's `files`
     /// list) within a multi-item entry's expanded detail tab, keyed by
     /// catalog entry id. Keyed by row position rather than file id because
@@ -433,48 +441,48 @@ pub struct LibraryController {
     /// unrelated rows select and deselect together. Ephemeral — never
     /// persisted, and cleared whenever the entry's detail tab is closed or
     /// reopened (see `catalog-entry-detail-view`).
-    selected_item_file:       HashMap<Arc<str>, usize>,
+    selected_item_file:            HashMap<Arc<str>, usize>,
     /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
     /// here (see `catalog-entry-detail-advanced-disclosure`).
-    other_details_open:       HashMap<Arc<str>, bool>,
+    other_details_open:            HashMap<Arc<str>, bool>,
     /// Whether a per-file "Other details" disclosure is expanded within a
     /// multi-item entry's item tier, keyed by `"{entry_id}:{row_ix}"`. Keyed
     /// by row position rather than file id for the same reason as
     /// `selected_item_file`. Ephemeral — never persisted, and defaults to
     /// collapsed.
-    file_other_details_open:  HashMap<Arc<str>, bool>,
+    file_other_details_open:       HashMap<Arc<str>, bool>,
     /// Ids of catalog items with an availability check currently in flight
     /// (on-demand or queued), mirroring `CoverCache::in_flight`'s role for
     /// thumbnails. `LibraryChanged` is emitted on insertion and removal so
     /// catalog card/row rendering can query [`Self::is_checking`] and show a
     /// spinner/overlay.
-    checking_items:           HashSet<Arc<str>>,
+    checking_items:                HashSet<Arc<str>>,
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
-    check_queue:              VecDeque<Arc<str>>,
+    check_queue:                   VecDeque<Arc<str>>,
     /// Queue of `(item_id, file_index, title)` triples pending a file
     /// download. Keyed per file (not per entry) so a multi-item entry can
     /// have more than one of its files queued or active independently.
-    download_queue:           VecDeque<(Arc<str>, u32, String)>,
+    download_queue:                VecDeque<(Arc<str>, u32, String)>,
     /// Number of file downloads currently in flight. Bounded by
     /// [`Self::available_slots`] together with `active_thumbnail_fetches`.
-    active_downloads:         usize,
+    active_downloads:              usize,
     /// Per-file cancellation flag for an in-flight download, keyed by
     /// `(item_id, file_index)`, set by [`Self::cancel_download`] and polled by
     /// the download task at its next checkpoint. Removed once the task
     /// observes it (success, error, or cancellation) or by `cancel_download`
     /// itself for a still-queued item.
-    download_cancel_flags:    HashMap<(Arc<str>, u32), Arc<std::sync::atomic::AtomicBool>>,
+    download_cancel_flags:         HashMap<(Arc<str>, u32), Arc<std::sync::atomic::AtomicBool>>,
     /// Activity panel id for each in-flight (slot-holding) download, keyed by
     /// `(item_id, file_index)`. Not populated for files still waiting in
     /// `download_queue`.
-    download_activity_ids:    HashMap<(Arc<str>, u32), u64>,
+    download_activity_ids:         HashMap<(Arc<str>, u32), u64>,
     /// Shared thumbnail/download concurrency limit. Initialized from
     /// [`crate::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].
-    max_concurrent_downloads: usize,
+    max_concurrent_downloads:      usize,
 }
 
 impl LibraryController {
@@ -493,6 +501,7 @@ impl LibraryController {
                activity: Entity<ActivityController>, cx: &mut Context<Self>)
                -> Self {
         let vm = LibraryViewModel::new(service);
+        let prefs = crate::data::ui_prefs::UiPrefs::load();
 
         let mut ctrl =
             Self { vm,
@@ -502,6 +511,8 @@ impl LibraryController {
                    search_query: String::new(),
                    sort: SortMethod::default(),
                    sort_direction: SortDirection::default(),
+                   collection_sort: prefs.collection_sort(),
+                   collection_sort_direction: prefs.collection_sort_direction(),
                    grouped: false,
                    presentation: CatalogPresentation::default(),
                    selection: Selection::default(),
@@ -1116,7 +1127,12 @@ impl LibraryController {
     }
 
     /// Stores the fetched collections and emits a change event.
-    fn apply_collections(&mut self, collections: Vec<CollectionEntry>, cx: &mut Context<Self>) {
+    fn apply_collections(&mut self, mut collections: Vec<CollectionEntry>, cx: &mut Context<Self>) {
+        let catalog_ids = self.catalog_ids();
+        sort_collections(&mut collections,
+                         self.collection_sort,
+                         self.collection_sort_direction,
+                         &catalog_ids);
         self.collections = collections;
         self.collections_loaded = true;
         // Refresh collection_members if the current filter is a Collection filter,
@@ -1811,22 +1827,7 @@ impl LibraryController {
         let items = self.visible_items();
         let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
-        // Build a set of all IDs that can match collection member_ids.
-        // Include both order_product_id and product_id since the product list items
-        // API returns productId (not orderProductId) in its response.
-        let catalog_ids: HashSet<u64> = self.catalog
-                                            .iter()
-                                            .flat_map(|i| {
-                                                let mut ids = Vec::with_capacity(2);
-                                                if i.order_product_id > 0 {
-                                                    ids.push(i.order_product_id);
-                                                }
-                                                if i.product_id > 0 {
-                                                    ids.push(i.product_id);
-                                                }
-                                                ids
-                                            })
-                                            .collect();
+        let catalog_ids = self.catalog_ids();
         LibrarySnapshot { filter: self.filter.clone(),
                           counts: self.section_counts,
                           publishers: self.publishers.clone(),
@@ -1840,6 +1841,8 @@ impl LibraryController {
                           search_query: self.search_query.clone(),
                           sort: self.sort,
                           sort_direction: self.sort_direction,
+                          collection_sort: self.collection_sort,
+                          collection_sort_direction: self.collection_sort_direction,
                           grouped: self.grouped,
                           presentation: self.presentation,
                           selected_item,
@@ -1856,6 +1859,28 @@ impl LibraryController {
     /// items have arrived.
     pub fn is_loading(&self) -> bool {
         self.catalog_loading && self.catalog.is_empty()
+    }
+
+    /// Builds the set of all product IDs that can match a collection's
+    /// `member_ids`.
+    ///
+    /// Includes both `order_product_id` and `product_id` since the product
+    /// list items API returns `productId` (not `orderProductId`) in its
+    /// response.
+    fn catalog_ids(&self) -> HashSet<u64> {
+        self.catalog
+            .iter()
+            .flat_map(|i| {
+                let mut ids = Vec::with_capacity(2);
+                if i.order_product_id > 0 {
+                    ids.push(i.order_product_id);
+                }
+                if i.product_id > 0 {
+                    ids.push(i.product_id);
+                }
+                ids
+            })
+            .collect()
     }
 
     // ── Filtered result set ───────────────────────────────────────────────────
@@ -1996,6 +2021,35 @@ impl LibraryController {
     pub fn set_sort_direction(&mut self, direction: SortDirection, cx: &mut Context<Self>) {
         self.sort_direction = direction;
         self.invalidate_cache();
+        cx.emit(LibraryChanged);
+    }
+
+    /// Sets the sidebar Collections sort method, persists it, and re-sorts
+    /// `self.collections` in place.
+    pub fn set_collection_sort(&mut self, method: CollectionSortMethod, cx: &mut Context<Self>) {
+        self.collection_sort = method;
+        let catalog_ids = self.catalog_ids();
+        sort_collections(&mut self.collections,
+                         method,
+                         self.collection_sort_direction,
+                         &catalog_ids);
+        crate::data::ui_prefs::UiPrefs::load().save_collection_sort(method,
+                                                                    self.collection_sort_direction);
+        cx.emit(LibraryChanged);
+    }
+
+    /// Sets the sidebar Collections sort direction, persists it, and
+    /// re-sorts `self.collections` in place.
+    pub fn set_collection_sort_direction(&mut self, direction: SortDirection,
+                                         cx: &mut Context<Self>) {
+        self.collection_sort_direction = direction;
+        let catalog_ids = self.catalog_ids();
+        sort_collections(&mut self.collections,
+                         self.collection_sort,
+                         direction,
+                         &catalog_ids);
+        crate::data::ui_prefs::UiPrefs::load().save_collection_sort(self.collection_sort,
+                                                                    direction);
         cx.emit(LibraryChanged);
     }
 

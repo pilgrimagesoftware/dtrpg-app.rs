@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::data::paths::app_preferences_dir;
+use crate::util::sort::{CollectionSortMethod, SortDirection};
 
 /// Persisted position and size of the library window, in pixels.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -16,37 +17,43 @@ pub struct WindowBoundsPref {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UiPrefsFile {
     /// Width of the sidebar panel in pixels.
-    pub sidebar_width:         Option<f32>,
+    pub sidebar_width:             Option<f32>,
     /// Width of the detail panel in pixels.
-    pub detail_width:          Option<f32>,
+    pub detail_width:              Option<f32>,
     /// Whether the Collections sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub collections_open:      Option<bool>,
+    pub collections_open:          Option<bool>,
     /// Whether the Publishers sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub publishers_open:       Option<bool>,
+    pub publishers_open:           Option<bool>,
     /// Index of the last-active settings page (Account/Storage/File
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
-    pub settings_page_ix:      Option<usize>,
+    pub settings_page_ix:          Option<usize>,
     /// Position and size the library window was closed at, so it reopens
     /// there instead of always resetting to the default placement.
-    pub library_window_bounds: Option<WindowBoundsPref>,
+    pub library_window_bounds:     Option<WindowBoundsPref>,
     /// Persisted key of the active color theme (`ThemeKey`'s variant name,
     /// lowercased). `None` before this preference existed, or if never
     /// changed from the default.
-    pub theme_key:             Option<String>,
+    pub theme_key:                 Option<String>,
     /// Persisted font family name of the active body font. Any font
     /// installed on the user's system is valid, not a curated list.
-    pub body_font_name:        Option<String>,
+    pub body_font_name:            Option<String>,
     /// Persisted font family name of the active value font.
-    pub value_font_name:       Option<String>,
+    pub value_font_name:           Option<String>,
     /// Persisted font family name of the active label font.
-    pub label_font_name:       Option<String>,
+    pub label_font_name:           Option<String>,
     /// Persisted font family name of the active monospace font.
-    pub mono_font_name:        Option<String>,
+    pub mono_font_name:            Option<String>,
     /// Persisted shared UI text size, in pixels/points.
-    pub ui_text_size:          Option<f32>,
+    pub ui_text_size:              Option<f32>,
+    /// Persisted sidebar Collections sort method (`CollectionSortMethod`'s
+    /// variant name: `"name"`, `"date_created"`, or `"item_count"`).
+    pub collection_sort:           Option<String>,
+    /// Persisted sidebar Collections sort direction (`"ascending"` or
+    /// `"descending"`).
+    pub collection_sort_direction: Option<String>,
 }
 
 /// Persists and restores small UI preferences.
@@ -110,6 +117,37 @@ impl UiPrefs {
     /// Persist the Publishers section open state.
     pub fn save_publishers_open(&mut self, open: bool) {
         self.data.publishers_open = Some(open);
+        self.flush();
+    }
+
+    /// Sidebar Collections sort method (defaults to `Name`).
+    pub fn collection_sort(&self) -> CollectionSortMethod {
+        match self.data.collection_sort.as_deref() {
+            Some("date_created") => CollectionSortMethod::DateCreated,
+            Some("item_count") => CollectionSortMethod::ItemCount,
+            _ => CollectionSortMethod::Name,
+        }
+    }
+
+    /// Sidebar Collections sort direction (defaults to `Ascending`).
+    pub fn collection_sort_direction(&self) -> SortDirection {
+        match self.data.collection_sort_direction.as_deref() {
+            Some("descending") => SortDirection::Descending,
+            _ => SortDirection::Ascending,
+        }
+    }
+
+    /// Persist the sidebar Collections sort method and direction together.
+    pub fn save_collection_sort(&mut self, method: CollectionSortMethod, direction: SortDirection) {
+        self.data.collection_sort = Some(match method {
+                                             CollectionSortMethod::Name => "name",
+                                             CollectionSortMethod::DateCreated => "date_created",
+                                             CollectionSortMethod::ItemCount => "item_count",
+                                         }.to_string());
+        self.data.collection_sort_direction = Some(match direction {
+                                                       SortDirection::Ascending => "ascending",
+                                                       SortDirection::Descending => "descending",
+                                                   }.to_string());
         self.flush();
     }
 
