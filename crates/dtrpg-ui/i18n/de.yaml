@@ -199,7 +199,7 @@ settings:
   appearance_theme_label: "Thema"
   appearance_font_placeholder: "Schriftart auswählen…"
   appearance_font_search_placeholder: "Schriftarten suchen…"
-  appearance_text_size_label: "Textgröße"
+  appearance_text_size_label: "Textskalierung"
   appearance_text_size_decrement_tooltip: "Verkleinern"
   appearance_text_size_increment_tooltip: "Vergrößern"
 

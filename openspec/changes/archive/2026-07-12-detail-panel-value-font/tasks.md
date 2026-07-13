@@ -22,7 +22,7 @@
 ## 4. Verification
 
 - [x] 4.1 Run `cargo check --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo +nightly fmt -- --check`, `cargo test --all-features --workspace`
-- [ ] 4.2 Manually verify: open the expanded detail tab for a single-item entry; confirm every metadata label (System, Released, Format, File Size, Category, Pages, Added, Updated) renders in the sans-serif label font while values stay in the serif body font
-- [ ] 4.3 Manually verify: open a multi-item entry, select a file, expand the file-detail disclosure; confirm the file id and download location labels use the label font, and the copy-on-hover affordance on the values still works
-- [ ] 4.4 Manually verify: expand "Other details"; confirm the stable id, numeric id, order product id, product id, added order, and cover color labels all use the label font, and their values remain in the body font
-- [ ] 4.5 Manually verify: change the label font in Settings > Appearance; confirm detail-tab labels update live to match
+- [x] 4.2 Manually verify: open the expanded detail tab for a single-item entry; confirm every metadata label (System, Released, Format, File Size, Category, Pages, Added, Updated) renders in the sans-serif label font while values stay in the serif body font
+- [x] 4.3 Manually verify: open a multi-item entry, select a file, expand the file-detail disclosure; confirm the file id and download location labels use the label font, and the copy-on-hover affordance on the values still works
+- [x] 4.4 Manually verify: expand "Other details"; confirm the stable id, numeric id, order product id, product id, added order, and cover color labels all use the label font, and their values remain in the body font
+- [x] 4.5 Manually verify: change the label font in Settings > Appearance; confirm detail-tab labels update live to match

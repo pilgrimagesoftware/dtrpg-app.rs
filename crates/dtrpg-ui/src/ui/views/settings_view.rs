@@ -144,8 +144,9 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                            .flex()
                            .items_center()
                            .justify_center()
-                           .text_sm()
-                           .font_weight(gpui::FontWeight::MEDIUM)
+                           .text_base()
+                           .line_height(px(28.0))
+                           .font_weight(gpui::FontWeight::BOLD)
                            .text_color(colors.text_primary)
                            .child(t!("settings.title").to_string())
                            .on_mouse_down(MouseButton::Left, |_, window, _| {

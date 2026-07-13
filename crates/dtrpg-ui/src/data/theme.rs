@@ -163,8 +163,9 @@ impl ThemeKey {
 ///
 /// Family choices are free-form: any font name the user's system reports via
 /// `cx.text_system().all_font_names()` is valid, not a curated list — see
-/// `settings_appearance_view`. `ui_text_size` is shared across all roles
-/// except monospace, which renders at [`MONO_SIZE_RATIO`] of it.
+/// `settings_appearance_view`. `ui_text_size` drives the window's rem size,
+/// so every role scales together as the Appearance page's "Text Scale"
+/// control changes it.
 #[derive(Debug, Clone)]
 pub struct FontSelections {
     /// Active body-font family; also applied to `gpui_component::Theme`'s

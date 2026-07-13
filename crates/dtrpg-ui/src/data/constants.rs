@@ -135,19 +135,10 @@ pub const DEFAULT_BODY_FONT: &str = "Georgia";
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub const DEFAULT_BODY_FONT: &str = "Liberation Serif";
 
-/// Default value-font family, sans-serif, used to visually distinguish data
-/// values (e.g. Advanced settings' "Cache details" rows) from the default
-/// serif body font.
-#[cfg(target_os = "macos")]
-pub const DEFAULT_VALUE_FONT: &str = "Gotham";
-/// Default value-font family, sans-serif, used to visually distinguish data
-/// values from the default serif body font.
-#[cfg(target_os = "windows")]
-pub const DEFAULT_VALUE_FONT: &str = "Segoe UI";
-/// Default value-font family, sans-serif, used to visually distinguish data
-/// values from the default serif body font.
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub const DEFAULT_VALUE_FONT: &str = "DejaVu Sans";
+/// Default value-font family — the same family as [`DEFAULT_BODY_FONT`],
+/// distinguished from body text by rendering at [`VALUE_FONT_SIZE_RATIO`] of
+/// its size rather than by a different family.
+pub const DEFAULT_VALUE_FONT: &str = DEFAULT_BODY_FONT;
 
 /// Default label-font family, sans-serif, used to visually distinguish
 /// field/row labels (e.g. the detail tab's metadata labels) from the default
@@ -176,9 +167,10 @@ pub const DEFAULT_MONO_FONT: &str = "Consolas";
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub const DEFAULT_MONO_FONT: &str = "Liberation Mono";
 
-/// Default shared UI text size, in points/pixels — matches
-/// `gpui`'s and `gpui_component`'s own stock default so nothing visibly
-/// changes until the user adjusts it in Settings > Appearance.
+/// Shared UI text size, in points/pixels, that corresponds to a "Text Scale"
+/// of `1.0` — matches `gpui`'s and `gpui_component`'s own stock default so
+/// nothing visibly changes until the user adjusts it in Settings >
+/// Appearance.
 pub const DEFAULT_UI_TEXT_SIZE: f32 = 16.0;
 /// Minimum shared UI text size the Appearance page's stepper allows.
 pub const MIN_UI_TEXT_SIZE: f32 = 12.0;
@@ -186,8 +178,23 @@ pub const MIN_UI_TEXT_SIZE: f32 = 12.0;
 /// generous enough to meaningfully help low-vision users without breaking
 /// layouts sized around the default.
 pub const MAX_UI_TEXT_SIZE: f32 = 28.0;
-/// Monospace text renders at this fraction of the shared UI text size,
-/// matching `gpui_component::Theme`'s stock 13px-on-16px default ratio, so
-/// code-like content (e.g. the masked API key hint) stays visually smaller
-/// than body text even as the shared size changes.
-pub const MONO_SIZE_RATIO: f32 = 13.0 / 16.0;
+/// Minimum "Text Scale" value the Appearance page's stepper allows.
+pub const MIN_UI_TEXT_SCALE: f32 = MIN_UI_TEXT_SIZE / DEFAULT_UI_TEXT_SIZE;
+/// Maximum "Text Scale" value the Appearance page's stepper allows.
+pub const MAX_UI_TEXT_SCALE: f32 = MAX_UI_TEXT_SIZE / DEFAULT_UI_TEXT_SIZE;
+/// Amount the Appearance page's +/- stepper adjusts the "Text Scale" value
+/// by on each click.
+pub const UI_TEXT_SCALE_STEP: f32 = 0.1;
+/// Rendered size, in points, of the "body" font role at a "Text Scale" of
+/// `1.0`.
+pub const BODY_FONT_SIZE_PT: f32 = 14.0;
+/// The "value" font role renders at this fraction of the "body" role's size
+/// — same family by default (see [`DEFAULT_VALUE_FONT`]), distinguished from
+/// body text by being slightly smaller rather than by a different typeface.
+pub const VALUE_FONT_SIZE_RATIO: f32 = 0.9;
+/// Rendered size, in points, of the "label" and "monospace" font roles at a
+/// "Text Scale" of `1.0` — matching `gpui_component::Theme`'s stock
+/// 13px-on-16px default ratio, so code-like content (e.g. the masked API key
+/// hint) stays visually smaller than body text even as the shared scale
+/// changes.
+pub const LABEL_MONO_FONT_SIZE_PT: f32 = 13.0;

@@ -105,7 +105,12 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
                 titlebar: Some(TitlebarOptions {
                     title: Some(t!("sidebar.app_name").to_string().into()),
                     appears_transparent: true,
-                    ..Default::default()
+                    // Vertically centers the traffic lights within
+                    // `title_bar_view::render_title_bar`'s 44px-tall custom
+                    // row — macOS's own default position assumes the
+                    // standard ~28px system title bar, which sits the
+                    // buttons noticeably above center in our taller row.
+                    traffic_light_position: Some(point(px(12.0), px(14.0))),
                 }),
                 window_bounds,
                 ..Default::default()
@@ -192,6 +197,19 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
                                    // scrolls (see `settings_view::render_settings_panel`).
                                    titlebar: Some(TitlebarOptions { appears_transparent:
                                                                         true,
+                                                                    // Vertically centers the
+                                                                    // traffic lights within
+                                                                    // `settings_view.rs`'s
+                                                                    // 28px-tall `settings-drag-region`
+                                                                    // —
+                                                                    // see the main window's
+                                                                    // equivalent comment in
+                                                                    // `open_library_window`
+                                                                    // for the (28 - 16) / 2
+                                                                    // math.
+                                                                    traffic_light_position:
+                                                                        Some(point(px(12.0),
+                                                                                   px(6.0))),
                                                                     ..Default::default() }),
                                    window_bounds: Some(WindowBounds::centered(window_size, cx)),
                                    is_resizable: false,

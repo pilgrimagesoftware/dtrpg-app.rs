@@ -200,7 +200,7 @@ settings:
   appearance_theme_label: "Theme"
   appearance_font_placeholder: "Select a font…"
   appearance_font_search_placeholder: "Search fonts…"
-  appearance_text_size_label: "Text Size"
+  appearance_text_size_label: "Text Scale"
   appearance_text_size_decrement_tooltip: "Decrease"
   appearance_text_size_increment_tooltip: "Increase"
 

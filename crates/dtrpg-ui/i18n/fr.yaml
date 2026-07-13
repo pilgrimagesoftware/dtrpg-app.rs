@@ -199,7 +199,7 @@ settings:
   appearance_theme_label: "Thème"
   appearance_font_placeholder: "Choisir une police…"
   appearance_font_search_placeholder: "Rechercher des polices…"
-  appearance_text_size_label: "Taille du texte"
+  appearance_text_size_label: "Échelle du texte"
   appearance_text_size_decrement_tooltip: "Réduire"
   appearance_text_size_increment_tooltip: "Agrandir"
 

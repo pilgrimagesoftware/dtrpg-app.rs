@@ -614,10 +614,12 @@ impl TableDelegate for CatalogListDelegate {
         // non-flex `div`, so the text sits at the top of the header cell instead of
         // vertically centered like every `render_td` cell. Match the cell style here.
         let name = self.column(col_ix, cx).name;
+        let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
         div().h_full()
              .flex()
              .items_center()
              .text_sm()
+             .font_family(label_font_family.to_string())
              .font_weight(FontWeight::MEDIUM)
              .child(name)
     }
@@ -813,10 +815,12 @@ impl TableDelegate for GroupedCatalogListDelegate {
                  cx: &mut Context<TableState<Self>>)
                  -> impl IntoElement {
         let name = self.column(col_ix, cx).name;
+        let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
         div().h_full()
              .flex()
              .items_center()
              .text_sm()
+             .font_family(label_font_family.to_string())
              .font_weight(FontWeight::MEDIUM)
              .child(name)
     }
