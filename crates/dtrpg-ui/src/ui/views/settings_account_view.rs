@@ -83,8 +83,9 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                 .items_baseline()
                                 .gap(px(6.0))
                                 .child(
-                                    div().text_color(colors.text_secondary)
-                                        .child(small_caps_text(t!("settings.email_label"), 0.75)),
+                                    div().text_xs()
+                                        .text_color(colors.text_secondary)
+                                        .child(small_caps_text(t!("settings.email_label"))),
                                 )
                                 .child(
                                     selectable_text("settings-account-email", email_text.clone())
@@ -102,9 +103,9 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                     .items_baseline()
                                     .gap(px(6.0))
                                     .child(
-                                        div().text_color(colors.text_secondary).child(
-                                            small_caps_text(t!("settings.api_key_label"), 0.75),
-                                        ),
+                                        div().text_xs()
+                                            .text_color(colors.text_secondary)
+                                            .child(small_caps_text(t!("settings.api_key_label"))),
                                     )
                                     .child(
                                         selectable_text("settings-account-api-key", hint.clone())

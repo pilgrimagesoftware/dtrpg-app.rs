@@ -61,6 +61,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
+    let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
     let item = item.clone();
     let is_checking = entity.read(cx).is_checking(&item.id);
@@ -294,7 +295,10 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 )
                             }),
                     )
-                    .child(render_metadata_table(&item, &storage_root_path, &label_font_family))
+                    .child(render_metadata_table(&item,
+                                                 &storage_root_path,
+                                                 &label_font_family,
+                                                 &value_font_family))
                     .when(item.is_multi_item(), |this| {
                         this.child(render_item_tier(&item, &storage_root_path,
                                                     entity_item_tier.clone(), tabs, colors, window,
@@ -396,12 +400,14 @@ impl TableDelegate for ItemListDelegate {
             return div().into_any_element();
         };
         let colors = cx.global::<LibriTheme>().colors.clone();
+        let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
         match col_ix {
             0 => div().h_full()
                       .flex()
                       .items_center()
                       .text_sm()
+                      .font_family(value_font_family.to_string())
                       .text_color(colors.text_primary)
                       .truncate()
                       .child(file.name.to_string())
@@ -410,6 +416,7 @@ impl TableDelegate for ItemListDelegate {
                       .flex()
                       .items_center()
                       .text_sm()
+                      .font_family(value_font_family.to_string())
                       .text_color(colors.text_secondary)
                       .truncate()
                       .child(file.format.to_string())
@@ -422,6 +429,7 @@ impl TableDelegate for ItemListDelegate {
                      .flex()
                      .items_center()
                      .text_sm()
+                     .font_family(value_font_family.to_string())
                      .text_color(colors.text_secondary)
                      .child(crate::util::file_size::prefer_on_disk_size(catalog_str, on_disk))
                      .into_any_element()
@@ -510,10 +518,12 @@ impl TableDelegate for ItemListDelegate {
                  cx: &mut Context<TableState<Self>>)
                  -> impl IntoElement {
         let name = self.column(col_ix, cx).name;
+        let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
         div().h_full()
              .flex()
              .items_center()
              .text_sm()
+             .font_family(label_font_family.to_string())
              .font_weight(gpui::FontWeight::MEDIUM)
              .child(name)
     }
@@ -607,8 +617,10 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
                         colors: &ColorTokens, cx: &App)
                         -> impl IntoElement + 'static {
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
+    let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
     let name_value = copyable_value(SharedString::from(format!("file-name-{row_ix}")),
-                                    file.name.to_string());
+                                    file.name.to_string(),
+                                    &value_font_family);
 
     let file_size_value = {
         let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
@@ -628,10 +640,10 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
                    .span(2))
         .child(DescriptionItem::new(styled_label(t!("detail.field_format").to_string(),
                                                  &label_font_family))
-                   .value(file.format.to_string()))
+                   .value(styled_value(file.format.to_string(), &value_font_family)))
         .child(DescriptionItem::new(styled_label(t!("detail.field_file_size").to_string(),
                                                  &label_font_family))
-                   .value(file_size_value))
+                   .value(styled_value(file_size_value, &value_font_family)))
         // .child(DescriptionItem::new(t!("detail.field_status").to_string())
         //            .value(if item.status == ItemStatus::Downloaded {
         //                t!("detail.status_on_device").to_string()
@@ -691,6 +703,7 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
     let toggle_key = file_other_details_key(entry_id, row_ix);
     let open = entity.read(cx).is_file_other_details_open(&toggle_key);
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
+    let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
     let toggle_entity = entity;
     let toggle_key_for_click = Arc::clone(&toggle_key);
@@ -733,6 +746,7 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                 .value(copyable_value(
                     SharedString::from(format!("file-id-{toggle_key}")),
                     file.id.to_string(),
+                    &value_font_family,
                 ))
                 .span(2),
         )
@@ -742,6 +756,7 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                 .value(copyable_value(
                     SharedString::from(format!("file-path-{toggle_key}")),
                     path_value,
+                    &value_font_family,
                 ))
                 .span(2),
         );
@@ -764,6 +779,7 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
     let entry_id = Arc::clone(&item.id);
     let open = entity.read(cx).is_other_details_open(&entry_id);
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
+    let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
     let toggle_entity = entity;
     let toggle_entry_id = Arc::clone(&entry_id);
@@ -800,6 +816,7 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
                 .value(copyable_value(
                     SharedString::from("other-details-stable-id"),
                     item.id.to_string(),
+                    &value_font_family,
                 )),
         )
         .child(
@@ -808,6 +825,7 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
                 .value(copyable_value(
                     SharedString::from("other-details-numeric-id"),
                     item.numeric_id.to_string(),
+                    &value_font_family,
                 )),
         )
         .child(
@@ -816,6 +834,7 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
                 .value(copyable_value(
                     SharedString::from("other-details-order-product-id"),
                     item.order_product_id.to_string(),
+                    &value_font_family,
                 )),
         )
         .child(
@@ -824,12 +843,13 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
                 .value(copyable_value(
                     SharedString::from("other-details-product-id"),
                     item.product_id.to_string(),
+                    &value_font_family,
                 )),
         )
         .child(
             DescriptionItem::new(styled_label(t!("detail.field_added_order").to_string(),
                                               &label_font_family))
-                .value(item.added_order.to_string()),
+                .value(styled_value(item.added_order.to_string(), &value_font_family)),
         )
         .child(
             DescriptionItem::new(styled_label(t!("detail.field_cover_color").to_string(),
@@ -843,6 +863,7 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
                         .child(copyable_value(
                             SharedString::from("other-details-cover-color"),
                             item.color.to_string(),
+                            &value_font_family,
                         ))
                         .into_any_element(),
                 )
@@ -928,11 +949,14 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
         )
 }
 
-/// Renders a text value with an appear-on-hover copy button.
+/// Renders a text value with an appear-on-hover copy button, in the app's
+/// dedicated value font.
 ///
 /// `field_id` must be unique within the surrounding view — it doubles as the
 /// hover group name and the copy button's element id.
-fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> AnyElement {
+fn copyable_value(field_id: SharedString, value: impl Into<SharedString>,
+                  value_font_family: &str)
+                  -> AnyElement {
     let value: SharedString = value.into();
 
     div()
@@ -941,10 +965,10 @@ fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> Any
         .flex()
         .items_center()
         .gap(px(6.0))
-        .child(selectable_text(
-            SharedString::from(format!("{field_id}-text")),
-            value.clone(),
-        ))
+        .child(
+            selectable_text(SharedString::from(format!("{field_id}-text")), value.clone())
+                .font_family(value_font_family.to_string()),
+        )
         .child(
             div()
                 .invisible()
@@ -959,15 +983,19 @@ fn copyable_value(field_id: SharedString, value: impl Into<SharedString>) -> Any
 }
 
 /// Renders a `DescriptionList` label in the app's dedicated label font and in
-/// small caps, distinguishing field names from their values (which stay in
-/// the default body font).
-///
-/// `0.875` matches `DescriptionList`'s own `.text_sm()` on the wrapping
-/// element, so the small-caps run sizes stay proportional to the size that
-/// element would otherwise cascade down unstyled.
+/// small caps, distinguishing field names from their values (rendered in the
+/// dedicated value font — see [`styled_value`]).
 fn styled_label(label: impl Into<SharedString>, label_font_family: &str) -> AnyElement {
     div().font_family(label_font_family.to_string())
-         .child(small_caps_text(label, 0.875))
+         .child(small_caps_text(label))
+         .into_any_element()
+}
+
+/// Renders a `DescriptionList` value in the app's dedicated value font, for
+/// plain text values that don't need [`copyable_value`]'s copy button.
+fn styled_value(value: impl Into<SharedString>, value_font_family: &str) -> AnyElement {
+    div().font_family(value_font_family.to_string())
+         .child(value.into())
          .into_any_element()
 }
 
@@ -1010,7 +1038,8 @@ fn value_or_dash(value: &str) -> String {
     }
 }
 
-fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_font_family: &str)
+fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_font_family: &str,
+                         value_font_family: &str)
                          -> impl IntoElement + 'static + use<> {
     let file_size_label = if item.files.len() > 1 {
         t!("detail.field_total_file_size").to_string()
@@ -1073,23 +1102,25 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
                 .value(Text::from(selectable_text(
                     "detail-field-system",
                     value_or_dash(&item.line),
-                ))),
+                ).font_family(value_font_family.to_string()))),
         )
         .child(
             DescriptionItem::new(styled_label(t!("detail.field_released").to_string(), label_font_family))
                 .value(Text::from(selectable_text(
                     "detail-field-released",
                     item.year.to_string(),
-                ))),
+                ).font_family(value_font_family.to_string()))),
         )
         .child(
             DescriptionItem::new(styled_label(t!("detail.field_format").to_string(), label_font_family)).value(
-                Text::from(selectable_text("detail-field-format", item.format.to_string())),
+                Text::from(selectable_text("detail-field-format", item.format.to_string())
+                    .font_family(value_font_family.to_string())),
             ),
         )
         .child(
             DescriptionItem::new(styled_label(file_size_label, label_font_family)).value(
-                Text::from(selectable_text("detail-field-file-size", file_size_value)),
+                Text::from(selectable_text("detail-field-file-size", file_size_value)
+                    .font_family(value_font_family.to_string())),
             ),
         )
         .child(
@@ -1098,7 +1129,7 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
                 .value(Text::from(selectable_text(
                     "detail-field-kind",
                     item.kind.to_string(),
-                )))
+                ).font_family(value_font_family.to_string())))
                 .span(2),
         );
 
@@ -1110,20 +1141,20 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
                 .value(Text::from(selectable_text(
                     "detail-field-pages",
                     item.pages.to_string(),
-                )))
+                ).font_family(value_font_family.to_string())))
                 .span(2),
         );
     }
 
     if let Some(ts) = item.date_added {
-        let value = render_relative_date_value(&item.id, "added", ts);
+        let value = render_relative_date_value(&item.id, "added", ts, value_font_family);
         list = list.child(DescriptionItem::new(styled_label(t!("detail.field_added").to_string(),
                                                             label_font_family)).value(value)
                                                                                .span(2));
     }
 
     if let Some(ts) = item.date_updated {
-        let value = render_relative_date_value(&item.id, "updated", ts);
+        let value = render_relative_date_value(&item.id, "updated", ts, value_font_family);
         list =
             list.child(DescriptionItem::new(styled_label(t!("detail.field_updated").to_string(),
                                                          label_font_family)).value(value)
@@ -1138,13 +1169,14 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
 ///
 /// `slot` disambiguates the element id (e.g. `"added"`, `"updated"`) so
 /// multiple date rows on the same item don't collide.
-fn render_relative_date_value(item_id: &str, slot: &str, ts: i64) -> AnyElement {
+fn render_relative_date_value(item_id: &str, slot: &str, ts: i64, value_font_family: &str)
+                              -> AnyElement {
     let relative = format_relative(ts);
     let absolute = format_absolute(ts);
     let id = SharedString::from(format!("detail-{slot}-{item_id}"));
     div().id(id)
          .child(selectable_text(SharedString::from(format!("detail-{slot}-{item_id}-text")),
-                                relative))
+                                relative).font_family(value_font_family.to_string()))
          .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
          .into_any_element()
 }
