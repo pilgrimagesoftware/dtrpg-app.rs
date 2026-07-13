@@ -130,16 +130,6 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                           snap: activity_snap,
                           alert_snap, } = activity_data;
 
-    let activity_total = activity_snap.in_progress_count + activity_snap.recent_count;
-    let activity_glyph = if activity_snap.in_progress_count > 0 {
-        "\u{21bb}"
-    }
-    else if activity_snap.recent_count > 0 {
-        "\u{25cf}"
-    }
-    else {
-        "\u{25cb}"
-    };
     // Only mention completed items in the tooltip when there are any this
     // session — otherwise it always reads "0 completed", which is noise.
     let activity_tooltip_body = if activity_snap.recent_count > 0 {
@@ -151,23 +141,35 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
         t!("status_bar.activity_tooltip_in_progress_only",
            in_progress = activity_snap.in_progress_count)
     };
-    let mut activity_indicator =
-        Button::new("status-bar-activity").ghost()
-                                          .compact()
-                                          .label(format!("{activity_glyph} {activity_total}"))
-                                          .tooltip(status_bar_tooltip(&t!("activity.title"),
-                                                                      &activity_tooltip_body));
-    if activity_snap.in_progress_count > 0 {
-        let progress_circle = match activity_snap.aggregate_progress {
+    // Idle state (no in-progress loaders) renders at value 0, which draws
+    // only the faint background ring — an inactive circle rather than the
+    // former "○" glyph. `gpui-component`'s default `progress_bar` theme
+    // token is near-black, invisible against a dark status bar, so the
+    // circle uses the app's accent color (already used for in-progress
+    // activity elsewhere, e.g. `activity_panel_view`) instead.
+    let progress_circle = if activity_snap.in_progress_count > 0 {
+        match activity_snap.aggregate_progress {
             Some(fraction) => {
                 ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
+                                                                   .color(colors.accent)
                                                                    .value(fraction * 100.0)
             }
             None => ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
+                                                                       .color(colors.accent)
                                                                        .loading(true),
-        };
-        activity_indicator = activity_indicator.child(progress_circle);
+        }
     }
+    else {
+        ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
+                                                            .color(colors.accent)
+                                                            .value(0.0)
+    };
+    let activity_indicator =
+        Button::new("status-bar-activity").ghost()
+                                          .compact()
+                                          .child(progress_circle)
+                                          .tooltip(status_bar_tooltip(&t!("activity.title"),
+                                                                      &activity_tooltip_body));
 
     let activity_for_open_change = activity.clone();
     let activity_panel = Popover::new("status-bar-activity-popover")

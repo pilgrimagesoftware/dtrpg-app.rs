@@ -1,24 +1,24 @@
 ## 1. Aggregate Progress Source
 
-- [ ] 1.1 Add or confirm an `ActivityController` accessor returning aggregate
+- [x] 1.1 Add or confirm an `ActivityController` accessor returning aggregate
       (completed, total) across all currently active loaders
-- [ ] 1.2 Determine indeterminate vs. determinate state: loaders without a known total
+- [x] 1.2 Determine indeterminate vs. determinate state: loaders without a known total
       (e.g. thumbnail queue) contribute to an indeterminate spin instead of a fixed value
 
 ## 2. Status Bar Indicator
 
-- [ ] 2.1 Replace the glyph `Button` label in `render_status_bar` with
+- [x] 2.1 Replace the glyph `Button` label in `render_status_bar` with
       `ProgressCircle::new(...)` sized for the status bar row
-- [ ] 2.2 Wire `.value()` from the aggregate accessor; use `.loading(true)` for the
+- [x] 2.2 Wire `.value()` from the aggregate accessor; use `.loading(true)` for the
       indeterminate case
-- [ ] 2.3 Preserve `.on_click()` → `toggle_panel` and the existing tooltip text
-- [ ] 2.4 Idle state (no in-progress or recent items) renders an empty/inactive circle
+- [x] 2.3 Preserve `.on_click()` → `toggle_panel` and the existing tooltip text
+- [x] 2.4 Idle state (no in-progress or recent items) renders an empty/inactive circle
 
 ## 3. Build and Quality
 
-- [ ] 3.1 `cargo check --workspace`
-- [ ] 3.2 `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] 3.3 `cargo test --workspace`
+- [x] 3.1 `cargo check --workspace`
+- [x] 3.2 `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] 3.3 `cargo test --workspace`
 
 ## 4. Manual Verification
 
