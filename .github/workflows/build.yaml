@@ -1,9 +1,5 @@
 name: Build and Test
 
-# CI build/test only. Packaging and releases (nightly and tagged) moved to
-# `package.yaml`/`nightly.yaml`/`release.yaml`; see
-# openspec/changes/add-release-packaging-workflow.
-
 on:
   push:
     branches:
@@ -35,9 +31,12 @@ jobs:
           - name: Linux
             os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-          - name: macOS
+          - name: macOS (Intel)
             os: macos-latest
             target: x86_64-apple-darwin
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            target: aarch64-apple-darwin
 
     steps:
       - name: Checkout
