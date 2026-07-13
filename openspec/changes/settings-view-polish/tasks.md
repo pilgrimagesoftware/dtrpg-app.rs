@@ -1,8 +1,8 @@
-## 1. Account section right-alignment
+## 1. Account section alignment
 
-- [x] 1.1 In `settings_account_view.rs`, update the Email row's wrapping `div()` to `justify_between` and add `.text_right()` (or `.flex_1()` + right alignment) to the value div
+- [x] 1.1 In `settings_account_view.rs`, right-align the Email row's label within the `DescriptionList` label column and left-align its value (superseded: values were briefly right-aligned, then reverted to left-aligned per follow-up feedback)
 - [x] 1.2 Apply the same change to the API Key row
-- [ ] 1.3 Run the app and visually confirm both rows right-align without breaking the existing `items_baseline()` vertical alignment
+- [ ] 1.3 Run the app and visually confirm the label right-aligns and the value left-aligns without breaking the existing `items_baseline()` vertical alignment
 
 ## 2. Downloads icon buttons
 
@@ -28,7 +28,7 @@
 ## 5. Verification
 
 - [x] 5.1 Run `cargo check --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo +nightly fmt -- --check`, `cargo test --all-features --workspace`
-- [ ] 5.2 Manually verify: Account's Email/API Key rows right-align
+- [ ] 5.2 Manually verify: Account's Email/API Key row labels right-align and values left-align
 - [ ] 5.3 Manually verify: Downloads' "Change…" and reveal buttons show folder icons, still open the folder picker / reveal the storage location, and still show their tooltips on hover
 - [ ] 5.4 Manually verify: About shows a real (non-"unknown") git commit hash, a plausible build date, and the correct target triple for a normal `cargo build` in this git checkout
 - [ ] 5.5 Manually verify: About's rows are right-aligned with no visible borders

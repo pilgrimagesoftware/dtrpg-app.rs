@@ -118,9 +118,9 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
 /// against each other.
 const ACCOUNT_INFO_COLUMN_GAP: gpui::Pixels = px(8.0);
 
-/// Builds a right-aligned label / monospace-value row for the Email/API Key
-/// `DescriptionList`. The label styling (font, weight, size, color) matches
-/// every other settings section's row labels — see
+/// Builds a right-aligned label / left-aligned monospace-value row for the
+/// Email/API Key `DescriptionList`. The label styling (font, weight, size,
+/// color) matches every other settings section's row labels — see
 /// `settings_appearance_view::row_label` — the value keeps its prior
 /// monospace treatment.
 fn account_info_item(value_id: &'static str, label: String, value: String, colors: &ColorTokens,
@@ -136,7 +136,6 @@ fn account_info_item(value_id: &'static str, label: String, value: String, color
              .into_any_element(),
     ).value(
         div().pl(ACCOUNT_INFO_COLUMN_GAP)
-             .text_right()
              .child(
                  selectable_text(value_id, value).text_xs()
                                                  .font_family(mono_font_family.to_string())
