@@ -28,10 +28,12 @@ pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsC
                               colors: &ColorTokens, email_input: Option<Entity<InputState>>,
                               password_input: Option<Entity<InputState>>,
                               sign_in_in_progress: bool, sign_in_enabled: bool,
-                              sign_in_error: Option<String>, mono_font_family: &str)
+                              sign_in_error: Option<String>, label_font_family: &str,
+                              mono_font_family: &str)
                               -> AnyElement {
     if auth.is_logged_in {
-        render_authenticated(auth, entity, colors, mono_font_family).into_any_element()
+        render_authenticated(auth, entity, colors, label_font_family, mono_font_family)
+            .into_any_element()
     }
     else {
         render_unauthenticated(entity,
@@ -48,7 +50,7 @@ pub fn render_account_section(auth: &AuthStateSnapshot, entity: Entity<SettingsC
 // ───────────────────────────────────────────────────────
 
 fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsController>,
-                        colors: &ColorTokens, mono_font_family: &str)
+                        colors: &ColorTokens, label_font_family: &str, mono_font_family: &str)
                         -> impl IntoElement + 'static {
     let text_primary = colors.text_primary;
     let border = colors.border;
@@ -67,6 +69,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                                           t!("settings.email_label").to_string(),
                                                           email_text.clone(),
                                                           colors,
+                                                          label_font_family,
                                                           mono_font_family,
                                                       ));
 
@@ -75,6 +78,7 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                                       t!("settings.api_key_label").to_string(),
                                                       hint.clone(),
                                                       colors,
+                                                      label_font_family,
                                                       mono_font_family));
     }
 
@@ -108,24 +112,35 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                      .child(render_logout_button(entity)))
 }
 
+/// Gap between the label column and the value column in the Email/API Key
+/// `DescriptionList` rows. The list's own column padding is zeroed out by
+/// `bordered(false)`, so without this the label and value text sit flush
+/// against each other.
+const ACCOUNT_INFO_COLUMN_GAP: gpui::Pixels = px(8.0);
+
 /// Builds a right-aligned label / monospace-value row for the Email/API Key
-/// `DescriptionList`, preserving the label and value styling from the prior
-/// hand-rolled rows.
+/// `DescriptionList`, in the app's dedicated label font (matching the other
+/// settings sections' row labels) and preserving the value styling from the
+/// prior hand-rolled rows.
 fn account_info_item(value_id: &'static str, label: String, value: String, colors: &ColorTokens,
-                     mono_font_family: &str)
+                     label_font_family: &str, mono_font_family: &str)
                      -> DescriptionItem {
     DescriptionItem::new(
         div().w_full()
              .text_right()
              .text_xs()
+             .font_family(label_font_family.to_string())
              .text_color(colors.text_secondary)
              .child(small_caps_text(label))
              .into_any_element(),
     ).value(
-        selectable_text(value_id, value).text_xs()
-                                        .font_family(mono_font_family.to_string())
-                                        .text_color(colors.text_tertiary)
-                                        .into_any_element(),
+        div().pl(ACCOUNT_INFO_COLUMN_GAP)
+             .child(
+                 selectable_text(value_id, value).text_xs()
+                                                 .font_family(mono_font_family.to_string())
+                                                 .text_color(colors.text_tertiary),
+             )
+             .into_any_element(),
     )
 }
 

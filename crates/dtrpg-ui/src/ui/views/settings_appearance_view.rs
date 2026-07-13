@@ -62,7 +62,6 @@ fn row_label(title: impl Into<gpui::SharedString>, colors: &ColorTokens, label_f
          .flex_none()
          .text_sm()
          .font_family(label_font_family.to_string())
-         .font_weight(gpui::FontWeight::MEDIUM)
          .text_color(colors.text_primary)
          .child(small_caps_text(title))
 }

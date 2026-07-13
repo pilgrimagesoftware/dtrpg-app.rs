@@ -115,6 +115,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
         4 => render_advanced_section(entity.clone(),
                                      cache_counts,
                                      colors,
+                                     &theme.fonts.label_font,
                                      &theme.fonts.value_font).into_any_element(),
         5 => render_about_section(colors).into_any_element(),
         _ => render_account_section(&auth,
@@ -125,6 +126,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     sign_in_in_progress,
                                     sign_in_enabled,
                                     sign_in_error,
+                                    &theme.fonts.label_font,
                                     &theme.fonts.mono_font),
     };
 
