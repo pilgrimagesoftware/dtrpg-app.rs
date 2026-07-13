@@ -131,7 +131,8 @@ pub mod stub {
                 CollectionsStubMode::Seeded => {
                     Ok(vec![CollectionEntry { id:         1,
                                               name:       Arc::from("Favorites"),
-                                              member_ids: Arc::from([42u64, 99u64]), }])
+                                              member_ids: Arc::from([42u64, 99u64]),
+                                              created_at: 1_700_000_000, }])
                 }
                 CollectionsStubMode::Empty => Ok(vec![]),
                 CollectionsStubMode::Error => {
@@ -147,7 +148,8 @@ pub mod stub {
                 CollectionsStubMode::Seeded | CollectionsStubMode::Empty => {
                     Ok(CollectionEntry { id:         1,
                                          name:       Arc::from(name),
-                                         member_ids: Arc::from(&[][..]), })
+                                         member_ids: Arc::from(&[][..]),
+                                         created_at: 1_700_000_000, })
                 }
                 CollectionsStubMode::Error => {
                     Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,

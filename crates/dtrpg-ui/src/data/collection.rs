@@ -13,4 +13,11 @@ pub struct CollectionEntry {
     pub name:       Arc<str>,
     /// Product `order_product_id` values belonging to this collection.
     pub member_ids: Arc<[u64]>,
+    /// Creation timestamp, Unix epoch seconds. Defaults to `0` when
+    /// deserializing cache files written before this field existed — the
+    /// cache is a startup-speed optimization, not a source of truth, and
+    /// gets overwritten with real timestamps by the next `load_collections`
+    /// fetch.
+    #[serde(default)]
+    pub created_at: i64,
 }

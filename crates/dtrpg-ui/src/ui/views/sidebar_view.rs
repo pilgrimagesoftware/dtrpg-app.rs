@@ -15,7 +15,7 @@ use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputState};
-use gpui_component::menu::{ContextMenuExt, PopupMenuItem};
+use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
@@ -33,6 +33,7 @@ use crate::ui::library::drag::DraggedLibraryItem;
 use crate::util::filter::SidebarFilter;
 use crate::util::matching::name_matches_query;
 use crate::util::publisher::PublisherEntry;
+use crate::util::sort::{CollectionSortMethod, SortDirection};
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
 /// Collections).
@@ -315,6 +316,8 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
 pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                       publishers: Vec<PublisherEntry>, collections: Vec<CollectionEntry>,
                       collections_loaded: bool, catalog_ids: HashSet<u64>,
+                      collection_sort: CollectionSortMethod,
+                      collection_sort_direction: SortDirection,
                       entity: Entity<LibraryController>, tabs: Entity<TabsController>,
                       collection_name_input: Entity<InputState>,
                       publisher_search: SidebarSectionSearch,
@@ -493,6 +496,9 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                 .items_center()
                 .gap(px(4.))
                 .child(div().text_xs().child(collections_count.clone()))
+                .child(render_collection_sort_control(collection_sort,
+                                                       collection_sort_direction,
+                                                       entity_for_toggle.clone()))
                 .child(
                     Button::new("collections-search-open")
                         .ghost()
@@ -570,6 +576,77 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
                    .child(SidebarContent::Separator)
                    .child(SidebarContent::Menu(Box::new(pub_menu)))
+}
+
+/// Renders the Collections header's sort control: an icon button whose
+/// dropdown menu offers the three sort methods plus an ascending/descending
+/// toggle, following `toolbar_view::render_sort_selector`'s `PopupMenuItem`
+/// construction.
+fn render_collection_sort_control(current: CollectionSortMethod, direction: SortDirection,
+                                  entity: Entity<LibraryController>)
+                                  -> impl IntoElement + 'static {
+    Button::new("collections-sort").ghost()
+                                   .compact()
+                                   .icon(if direction == SortDirection::Ascending {
+                                             IconName::SortAscending
+                                         }
+                                         else {
+                                             IconName::SortDescending
+                                         })
+                                   .tooltip(t!("sidebar.collections_sort_tooltip").to_string())
+                                   .dropdown_menu(move |menu, _, _| {
+                                       let e_name = entity.clone();
+                                       let e_date = entity.clone();
+                                       let e_count = entity.clone();
+                                       let e_asc = entity.clone();
+                                       let e_desc = entity.clone();
+                                       menu.item(
+                PopupMenuItem::new(t!("sidebar.collections_sort_name"))
+                    .checked(current == CollectionSortMethod::Name)
+                    .on_click(move |_, _, cx| {
+                        e_name.update(cx, |ctrl, cx| {
+                            ctrl.set_collection_sort(CollectionSortMethod::Name, cx);
+                        });
+                    }),
+            )
+            .item(
+                PopupMenuItem::new(t!("sidebar.collections_sort_date_created"))
+                    .checked(current == CollectionSortMethod::DateCreated)
+                    .on_click(move |_, _, cx| {
+                        e_date.update(cx, |ctrl, cx| {
+                            ctrl.set_collection_sort(CollectionSortMethod::DateCreated, cx);
+                        });
+                    }),
+            )
+            .item(
+                PopupMenuItem::new(t!("sidebar.collections_sort_item_count"))
+                    .checked(current == CollectionSortMethod::ItemCount)
+                    .on_click(move |_, _, cx| {
+                        e_count.update(cx, |ctrl, cx| {
+                            ctrl.set_collection_sort(CollectionSortMethod::ItemCount, cx);
+                        });
+                    }),
+            )
+            .separator()
+            .item(
+                PopupMenuItem::new(t!("sidebar.collections_sort_ascending"))
+                    .checked(direction == SortDirection::Ascending)
+                    .on_click(move |_, _, cx| {
+                        e_asc.update(cx, |ctrl, cx| {
+                            ctrl.set_collection_sort_direction(SortDirection::Ascending, cx);
+                        });
+                    }),
+            )
+            .item(
+                PopupMenuItem::new(t!("sidebar.collections_sort_descending"))
+                    .checked(direction == SortDirection::Descending)
+                    .on_click(move |_, _, cx| {
+                        e_desc.update(cx, |ctrl, cx| {
+                            ctrl.set_collection_sort_direction(SortDirection::Descending, cx);
+                        });
+                    }),
+            )
+                                   })
 }
 
 // ── Helpers

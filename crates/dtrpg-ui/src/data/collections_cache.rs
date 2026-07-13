@@ -78,7 +78,8 @@ mod tests {
     fn make_entry(id: u64, name: &str) -> CollectionEntry {
         CollectionEntry { id,
                           name: Arc::from(name),
-                          member_ids: Arc::from(vec![1u64, 2u64].as_slice()) }
+                          member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
+                          created_at: 1_700_000_000 }
     }
 
     #[test]
