@@ -10,12 +10,17 @@ use gpui::{
 use gpui_component::Sizable;
 use gpui_component::avatar::Avatar;
 use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::input::{Input, InputState};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::{selectable_text, small_caps_text};
+
+/// Width of the Email/API Key info rows' shared label column, sized to fit
+/// "API Key" (the longer of the two labels) plus a small margin.
+const ACCOUNT_INFO_LABEL_WIDTH: gpui::Pixels = px(64.0);
 
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
@@ -54,71 +59,46 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                          .or_else(|| auth.api_key_hint.clone())
                          .unwrap_or_else(|| t!("settings.default_account_name").to_string());
 
+    let mut info_list = DescriptionList::horizontal().bordered(false)
+                                                      .columns(1)
+                                                      .label_width(ACCOUNT_INFO_LABEL_WIDTH)
+                                                      .child(account_info_item(
+                                                          "settings-account-email",
+                                                          t!("settings.email_label").to_string(),
+                                                          email_text.clone(),
+                                                          colors,
+                                                          mono_font_family,
+                                                      ));
+
+    if let Some(hint) = &auth.api_key_hint {
+        info_list = info_list.child(account_info_item("settings-account-api-key",
+                                                      t!("settings.api_key_label").to_string(),
+                                                      hint.clone(),
+                                                      colors,
+                                                      mono_font_family));
+    }
+
     div().flex()
          .flex_col()
          .gap(px(24.0))
          .p(px(24.0))
          // ── Identity row ──────────────────────────────────────────────────
-         .child(
-                div().flex().items_center().child(
-        div().flex()
-             .items_center()
-             .gap(px(16.0))
-             .flex_1()
-             .min_w_0()
-             .child(avatar)
-             .child({
-                 let mut col = div().flex()
-                                    .flex_col()
-                                    .gap(px(4.0))
-                                    .child(div().text_sm()
-                                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                .text_color(text_primary)
-                                                .child(t!("settings.account_title")));
-
-                 // Email
-                 col = col.child(
-                            div()
-                                .flex()
-                                .items_baseline()
-                                .gap(px(6.0))
-                                .child(
-                                    div().text_xs()
-                                        .text_color(colors.text_secondary)
-                                        .child(small_caps_text(t!("settings.email_label"))),
-                                )
-                                .child(
-                                    selectable_text("settings-account-email", email_text.clone())
-                                        .text_xs()
-                                        .font_family(mono_font_family.to_string())
-                                        .text_color(colors.text_tertiary),
-                                ),
-                        );
-
-                 // API Key
-                 if let Some(hint) = &auth.api_key_hint {
-                     col = col.child(
-                                div()
-                                    .flex()
-                                    .items_baseline()
-                                    .gap(px(6.0))
-                                    .child(
-                                        div().text_xs()
-                                            .text_color(colors.text_secondary)
-                                            .child(small_caps_text(t!("settings.api_key_label"))),
-                                    )
-                                    .child(
-                                        selectable_text("settings-account-api-key", hint.clone())
-                                            .text_xs()
-                                            .font_family(mono_font_family.to_string())
-                                            .text_color(colors.text_tertiary),
-                                    ),
-                            );
-                 }
-                 col
-             }),
-    ),
-    )
+         .child(div().flex()
+                     .items_center()
+                     .child(div().flex()
+                                 .items_center()
+                                 .gap(px(16.0))
+                                 .flex_1()
+                                 .min_w_0()
+                                 .child(avatar)
+                                 .child(div().flex()
+                                             .flex_col()
+                                             .gap(px(4.0))
+                                             .child(div().text_sm()
+                                                         .font_weight(gpui::FontWeight::SEMIBOLD)
+                                                         .text_color(text_primary)
+                                                         .child(t!("settings.account_title")))
+                                             .child(info_list))))
          // ── Divider ───────────────────────────────────────────────────────
          .child(div().h(px(1.0)).bg(border))
          // ── Actions ───────────────────────────────────────────────────────
@@ -126,6 +106,27 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                      .flex_col()
                      .gap(px(12.0))
                      .child(render_logout_button(entity)))
+}
+
+/// Builds a right-aligned label / monospace-value row for the Email/API Key
+/// `DescriptionList`, preserving the label and value styling from the prior
+/// hand-rolled rows.
+fn account_info_item(value_id: &'static str, label: String, value: String, colors: &ColorTokens,
+                     mono_font_family: &str)
+                     -> DescriptionItem {
+    DescriptionItem::new(
+        div().w_full()
+             .text_right()
+             .text_xs()
+             .text_color(colors.text_secondary)
+             .child(small_caps_text(label))
+             .into_any_element(),
+    ).value(
+        selectable_text(value_id, value).text_xs()
+                                        .font_family(mono_font_family.to_string())
+                                        .text_color(colors.text_tertiary)
+                                        .into_any_element(),
+    )
 }
 
 /// Renders a 56×56 avatar circle: Gravatar image if available, initial letter
