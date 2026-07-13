@@ -240,14 +240,15 @@ pub fn setup(cx: &mut App) {
     init(cx);
     init_globals(cx);
 
-    // Apply the persisted (or default) body font and sync gpui-component's table
-    // colors (DataTable/Table) with the active Libri theme; otherwise the catalog
-    // list view renders with gpui-component's default light table colors
-    // regardless of which Libri theme is active.
+    // Apply the persisted (or default) body font and sync gpui-component's
+    // theme colors with the active Libri theme; otherwise buttons, inputs,
+    // popovers, scrollbars, the sidebar, and the catalog table all render
+    // with gpui-component's default light colors regardless of which Libri
+    // theme is active.
     let initial_theme = cx.global::<crate::data::theme::LibriTheme>().clone();
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
           theme.font_family = initial_theme.fonts.body_font.clone();
-          crate::data::theme::apply_table_colors(theme, &initial_theme.colors);
+          crate::data::theme::apply_theme_colors(theme, &initial_theme.colors);
       });
 
     // Key bindings

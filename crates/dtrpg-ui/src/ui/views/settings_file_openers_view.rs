@@ -220,7 +220,7 @@ fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<Sett
                     el.child(
                         div()
                             .text_xs()
-                            .text_color(gpui::hsla(0.08, 0.9, 0.55, 1.0)) // amber warning
+                            .text_color(colors.warning_text)
                             .child(format!("⚠ {}", t!("settings.file_opener_app_not_found"))),
                     )
                 }),
