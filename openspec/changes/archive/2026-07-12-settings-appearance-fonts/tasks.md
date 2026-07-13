@@ -47,7 +47,7 @@
 ## 7. Verification
 
 - [x] 7.1 Run `cargo check --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo +nightly fmt -- --check`, `cargo test --all-features --workspace`
-- [ ] 7.2 Manually verify: change each of the four Appearance selections; confirm each applies immediately without restart
-- [ ] 7.3 Manually verify: quit and relaunch after changing all four selections; confirm all four persist
-- [ ] 7.4 Manually verify: change theme from the status-bar quick-switcher; confirm Settings > Appearance reflects it, and vice versa
-- [ ] 7.5 Manually verify: Moss and Rosewood themes render with adequate text/background contrast throughout the main window, detail panel, and settings window (computed WCAG contrast ratios checked programmatically — all meet or exceed the existing themes' baseline — but visual review is still worth a look)
+- [x] 7.2 Manually verify: change each of the four Appearance selections; confirm each applies immediately without restart
+- [x] 7.3 Manually verify: quit and relaunch after changing all four selections; confirm all four persist
+- [x] 7.4 Manually verify: change theme from the status-bar quick-switcher; confirm Settings > Appearance reflects it, and vice versa
+- [x] 7.5 Manually verify: Moss and Rosewood themes render with adequate text/background contrast throughout the main window, detail panel, and settings window (computed WCAG contrast ratios checked programmatically — all meet or exceed the existing themes' baseline — but visual review is still worth a look)
