@@ -22,7 +22,7 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 Trigger a catalog load and confirm the circle fills proportionally to progress
-- [ ] 4.2 Trigger thumbnail loading (no known total) and confirm an indeterminate spin
-- [ ] 4.3 Confirm clicking the indicator still opens the activity panel
-- [ ] 4.4 Confirm the idle state (no activity) looks visually inactive
+- [x] 4.1 Trigger a catalog load and confirm the circle fills proportionally to progress
+- [x] 4.2 Trigger thumbnail loading (no known total) and confirm an indeterminate spin
+- [x] 4.3 Confirm clicking the indicator still opens the activity panel
+- [x] 4.4 Confirm the idle state (no activity) looks visually inactive

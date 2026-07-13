@@ -161,8 +161,8 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
     }
     else {
         ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
-                                                            .color(colors.accent)
-                                                            .value(0.0)
+                                                           .color(colors.accent)
+                                                           .value(0.0)
     };
     let activity_indicator =
         Button::new("status-bar-activity").ghost()
