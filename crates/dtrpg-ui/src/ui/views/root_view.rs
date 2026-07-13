@@ -9,12 +9,12 @@ use gpui::{
 use gpui_component::Root;
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::combobox::{ComboboxEvent, ComboboxState};
 use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle};
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::notification::{Notification, NotificationType};
 use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
 use gpui_component::searchable_list::SearchableListDelegate as _;
+use gpui_component::select::{SelectEvent, SelectState};
 use gpui_component::{IconName, Sizable as _};
 use rust_i18n::t;
 
@@ -246,108 +246,100 @@ impl LibraryRootView {
 
         let current_fonts = cx.global::<LibriTheme>().fonts.clone();
 
-        let body_selected = installed_fonts.position(&current_fonts.body_font.to_string())
-                                           .into_iter()
-                                           .collect::<Vec<_>>();
+        let body_selected = installed_fonts.position(&current_fonts.body_font.to_string());
         let body_font_select = cx.new(|cx| {
-                                     ComboboxState::new(installed_fonts.clone(),
-                                                        body_selected,
-                                                        window,
-                                                        cx).multiple(false)
+                                     SelectState::new(installed_fonts.clone(),
+                                                      body_selected,
+                                                      window,
+                                                      cx).searchable(true)
                                  });
         let controller_for_body_font = controller.clone();
         cx.subscribe(&body_font_select,
-                     move |_this, _state, event: &ComboboxEvent<Vec<String>>, cx| {
-                         if let ComboboxEvent::Confirm(values) = event
-                            && let Some(name) = values.first()
-                         {
-                             controller_for_body_font.update(cx, |ctrl, cx| {
-                                                         ctrl.set_body_font(SharedString::from(
-                                                                  name.clone(),
-                                                              ),
-                                                                             cx);
-                                                     });
-                         }
+                     move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
+                         let SelectEvent::Confirm(Some(name)) = event
+                         else {
+                             return;
+                         };
+                         controller_for_body_font.update(cx, |ctrl, cx| {
+                                                     ctrl.set_body_font(SharedString::from(
+                                                              name.clone(),
+                                                          ),
+                                                                         cx);
+                                                 });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_body_font_select(body_font_select));
 
-        let value_selected = installed_fonts.position(&current_fonts.value_font.to_string())
-                                            .into_iter()
-                                            .collect::<Vec<_>>();
+        let value_selected = installed_fonts.position(&current_fonts.value_font.to_string());
         let value_font_select = cx.new(|cx| {
-                                      ComboboxState::new(installed_fonts.clone(),
-                                                         value_selected,
-                                                         window,
-                                                         cx).multiple(false)
+                                      SelectState::new(installed_fonts.clone(),
+                                                       value_selected,
+                                                       window,
+                                                       cx).searchable(true)
                                   });
         let controller_for_value_font = controller.clone();
         cx.subscribe(&value_font_select,
-                     move |_this, _state, event: &ComboboxEvent<Vec<String>>, cx| {
-                         if let ComboboxEvent::Confirm(values) = event
-                            && let Some(name) = values.first()
-                         {
-                             controller_for_value_font.update(cx, |ctrl, cx| {
-                                                          ctrl.set_value_font(SharedString::from(
-                                                                   name.clone(),
-                                                               ),
-                                                                               cx);
-                                                      });
-                         }
+                     move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
+                         let SelectEvent::Confirm(Some(name)) = event
+                         else {
+                             return;
+                         };
+                         controller_for_value_font.update(cx, |ctrl, cx| {
+                                                      ctrl.set_value_font(SharedString::from(
+                                                               name.clone(),
+                                                           ),
+                                                                           cx);
+                                                  });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| {
                     ctrl.set_value_font_select(value_font_select)
                 });
 
-        let label_selected = installed_fonts.position(&current_fonts.label_font.to_string())
-                                            .into_iter()
-                                            .collect::<Vec<_>>();
+        let label_selected = installed_fonts.position(&current_fonts.label_font.to_string());
         let label_font_select = cx.new(|cx| {
-                                      ComboboxState::new(installed_fonts.clone(),
-                                                         label_selected,
-                                                         window,
-                                                         cx).multiple(false)
+                                      SelectState::new(installed_fonts.clone(),
+                                                       label_selected,
+                                                       window,
+                                                       cx).searchable(true)
                                   });
         let controller_for_label_font = controller.clone();
         cx.subscribe(&label_font_select,
-                     move |_this, _state, event: &ComboboxEvent<Vec<String>>, cx| {
-                         if let ComboboxEvent::Confirm(values) = event
-                            && let Some(name) = values.first()
-                         {
-                             controller_for_label_font.update(cx, |ctrl, cx| {
-                                                          ctrl.set_label_font(SharedString::from(
-                                                                   name.clone(),
-                                                               ),
-                                                                               cx);
-                                                      });
-                         }
+                     move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
+                         let SelectEvent::Confirm(Some(name)) = event
+                         else {
+                             return;
+                         };
+                         controller_for_label_font.update(cx, |ctrl, cx| {
+                                                      ctrl.set_label_font(SharedString::from(
+                                                               name.clone(),
+                                                           ),
+                                                                           cx);
+                                                  });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| {
                     ctrl.set_label_font_select(label_font_select)
                 });
 
-        let mono_selected = installed_fonts.position(&current_fonts.mono_font.to_string())
-                                           .into_iter()
-                                           .collect::<Vec<_>>();
+        let mono_selected = installed_fonts.position(&current_fonts.mono_font.to_string());
         let mono_font_select =
             cx.new(|cx| {
-                  ComboboxState::new(installed_fonts, mono_selected, window, cx).multiple(false)
+                  SelectState::new(installed_fonts, mono_selected, window, cx).searchable(true)
               });
         let controller_for_mono_font = controller.clone();
         cx.subscribe(&mono_font_select,
-                     move |_this, _state, event: &ComboboxEvent<Vec<String>>, cx| {
-                         if let ComboboxEvent::Confirm(values) = event
-                            && let Some(name) = values.first()
-                         {
-                             controller_for_mono_font.update(cx, |ctrl, cx| {
-                                                         ctrl.set_mono_font(SharedString::from(
-                                                                  name.clone(),
-                                                              ),
-                                                                             cx);
-                                                     });
-                         }
+                     move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
+                         let SelectEvent::Confirm(Some(name)) = event
+                         else {
+                             return;
+                         };
+                         controller_for_mono_font.update(cx, |ctrl, cx| {
+                                                     ctrl.set_mono_font(SharedString::from(
+                                                              name.clone(),
+                                                          ),
+                                                                         cx);
+                                                 });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_mono_font_select(mono_font_select));

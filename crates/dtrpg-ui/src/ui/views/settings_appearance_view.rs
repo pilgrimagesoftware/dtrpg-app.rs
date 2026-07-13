@@ -1,6 +1,6 @@
 //! Appearance settings section: searchable font pickers for the four font
 //! roles (body, value, label, monospace) covering every font installed on
-//! the user's system, a shared UI text size stepper, and the active color
+//! the user's system, a shared UI text scale stepper, and the active color
 //! theme picker.
 //!
 //! Font/theme changes apply immediately via `LibraryController`'s
@@ -13,15 +13,23 @@ use gpui::{
     div, px,
 };
 use gpui_component::button::Button;
-use gpui_component::combobox::Combobox;
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_component::select::Select;
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::FontSelectState;
-use crate::data::constants::{MAX_UI_TEXT_SIZE, MIN_UI_TEXT_SIZE, MONO_SIZE_RATIO};
+use crate::data::constants::{
+    BODY_VALUE_FONT_SIZE_PT, DEFAULT_UI_TEXT_SIZE, LABEL_MONO_FONT_SIZE_PT, MAX_UI_TEXT_SCALE,
+    MIN_UI_TEXT_SCALE, UI_TEXT_SCALE_STEP,
+};
 use crate::data::theme::{ColorTokens, LibriTheme, ThemeKey};
+
+/// Width of the label column shared by every row in this section, so the
+/// controls on the right all start at the same horizontal position
+/// regardless of how long each row's label text is.
+const LABEL_COL_WIDTH: gpui::Pixels = px(130.0);
 
 /// All theme keys offered by the picker, in display order.
 const THEME_KEYS: [ThemeKey; 6] = [ThemeKey::Parchment,
@@ -42,63 +50,69 @@ fn theme_label(key: ThemeKey) -> String {
     }
 }
 
-/// Renders one font-picker row: the role's label on the left, a searchable
-/// combobox on the right showing the current font name and its rendered
-/// size in points — the size is shown alongside the name (not just settable
+/// Renders a row's label in the shared, fixed-width left column so every
+/// row's control starts at the same horizontal position.
+fn row_label(title: impl Into<gpui::SharedString>, colors: &ColorTokens) -> impl IntoElement {
+    div().w(LABEL_COL_WIDTH)
+         .flex_none()
+         .text_sm()
+         .font_weight(gpui::FontWeight::MEDIUM)
+         .text_color(colors.text_primary)
+         .child(title.into())
+}
+
+/// Renders one font-picker row: the role's label in the shared left column, a
+/// searchable [`Select`] in the middle, and the font's rendered size in
+/// points on the right — shown alongside the picker (not just settable
 /// elsewhere) so a low-vision user picking a font can see, without hunting
 /// for a separate control, exactly what size it will render at.
 ///
 /// `select` is `None` for one render pass at most (the root view attaches it
 /// immediately after construction, before this section can be reached), in
-/// which case a disabled placeholder renders instead of a broken combobox.
+/// which case a disabled placeholder renders instead of a broken picker.
 fn font_picker_row(title: impl Into<gpui::SharedString>, select: Option<&FontSelectState>,
                    size_pt: f32, colors: &ColorTokens)
                    -> impl IntoElement + 'static {
     let row = div().flex()
                    .items_center()
-                   .justify_between()
                    .gap(px(12.0))
-                   .child(div().text_sm()
-                               .font_weight(gpui::FontWeight::MEDIUM)
-                               .text_color(colors.text_primary)
-                               .child(title.into()));
+                   .child(row_label(title, colors));
 
     let Some(select) = select
     else {
         return row.child(div().text_sm().text_color(colors.text_tertiary).child("…"));
     };
 
-    row.child(Combobox::new(select).menu_width(px(280.0))
-                                   .placeholder(t!("settings.appearance_font_placeholder"))
-                                   .search_placeholder(t!("settings.appearance_font_search_placeholder"))
-                                   .render_trigger(move |ctx, _window, _cx| {
-                                       let label = match ctx.selection.first() {
-                                           Some((_, name)) => format!("{name}, {size_pt:.0}pt"),
-                                           None => ctx.placeholder
-                                                      .map(ToString::to_string)
-                                                      .unwrap_or_default(),
-                                       };
-                                       Button::new("font-picker-trigger").outline()
-                                                                         .label(label)
-                                                                         .into_any_element()
-                                   }))
+    row.child(div().flex_1()
+                   .child(Select::new(select).menu_width(px(280.0))
+                                             .placeholder(t!("settings.appearance_font_placeholder"))
+                                             .search_placeholder(t!(
+                                                 "settings.appearance_font_search_placeholder"
+                                             ))
+                                             .w_full()))
+       .child(div().w(px(48.0))
+                   .flex_none()
+                   .text_sm()
+                   .text_color(colors.text_tertiary)
+                   .text_align(gpui::TextAlign::Right)
+                   .child(format!("{size_pt:.0}pt")))
 }
 
-/// Renders the shared "Text Size" stepper row, matching the concurrency
+/// Renders the shared "Text Scale" stepper row, matching the concurrency
 /// stepper style already used in `settings_storage_view`.
-fn text_size_row(current_pt: f32, entity: Entity<LibraryController>, colors: &ColorTokens)
-                 -> impl IntoElement + 'static {
+///
+/// The value is a decimal multiplier where `1.0` is the app's normal text
+/// scale (body/value fonts render at [`BODY_VALUE_FONT_SIZE_PT`], label/mono
+/// fonts at [`LABEL_MONO_FONT_SIZE_PT`]).
+fn text_scale_row(scale: f32, entity: Entity<LibraryController>, colors: &ColorTokens)
+                  -> impl IntoElement + 'static {
     let entity_dec = entity.clone();
     let entity_inc = entity;
 
     div().flex()
          .items_center()
-         .justify_between()
          .gap(px(12.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::MEDIUM)
-                     .text_color(colors.text_primary)
-                     .child(t!("settings.appearance_text_size_label")))
+         .child(row_label(t!("settings.appearance_text_size_label"), colors))
          .child(div().flex()
                      .items_center()
                      .gap(px(8.0))
@@ -117,19 +131,21 @@ fn text_size_row(current_pt: f32, entity: Entity<LibraryController>, colors: &Co
                                           .to_string()).build(window, cx)
                                  })
                                  .on_click(move |_, _, cx| {
-                                     let next = (current_pt - 1.0).max(MIN_UI_TEXT_SIZE);
+                                     let next = (scale - UI_TEXT_SCALE_STEP).max(MIN_UI_TEXT_SCALE);
                                      entity_dec.update(cx, |ctrl, cx| {
-                                                   ctrl.set_ui_text_size(px(next), cx);
+                                                   ctrl.set_ui_text_size(px(next
+                                                                            * DEFAULT_UI_TEXT_SIZE),
+                                                                         cx);
                                                });
                                  })
                                  .child(div().text_sm()
                                              .text_color(colors.text_primary)
                                              .child("\u{2212}")))
-                     .child(div().w(px(40.0))
+                     .child(div().w(px(48.0))
                                  .text_sm()
                                  .text_color(colors.text_primary)
                                  .text_align(gpui::TextAlign::Center)
-                                 .child(format!("{current_pt:.0}pt")))
+                                 .child(format!("{scale:.2}")))
                      .child(div().id("appearance-text-size-increment")
                                  .flex_none()
                                  .size(px(28.0))
@@ -145,9 +161,11 @@ fn text_size_row(current_pt: f32, entity: Entity<LibraryController>, colors: &Co
                                           .to_string()).build(window, cx)
                                  })
                                  .on_click(move |_, _, cx| {
-                                     let next = (current_pt + 1.0).min(MAX_UI_TEXT_SIZE);
+                                     let next = (scale + UI_TEXT_SCALE_STEP).min(MAX_UI_TEXT_SCALE);
                                      entity_inc.update(cx, |ctrl, cx| {
-                                                   ctrl.set_ui_text_size(px(next), cx);
+                                                   ctrl.set_ui_text_size(px(next
+                                                                            * DEFAULT_UI_TEXT_SIZE),
+                                                                         cx);
                                                });
                                  })
                                  .child(div().text_sm().text_color(colors.text_primary).child("+"))))
@@ -165,7 +183,7 @@ pub struct AppearanceFontSelects {
 
 /// Renders the Appearance settings section: body/value/label/monospace font
 /// pickers (searchable, listing every font installed on the user's system),
-/// a shared text-size stepper, and the active theme picker.
+/// a shared text-scale stepper, and the active theme picker.
 pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &ColorTokens,
                                  theme: &LibriTheme, font_selects: AppearanceFontSelects)
                                  -> impl IntoElement + 'static + use<> {
@@ -176,8 +194,9 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
     let text_primary = colors.text_primary;
     let border = colors.border;
     let theme_key = theme.key;
-    let base_pt = theme.fonts.ui_text_size.as_f32();
-    let mono_pt = base_pt * MONO_SIZE_RATIO;
+    let scale = theme.fonts.ui_text_size.as_f32() / DEFAULT_UI_TEXT_SIZE;
+    let body_value_pt = BODY_VALUE_FONT_SIZE_PT * scale;
+    let label_mono_pt = LABEL_MONO_FONT_SIZE_PT * scale;
 
     let entity_theme = entity.clone();
 
@@ -198,12 +217,8 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
                                        });
     let theme_row = div().flex()
                          .items_center()
-                         .justify_between()
                          .gap(px(12.0))
-                         .child(div().text_sm()
-                                     .font_weight(gpui::FontWeight::MEDIUM)
-                                     .text_color(text_primary)
-                                     .child(t!("settings.appearance_theme_label")))
+                         .child(row_label(t!("settings.appearance_theme_label"), colors))
                          .child(theme_button);
 
     div().flex()
@@ -217,21 +232,21 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
          .child(div().h(px(1.0)).bg(border))
          .child(font_picker_row(t!("settings.appearance_body_font_label"),
                                 body_font_select.as_ref(),
-                                base_pt,
+                                body_value_pt,
                                 colors))
          .child(font_picker_row(t!("settings.appearance_value_font_label"),
                                 value_font_select.as_ref(),
-                                base_pt,
+                                body_value_pt,
                                 colors))
          .child(font_picker_row(t!("settings.appearance_label_font_label"),
                                 label_font_select.as_ref(),
-                                base_pt,
+                                label_mono_pt,
                                 colors))
          .child(font_picker_row(t!("settings.appearance_mono_font_label"),
                                 mono_font_select.as_ref(),
-                                mono_pt,
+                                label_mono_pt,
                                 colors))
-         .child(text_size_row(base_pt, entity, colors))
+         .child(text_scale_row(scale, entity, colors))
          .child(div().h(px(1.0)).bg(border))
          .child(theme_row)
 }
