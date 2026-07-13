@@ -70,3 +70,29 @@ The generative cover foreground color (cream or ink) MUST be derived from the it
 #### Scenario: Cover foreground is unaffected by theme changes
 - **WHEN** the user switches from parchment theme to ink theme
 - **THEN** each cover's foreground color remains the same (determined by the item's color field luminance, not the app theme)
+
+### Requirement: Theme changes MUST propagate to all gpui-component-backed widgets
+Switching the active theme SHALL update colors on every `gpui-component` widget the app uses that reads from `gpui_component::Theme` rather than this app's own `ColorTokens` — including default-styled buttons, inputs, popovers/dropdown menus, tooltips, scrollbars, the sidebar, the tab bar/view-mode selector, and the status bar — not only the catalog `DataTable`/`Table`.
+
+#### Scenario: Sidebar reflects the active theme
+- **WHEN** the user switches from one theme to another
+- **THEN** the sidebar's background, borders, and active-item highlight update to match the newly active theme
+
+#### Scenario: Default-styled buttons reflect the active theme
+- **WHEN** the user switches from one theme to another
+- **THEN** buttons without a custom color variant (e.g. ghost/ordinary buttons throughout Settings and the toolbar) update to match the newly active theme
+
+#### Scenario: Inputs, popovers, and scrollbars reflect the active theme
+- **WHEN** the user switches from one theme to another
+- **THEN** text input fields, popover/dropdown menu backgrounds, and scrollbar colors update to match the newly active theme
+
+#### Scenario: Tab bar and status bar reflect the active theme
+- **WHEN** the user switches from one theme to another
+- **THEN** the catalog view-mode selector, any other tab bar, and the status bar update to match the newly active theme
+
+### Requirement: Settings warning labels MUST use theme tokens, not hardcoded colors
+Settings-page warning labels (e.g. missing-download-folder, missing-file-opener-app warnings) SHALL use the active theme's `warning_text`/`warning_bg` tokens rather than a hardcoded color literal.
+
+#### Scenario: Warning label color follows the active theme
+- **WHEN** a settings-page warning label is shown and the user switches themes
+- **THEN** the warning label's text color updates to match the newly active theme's warning color, the same as every other themed element on that page
