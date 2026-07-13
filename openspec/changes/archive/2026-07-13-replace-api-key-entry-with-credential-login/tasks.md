@@ -28,7 +28,7 @@
 
 - [x] 4.1 Run `cargo test --workspace`
 - [x] 4.2 Run `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] 4.3 Manually verify sign-in with valid and invalid credentials against
+- [x] 4.3 Manually verify sign-in with valid and invalid credentials against
       the real DriveThruRPG website endpoints
-- [ ] 4.4 Verify a pre-existing legacy (key-only) keychain entry still allows
+- [x] 4.4 Verify a pre-existing legacy (key-only) keychain entry still allows
       silent startup reauthentication until the key is rejected
