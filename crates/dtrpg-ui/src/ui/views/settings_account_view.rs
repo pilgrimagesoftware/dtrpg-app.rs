@@ -19,8 +19,8 @@ use crate::data::theme::ColorTokens;
 use crate::ui::widgets::{selectable_text, small_caps_text};
 
 /// Width of the Email/API Key info rows' shared label column, sized to fit
-/// "API Key" (the longer of the two labels) plus a small margin.
-const ACCOUNT_INFO_LABEL_WIDTH: gpui::Pixels = px(64.0);
+/// "API Key" (the longer of the two labels) at `text_sm` plus a small margin.
+const ACCOUNT_INFO_LABEL_WIDTH: gpui::Pixels = px(80.0);
 
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
@@ -119,18 +119,19 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
 const ACCOUNT_INFO_COLUMN_GAP: gpui::Pixels = px(8.0);
 
 /// Builds a right-aligned label / monospace-value row for the Email/API Key
-/// `DescriptionList`, in the app's dedicated label font (matching the other
-/// settings sections' row labels) and preserving the value styling from the
-/// prior hand-rolled rows.
+/// `DescriptionList`. The label styling (font, weight, size, color) matches
+/// every other settings section's row labels — see
+/// `settings_appearance_view::row_label` — the value keeps its prior
+/// monospace treatment.
 fn account_info_item(value_id: &'static str, label: String, value: String, colors: &ColorTokens,
                      label_font_family: &str, mono_font_family: &str)
                      -> DescriptionItem {
     DescriptionItem::new(
         div().w_full()
              .text_right()
-             .text_xs()
+             .text_sm()
              .font_family(label_font_family.to_string())
-             .text_color(colors.text_secondary)
+             .text_color(colors.text_primary)
              .child(small_caps_text(label))
              .into_any_element(),
     ).value(

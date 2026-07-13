@@ -52,10 +52,12 @@ fn format_static_duration(secs: u64) -> String {
     }
 }
 
-/// Renders the shared "Cache details" row frame: a bold label + value cell
-/// on one line, with a short explanatory description beneath in tertiary
-/// text. `value_el` is prebuilt so callers can supply either plain text
-/// ([`stat_row`]) or a tooltip-carrying element ([`timestamp_row`]).
+/// Renders the shared "Cache details" row frame: a label + value cell on one
+/// line, with a short explanatory description beneath in tertiary text.
+/// `value_el` is prebuilt so callers can supply either plain text
+/// ([`stat_row`]) or a tooltip-carrying element ([`timestamp_row`]). The
+/// label styling (font, weight, size, color) matches every other settings
+/// section's row labels — see `settings_appearance_view::row_label`.
 fn row_frame(label: impl Into<SharedString>, value_el: impl IntoElement,
              description: impl Into<SharedString>, colors: &ColorTokens, label_font_family: &str)
              -> impl IntoElement + 'static {
@@ -70,7 +72,6 @@ fn row_frame(label: impl Into<SharedString>, value_el: impl IntoElement,
                      .gap(px(12.0))
                      .child(div().text_sm()
                                  .font_family(label_font_family.to_string())
-                                 .font_weight(gpui::FontWeight::MEDIUM)
                                  .text_color(colors.text_primary)
                                  .child(small_caps_text(label)))
                      .child(value_el))
