@@ -31,6 +31,7 @@
 - [x] 4.1 Open a detail tab at normal width and confirm thumbnail-left / info-right layout.
       Verified manually 2026-07-14 (cover was left of text, but hugging the left edge -
       fixed via 1.2's padding change).
-- [ ] 4.2 Scroll a long description and confirm the cover stays fixed in place
+- [x] 4.2 Scroll a long description and confirm the cover stays fixed in place. Verified
+      manually 2026-07-14.
 - [ ] 4.3 Narrow the tab below the fallback threshold and confirm it reverts to stacked
       layout without clipping the cover. N/A - fallback dropped, see 2.1.
