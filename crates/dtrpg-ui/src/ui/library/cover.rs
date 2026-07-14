@@ -12,6 +12,15 @@ use crate::util::image_format::{ImageKind, sniff};
 // ── CoverCache
 // ────────────────────────────────────────────────────────────────
 
+/// Derives the cache key used for an item's large-context (detail panel)
+/// cover image, distinct from its plain item id (used for the small-context
+/// grid/thumb cover) so both can be cached — in memory and on disk —
+/// independently.
+#[must_use]
+pub fn detail_cache_key(item_id: &str) -> Arc<str> {
+    Arc::from(format!("{item_id}::detail"))
+}
+
 /// Disk-backed in-memory cache of cover images keyed by item id.
 ///
 /// Stored as a GPUI app-level global so all views share the same cache without
@@ -259,6 +268,7 @@ mod tests {
                       color:                     color.into(),
                       desc:                      "A test item.".into(),
                       cover_url:                 None,
+                      detail_cover_url:          None,
                       date_added:                None,
                       date_updated:              None,
                       thumbnail_last_attempted:  None,
@@ -292,6 +302,17 @@ mod tests {
         let style = cover_style(&item);
         assert!(style.foreground.l < 0.2,
                 "expected dark foreground on light bg");
+    }
+
+    #[test]
+    fn detail_cache_key_is_distinct_from_item_id_and_deterministic() {
+        let key_a = detail_cache_key("b1");
+        let key_b = detail_cache_key("b1");
+        let key_other = detail_cache_key("b2");
+
+        assert_ne!(key_a.as_ref(), "b1", "must not collide with the small-context cache key");
+        assert_eq!(key_a, key_b, "same item id must derive the same detail cache key");
+        assert_ne!(key_a, key_other, "different item ids must derive different detail cache keys");
     }
 
     #[test]

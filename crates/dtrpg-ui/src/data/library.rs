@@ -50,9 +50,14 @@ pub struct LibraryItem {
     /// Hex color string for the generative cover background, e.g. `"#1C2A44"`.
     pub color:                     Arc<str>,
     pub desc:                      Arc<str>,
-    /// Optional URL for a real cover thumbnail.
+    /// Optional URL for a small-context cover thumbnail (grid card, thumb
+    /// row).
     #[serde(default)]
     pub cover_url:                 Option<Arc<str>>,
+    /// Optional URL for a large-context cover image (detail panel), preferring
+    /// the full-size/WebP source over the pre-generated thumbnails.
+    #[serde(default)]
+    pub detail_cover_url:          Option<Arc<str>>,
     /// Unix timestamp (seconds since epoch) when the item was added to the
     /// library.
     #[serde(default)]
@@ -109,6 +114,7 @@ impl LibraryItem {
                color: color.into(),
                desc: desc.into(),
                cover_url: None,
+               detail_cover_url: None,
                date_added,
                date_updated: None,
                thumbnail_last_attempted: None,

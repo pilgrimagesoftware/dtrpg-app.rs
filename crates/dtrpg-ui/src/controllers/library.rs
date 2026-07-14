@@ -23,7 +23,7 @@ use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
-use crate::ui::library::cover::CoverCache;
+use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use crate::util::filter::*;
 use crate::util::matching::*;
 use crate::util::publisher::*;
@@ -1803,6 +1803,58 @@ impl LibraryController {
               .mark_in_flight(Arc::clone(&id));
             self.thumbnail_queue.push_front((id, cover_url, true));
             self.drain_thumbnail_queue(cx);
+        }
+    }
+
+    /// Enqueues a fetch of `detail_cover_url` for `item_id` if it isn't
+    /// already cached (in-memory or on disk) or already in flight.
+    ///
+    /// Called when a detail tab is opened for an item. Unlike `cover_url`
+    /// (fetched eagerly for every catalog item as soon as the catalog loads),
+    /// the large-context detail cover is fetched lazily — most items are
+    /// never opened in the detail panel, so eagerly downloading a full-size
+    /// or WebP image for all of them would waste bandwidth and disk space.
+    pub fn ensure_detail_cover(&mut self, item_id: &Arc<str>, cx: &mut Context<Self>) {
+        let Some(url) =
+            self.catalog.iter().find(|i| i.id == *item_id).and_then(|i| i.detail_cover_url.clone())
+        else {
+            return;
+        };
+        let cache_key = detail_cache_key(item_id);
+        if cx.global::<CoverCache>().get(&cache_key).is_some()
+           || cx.global::<CoverCache>().is_in_flight(&cache_key)
+        {
+            return;
+        }
+        if let Some(bytes) = load_cached_cover(&covers_dir(), &cache_key) {
+            cx.global_mut::<CoverCache>().insert(cache_key, bytes);
+            return;
+        }
+        cx.global_mut::<CoverCache>()
+          .mark_in_flight(Arc::clone(&cache_key));
+        self.thumbnail_queue.push_front((cache_key, url, false));
+        self.drain_thumbnail_queue(cx);
+    }
+
+    /// Force re-fetches the large-context detail cover for `item_id`,
+    /// bypassing the cache — used by the detail panel's refresh-thumbnail
+    /// action. Falls back to refreshing the small-context `cover_url` when
+    /// the item has no `detail_cover_url`.
+    pub fn refresh_detail_cover(&mut self, item_id: Arc<str>, cx: &mut Context<Self>) {
+        let Some(item) = self.catalog.iter().find(|i| i.id == item_id)
+        else {
+            return;
+        };
+        if let Some(url) = item.detail_cover_url.clone() {
+            let cache_key = detail_cache_key(&item_id);
+            self.thumbnail_queue.retain(|(i, _, _)| *i != cache_key);
+            cx.global_mut::<CoverCache>()
+              .mark_in_flight(Arc::clone(&cache_key));
+            self.thumbnail_queue.push_front((cache_key, url, true));
+            self.drain_thumbnail_queue(cx);
+        }
+        else if let Some(url) = item.cover_url.clone() {
+            self.load_thumbnail(url, cx);
         }
     }
 

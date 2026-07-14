@@ -85,7 +85,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     else {
         render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
     };
-    let cover_url = item.cover_url.clone();
+    let has_cover = item.detail_cover_url.is_some() || item.cover_url.is_some();
+    let refresh_item_id = Arc::clone(&item_id);
 
     div()
         .id("detail-tab-content")
@@ -98,7 +99,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
         .child({
             let mut cover_box =
                 div().relative().w(px(cover_w)).flex_none().overflow_hidden().child(cover);
-            if let Some(cover_url) = cover_url {
+            if has_cover {
                 cover_box = cover_box.child(
                     div()
                         .id("detail-tab-refresh-thumbnail")
@@ -119,8 +120,12 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 .build(window, cx)
                         })
                         .on_click(move |_, _, cx| {
-                            entity_refresh_thumbnail
-                                .update(cx, |ctrl, cx| ctrl.load_thumbnail(cover_url.clone(), cx));
+                            entity_refresh_thumbnail.update(cx, |ctrl, cx| {
+                                                         ctrl.refresh_detail_cover(
+                                                             Arc::clone(&refresh_item_id),
+                                                             cx,
+                                                         );
+                                                     });
                         })
                         .child("\u{27f3}"),
                 );
