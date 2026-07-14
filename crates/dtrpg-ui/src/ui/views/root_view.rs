@@ -27,7 +27,7 @@ use crate::ui::actions::{
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
-    open_settings_window,
+    open_settings_window, save_library_window_bounds,
 };
 use crate::ui::views::{
     catalog_view::CatalogView,
@@ -649,6 +649,14 @@ impl LibraryRootView {
                   let sidebar = sizes[0].as_f32();
                   UiPrefs::load().save_sidebar_width(sidebar);
               }
+          })
+          .detach();
+
+        // Save the window's position/size on every live resize/move, not
+        // just at close time — some quit paths (e.g. Cmd+Q) don't reliably
+        // fire `on_window_should_close`, which left the saved bounds stale.
+        cx.observe_window_bounds(window, |_this, window, _cx| {
+              save_library_window_bounds(window);
           })
           .detach();
 

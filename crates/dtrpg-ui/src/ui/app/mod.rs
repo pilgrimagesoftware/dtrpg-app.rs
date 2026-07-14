@@ -146,14 +146,22 @@ fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
                                          height: px(saved.height), }, };
     let display_bounds: Vec<_> = cx.displays().iter().map(|d| d.bounds()).collect();
     let fits_a_display = display_bounds.iter().any(|db| bounds.intersects(db));
-    debug!(?saved, ?bounds, ?display_bounds, fits_a_display, "restoring library window bounds");
+    debug!(?saved,
+           ?bounds,
+           ?display_bounds,
+           fits_a_display,
+           "restoring library window bounds");
     fits_a_display.then_some(WindowBounds::Windowed(bounds))
 }
 
-/// Saves the library window's current position/size to `UiPrefs`, called
-/// just before the window closes (mirroring `open_settings_window`'s
-/// existing `on_window_should_close` pattern).
-fn save_library_window_bounds(window: &Window) {
+/// Saves the library window's current position/size to `UiPrefs`.
+///
+/// Called both on every live resize/move (via `LibraryRootView`'s
+/// `observe_window_bounds` subscription) and once more just before the
+/// window closes (mirroring `open_settings_window`'s existing
+/// `on_window_should_close` pattern), so the saved bounds stay current even
+/// if the close hook doesn't fire for a given quit path.
+pub fn save_library_window_bounds(window: &Window) {
     let bounds = window.bounds();
     debug!(?bounds, "saving library window bounds");
     UiPrefs::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
