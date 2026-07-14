@@ -110,6 +110,40 @@ fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
          .collect()
 }
 
+/// Returns `(id, title)` for every `catalog` item that is a member of
+/// `member_ids`, in catalog order.
+///
+/// Used by [`LibraryController::download_all_for_collection`] to determine
+/// which items to pass to [`LibraryController::enqueue_download`]. Membership
+/// matching (not download status) is this function's only concern —
+/// already-downloaded items are filtered out downstream by
+/// [`enqueue_download`](LibraryController::enqueue_download) via
+/// [`missing_file_indices`], not here.
+fn collection_download_targets(catalog: &[LibraryItem], member_ids: &[u64])
+                               -> Vec<(Arc<str>, Arc<str>)> {
+    catalog.iter()
+           .filter(|item| member_ids_contain(member_ids, item.order_product_id, item.product_id))
+           .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
+           .collect()
+}
+
+/// Returns `(id, title)` for every `catalog` item whose publisher exactly
+/// matches `publisher`, in catalog order.
+///
+/// Used by [`LibraryController::download_all_for_publisher`] to determine
+/// which items to pass to [`LibraryController::enqueue_download`]. Publisher
+/// matching (not download status) is this function's only concern —
+/// already-downloaded items are filtered out downstream by
+/// [`enqueue_download`](LibraryController::enqueue_download) via
+/// [`missing_file_indices`], not here.
+fn publisher_download_targets(catalog: &[LibraryItem], publisher: &str)
+                              -> Vec<(Arc<str>, Arc<str>)> {
+    catalog.iter()
+           .filter(|item| item.publisher.as_ref() == publisher)
+           .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
+           .collect()
+}
+
 /// Removes the queued download for `(id, index)` from `queue`, if present.
 ///
 /// Returns `true` if an entry was removed. Only the matching `(id, index)`
@@ -2586,6 +2620,38 @@ impl LibraryController {
         }
     }
 
+    /// Queues a download for every not-yet-downloaded item that is a member
+    /// of the collection with `collection_id`, reusing
+    /// [`Self::enqueue_download`] per matching item.
+    ///
+    /// No-op if the collection id doesn't exist or has no matching catalog
+    /// items. Already-downloaded, already-queued, and already-active
+    /// items/files are left untouched — see [`Self::enqueue_download`].
+    pub fn download_all_for_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
+        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        else {
+            return;
+        };
+        let member_ids = Arc::clone(&collection.member_ids);
+        let targets = collection_download_targets(&self.catalog, &member_ids);
+        for (id, title) in targets {
+            self.enqueue_download(&id, title.to_string(), cx);
+        }
+    }
+
+    /// Queues a download for every not-yet-downloaded item under the given
+    /// publisher, reusing [`Self::enqueue_download`] per matching item.
+    ///
+    /// No-op if the publisher has no matching catalog items.
+    /// Already-downloaded, already-queued, and already-active items/files
+    /// are left untouched — see [`Self::enqueue_download`].
+    pub fn download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
+        let targets = publisher_download_targets(&self.catalog, publisher);
+        for (id, title) in targets {
+            self.enqueue_download(&id, title.to_string(), cx);
+        }
+    }
+
     /// Queues a single file's download, dispatching it immediately if a
     /// concurrency slot is free.
     ///
@@ -3798,6 +3864,88 @@ mod download_queue_tests {
 
         assert!(!removed);
         assert_eq!(queue.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod bulk_download_target_tests {
+    use super::{collection_download_targets, publisher_download_targets};
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::LibraryItem;
+
+    fn item(id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64)
+            -> LibraryItem {
+        let mut item = LibraryItem::new(id,
+                                        title,
+                                        publisher,
+                                        "Line",
+                                        "Core",
+                                        "PDF",
+                                        0,
+                                        0.0,
+                                        2020,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.order_product_id = order_product_id;
+        item.product_id = product_id;
+        item
+    }
+
+    #[test]
+    fn collection_download_targets_includes_every_member() {
+        let catalog = vec![item("b1", "Book One", "Pub", 1, 0),
+                           item("b2", "Book Two", "Pub", 2, 0),
+                           item("b3", "Not A Member", "Pub", 3, 0)];
+
+        let targets = collection_download_targets(&catalog, &[1, 2]);
+
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].0.as_ref(), "b1");
+        assert_eq!(targets[1].0.as_ref(), "b2");
+    }
+
+    #[test]
+    fn collection_download_targets_matches_on_product_id_fallback() {
+        let catalog = vec![item("b1", "Book One", "Pub", 0, 42)];
+
+        let targets = collection_download_targets(&catalog, &[42]);
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].0.as_ref(), "b1");
+    }
+
+    #[test]
+    fn collection_download_targets_is_empty_for_unknown_collection() {
+        let catalog = vec![item("b1", "Book One", "Pub", 1, 0)];
+
+        let targets = collection_download_targets(&catalog, &[999]);
+
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn publisher_download_targets_includes_every_matching_item() {
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0),
+                           item("b2", "Book Two", "Acme", 2, 0),
+                           item("b3", "Other Publisher", "Other Co", 3, 0)];
+
+        let targets = publisher_download_targets(&catalog, "Acme");
+
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].0.as_ref(), "b1");
+        assert_eq!(targets[1].0.as_ref(), "b2");
+    }
+
+    #[test]
+    fn publisher_download_targets_is_empty_for_unknown_publisher() {
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0)];
+
+        let targets = publisher_download_targets(&catalog, "Nobody");
+
+        assert!(targets.is_empty());
     }
 }
 
