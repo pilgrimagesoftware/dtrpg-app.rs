@@ -30,4 +30,4 @@
 - [x] 5.1 `cargo build --workspace --all-features`
 - [x] 5.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - [x] 5.3 `cargo test --workspace --all-features`
-- [ ] 5.4 Launch app, clear the cover cache, and confirm grid/thumb covers still render crisply at their small size while the detail panel renders sharper at ~480px than before
+- [x] 5.4 Launch app, clear the cover cache, and confirm grid/thumb covers still render crisply at their small size while the detail panel renders sharper at ~480px than before
