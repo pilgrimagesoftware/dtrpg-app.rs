@@ -60,14 +60,14 @@ jobs:
           # AppImage/.deb packaging expects dynamic linking against the
           # system's GUI libraries (X11/Wayland, fontconfig, D-Bus/libsecret),
           # which is impractical to statically link via musl for a GUI app.
-          - name: Linux
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            formats: appimage,deb
-          - name: Windows
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            formats: nsis,wix
+          # - name: Linux
+          #   os: ubuntu-latest
+          #   target: x86_64-unknown-linux-gnu
+          #   formats: appimage,deb
+          # - name: Windows
+          #   os: windows-latest
+          #   target: x86_64-pc-windows-msvc
+          #   formats: nsis,wix
 
     steps:
       - name: Checkout
