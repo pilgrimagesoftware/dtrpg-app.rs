@@ -120,3 +120,13 @@ and variables > Actions for the release build workflow to embed it. This is a pl
 not a sensitive credential (Sentry DSNs only permit event submission, not read access), but it
 should still come from the project's own Sentry organization rather than being hardcoded anywhere
 in this repository.
+
+### Release registration
+
+`.github/workflows/package.yaml`'s `sentry-release` job registers each nightly/release build as a
+Sentry release (org `pilgrimage-software`, project `dtrpg`) via `getsentry/action-release`,
+associating it with the commit range so Sentry can show suspect commits and mark issues resolved
+on deploy. This needs a `SENTRY_AUTH_TOKEN` repository secret (a Sentry auth token with
+release-management scope) — unlike the DSN, this token is a real credential and must be generated
+in Sentry's organization settings and added as a secret, never committed. Registration is
+skipped, not failed, when the secret is absent; crash reporting itself only needs `SENTRY_DSN`.

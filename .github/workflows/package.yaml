@@ -108,6 +108,14 @@ jobs:
         run: cargo install cargo-packager --locked
 
       - name: Package
+        # cargo-packager 0.11 does not resolve a workspace member's
+        # `[package.metadata.packager]` when invoked from the workspace root
+        # with `--packages`, even with `--manifest-path` pointing at the
+        # member - it fails with "Couldn't detect a valid configuration
+        # file". Running with cwd inside the crate directory (and dropping
+        # `--packages`, since it's then a single-package context) is the
+        # combination that actually finds the config.
+        working-directory: crates/dtrpg-core
         env:
           # `crates/dtrpg-core/build.rs` embeds these at compile time when the
           # `sentry` feature is enabled (see before-packaging-command in
@@ -122,11 +130,12 @@ jobs:
           # ${{ matrix.target }}` looks for it under
           # `target/${{ matrix.target }}/release/`, so packaging fails with a
           # "file not found" error even though the build itself succeeded.
+          # This is unaffected by the working-directory change above - cargo
+          # resolves the shared workspace target dir regardless of cwd.
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: |
           cargo packager \
             --release \
-            --packages dtrpg-core \
             --target ${{ matrix.target }} \
             --formats ${{ matrix.formats }} \
             --verbose
@@ -175,3 +184,35 @@ jobs:
           # didn't supply its own (release.yaml passes Conventional-Commits
           # notes from semantic-release; nightly.yaml passes none).
           generateReleaseNotes: ${{ inputs.release_notes == '' && !inputs.prerelease }}
+
+  sentry-release:
+    name: Register release with Sentry
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      # Requires the SENTRY_AUTH_TOKEN repo secret (a Sentry auth token with
+      # release-management scope). Skipped, not failed, until that secret is
+      # added - registration is metadata on top of crash reporting, which
+      # already works via SENTRY_DSN alone.
+      - name: Create Sentry release
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: pilgrimage-software
+          SENTRY_PROJECT: dtrpg
+        with:
+          environment: ${{ inputs.prerelease && 'nightly' || 'production' }}
+          version: ${{ inputs.tag }}
+          set_commits: auto
+
+      - name: Note skipped registration
+        if: ${{ secrets.SENTRY_AUTH_TOKEN == '' }}
+        run: echo "::warning::SENTRY_AUTH_TOKEN not set - skipping Sentry release registration"
