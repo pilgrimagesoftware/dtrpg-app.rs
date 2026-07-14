@@ -93,6 +93,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
         .min_h_0()
         .min_w_0()
         .flex()
+        .flex_row()
         .bg(surface)
         .child({
             let mut cover_box =
@@ -124,7 +125,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                         .child("\u{27f3}"),
                 );
             }
-            div().flex_none().pr(px(16.0)).py(px(16.0)).child(cover_box)
+            div().flex_none().pl(px(20.0)).pr(px(16.0)).py(px(16.0)).child(cover_box)
         })
         .child(
             div().flex_1().min_h_0().flex().flex_col().child(
