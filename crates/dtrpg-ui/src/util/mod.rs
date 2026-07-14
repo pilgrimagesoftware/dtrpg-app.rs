@@ -14,3 +14,4 @@ pub mod sort;
 #[cfg(test)]
 pub mod stubs;
 pub mod text;
+pub mod zip_preview;
