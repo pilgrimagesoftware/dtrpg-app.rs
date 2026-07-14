@@ -1,3 +1,5 @@
+Issue: https://github.com/pilgrimagesoftware/dtrpg-app.rs/issues/92
+
 ## Why
 
 `resolve_cover_url` (`dtrpg-core/src/services/sdk/library/mapping.rs`) picks the smallest available cover image first: the 140px `thumbnail`, falling back to the 100px `thumbnail_100`, then the full-size `image`. But the UI renders that same URL well beyond 140px — the detail panel cover is ~480px wide and grid cards scale to their column width — so most covers are a small bitmap stretched several times past its native resolution, producing visibly blurry, pixelated covers throughout the catalog.
