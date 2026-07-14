@@ -29,6 +29,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  SENTRY_ORG: pilgrimage-software
+  SENTRY_PROJECT: dtrpg
 
 permissions:
   contents: write
@@ -58,18 +60,18 @@ jobs:
           # AppImage/.deb packaging expects dynamic linking against the
           # system's GUI libraries (X11/Wayland, fontconfig, D-Bus/libsecret),
           # which is impractical to statically link via musl for a GUI app.
-          # - name: Linux
-          #   os: ubuntu-latest
-          #   target: x86_64-unknown-linux-gnu
-          #   formats: appimage,deb
-          # - name: Windows
-          #   os: windows-latest
-          #   target: x86_64-pc-windows-msvc
-          #   formats: nsis,wix
+          - name: Linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            formats: appimage,deb
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            formats: nsis,wix
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
@@ -192,7 +194,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
@@ -221,9 +223,10 @@ jobs:
         if: steps.sentry_auth.outputs.present == 'true'
         uses: getsentry/action-release@v3
         env:
+          # SENTRY_ORG/SENTRY_PROJECT come from the workflow-level `env:`
+          # block above; the action reads them from the environment
+          # automatically, no need to redeclare them here.
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ env.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
         with:
           # `SENTRY_PROJECT` alone does not scope the release to a project -
           # the action only passes `-p <project>` to sentry-cli when
