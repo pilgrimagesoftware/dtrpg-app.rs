@@ -20,4 +20,4 @@
 
 - [x] 5.1 `cargo build --workspace --all-features`
 - [x] 5.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
-- [ ] 5.3 Launch app and confirm: clicking "Remove Download" from each of the three entry points shows the dialog; confirming reverts status to Cloud; cancelling leaves the item Downloaded
+- [x] 5.3 Launch app and confirm: clicking "Remove Download" from each of the three entry points shows the dialog; confirming reverts status to Cloud; cancelling leaves the item Downloaded. Verified manually 2026-07-14.
