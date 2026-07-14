@@ -2,7 +2,7 @@ use gpui::*;
 use gpui_component::input::InputState;
 use gpui_component::{Root, init};
 use rust_i18n::t;
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::controllers::settings::SettingsController;
 use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
@@ -99,6 +99,7 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let collections_service = (cx.global::<CollectionsServiceFactory>().0)(None);
     let mut library_view = None;
     let window_bounds = restore_library_window_bounds(cx);
+    debug!(?window_bounds, "opening library window");
     let window = cx
         .open_window(
             WindowOptions {
@@ -143,9 +144,9 @@ fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
                                           y: px(saved.y), },
                           size:   Size { width:  px(saved.width),
                                          height: px(saved.height), }, };
-    let fits_a_display = cx.displays()
-                           .iter()
-                           .any(|display| bounds.intersects(&display.bounds()));
+    let display_bounds: Vec<_> = cx.displays().iter().map(|d| d.bounds()).collect();
+    let fits_a_display = display_bounds.iter().any(|db| bounds.intersects(db));
+    debug!(?saved, ?bounds, ?display_bounds, fits_a_display, "restoring library window bounds");
     fits_a_display.then_some(WindowBounds::Windowed(bounds))
 }
 
@@ -154,6 +155,7 @@ fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
 /// existing `on_window_should_close` pattern).
 fn save_library_window_bounds(window: &Window) {
     let bounds = window.bounds();
+    debug!(?bounds, "saving library window bounds");
     UiPrefs::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
                                                                   y:      bounds.origin.y.as_f32(),
                                                                   width:  bounds.size
