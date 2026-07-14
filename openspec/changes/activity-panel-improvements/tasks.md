@@ -36,10 +36,10 @@
 
 ## 7. Manual Verification
 
-- [ ] 7.1 Open the activity panel with several items and confirm the list scrolls when items exceed panel height
-- [ ] 7.2 Hover over an item row with a long label and confirm the tooltip shows the full text
-- [ ] 7.3 Hover over an error item row and confirm the tooltip shows both the full label and the error message
-- [ ] 7.4 Click an item row and confirm it expands to show full word-wrapped text
-- [ ] 7.5 Click the same row again and confirm it collapses back to truncated
-- [ ] 7.6 Click one row then click a different row and confirm only the second is expanded
-- [ ] 7.7 Open the panel with no activity items and confirm the prominent empty state is shown
+- [x] 7.1 Open the activity panel with several items and confirm the list scrolls when items exceed panel height
+- [x] 7.2 Hover over an item row with a long label and confirm the tooltip shows the full text
+- [x] 7.3 Hover over an error item row and confirm the tooltip shows both the full label and the error message
+- [x] 7.4 Click an item row and confirm it expands to show full word-wrapped text
+- [x] 7.5 Click the same row again and confirm it collapses back to truncated
+- [x] 7.6 Click one row then click a different row and confirm only the second is expanded
+- [x] 7.7 Open the panel with no activity items and confirm the prominent empty state is shown
