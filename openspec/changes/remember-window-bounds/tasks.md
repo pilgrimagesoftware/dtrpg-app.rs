@@ -18,7 +18,7 @@
 ## 4. Verification
 
 - [x] 4.1 Run `cargo check --all-targets --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo +nightly fmt -- --check`, `cargo test --all-features --workspace`
-- [ ] 4.2 Manually verify: resize and move the library window, quit, relaunch; confirm it reopens at the same position and size
-- [ ] 4.3 Manually verify: quit and relaunch without ever having moved the window (fresh prefs); confirm it opens at the same default placement as before this change
-- [ ] 4.4 Manually verify (if a multi-monitor setup is available): move the window to a secondary display, disconnect that display, relaunch; confirm it falls back to the default placement instead of opening off-screen
-- [ ] 4.5 Manually verify: opening Settings still centers that window at its fixed size, unaffected by the library window's saved bounds
+- [x] 4.2 Manually verify: resize and move the library window, quit, relaunch; confirm it reopens at the same position and size
+- [x] 4.3 Manually verify: quit and relaunch without ever having moved the window (fresh prefs); confirm it opens at the same default placement as before this change
+- [x] 4.4 Manually verify (if a multi-monitor setup is available): move the window to a secondary display, disconnect that display, relaunch; confirm it falls back to the default placement instead of opening off-screen
+- [x] 4.5 Manually verify: opening Settings still centers that window at its fixed size, unaffected by the library window's saved bounds
