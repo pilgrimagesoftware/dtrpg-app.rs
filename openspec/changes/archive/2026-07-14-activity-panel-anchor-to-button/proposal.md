@@ -1,3 +1,17 @@
+Issue: https://github.com/pilgrimagesoftware/dtrpg-app.rs/issues/57
+
+## Resolution: already fixed, no implementation needed
+
+The bug this proposal describes no longer exists on `develop`. Commit `47c0661` ("feat(activity):
+Add direct panel open state setters") removed the hardcoded `.absolute().bottom(px(56.0))`
+positioning from both `render_activity_panel` and `render_alert_history_panel`. Both panels are
+now rendered by `status_bar_view.rs` as `gpui-component` `Popover`s anchored directly to their
+trigger buttons (`Anchor::BottomLeft` / `Anchor::BottomRight`), which is exactly the behavior this
+proposal asked for. Doc comments on both render functions and at the top of `status_bar_view.rs`
+confirm this is the intended, current design.
+
+No code changes were made under this change. Archived as obsolete without implementation.
+
 ## Why
 
 `render_activity_panel` is anchored with `.absolute().bottom(px(56.0)).left(px(8.0))`, a
