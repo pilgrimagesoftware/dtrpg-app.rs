@@ -1,3 +1,8 @@
+All tasks below are moot — see `proposal.md`'s "Resolution" section. The anchor fix these
+tasks describe was already implemented on `develop` prior to this change (commit `47c0661`),
+via `gpui-component`'s `Popover` anchored to each panel's trigger button in
+`status_bar_view.rs`. Left unchecked to keep an honest record that no work happened here.
+
 ## 1. Capture Button Bounds
 
 - [ ] 1.1 Determine the status bar activity button's on-screen bounds at render time
