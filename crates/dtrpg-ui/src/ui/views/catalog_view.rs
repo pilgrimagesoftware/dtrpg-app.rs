@@ -7,8 +7,9 @@ use std::sync::Arc;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Bounds, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement,
-    MouseButton, MouseDownEvent, ObjectFit, ParentElement, Pixels, Point, Render, Styled,
-    StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
+    MouseButton, MouseDownEvent, ObjectFit, ParentElement, Pixels, Point, Render, SharedString,
+    Styled, StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems,
+    uniform_list,
 };
 use gpui_component::ElementExt;
 use gpui_component::WindowExt as _;
@@ -683,9 +684,22 @@ impl TableDelegate for GroupedCatalogListDelegate {
     fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, window: &mut Window,
                     cx: &mut Context<TableState<Self>>)
                     -> PopupMenu {
-        let Some(GroupedRow::Item(item)) = self.row_at(row_ix)
-        else {
-            return menu;
+        let item = match self.row_at(row_ix) {
+            Some(GroupedRow::Header { publisher, .. }) => {
+                let publisher = publisher.to_string();
+                let entity = self.controller.clone();
+                return menu.item(
+                    PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
+                        move |_, _, cx| {
+                            entity.update(cx, |ctrl, cx| {
+                                ctrl.download_all_for_publisher(&publisher, cx);
+                            });
+                        },
+                    ),
+                );
+            }
+            Some(GroupedRow::Item(item)) => item,
+            None => return menu,
         };
         let id = Arc::clone(&item.id);
         let status = item.status;
@@ -1254,7 +1268,8 @@ impl Render for CatalogView {
                         // `move` closure can capture it on every
                         // outer iteration without moving `window`.
                         let window: &Window = &*window;
-                        div().child(render_group_header(&g.publisher, g.items.len(), &c))
+                        div().child(render_group_header(&g.publisher, g.items.len(), &c,
+                                                        e.clone()))
                              .children(g.items.into_iter().map(move |item| {
                                                               let cover = cc.get(&item.id).cloned();
                                                               let is_checking =
@@ -1363,7 +1378,7 @@ impl Render for CatalogView {
                                                     let ci = checking_items.clone();
                                                     div().child(render_group_header(&g.publisher,
                                                                                     g.items.len(),
-                                                                                    &c))
+                                                                                    &c, e.clone()))
                                                          .child(render_grid(g.items, cc, ci, c, d,
                                                                             e, t, s, &*window))
                                                 }))
@@ -1443,12 +1458,15 @@ fn render_library_empty_state(text_color: Hsla) -> impl IntoElement + 'static {
 // ── Group header
 // ──────────────────────────────────────────────────────────────
 
-fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens)
+fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
+                       entity: Entity<LibraryController>)
                        -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
     let publisher = publisher.to_string();
-    div().flex()
+    let menu_publisher = publisher.clone();
+    div().id(SharedString::from(format!("group-header-{publisher}")))
+         .flex()
          .items_center()
          .gap(px(8.0))
          .py(px(10.0))
@@ -1459,6 +1477,15 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens)
          .child(div().text_xs()
                      .text_color(text_tertiary)
                      .child(count.to_string()))
+         .context_menu(move |menu, _, _| {
+             let entity = entity.clone();
+             let publisher = menu_publisher.clone();
+             menu.item(PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
+                 move |_, _, cx| {
+                     entity.update(cx, |ctrl, cx| ctrl.download_all_for_publisher(&publisher, cx));
+                 },
+             ))
+         })
 }
 
 // ── Status glyph

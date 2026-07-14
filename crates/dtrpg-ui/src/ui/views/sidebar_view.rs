@@ -213,8 +213,8 @@ impl SidebarItem for CollectionsSection {
 }
 
 /// Renders a single collection nav row: click to filter, right-click to
-/// reload/delete, and drop target for [`DraggedLibraryItem`] (adds the
-/// dragged catalog item as a member of this collection).
+/// download all/reload/delete, and drop target for [`DraggedLibraryItem`]
+/// (adds the dragged catalog item as a member of this collection).
 fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                          entity: Entity<LibraryController>, tabs: Entity<TabsController>,
                          cx: &mut App)
@@ -223,6 +223,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
     let filter = SidebarFilter::Collection(row.id, Arc::clone(&row.name));
     let click_entity = entity.clone();
     let click_tabs = tabs;
+    let download_entity = entity.clone();
     let reload_entity = entity.clone();
     let delete_entity = entity.clone();
     let drop_entity = entity;
@@ -275,7 +276,15 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                         });
          })
          .context_menu(move |menu, _, _| {
-             menu.item(PopupMenuItem::new(t!("collections.reload")).on_click({
+             menu.item(PopupMenuItem::new(t!("collections.download_all")).on_click({
+                           let entity = download_entity.clone();
+                           move |_, _, cx| {
+                               entity.update(cx, |ctrl, cx| {
+                                   ctrl.download_all_for_collection(col_id, cx);
+                               });
+                           }
+                       }))
+                 .item(PopupMenuItem::new(t!("collections.reload")).on_click({
                            let entity = reload_entity.clone();
                            move |_, _, cx| {
                                entity.update(cx, |ctrl, cx| ctrl.load_collections(cx));
