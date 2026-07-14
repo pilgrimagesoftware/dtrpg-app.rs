@@ -18,3 +18,4 @@ pub mod status_bar_view;
 pub mod tab_strip_view;
 pub mod title_bar_view;
 pub mod toolbar_view;
+pub mod zip_preview_popover;
