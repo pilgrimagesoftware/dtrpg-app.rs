@@ -53,11 +53,11 @@
 
 ## 6. Manual Verification
 
-- [ ] 6.1 Right-click a collection with several undownloaded items, select "Download All", and
+- [x] 6.1 Right-click a collection with several undownloaded items, select "Download All", and
       confirm all of them start downloading (activity panel shows an entry per item)
-- [ ] 6.2 Right-click a collection where some items are already downloaded and confirm only the
+- [x] 6.2 Right-click a collection where some items are already downloaded and confirm only the
       remaining items are enqueued
-- [ ] 6.3 Right-click a publisher group header in Grid, Thumbs, and List presentations and
+- [x] 6.3 Right-click a publisher group header in Grid, Thumbs, and List presentations and
       confirm "Download All" appears and works in all three
-- [ ] 6.4 Confirm re-selecting "Download All" while a prior batch is still queued/downloading
+- [x] 6.4 Confirm re-selecting "Download All" while a prior batch is still queued/downloading
       does not duplicate any in-flight or queued downloads
