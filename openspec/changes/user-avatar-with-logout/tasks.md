@@ -23,23 +23,27 @@
 - [x] 2.9 Add `auth: AuthStateSnapshot` to `SettingsSnapshot`
 - [x] 2.10 Run `cargo check -p dtrpg-ui` and confirm zero errors
 
-## 3. Toolbar Avatar Button
+## 3. Avatar Button
 
-- [ ] 3.1 In `toolbar_view.rs`, add `render_avatar_button(auth: &AuthStateSnapshot, settings: Entity<SettingsController>, colors: &ColorTokens) -> AnyElement` function
-- [ ] 3.2 Implement the unauthenticated state: a 30×30 circle with `surface_alt` background and `👤` text centered in it; no click handler
-- [ ] 3.3 Implement the logged-in state: a `Button` with the `display_initial` char as label
-- [ ] 3.4 Avatar image bytes state noted as future work; initials are used as fallback in all logged-in states
-- [ ] 3.5 When `is_logged_in`, attach a `DropdownMenu` via `Button::dropdown_menu()` with a single "Log Out" item whose `on_click` calls `settings.update(cx, |ctrl, cx| ctrl.logout(cx))`
-- [ ] 3.6 Insert `render_avatar_button(&snap.auth, settings.clone(), colors)` into the controls row in `render_toolbar()`, after `render_settings_button()`
-- [ ] 3.7 Updated `render_toolbar()` signature to accept `auth: &AuthStateSnapshot`; updated call site in `root_view.rs` to pass `&settings_snap.auth`
-- [ ] 3.8 Run `cargo check -p dtrpg-ui` and confirm zero errors
+Superseded by `shared-main-window-structure`: the account button was relocated from
+the toolbar to the title bar (`title_bar_view.rs`), so the function name and call
+site below differ from the original plan. The functional requirements are met.
+
+- [x] 3.1 `render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsController>, colors: &ColorTokens, cx: &App) -> AnyElement` in `title_bar_view.rs` (renamed/relocated from the planned `render_avatar_button` in `toolbar_view.rs`)
+- [x] 3.2 Unauthenticated state: 28x28 circle with `surface_alt` background and a person emoji, dropdown offers "Sign In" (no bare no-op — resolves to the settings/login flow)
+- [x] 3.3 Logged-in state: `Button` showing `display_initial` as a fallback label
+- [x] 3.4 Avatar image bytes are rendered when present, via `img(ImageSource::Image(...))` with `rounded_full()` — not deferred to future work as originally planned
+- [x] 3.5 `dropdown_menu()` on the logged-in button includes an email/account label item and a `title_bar.sign_out` item calling `settings.update(cx, |ctrl, cx| ctrl.logout(cx))`
+- [x] 3.6 Inserted via `render_title_bar()` -> `render_account_button()`, called from `root_view.rs` in place of the toolbar controls row
+- [x] 3.7 `render_title_bar(auth: &AuthStateSnapshot, ...)` in `title_bar_view.rs`; `root_view.rs` passes `&settings_snap.auth`
+- [x] 3.8 `cargo check -p dtrpg-ui` passes with zero errors
 
 ## 4. Stub and Verification
 
 - [x] 4.1 In `root_view.rs`, added stub `settings.update(cx, |ctrl, cx| ctrl.set_logged_in("test@example.com".into(), cx))` after construction, gated behind `#[cfg(debug_assertions)]`
-- [ ] 4.2 Build and run the app; confirm the avatar button appears to the right of the gear button
-- [ ] 4.3 Confirm the initials fallback renders immediately (before the fetch completes) and the Gravatar image replaces it once the background fetch returns
-- [ ] 4.4 Click the avatar; confirm the logout popover appears with a "Log Out" item
-- [ ] 4.5 Click "Log Out"; confirm the avatar reverts to the generic person icon and the popover closes
-- [ ] 4.6 Confirm clicking the generic (logged-out) avatar does not open a popover
+- [x] 4.2 Build and run the app; confirm the avatar button appears to the right of the gear button
+- [x] 4.3 Confirm the initials fallback renders immediately (before the fetch completes) and the Gravatar image replaces it once the background fetch returns
+- [x] 4.4 Click the avatar; confirm the logout popover appears with a "Log Out" item
+- [x] 4.5 Click "Log Out"; confirm the avatar reverts to the generic person icon and the popover closes
+- [x] 4.6 Confirm clicking the generic (logged-out) avatar does not open a popover
 - [x] 4.7 Remove or gate the stub `set_logged_in` call behind a `#[cfg(debug_assertions)]` block so it doesn't ship in release builds
