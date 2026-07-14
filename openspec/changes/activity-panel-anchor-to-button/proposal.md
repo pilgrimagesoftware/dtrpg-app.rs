@@ -1,3 +1,5 @@
+Issue: https://github.com/pilgrimagesoftware/dtrpg-app.rs/issues/57
+
 ## Why
 
 `render_activity_panel` is anchored with `.absolute().bottom(px(56.0)).left(px(8.0))`, a
