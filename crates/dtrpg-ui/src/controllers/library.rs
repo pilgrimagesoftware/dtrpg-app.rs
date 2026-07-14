@@ -119,8 +119,7 @@ fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
 /// already-downloaded items are filtered out downstream by
 /// [`enqueue_download`](LibraryController::enqueue_download) via
 /// [`missing_file_indices`], not here.
-fn collection_download_targets(catalog: &[LibraryItem],
-                               member_ids: &[u64])
+fn collection_download_targets(catalog: &[LibraryItem], member_ids: &[u64])
                                -> Vec<(Arc<str>, Arc<str>)> {
     catalog.iter()
            .filter(|item| member_ids_contain(member_ids, item.order_product_id, item.product_id))
@@ -137,7 +136,8 @@ fn collection_download_targets(catalog: &[LibraryItem],
 /// already-downloaded items are filtered out downstream by
 /// [`enqueue_download`](LibraryController::enqueue_download) via
 /// [`missing_file_indices`], not here.
-fn publisher_download_targets(catalog: &[LibraryItem], publisher: &str) -> Vec<(Arc<str>, Arc<str>)> {
+fn publisher_download_targets(catalog: &[LibraryItem], publisher: &str)
+                              -> Vec<(Arc<str>, Arc<str>)> {
     catalog.iter()
            .filter(|item| item.publisher.as_ref() == publisher)
            .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
@@ -2621,14 +2621,15 @@ impl LibraryController {
     }
 
     /// Queues a download for every not-yet-downloaded item that is a member
-    /// of the collection with `collection_id`, reusing [`Self::enqueue_download`]
-    /// per matching item.
+    /// of the collection with `collection_id`, reusing
+    /// [`Self::enqueue_download`] per matching item.
     ///
     /// No-op if the collection id doesn't exist or has no matching catalog
     /// items. Already-downloaded, already-queued, and already-active
     /// items/files are left untouched — see [`Self::enqueue_download`].
     pub fn download_all_for_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id) else {
+        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        else {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
@@ -3872,9 +3873,8 @@ mod bulk_download_target_tests {
     use crate::data::enums::ItemStatus;
     use crate::data::library::LibraryItem;
 
-    fn item(id: &str, title: &str, publisher: &str, order_product_id: u64,
-           product_id: u64)
-           -> LibraryItem {
+    fn item(id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64)
+            -> LibraryItem {
         let mut item = LibraryItem::new(id,
                                         title,
                                         publisher,
