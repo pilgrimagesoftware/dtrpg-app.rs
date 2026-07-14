@@ -58,14 +58,14 @@ jobs:
           # AppImage/.deb packaging expects dynamic linking against the
           # system's GUI libraries (X11/Wayland, fontconfig, D-Bus/libsecret),
           # which is impractical to statically link via musl for a GUI app.
-          - name: Linux
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            formats: appimage,deb
-          - name: Windows
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            formats: nsis,wix
+          # - name: Linux
+          #   os: ubuntu-latest
+          #   target: x86_64-unknown-linux-gnu
+          #   formats: appimage,deb
+          # - name: Windows
+          #   os: windows-latest
+          #   target: x86_64-pc-windows-msvc
+          #   formats: nsis,wix
 
     steps:
       - name: Checkout
@@ -222,15 +222,15 @@ jobs:
         uses: getsentry/action-release@v3
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: pilgrimage-software
-          SENTRY_PROJECT: dtrpg
+          SENTRY_ORG: ${{ env.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
         with:
           # `SENTRY_PROJECT` alone does not scope the release to a project -
           # the action only passes `-p <project>` to sentry-cli when
           # `projects` is set, and without it the release is created
           # org-wide but unlinked from any project (Sentry then emails a
           # "release may not be linked with your project" warning).
-          projects: dtrpg
+          projects: ${{ env.SENTRY_PROJECT }}
           environment: ${{ inputs.prerelease && 'nightly' || 'production' }}
           # `version` is deprecated in favor of `release`; both accept the
           # same value, this just stops the deprecation warning in CI logs.
