@@ -35,4 +35,4 @@
 - [x] 6.1 `cargo build --workspace --all-features`
 - [x] 6.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - [x] 6.3 `cargo test --workspace --all-features`
-- [ ] 6.4 Launch app: place files manually at a downloaded single-file and a downloaded multi-file item's resolved paths and confirm the detail view (top-level field, Items table Size column, selected-file panel) shows catalog size plus on-disk suffix, with the multi-file entry showing a combined total
+- [x] 6.4 Launch app: place files manually at a downloaded single-file and a downloaded multi-file item's resolved paths and confirm the detail view (top-level field, Items table Size column, selected-file panel) shows catalog size plus on-disk suffix, with the multi-file entry showing a combined total. Verified manually 2026-07-14.
