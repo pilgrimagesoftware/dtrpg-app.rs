@@ -18,6 +18,6 @@
 ## 4. Verify
 
 - [x] 4.1 Run `cargo test --all-features --workspace`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo fmt --all -- --check`; all pass
-- [ ] 4.2 Manually launch the app, open the View menu, switch presentation modes, and confirm the checkmark moves to the newly active item
-- [ ] 4.3 Sort via the menu and via a column header click; confirm the menu checkmark tracks both
-- [ ] 4.4 Toggle "Group by Publisher" and confirm the checkmark appears/disappears accordingly
+- [x] 4.2 Manually launch the app, open the View menu, switch presentation modes, and confirm the checkmark moves to the newly active item
+- [x] 4.3 Sort via the menu and via a column header click; confirm the menu checkmark tracks both
+- [x] 4.4 Toggle "Group by Publisher" and confirm the checkmark appears/disappears accordingly
