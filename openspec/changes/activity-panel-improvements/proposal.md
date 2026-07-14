@@ -1,3 +1,5 @@
+Issue: https://github.com/pilgrimagesoftware/dtrpg-app.rs/issues/95
+
 ## Why
 
 The activity panel shipped with three usability gaps: long labels are ellipsized with no way to see the full text, the list clips at 300 px and is not scrollable when items overflow, and the empty state (though present in code) is visually minimal and easy to overlook. Users need to be able to read complete activity information without the panel being the main focus of the screen.
