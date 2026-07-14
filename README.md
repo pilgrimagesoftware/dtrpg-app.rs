@@ -115,6 +115,13 @@ To test locally with the feature enabled:
 DTRPG_SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project> cargo run --features dtrpg-core/sentry
 ```
 
+To confirm an event actually reaches Sentry without launching the GUI, pass
+`--trigger-test-error`: this emits one ERROR-level `tracing` event and exits immediately.
+
+```bash
+DTRPG_SENTRY_DSN=https://<key>@<org>.ingest.sentry.io/<project> cargo run --features dtrpg-core/sentry -- --trigger-test-error
+```
+
 Maintainers: the `SENTRY_DSN` repository secret must be set under repository Settings > Secrets
 and variables > Actions for the release build workflow to embed it. This is a plain project DSN,
 not a sensitive credential (Sentry DSNs only permit event submission, not read access), but it

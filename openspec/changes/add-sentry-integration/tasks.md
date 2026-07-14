@@ -64,11 +64,10 @@
 - [x] 6.2 Run `cargo build --features sentry` (qualified as `dtrpg-core/sentry` from the workspace
       root) with no `DTRPG_SENTRY_DSN` set; confirm the app starts normally and logs "disabled - no
       DSN".
-- [ ] 6.3 Run `cargo run --features sentry` with a test DSN set; confirm an intentionally
-      triggered ERROR-level `tracing` event appears as a Sentry issue. Not run: requires a live
-      Sentry project/DSN and outbound network access to sentry.io, neither available in this
-      environment. Local unit tests (3.2, 3.3) cover client construction/DSN parsing without
-      network access; end-to-end delivery needs manual verification by a maintainer with a real
-      DSN before the first release build.
+- [x] 6.3 Run `cargo run --features sentry` with a test DSN set; confirm an intentionally
+      triggered ERROR-level `tracing` event appears as a Sentry issue. Verified manually
+      2026-07-14 via the `--trigger-test-error` flag (added in `fix/sentry-release-if-secrets`,
+      dtrpg-app.rs#87): event arrived as issue DTRPG-1 in the `dtrpg` Sentry project, tagged
+      with release `0.0.6` and the correct `main.rs` source location.
 - [x] 6.4 Run `cargo clippy --all-targets --all-features -- -D warnings` and `cargo +nightly fmt
       --all -- --check` (this repo formats with the nightly toolchain per `docs/rust.md`).
