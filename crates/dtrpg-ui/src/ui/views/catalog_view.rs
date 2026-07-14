@@ -65,6 +65,7 @@ fn item_click_handler(id: Arc<str>, title: String, entity: Entity<LibraryControl
                       // Reopening a detail tab must show no pre-selected item
                       // (selection is ephemeral, see `catalog-entry-detail-view`).
                       ctrl.clear_item_selection(&id, cx);
+                      ctrl.ensure_detail_cover(&id, cx);
                   });
         }
     }
@@ -89,6 +90,7 @@ pub(crate) fn open_item_or_focus_detail_tab(entry_dir: &Path, item: &LibraryItem
             controller.update(cx, |ctrl, cx| {
                           ctrl.clear_item_selection(&id, cx);
                           ctrl.maybe_check_item(Arc::clone(&id), cx);
+                          ctrl.ensure_detail_cover(&id, cx);
                       });
         }
         Err(OpenError::FileNotFound(path)) => {
@@ -944,6 +946,7 @@ impl CatalogView {
                                                     ctrl.clear_selection(cx);
                                                     ctrl.clear_item_selection(&id, cx);
                                                     ctrl.maybe_check_item(Arc::clone(&id), cx);
+                                                    ctrl.ensure_detail_cover(&id, cx);
                                                 });
                              }
                          }
@@ -998,6 +1001,7 @@ impl CatalogView {
                                                     ctrl.clear_selection(cx);
                                                     ctrl.clear_item_selection(&id, cx);
                                                     ctrl.maybe_check_item(Arc::clone(&id), cx);
+                                                    ctrl.ensure_detail_cover(&id, cx);
                                                 });
                              }
                          }

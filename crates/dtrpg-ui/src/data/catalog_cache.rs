@@ -26,7 +26,12 @@ use crate::data::library::LibraryItem;
 /// error. Caches written before this field existed deserialize
 /// `schema_version` as `0` via `#[serde(default)]`, which never matches the
 /// current version and is always treated as stale.
-const CACHE_SCHEMA_VERSION: u32 = 2;
+///
+/// Version 3: `detail_cover_url` was added for the detail panel's
+/// large-context cover. Caches written before this field existed
+/// deserialize it as `None` via `#[serde(default)]` and would otherwise never
+/// populate it until the 7-day staleness window expired.
+const CACHE_SCHEMA_VERSION: u32 = 3;
 
 // ── CacheMetadata
 // ─────────────────────────────────────────────────────────────

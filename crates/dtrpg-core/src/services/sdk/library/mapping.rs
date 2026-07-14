@@ -111,15 +111,31 @@ fn resolve_product_info<'a>(item: &'a OrderProductItem,
         .or(item.attributes.product.as_ref())
 }
 
-// Prefer the smallest thumbnail available for catalog rendering, falling back
-// to progressively larger images if a thumbnail wasn't generated for this
-// product.
+// Small render contexts (grid card, thumb row) want the smallest
+// correctly-sized source, falling back to progressively larger images only if
+// no pre-generated thumbnail exists for this product.
 fn resolve_cover_url(product_info: Option<&OrderProductInfo>) -> Option<String> {
     product_info.and_then(|p| {
                     p.thumbnail
                      .as_deref()
                      .or(p.thumbnail_100.as_deref())
                      .or(p.image.as_deref())
+                     .or(p.web_image.as_deref())
+                     .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
+                })
+}
+
+// The detail panel (~480px wide) wants the largest available source so it
+// doesn't upscale a small pre-generated thumbnail past its native resolution;
+// pre-generated thumbnails are a last-resort fallback for catalog entries the
+// API never populated a full-size or WebP image for.
+fn resolve_detail_cover_url(product_info: Option<&OrderProductInfo>) -> Option<String> {
+    product_info.and_then(|p| {
+                    p.image
+                     .as_deref()
+                     .or(p.web_image.as_deref())
+                     .or(p.thumbnail.as_deref())
+                     .or(p.thumbnail_100.as_deref())
                      .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
                 })
 }
@@ -208,6 +224,7 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
     let publisher = resolve_publisher(item, publishers);
     let product_info = resolve_product_info(item, products);
     let cover_url = resolve_cover_url(product_info);
+    let detail_cover_url = resolve_detail_cover_url(product_info);
     let kind = resolve_kind(attributes);
     let format = resolve_format(&attributes.files);
     let size_mb = attributes.files.iter().map(|f| f.size as f64).sum::<f64>() / BYTES_PER_MB;
@@ -243,6 +260,7 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
                   color: DEFAULT_COLOR.into(),
                   desc: "".into(),
                   cover_url: cover_url.map(Into::into),
+                  detail_cover_url: detail_cover_url.map(Into::into),
                   date_added: date_purchased_epoch,
                   date_updated: file_last_modified_epoch,
                   thumbnail_last_attempted: None,
@@ -601,6 +619,8 @@ mod tests {
         assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
         assert_eq!(mapped.cover_url.as_deref(),
                    Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg"));
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276.jpg"));
     }
 
     #[test]
@@ -630,6 +650,52 @@ mod tests {
         assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
         assert_eq!(mapped.cover_url.as_deref(),
                    Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg"));
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276.jpg"));
+    }
+
+    #[test]
+    fn map_order_product_detail_cover_url_prefers_web_image_over_thumbnail() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.product =
+            Some(OrderProductInfo { image:         None,
+                                    web_image:     Some("4952/515276.webp".to_string()),
+                                    thumbnail:     Some("4952/515276-thumb140.jpg".to_string()),
+                                    thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+                                    bundle_id:     0,
+                                    date_created:  Some("2025-03-13T16:07:01-05:00".to_string()),
+                                    product_id:    515_276,
+                                    description:   None,
+                                    filesize:      Some(24.13), });
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276.webp"));
+        assert_eq!(mapped.cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg"));
+    }
+
+    #[test]
+    fn map_order_product_detail_cover_url_falls_back_to_thumbnail_only() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.product =
+            Some(OrderProductInfo { image:         None,
+                                    web_image:     None,
+                                    thumbnail:     None,
+                                    thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+                                    bundle_id:     0,
+                                    date_created:  Some("2025-03-13T16:07:01-05:00".to_string()),
+                                    product_id:    515_276,
+                                    description:   None,
+                                    filesize:      Some(24.13), });
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb100.jpg"));
+        assert_eq!(mapped.cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb100.jpg"));
     }
 
     #[test]
