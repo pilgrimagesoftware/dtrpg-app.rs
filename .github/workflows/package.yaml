@@ -225,8 +225,16 @@ jobs:
           SENTRY_ORG: pilgrimage-software
           SENTRY_PROJECT: dtrpg
         with:
+          # `SENTRY_PROJECT` alone does not scope the release to a project -
+          # the action only passes `-p <project>` to sentry-cli when
+          # `projects` is set, and without it the release is created
+          # org-wide but unlinked from any project (Sentry then emails a
+          # "release may not be linked with your project" warning).
+          projects: dtrpg
           environment: ${{ inputs.prerelease && 'nightly' || 'production' }}
-          version: ${{ inputs.tag }}
+          # `version` is deprecated in favor of `release`; both accept the
+          # same value, this just stops the deprecation warning in CI logs.
+          release: ${{ inputs.tag }}
           set_commits: auto
 
       - name: Note skipped registration
