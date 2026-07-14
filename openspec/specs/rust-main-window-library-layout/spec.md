@@ -4,11 +4,12 @@
 TBD - created by archiving change define-rust-main-window-library-layout. Update Purpose after archive.
 ## Requirements
 ### Requirement: Rust main window MUST provide GPUI layout regions
-The Rust desktop app MUST implement the shared main-window library layout using GPUI view modules and controller state.
+The Rust desktop app MUST implement the shared main-window library layout using GPUI view modules and controller state. The layout MUST use `h_resizable` panels for the sidebar, catalog content, and detail panel columns. Panel widths MUST be draggable by the user within configured bounds and MUST persist across app launches.
 
 #### Scenario: Rendering the Rust main library window
 - **WHEN** the Rust app displays the library browsing window
 - **THEN** it presents GPUI regions for search/filter controls, account menu access, library content, summary, and sync status
+- **AND** the sidebar, catalog, and detail panel are separated by draggable resize handles
 
 ### Requirement: Rust search and filter controls MUST be disclosable
 The Rust desktop app MUST provide a low-profile disclosable search/filter area with search input, view mode, grouping, and sort controls, plus a collapsed summary of active browsing state.
@@ -57,15 +58,4 @@ The Rust desktop app MUST keep background library sync and thumbnail loading fro
 #### Scenario: Concurrency limit enforced during heavy load
 - **WHEN** more thumbnail fetches or downloads are pending than the configured limit allows
 - **THEN** the excess requests wait in their respective queues and the main window remains responsive
-
-### Requirement: Catalog pane fills remaining horizontal space without a resize handle
-The catalog pane SHALL occupy all horizontal space between the sidebar and the right window edge. There SHALL be no resize splitter between the catalog and the detail panel. The detail panel SHALL be an overlay or fixed-width panel that does not reduce catalog width.
-
-#### Scenario: Catalog fills window width when detail panel is hidden
-- **WHEN** no item is selected and the detail panel is not shown
-- **THEN** the catalog occupies the full width from the sidebar right edge to the window right edge with no visible resize handle
-
-#### Scenario: Detail panel appears without shrinking the catalog
-- **WHEN** an item is selected and the detail panel opens
-- **THEN** the detail panel is displayed at a fixed width overlapping or adjacent to the catalog without pushing catalog content to resize
 
