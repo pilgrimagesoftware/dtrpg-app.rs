@@ -197,12 +197,28 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
 
+      # `if:` conditions cannot reference the `secrets` context directly
+      # (GitHub Actions rejects the workflow at parse time), so the token's
+      # presence is checked here in a `run:` step - where secrets ARE
+      # accessible - and the result exposed as a step output for later
+      # steps to branch on.
+      - name: Check for Sentry auth token
+        id: sentry_auth
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Requires the SENTRY_AUTH_TOKEN repo secret (a Sentry auth token with
       # release-management scope). Skipped, not failed, until that secret is
       # added - registration is metadata on top of crash reporting, which
       # already works via SENTRY_DSN alone.
       - name: Create Sentry release
-        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
+        if: steps.sentry_auth.outputs.present == 'true'
         uses: getsentry/action-release@v3
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -214,5 +230,5 @@ jobs:
           set_commits: auto
 
       - name: Note skipped registration
-        if: ${{ secrets.SENTRY_AUTH_TOKEN == '' }}
+        if: steps.sentry_auth.outputs.present != 'true'
         run: echo "::warning::SENTRY_AUTH_TOKEN not set - skipping Sentry release registration"
