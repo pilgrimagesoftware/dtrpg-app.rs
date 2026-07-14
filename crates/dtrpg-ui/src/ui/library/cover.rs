@@ -310,9 +310,13 @@ mod tests {
         let key_b = detail_cache_key("b1");
         let key_other = detail_cache_key("b2");
 
-        assert_ne!(key_a.as_ref(), "b1", "must not collide with the small-context cache key");
-        assert_eq!(key_a, key_b, "same item id must derive the same detail cache key");
-        assert_ne!(key_a, key_other, "different item ids must derive different detail cache keys");
+        assert_ne!(key_a.as_ref(),
+                   "b1",
+                   "must not collide with the small-context cache key");
+        assert_eq!(key_a, key_b,
+                   "same item id must derive the same detail cache key");
+        assert_ne!(key_a, key_other,
+                   "different item ids must derive different detail cache keys");
     }
 
     #[test]

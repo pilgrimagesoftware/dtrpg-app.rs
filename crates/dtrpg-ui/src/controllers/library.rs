@@ -1815,8 +1815,10 @@ impl LibraryController {
     /// never opened in the detail panel, so eagerly downloading a full-size
     /// or WebP image for all of them would waste bandwidth and disk space.
     pub fn ensure_detail_cover(&mut self, item_id: &Arc<str>, cx: &mut Context<Self>) {
-        let Some(url) =
-            self.catalog.iter().find(|i| i.id == *item_id).and_then(|i| i.detail_cover_url.clone())
+        let Some(url) = self.catalog
+                            .iter()
+                            .find(|i| i.id == *item_id)
+                            .and_then(|i| i.detail_cover_url.clone())
         else {
             return;
         };

@@ -933,8 +933,7 @@ impl Render for LibraryRootView {
                         let item = item.clone();
                         let cache = cx.global::<crate::ui::library::cover::CoverCache>();
                         let detail_key = crate::ui::library::cover::detail_cache_key(&item.id);
-                        let cover_image =
-                            cache.get(&detail_key).or_else(|| cache.get(&item.id));
+                        let cover_image = cache.get(&detail_key).or_else(|| cache.get(&item.id));
                         render_detail_tab_content(&item,
                                                   settings_snap.storage_root_path.clone(),
                                                   lib_entity.clone(),
