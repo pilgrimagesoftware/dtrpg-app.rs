@@ -1,6 +1,7 @@
 //! Library UI state and interaction controller.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::path::Path;
 use std::sync::Arc;
 
 use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString};
@@ -38,6 +39,32 @@ fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, bool>, key: K)
     let flag = map.entry(key).or_insert(false);
     *flag = !*flag;
     *flag
+}
+
+/// Returns `entry_id`/`row_ix`'s cached Info value if present; otherwise, if
+/// `downloaded` is true, computes it via `compute_file_info(path, format)`
+/// and caches it. Returns `FileInfo::None` for undownloaded files without
+/// touching the cache.
+///
+/// Extracted as a pure function (independent of `LibraryController`'s
+/// service/entity fields) so the caching behavior can be unit tested
+/// directly.
+fn cached_file_info(cache: &mut HashMap<(Arc<str>, usize), crate::util::file_info::FileInfo>,
+                    entry_id: &Arc<str>, row_ix: usize, downloaded: bool, path: &Path,
+                    format: &str)
+                    -> crate::util::file_info::FileInfo {
+    use crate::util::file_info::{FileInfo, compute_file_info};
+
+    let key = (Arc::clone(entry_id), row_ix);
+    if let Some(info) = cache.get(&key) {
+        return *info;
+    }
+    if !downloaded {
+        return FileInfo::None;
+    }
+    let info = compute_file_info(path, format);
+    cache.insert(key, info);
+    info
 }
 
 /// Selects `row_ix` for `key` in a per-entry row-selection map, toggling it
@@ -530,6 +557,12 @@ pub struct LibraryController {
     /// whenever the entry's detail tab is closed or reopened, same
     /// convention as `selected_item_file`.
     zip_preview:                   Option<ZipPreviewState>,
+    /// Per-file Info column metadata (PDF page count, Zip file count, image
+    /// dimensions), keyed by `(entry_id, row_ix)` and computed once on first
+    /// access — see [`Self::file_info`]. Evicted per-entry whenever a file's
+    /// `downloaded` flag transitions, since re-downloading may change the
+    /// file's content.
+    file_info_cache:               HashMap<(Arc<str>, usize), crate::util::file_info::FileInfo>,
     /// Ids of catalog items with an availability check currently in flight
     /// (on-demand or queued), mirroring `CoverCache::in_flight`'s role for
     /// thumbnails. `LibraryChanged` is emitted on insertion and removal so
@@ -620,6 +653,7 @@ impl LibraryController {
                    other_details_open: HashMap::new(),
                    file_other_details_open: HashMap::new(),
                    zip_preview: None,
+                   file_info_cache: HashMap::new(),
                    checking_items: HashSet::new(),
                    check_queue: VecDeque::new(),
                    download_queue: VecDeque::new(),
@@ -2501,6 +2535,33 @@ impl LibraryController {
             .map(|p| (p.row_ix, p.anchor_pos, p.pinned))
     }
 
+    /// Returns `entry_id`'s file at `row_ix`'s Info column value (PDF page
+    /// count, Zip file count, or image dimensions).
+    ///
+    /// Returns the cached value if present. Otherwise, if the file has been
+    /// downloaded to `entry_dir`, extracts and caches its Info value via
+    /// [`crate::util::file_info::compute_file_info`]; returns
+    /// [`FileInfo::None`] immediately for undownloaded files or an unknown
+    /// entry/row without touching the cache.
+    pub fn file_info(&mut self, entry_id: &Arc<str>, row_ix: usize, entry_dir: &Path)
+                     -> crate::util::file_info::FileInfo {
+        let Some((downloaded, path, format)) =
+            self.item_by_id(entry_id)
+                .and_then(|item| item.files.get(row_ix))
+                .map(|file| {
+                    (file.downloaded, entry_dir.join(file.name.as_ref()), file.format.clone())
+                })
+        else {
+            return crate::util::file_info::FileInfo::None;
+        };
+        cached_file_info(&mut self.file_info_cache,
+                         entry_id,
+                         row_ix,
+                         downloaded,
+                         &path,
+                         &format)
+    }
+
     /// Opens (or moves) the hover preview to `entry_id`'s file row `row_ix`,
     /// anchored at `anchor_pos`. No-op while a *different* row is pinned —
     /// pinning takes priority over hover until explicitly dismissed. Also a
@@ -2669,6 +2730,8 @@ impl LibraryController {
             item.recompute_status();
             self.section_counts = section_counts(&self.catalog);
             self.invalidate_cache();
+            self.file_info_cache
+                .retain(|(entry_id, _), _| entry_id.as_ref() != id);
             cx.emit(LibraryChanged);
         }
     }
@@ -2900,6 +2963,8 @@ impl LibraryController {
                                       if let Some(file) = item.files.get_mut(index as usize) {
                                           file.downloaded = true;
                                       }
+                                      ctrl.file_info_cache
+                                          .remove(&(task_item_id.clone(), index as usize));
                                       if let Some(dest) = &dest_for_symlink {
                                           create_collections_symlinks(dest,
                                                                       item.order_product_id,
@@ -3077,7 +3142,7 @@ impl LibraryController {
 /// directory) is logged via `tracing::warn!` and does not affect the
 /// caller's own success/failure outcome — see
 /// [`crate::util::symlink::ensure_symlink`].
-fn create_collections_symlinks(dest: &std::path::Path, order_product_id: u64, product_id: u64,
+fn create_collections_symlinks(dest: &Path, order_product_id: u64, product_id: u64,
                                collections: &[CollectionEntry]) {
     let storage = crate::data::storage::StorageConfig::load();
     if !storage.create_collections() {
@@ -3985,6 +4050,74 @@ mod download_queue_tests {
 
         assert!(!removed);
         assert_eq!(queue.len(), 1);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod file_info_cache_tests {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use super::cached_file_info;
+    use crate::util::file_info::FileInfo;
+
+    #[test]
+    fn undownloaded_file_returns_none_without_caching() {
+        let mut cache = HashMap::new();
+        let entry_id: Arc<str> = Arc::from("entry-a");
+        let path = std::path::Path::new("/does/not/exist.pdf");
+
+        let info = cached_file_info(&mut cache, &entry_id, 0, false, path, "PDF");
+
+        assert_eq!(info, FileInfo::None);
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn downloaded_unsupported_format_caches_none() {
+        let mut cache = HashMap::new();
+        let entry_id: Arc<str> = Arc::from("entry-a");
+        let path = std::path::Path::new("/does/not/exist.txt");
+
+        let info = cached_file_info(&mut cache, &entry_id, 0, true, path, "TXT");
+
+        assert_eq!(info, FileInfo::None);
+        assert_eq!(cache.get(&(Arc::clone(&entry_id), 0)),
+                   Some(&FileInfo::None));
+    }
+
+    #[test]
+    fn second_call_reuses_cached_value_without_re_reading_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.png");
+        image::RgbImage::new(5, 6).save(&path).unwrap();
+        let mut cache = HashMap::new();
+        let entry_id: Arc<str> = Arc::from("entry-a");
+
+        let first = cached_file_info(&mut cache, &entry_id, 0, true, &path, "PNG");
+        assert_eq!(first, FileInfo::Dimensions(5, 6));
+
+        // Delete the underlying file: if the second call re-read from disk,
+        // extraction would fail and return `FileInfo::None` instead of the
+        // cached dimensions.
+        std::fs::remove_file(&path).unwrap();
+
+        let second = cached_file_info(&mut cache, &entry_id, 0, true, &path, "PNG");
+        assert_eq!(second, FileInfo::Dimensions(5, 6));
+    }
+
+    #[test]
+    fn different_rows_cache_independently() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.png");
+        image::RgbImage::new(2, 2).save(&path).unwrap();
+        let mut cache = HashMap::new();
+        let entry_id: Arc<str> = Arc::from("entry-a");
+
+        cached_file_info(&mut cache, &entry_id, 0, true, &path, "PNG");
+
+        assert_eq!(cache.get(&(Arc::clone(&entry_id), 1)), None);
     }
 }
 
