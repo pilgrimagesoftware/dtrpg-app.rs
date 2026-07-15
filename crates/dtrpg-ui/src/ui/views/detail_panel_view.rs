@@ -341,12 +341,12 @@ pub(crate) fn item_list_columns() -> Vec<Column> {
          Column::new("size", t!("detail.item_list_column_size")).width(90.)
                                                                 .min_width(60.)
                                                                 .resizable(true),
-         Column::new("status", t!("detail.item_list_column_status")).width(90.)
-                                                                    .min_width(60.)
-                                                                    .resizable(true),
          Column::new("info", t!("detail.item_list_column_info")).width(100.)
                                                                 .min_width(60.)
-                                                                .resizable(true),]
+                                                                .resizable(true),
+         Column::new("status", t!("detail.item_list_column_status")).width(90.)
+                                                                    .min_width(60.)
+                                                                    .resizable(true),]
 }
 
 /// `TableDelegate` for a multi-item entry's item list. Backed by
@@ -507,6 +507,23 @@ impl TableDelegate for ItemListDelegate {
                      .into_any_element()
             }
             3 => {
+                let entry_id = Arc::clone(&self.entry_id);
+                let entry_dir = self.entry_dir.clone();
+                let info = self.controller.update(cx, |ctrl, _cx| {
+                                              ctrl.file_info(&entry_id, row_ix, &entry_dir)
+                                          });
+                let text = info.display().unwrap_or_else(|| "\u{2014}".to_string());
+                div().h_full()
+                     .flex()
+                     .items_center()
+                     .text_sm()
+                     .font_family(value_font_family.to_string())
+                     .text_color(colors.text_secondary)
+                     .truncate()
+                     .child(text)
+                     .into_any_element()
+            }
+            4 => {
                 // Status: downloaded checkmark, in-progress indicator, or a
                 // download action for this specific item — independent of
                 // sibling rows and of the entry-level download button (see
@@ -581,23 +598,6 @@ impl TableDelegate for ItemListDelegate {
                          })
                          .into_any_element()
                 }
-            }
-            4 => {
-                let entry_id = Arc::clone(&self.entry_id);
-                let entry_dir = self.entry_dir.clone();
-                let info = self.controller.update(cx, |ctrl, _cx| {
-                                              ctrl.file_info(&entry_id, row_ix, &entry_dir)
-                                          });
-                let text = info.display().unwrap_or_else(|| "\u{2014}".to_string());
-                div().h_full()
-                     .flex()
-                     .items_center()
-                     .text_sm()
-                     .font_family(value_font_family.to_string())
-                     .text_color(colors.text_secondary)
-                     .truncate()
-                     .child(text)
-                     .into_any_element()
             }
             _ => div().into_any_element(),
         }
