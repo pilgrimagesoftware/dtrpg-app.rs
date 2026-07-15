@@ -28,9 +28,9 @@
 - [x] 5.1 Run `cargo test --all-features -- datetime` — all datetime unit tests pass (13 unit + 2 doc)
 - [x] 5.2 Run `cargo check --all-targets` — no compile errors
 - [x] 5.3 Run `cargo clippy --all-targets --all-features -- -D warnings` — no new warnings (pre-existing expect lint at library.rs:102 is unrelated)
-- [ ] 5.4 Open the detail panel for an item; confirm the "Added" row shows a relative label
-- [ ] 5.5 Hover the "Added" value; confirm a tooltip appears with the full date and time
-- [ ] 5.6 Confirm items with `added_order` values in each time bucket show the correct label format
+- [x] 5.4 Open the detail panel for an item; confirm the "Added" row shows a relative label
+- [x] 5.5 Hover the "Added" value; confirm a tooltip appears with the full date and time
+- [x] 5.6 Confirm items with `added_order` values in each time bucket show the correct label format
 
 ## 6. Fix: real SDK data leaked raw RFC 3339 timestamps into `desc`
 
