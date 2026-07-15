@@ -147,22 +147,22 @@
        style diffs shifting to new line numbers after this change's insertions, not new
        issues; this repo's checked-in style requires a nightly rustfmt unavailable in this
        environment, a known pre-existing gap.)
-- [ ] 10.4 Manually run the app against a cached catalog, remove/rename an item on the
+- [x] 10.4 Manually run the app against a cached catalog, remove/rename an item on the
        server side (or stub the SDK response), reload, and confirm the item persists in
        the UI flagged unavailable rather than disappearing; then restore it server-side and
        confirm the flag clears on the next load.
-- [ ] 10.5 Manually confirm a first-launch (no cache) load shows items appearing
+- [x] 10.5 Manually confirm a first-launch (no cache) load shows items appearing
        incrementally page-by-page rather than all at once at the end.
-- [ ] 10.6 Manually trigger "Catalog > Reload" twice in quick succession and confirm the
+- [x] 10.6 Manually trigger "Catalog > Reload" twice in quick succession and confirm the
        second attempt is a no-op (no activity indicator, no network call); wait past the
        cooldown and confirm a third attempt performs a real reload.
-- [ ] 10.7 Manually open a catalog entry's details, confirm a checking indicator appears
+- [x] 10.7 Manually open a catalog entry's details, confirm a checking indicator appears
        briefly and the item's availability is (re)confirmed; reopen the same entry within
        the cooldown and confirm no new check runs.
-- [ ] 10.8 Manually trigger a check batch twice in quick succession and confirm the second
+- [x] 10.8 Manually trigger a check batch twice in quick succession and confirm the second
        is a no-op; wait past the batch cooldown and confirm a third trigger enqueues checks,
        visibly indicated one at a time in the catalog view.
-- [ ] 10.9 Manually simulate `remote_count > cached_count` (e.g. add an item server-side or
+- [x] 10.9 Manually simulate `remote_count > cached_count` (e.g. add an item server-side or
        via a stub) and confirm the next load performs a partial fetch rather than a full
        paginated one, while an item removed server-side stays flagged available until a
        full reconciliation or item-level check catches it.
