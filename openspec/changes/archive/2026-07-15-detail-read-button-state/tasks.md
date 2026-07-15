@@ -9,5 +9,5 @@
 - [x] 2.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 2.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings
 - [x] 2.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 2.4 Launch the app; open the detail panel for a non-downloaded item; confirm the Read button appears dimmed and non-clickable with a tooltip on hover
-- [ ] 2.5 Trigger a download to make the item downloaded; confirm the Read button becomes fully enabled with accent appearance and no tooltip
+- [x] 2.4 Launch the app; open the detail panel for a non-downloaded item; confirm the Read button appears dimmed and non-clickable with a tooltip on hover
+- [x] 2.5 Trigger a download to make the item downloaded; confirm the Read button becomes fully enabled with accent appearance and no tooltip
