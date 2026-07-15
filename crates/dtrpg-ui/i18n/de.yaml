@@ -239,6 +239,10 @@ activity:
   loading_library_page: "Bibliothek wird geladen: Seite %{page}…"
   loading_library_partial: "Bibliothek wird geladen: Auf Updates wird geprüft…"
   loading_collections: "Sammlungen werden geladen…"
+  loading_thumbnails: "Miniaturansichten werden geladen…"
+  loading_thumbnails_remaining: "Miniaturansichten werden geladen… (%{remaining} verbleibend)"
+  refreshing_thumbnails: "Miniaturansichten werden aktualisiert…"
+  refreshing_thumbnails_remaining: "Miniaturansichten werden aktualisiert… (%{remaining} verbleibend)"
 
 alert_history:
   title: "Warnungsverlauf"
@@ -253,6 +257,10 @@ notification:
   sign_in_again: "Erneut anmelden"
   signing_in: "Bei DriveThruRPG anmelden…"
   copy_tooltip: "Fehlermeldung kopieren"
+  refresh_thumbnails_started: "%{count} Miniaturansichten werden aktualisiert…"
+  refresh_thumbnails_completed: "%{succeeded} Miniaturansichten aktualisiert"
+  refresh_thumbnails_completed_with_failures: "%{succeeded} Miniaturansichten aktualisiert, %{failed} fehlgeschlagen"
+  refresh_thumbnails_noop: "Keine Miniaturansichten zu aktualisieren"
 
 about:
   version: "Version %{version}"

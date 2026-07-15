@@ -239,6 +239,10 @@ activity:
   loading_library_page: "Chargement de la bibliothèque : page %{page}…"
   loading_library_partial: "Chargement de la bibliothèque : vérification des mises à jour…"
   loading_collections: "Chargement des collections…"
+  loading_thumbnails: "Chargement des miniatures…"
+  loading_thumbnails_remaining: "Chargement des miniatures… (%{remaining} restantes)"
+  refreshing_thumbnails: "Actualisation des miniatures…"
+  refreshing_thumbnails_remaining: "Actualisation des miniatures… (%{remaining} restantes)"
 
 alert_history:
   title: "Historique des alertes"
@@ -253,6 +257,10 @@ notification:
   sign_in_again: "Se reconnecter"
   signing_in: "Connexion à DriveThruRPG en cours…"
   copy_tooltip: "Copier le message d'erreur"
+  refresh_thumbnails_started: "Actualisation de %{count} miniatures…"
+  refresh_thumbnails_completed: "%{succeeded} miniatures actualisées"
+  refresh_thumbnails_completed_with_failures: "%{succeeded} miniatures actualisées, %{failed} échouées"
+  refresh_thumbnails_noop: "Aucune miniature à actualiser"
 
 about:
   version: "Version %{version}"
