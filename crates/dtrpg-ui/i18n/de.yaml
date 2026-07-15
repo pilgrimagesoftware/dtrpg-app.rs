@@ -13,6 +13,7 @@ sidebar:
   collections_sort_ascending: "Aufsteigend"
   collections_sort_descending: "Absteigend"
   collections_sort_tooltip: "Sammlungen sortieren"
+  loading: "Wird geladen…"
 
 toolbar:
   sort_by: "Sortieren nach"
