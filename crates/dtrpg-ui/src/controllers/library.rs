@@ -1813,13 +1813,13 @@ impl LibraryController {
 
               // Count this attempt (success or failure) toward the batch total so the
               // progress bar reflects real throughput instead of sitting indeterminate.
-              let (processed, remaining, refresh_active) =
-                  this.update(async_cx, |ctrl, _cx| {
-                          ctrl.thumbnail_processed += 1;
-                          (ctrl.thumbnail_processed, ctrl.thumbnail_queue.len(),
-                           ctrl.thumbnail_refresh_active)
-                      })
-                      .unwrap_or((0, 0, false));
+              let (processed, remaining, refresh_active) = this.update(async_cx, |ctrl, _cx| {
+                                                                   ctrl.thumbnail_processed += 1;
+                                                                   (ctrl.thumbnail_processed,
+                                                                    ctrl.thumbnail_queue.len(),
+                                                                    ctrl.thumbnail_refresh_active)
+                                                               })
+                                                               .unwrap_or((0, 0, false));
 
               if remaining == 0 {
                   weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
@@ -1832,12 +1832,12 @@ impl LibraryController {
               }
               else {
                   let label = if refresh_active {
-                      t!("activity.refreshing_thumbnails_remaining", remaining = remaining)
-                          .to_string()
+                      t!("activity.refreshing_thumbnails_remaining",
+                         remaining = remaining).to_string()
                   }
                   else {
-                      t!("activity.loading_thumbnails_remaining", remaining = remaining)
-                          .to_string()
+                      t!("activity.loading_thumbnails_remaining",
+                         remaining = remaining).to_string()
                   };
                   let total = (processed + remaining) as f32;
                   let progress = if total > 0.0 {
@@ -1960,14 +1960,15 @@ impl LibraryController {
         // had already completed before this action was invoked.
         self.thumbnail_processed = 0;
         self.thumbnail_refresh_active = true;
-        self.thumbnail_refresh_pending = to_enqueue.iter().map(|(id, _, _)| Arc::clone(id)).collect();
+        self.thumbnail_refresh_pending =
+            to_enqueue.iter().map(|(id, _, _)| Arc::clone(id)).collect();
         self.thumbnail_refresh_succeeded = 0;
         self.thumbnail_refresh_failed = 0;
         let cache = cx.global_mut::<CoverCache>();
         for (id, _, _) in &to_enqueue {
             cache.mark_in_flight(Arc::clone(id));
         }
-        cx.emit(ThumbnailRefreshStarted { count: to_enqueue.len() });
+        cx.emit(ThumbnailRefreshStarted { count: to_enqueue.len(), });
         self.thumbnail_queue.extend(to_enqueue);
         self.drain_thumbnail_queue(cx);
     }
