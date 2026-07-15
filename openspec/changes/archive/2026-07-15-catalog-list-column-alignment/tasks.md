@@ -49,6 +49,6 @@
 - [x] 9.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 9.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings (pre-existing `library.rs:99` expect_used error is not introduced by this change)
 - [x] 9.3 Launch the app in ungrouped list view; confirm the Publisher, System, Pages, Size, and Added header labels align exactly with the data values in each row
-- [ ] 9.4 Switch to grouped list view; confirm the same column alignment holds under each group header
-- [ ] 9.5 Confirm clicking a row in ungrouped list view selects the item (detail panel updates)
+- [x] 9.4 Switch to grouped list view; confirm the same column alignment holds under each group header
+- [x] 9.5 Confirm clicking a row in ungrouped list view selects the item (detail panel updates)
 - [x] 9.6 Confirm clicking the reveal arrow (↗) for a downloaded item opens Finder/Explorer
