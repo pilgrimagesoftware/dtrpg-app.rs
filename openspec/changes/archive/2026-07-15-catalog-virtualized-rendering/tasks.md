@@ -44,9 +44,9 @@
 - [x] 8.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 8.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any warnings
 - [x] 8.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 8.4 Manually launch the app, load a large catalog (500+ items), and confirm scrolling in list layout is smooth with no visible lag
-- [ ] 8.5 Switch to thumbs layout and confirm smooth scrolling
-- [ ] 8.6 Switch to grid layout and confirm smooth scrolling and correct card tiling
-- [ ] 8.7 Switch to grouped layout and confirm all items and group headers appear (non-virtualized fallback)
-- [ ] 8.8 Click an item in list layout and confirm detail view opens; right-click and confirm context menu appears
-- [ ] 8.9 Click an item in thumbs layout and confirm detail view opens; right-click and confirm context menu appears
+- [x] 8.4 Manually launch the app, load a large catalog (500+ items), and confirm scrolling in list layout is smooth with no visible lag
+- [x] 8.5 Switch to thumbs layout and confirm smooth scrolling
+- [x] 8.6 Switch to grid layout and confirm smooth scrolling and correct card tiling
+- [x] 8.7 Switch to grouped layout and confirm all items and group headers appear (non-virtualized fallback)
+- [x] 8.8 Click an item in list layout and confirm detail view opens; right-click and confirm context menu appears
+- [x] 8.9 Click an item in thumbs layout and confirm detail view opens; right-click and confirm context menu appears
