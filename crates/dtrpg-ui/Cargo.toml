@@ -28,6 +28,8 @@ chrono = { workspace = true }
 sys-locale = { workspace = true }
 open = { workspace = true }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+lopdf = { version = "0.44.0", default-features = false }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 
 [dev-dependencies]
 pretty_assertions = "1"

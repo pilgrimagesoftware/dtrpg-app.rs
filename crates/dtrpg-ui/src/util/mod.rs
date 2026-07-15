@@ -1,4 +1,5 @@
 pub mod datetime;
+pub mod file_info;
 pub mod file_size;
 pub mod filter;
 pub mod hash;
