@@ -30,6 +30,6 @@
 - [x] 5.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 5.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any warnings
 - [x] 5.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 5.4 Manually launch the app in debug mode (with the `set_logged_in` stub active) and open Settings → Account; confirm the avatar circle with an initial letter and the email address are visible
-- [ ] 5.5 If `avatar-load-and-cache` is also applied: confirm that after a successful Gravatar fetch the image renders in place of the initial letter
-- [ ] 5.6 Sign out and reopen Settings → Account; confirm the avatar circle and email are absent and the "not signed in" prompt is shown
+- [x] 5.4 Manually launch the app in debug mode (with the `set_logged_in` stub active) and open Settings → Account; confirm the avatar circle with an initial letter and the email address are visible
+- [x] 5.5 If `avatar-load-and-cache` is also applied: confirm that after a successful Gravatar fetch the image renders in place of the initial letter
+- [x] 5.6 Sign out and reopen Settings → Account; confirm the avatar circle and email are absent and the "not signed in" prompt is shown
