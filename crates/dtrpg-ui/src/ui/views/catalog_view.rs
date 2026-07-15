@@ -442,6 +442,10 @@ impl TableDelegate for CatalogListDelegate {
         self.controller.read(cx).visible_items_count()
     }
 
+    fn loading(&self, cx: &App) -> bool {
+        self.controller.read(cx).is_loading()
+    }
+
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         let snap = self.controller.read(cx).snapshot();
         let active_col = match snap.sort {
@@ -667,6 +671,10 @@ impl GroupedCatalogListDelegate {
 impl TableDelegate for GroupedCatalogListDelegate {
     fn columns_count(&self, _cx: &App) -> usize {
         self.columns.len()
+    }
+
+    fn loading(&self, cx: &App) -> bool {
+        self.controller.read(cx).is_loading()
     }
 
     fn rows_count(&self, _cx: &App) -> usize {
@@ -1108,7 +1116,12 @@ impl Render for CatalogView {
         let pad_top = density.catalog_pad_top;
         let pad_side = density.catalog_pad_side;
         let pad_bottom = density.catalog_pad_bottom;
-        let empty_reason = if item_count == 0 {
+        // List presentation renders its own skeleton loading view via the
+        // `TableDelegate::loading()` hook, so it must fall through to the
+        // content match below instead of the shared empty/loading short
+        // circuits used by the Thumbs/Grid presentations.
+        let is_list_presentation = matches!(snap.presentation, CatalogPresentation::List);
+        let empty_reason = if item_count == 0 && !(is_list_presentation && snap.catalog_loading) {
             Some(if snap.total_count == 0 {
                      EmptyReason::LibraryEmpty
                  }
@@ -1148,7 +1161,7 @@ impl Render for CatalogView {
                         .pt(pad_top)
                         .pb(pad_bottom);
 
-        if snap.catalog_loading && item_count == 0 {
+        if snap.catalog_loading && item_count == 0 && !is_list_presentation {
             return outer.child(root.justify_center()
                                    .items_center()
                                    .child(Spinner::new().with_size(Size::Large)))

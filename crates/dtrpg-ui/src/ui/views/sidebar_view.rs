@@ -19,8 +19,9 @@ use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
 use gpui_component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
+use gpui_component::spinner::Spinner;
 use gpui_component::{
-    ActiveTheme, Collapsible, Side, Sizable as _, StyledExt as _, WindowExt as _,
+    ActiveTheme, Collapsible, Side, Sizable as _, Size, StyledExt as _, WindowExt as _,
 };
 use rust_i18n::t;
 
@@ -128,6 +129,10 @@ struct CollectionsSection {
     suffix:    CollectionsSuffixFn,
     on_toggle: CollectionsToggleFn,
     rows:      Vec<CollectionRow>,
+    /// Whether the initial collections fetch is still in flight. While
+    /// `true` and `rows` is empty, the section shows a loading indicator
+    /// instead of a blank submenu.
+    loading:   bool,
     entity:    Entity<LibraryController>,
     tabs:      Entity<TabsController>,
 }
@@ -151,6 +156,7 @@ impl SidebarItem for CollectionsSection {
         let on_toggle = self.on_toggle.clone();
         let suffix = (self.suffix)(window, cx);
         let open = self.open;
+        let loading = self.loading;
         let entity = self.entity.clone();
         let tabs = self.tabs.clone();
 
@@ -180,17 +186,31 @@ impl SidebarItem for CollectionsSection {
                              .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
                              .child(suffix));
 
-        let rows: Vec<AnyElement> = self.rows
-                                        .into_iter()
-                                        .enumerate()
-                                        .map(|(ix, row)| {
-                                            render_collection_row(format!("{id:?}-row-{ix}"),
-                                                                  row,
-                                                                  entity.clone(),
-                                                                  tabs.clone(),
-                                                                  cx)
-                                        })
-                                        .collect();
+        let mut rows: Vec<AnyElement> = self.rows
+                                            .into_iter()
+                                            .enumerate()
+                                            .map(|(ix, row)| {
+                                                render_collection_row(format!("{id:?}-row-{ix}"),
+                                                                      row,
+                                                                      entity.clone(),
+                                                                      tabs.clone(),
+                                                                      cx)
+                                            })
+                                            .collect();
+
+        // Collections not yet known (initial fetch in flight) show a loading
+        // indicator instead of a blank submenu.
+        if rows.is_empty() && loading {
+            rows.push(div().id("collections-loading")
+                           .flex()
+                           .items_center()
+                           .gap_x_2()
+                           .p_2()
+                           .text_sm()
+                           .child(Spinner::new().with_size(Size::Small))
+                           .child(t!("sidebar.loading"))
+                           .into_any_element());
+        }
 
         div().id(id)
              .w_full()
@@ -324,8 +344,8 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
 #[allow(clippy::too_many_arguments)]
 pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                       publishers: Vec<PublisherEntry>, collections: Vec<CollectionEntry>,
-                      collections_loaded: bool, catalog_ids: HashSet<u64>,
-                      collection_sort: CollectionSortMethod,
+                      collections_loaded: bool, catalog_loading: bool,
+                      catalog_ids: HashSet<u64>, collection_sort: CollectionSortMethod,
                       collection_sort_direction: SortDirection,
                       entity: Entity<LibraryController>, tabs: Entity<TabsController>,
                       collection_name_input: Entity<InputState>,
@@ -366,7 +386,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     let publishers_count = publishers.len();
 
     // ── Publishers menu ───────────────────────────────────────────────────────
-    let pub_children: Vec<SidebarMenuItem> =
+    let mut pub_children: Vec<SidebarMenuItem> =
         publishers.into_iter()
                   .filter(|p| name_matches_query(p.name.as_ref(), &publisher_search.query))
                   .map(|p| {
@@ -380,6 +400,18 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                tabs.clone())
                   })
                   .collect();
+
+    // Publishers are derived from the catalog itself, so an empty list while
+    // the initial fetch is still in flight means "not yet known", not
+    // "confirmed zero publishers" — show a loading indicator instead of a
+    // blank section.
+    if pub_children.is_empty() && catalog_loading {
+        pub_children.push(
+            SidebarMenuItem::new(t!("sidebar.loading"))
+                .disable(true)
+                .suffix(|_window, _cx| Spinner::new().with_size(Size::Small)),
+        );
+    }
 
     let entity_for_pub = entity.clone();
     let pub_title: SharedString = if publisher_search.open {
@@ -579,6 +611,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                    suffix,
                                                    on_toggle,
                                                    rows: col_rows,
+                                                   loading: !collections_loaded,
                                                    entity: entity.clone(),
                                                    tabs };
 

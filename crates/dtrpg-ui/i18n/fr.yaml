@@ -13,6 +13,7 @@ sidebar:
   collections_sort_ascending: "Ordre croissant"
   collections_sort_descending: "Ordre décroissant"
   collections_sort_tooltip: "Trier les collections"
+  loading: "Chargement…"
 
 toolbar:
   sort_by: "Trier par"

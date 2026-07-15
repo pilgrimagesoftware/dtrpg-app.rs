@@ -13,6 +13,7 @@ sidebar:
   collections_sort_ascending: "Ascending"
   collections_sort_descending: "Descending"
   collections_sort_tooltip: "Sort collections"
+  loading: "Loading…"
 
 toolbar:
   sort_by: "Sort by"
