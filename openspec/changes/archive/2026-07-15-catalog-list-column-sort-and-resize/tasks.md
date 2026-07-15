@@ -59,5 +59,5 @@
 - [x] 8.6 Click "Publisher" a third time; confirm sort resets to Title ascending
 - [x] 8.7 Click the "System" column header; confirm the dropdown shows "Custom" as the active indicator
 - [x] 8.8 Select "Descending" from the dropdown; confirm the active sort reverses; select "Ascending" and confirm it reverses again
-- [ ] 8.9 Select "Pages" from the dropdown; confirm the Pages column header shows the active sort indicator and the Title column returns to neutral
-- [ ] 8.10 Confirm each row's title cell shows a kind badge ("CR", "SUP", "ADV", etc.) and the badge does not wrap or displace the title
+- [x] 8.9 Select "Pages" from the dropdown; confirm the Pages column header shows the active sort indicator and the Title column returns to neutral
+- [x] 8.10 Confirm each row's title cell shows a kind badge ("CR", "SUP", "ADV", etc.) and the badge does not wrap or displace the title
