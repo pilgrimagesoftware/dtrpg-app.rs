@@ -89,7 +89,12 @@ fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, ke
 /// requirement.
 ///
 /// - An id present in both: kept at its existing position, replaced with the
-///   live item's fields, with `is_available` set to `true`.
+///   live item's fields, with `is_available` set to `true`. Live items always
+///   carry `downloaded: false` on every file (the API has no concept of local
+///   downloads), so each live file's `downloaded` flag is restored from the
+///   existing item's file with the same id (if any) before recomputing the
+///   entry's aggregate `status`, per `catalog-live-data-swap`'s per-file
+///   downloaded-state requirement.
 /// - An id present only in `existing`: kept unchanged except `is_available` is
 ///   set to `false` — the server no longer lists it, but it isn't removed.
 /// - An id present only in `live`: appended at the end, `is_available` stays
@@ -107,9 +112,20 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
     let mut reconciled: Vec<LibraryItem> =
         existing.into_iter()
                 .map(|mut item| {
-                    if let Some(live_item) = live_by_id.remove(&item.id) {
+                    if let Some(mut live_item) = live_by_id.remove(&item.id) {
+                        let downloaded_by_id: HashMap<Arc<str>, bool> =
+                            item.files
+                                .iter()
+                                .map(|f| (Arc::clone(&f.id), f.downloaded))
+                                .collect();
+                        for file in &mut live_item.files {
+                            if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
+                                file.downloaded = downloaded;
+                            }
+                        }
                         item = live_item;
                         item.is_available = true;
+                        item.recompute_status();
                     }
                     else {
                         item.is_available = false;
@@ -2985,6 +3001,24 @@ impl LibraryController {
                       .ok()
                       .flatten();
 
+              // Persist the download to the on-disk catalog cache immediately —
+              // otherwise a restart before the next live-fetch cache write (see
+              // `start_load_inner`) loads a cache that never recorded this
+              // download, showing `Cloud` status regardless of what
+              // `reconcile_catalog` does (see `catalog-live-data-swap`).
+              if !cancelled && outcome.is_ok() {
+                  let items_to_save = this.update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
+                                          .unwrap_or_default();
+                  let save_root = cache_dir();
+                  async_cx.background_executor()
+                          .spawn(async move {
+                              if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
+                                  tracing::warn!(error = %e, "failed to save catalog cache");
+                              }
+                          })
+                          .await;
+              }
+
               if let Err(e) = &outcome
                  && !cancelled
               {
@@ -4207,7 +4241,7 @@ mod bulk_download_target_tests {
 mod reconcile_catalog_tests {
     use super::reconcile_catalog;
     use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
 
     fn item(id: &str, title: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -4224,6 +4258,15 @@ mod reconcile_catalog_tests {
                          "#000000",
                          "",
                          None)
+    }
+
+    fn file(id: &str, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded }
     }
 
     #[test]
@@ -4282,6 +4325,62 @@ mod reconcile_catalog_tests {
         assert_eq!(reconciled.len(), 2);
         assert_eq!(reconciled[0].id.as_ref(), "b1");
         assert_eq!(reconciled[1].id.as_ref(), "b2");
+    }
+
+    #[test]
+    fn downloaded_status_survives_reconcile_against_a_live_fetch() {
+        let mut local = item("b1", "Old Title");
+        local.files = vec![file("f1", true), file("f2", true)];
+        local.recompute_status();
+        assert_eq!(local.status, ItemStatus::Downloaded);
+
+        let mut live = item("b1", "New Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        assert!(reconciled[0].files.iter().all(|f| f.downloaded));
+        assert_eq!(reconciled[0].status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn live_file_with_no_cached_counterpart_is_not_downloaded() {
+        let mut local = item("b1", "Title");
+        local.files = vec![file("f1", true)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
+        assert_eq!(f2_downloaded, Some(false));
+    }
+
+    #[test]
+    fn partially_downloaded_item_keeps_its_per_file_state() {
+        let mut local = item("b1", "Title");
+        local.files = vec![file("f1", true), file("f2", false)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let f1_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f1")
+                                         .map(|f| f.downloaded);
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
+        assert_eq!(f1_downloaded, Some(true));
+        assert_eq!(f2_downloaded, Some(false));
+        assert_eq!(reconciled[0].status, ItemStatus::Cloud);
     }
 }
 
