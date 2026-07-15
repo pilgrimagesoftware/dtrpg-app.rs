@@ -236,11 +236,26 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
             let numeric_id = item.numeric_id;
             let order_product_id = item.order_product_id;
             let product_id = item.product_id;
+            // Live single-item responses always carry `downloaded: false` on
+            // every file (the API has no concept of local downloads); merge
+            // by file id so a wholesale field replace below doesn't discard
+            // download state the same way `reconcile_catalog` used to.
+            let downloaded_by_id: HashMap<Arc<str>, bool> =
+                item.files
+                    .iter()
+                    .map(|f| (Arc::clone(&f.id), f.downloaded))
+                    .collect();
             *item = fresh;
             item.id = id;
             item.numeric_id = numeric_id;
             item.order_product_id = order_product_id;
             item.product_id = product_id;
+            for file in &mut item.files {
+                if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
+                    file.downloaded = downloaded;
+                }
+            }
+            item.recompute_status();
             item.is_available = true;
             item.availability_last_checked = Some(checked_at);
         }
@@ -2370,6 +2385,7 @@ impl LibraryController {
             this.update(async_cx, |ctrl, cx| {
                     if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
                         apply_check_result(existing, result, std::time::SystemTime::now());
+                        ctrl.section_counts = section_counts(&ctrl.catalog);
                         ctrl.invalidate_cache();
                     }
                     ctrl.checking_items.remove(&id);
@@ -4327,7 +4343,7 @@ mod item_check_tests {
 
     use super::{apply_check_result, item_check_due};
     use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
     use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
     fn item(id: &str, title: &str) -> LibraryItem {
@@ -4345,6 +4361,15 @@ mod item_check_tests {
                          "#000000",
                          "",
                          None)
+    }
+
+    fn file(id: &str, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded }
     }
 
     #[test]
@@ -4429,6 +4454,62 @@ mod item_check_tests {
 
         assert!(existing.is_available);
         assert_eq!(existing.availability_last_checked, None);
+    }
+
+    #[test]
+    fn downloaded_status_survives_a_single_item_check() {
+        let mut existing = item("b1", "Old Title");
+        existing.files = vec![file("f1", true), file("f2", true)];
+        existing.recompute_status();
+        assert_eq!(existing.status, ItemStatus::Downloaded);
+
+        let mut fresh = item("b1", "New Title");
+        fresh.files = vec![file("f1", false), file("f2", false)];
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert!(existing.files.iter().all(|f| f.downloaded));
+        assert_eq!(existing.status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn fresh_file_with_no_existing_counterpart_is_not_downloaded() {
+        let mut existing = item("b1", "Title");
+        existing.files = vec![file("f1", true)];
+
+        let mut fresh = item("b1", "Title");
+        fresh.files = vec![file("f1", false), file("f2", false)];
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        let f2_downloaded = existing.files
+                                    .iter()
+                                    .find(|f| f.id.as_ref() == "f2")
+                                    .map(|f| f.downloaded);
+        assert_eq!(f2_downloaded, Some(false));
+    }
+
+    #[test]
+    fn partially_downloaded_item_keeps_its_per_file_state_after_a_check() {
+        let mut existing = item("b1", "Title");
+        existing.files = vec![file("f1", true), file("f2", false)];
+
+        let mut fresh = item("b1", "Title");
+        fresh.files = vec![file("f1", false), file("f2", false)];
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        let f1_downloaded = existing.files
+                                    .iter()
+                                    .find(|f| f.id.as_ref() == "f1")
+                                    .map(|f| f.downloaded);
+        let f2_downloaded = existing.files
+                                    .iter()
+                                    .find(|f| f.id.as_ref() == "f2")
+                                    .map(|f| f.downloaded);
+        assert_eq!(f1_downloaded, Some(true));
+        assert_eq!(f2_downloaded, Some(false));
+        assert_eq!(existing.status, ItemStatus::Cloud);
     }
 }
 
