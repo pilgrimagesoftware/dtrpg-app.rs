@@ -20,9 +20,9 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 Single-click a catalog item to open the popover, move the mouse around the
+- [x] 4.1 Single-click a catalog item to open the popover, move the mouse around the
       catalog area, and confirm the popover stays put
-- [ ] 4.2 Close the popover and click a different item; confirm it opens at the new
+- [x] 4.2 Close the popover and click a different item; confirm it opens at the new
       item's position
 
 ## 5. Anchor Beside the Entry, Not Over It
@@ -52,8 +52,8 @@
 
 ## 6. Manual Verification — Anchor Side
 
-- [ ] 6.1 Single-click a Grid card or Thumbs row with room to its right; confirm the
+- [x] 6.1 Single-click a Grid card or Thumbs row with room to its right; confirm the
       popover opens beside it (not over it), top-aligned with the entry, immediately —
       with no flash at the click point first
-- [ ] 6.2 Single-click an entry near the right edge of the window; confirm the popover
+- [x] 6.2 Single-click an entry near the right edge of the window; confirm the popover
       falls back to opening on the entry's left instead of being clipped or covering it
