@@ -50,9 +50,9 @@
 
 - [x] 9.1 Run `cargo check --all-targets` — no compile errors
 - [x] 9.2 Run `cargo clippy --all-targets --all-features -- -D warnings` — no new warnings introduced by this change
-- [ ] 9.3 Launch the app; confirm the Group toggle button visually reflects active/inactive state correctly
-- [ ] 9.4 Confirm the layout switcher segmented control highlights the active presentation
-- [ ] 9.5 Confirm the settings tab strip highlights the active tab
-- [ ] 9.6 Trigger a notification (e.g., set `DTRPG_AUTH_STATE_OVERRIDE=unauthenticated`) and confirm the Alert banner renders and dismisses correctly
-- [ ] 9.7 Open a downloaded item's detail panel; confirm Read, Download, and Show in Finder buttons render and function correctly
-- [ ] 9.8 Confirm the metadata DescriptionList renders all rows with correct labels and values
+- [x] 9.3 Launch the app; confirm the Group toggle button visually reflects active/inactive state correctly
+- [x] 9.4 Confirm the layout switcher segmented control highlights the active presentation
+- [x] 9.5 Confirm the settings tab strip highlights the active tab
+- [x] 9.6 Trigger a notification (e.g., set `DTRPG_AUTH_STATE_OVERRIDE=unauthenticated`) and confirm the Alert banner renders and dismisses correctly
+- [x] 9.7 Open a downloaded item's detail panel; confirm Read, Download, and Show in Finder buttons render and function correctly
+- [x] 9.8 Confirm the metadata DescriptionList renders all rows with correct labels and values
