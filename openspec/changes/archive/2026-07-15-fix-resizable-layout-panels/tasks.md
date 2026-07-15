@@ -15,8 +15,8 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 With no item selected, catalog fills all space from sidebar to window right edge with no blank column on the right
-- [ ] 4.2 Selecting an item causes the detail panel to appear from the right; catalog compresses; no gap at window edge
-- [ ] 4.3 Dragging the detail panel's left handle leftward stops when the catalog reaches approximately 280 px; catalog remains visible
-- [ ] 4.4 Deselecting the item hides the detail panel and catalog returns to full width immediately with no gap
-- [ ] 4.5 Sidebar drag handle still controls sidebar width correctly; catalog fills the remainder
+- [x] 4.1 With no item selected, catalog fills all space from sidebar to window right edge with no blank column on the right
+- [x] 4.2 Selecting an item causes the detail panel to appear from the right; catalog compresses; no gap at window edge
+- [x] 4.3 Dragging the detail panel's left handle leftward stops when the catalog reaches approximately 280 px; catalog remains visible
+- [x] 4.4 Deselecting the item hides the detail panel and catalog returns to full width immediately with no gap
+- [x] 4.5 Sidebar drag handle still controls sidebar width correctly; catalog fills the remainder
