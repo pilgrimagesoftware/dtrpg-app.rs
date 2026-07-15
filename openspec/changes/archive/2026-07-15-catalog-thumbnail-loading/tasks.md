@@ -34,9 +34,9 @@
 ## 7. Verify
 
 - [x] 7.1 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 7.2 Manually launch the app and confirm thumbnails begin loading as catalog pages arrive, with the activity panel showing the aggregated label
-- [ ] 7.3 Confirm the context menu appears on right-click in all three catalog layouts
-- [ ] 7.4 Confirm the "Load Thumbnail" item is disabled within 5 minutes of a prior attempt and enabled after
+- [x] 7.2 Manually launch the app and confirm thumbnails begin loading as catalog pages arrive, with the activity panel showing the aggregated label
+- [x] 7.3 Confirm the context menu appears on right-click in all three catalog layouts
+- [x] 7.4 Confirm the "Load Thumbnail" item is disabled within 5 minutes of a prior attempt and enabled after
 
 ## 8. Bug fix: thumbnails never actually loaded
 
@@ -57,7 +57,7 @@
       same background-executor threads. The `blocking` reqwest feature was already enabled
       in the workspace `Cargo.toml` (added previously, seemingly in anticipation of this
       issue) but never wired into the actual call site until now.
-- [ ] 8.3 Manually launch the app, sign in, and confirm thumbnails now actually appear on
+- [x] 8.3 Manually launch the app, sign in, and confirm thumbnails now actually appear on
       catalog items (not just that the queue drains without visible progress)
 
 ## 9. Bug fix: stale pre-existing disk cache silently disables thumbnail loading
@@ -84,7 +84,7 @@
       (`~/Library/Caches/com.pilgrimagesoftware.dtrpg/metadata/catalog_cache*.json`) so their
       next launch does a live refetch under the new schema version — this was a one-time local
       fix; 9.2 prevents recurrence for this and any other existing install.
-- [ ] 9.4 Manually launch the app and confirm: (a) with the reporter's now-deleted cache, a live
+- [x] 9.4 Manually launch the app and confirm: (a) with the reporter's now-deleted cache, a live
       refetch happens and thumbnails begin loading; (b) with a freshly-saved cache from this
       build, a second launch within 7 days correctly skips the live refetch (schema version now
       matches, so the auto-load optimization still works for genuinely current caches)
