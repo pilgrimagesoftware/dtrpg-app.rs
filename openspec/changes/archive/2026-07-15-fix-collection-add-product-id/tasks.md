@@ -46,8 +46,8 @@
 - [x] 4.4 Run `cargo test --workspace` and confirm no new failures (6 pre-existing
   `util::datetime` locale test failures, unrelated to collections, confirmed present before this
   change too)
-- [ ] 4.5 Manually add an item whose `order_product_id` differs from its `product_id` to a
+- [x] 4.5 Manually add an item whose `order_product_id` differs from its `product_id` to a
   collection (via drag-and-drop, the context menu, and the Manage Collections dialog) and
   confirm the request succeeds (no 409, item persists in the collection after a reload)
-- [ ] 4.6 Manually confirm removal, the "already a member" checked state, and collection
+- [x] 4.6 Manually confirm removal, the "already a member" checked state, and collection
   filtering still behave correctly for items added under this change
