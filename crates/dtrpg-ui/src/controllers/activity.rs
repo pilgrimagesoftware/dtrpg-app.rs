@@ -349,6 +349,8 @@ impl Default for ActivityController {
 mod tests {
     use std::time::{Instant, SystemTime};
 
+    use gpui::{AppContext, TestAppContext};
+
     use super::*;
 
     /// Directly seeds `alert_log`/`recent` rather than calling `error()`/
@@ -411,5 +413,31 @@ mod tests {
         ctrl.recent.clear();
 
         assert_eq!(ctrl.snapshot().alert_count, 1);
+    }
+
+    // `log_alert` takes `Context<Self>`, so exercising it (rather than
+    // seeding `alert_log` directly, as the tests above do) needs a real
+    // entity via `gpui::TestAppContext` - the `test-support` feature is
+    // enabled for `gpui` under `[dev-dependencies]` for this.
+    #[gpui::test]
+    fn log_alert_appends_entry_without_touching_in_progress_or_recent(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|_| ActivityController::new());
+
+        ctrl.update(cx, |ctrl, cx| {
+                ctrl.log_alert("Add to collection 'Favorites'",
+                               "network error".to_string(),
+                               cx);
+            });
+
+        let alerts = ctrl.read_with(cx, |ctrl, _| ctrl.alert_snapshot());
+        assert_eq!(alerts.entries.len(), 1);
+        assert_eq!(alerts.entries[0].label.as_ref(),
+                   "Add to collection 'Favorites'");
+        assert_eq!(alerts.entries[0].message, "network error");
+
+        let snapshot = ctrl.read_with(cx, |ctrl, _| ctrl.snapshot());
+        assert!(snapshot.items.is_empty());
+        assert_eq!(snapshot.in_progress_count, 0);
+        assert_eq!(snapshot.recent_count, 0);
     }
 }
