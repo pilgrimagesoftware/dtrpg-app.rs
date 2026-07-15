@@ -3,7 +3,7 @@
 - [x] 1.1 Add a `loading: bool` (or shared read of `LibraryController`'s existing loading
       flag) to `CatalogListDelegate`
 - [x] 1.2 Override `CatalogListDelegate::loading()` to return that flag
-- [ ] 1.3 Confirm the built-in skeleton view replaces the empty table during initial load
+- [x] 1.3 Confirm the built-in skeleton view replaces the empty table during initial load
 
 ## 2. Sidebar Sections
 
@@ -20,7 +20,7 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 Cold start with no cache: list presentation shows skeleton rows, not an empty
+- [x] 4.1 Cold start with no cache: list presentation shows skeleton rows, not an empty
       table
-- [ ] 4.2 Sidebar shows a loading indicator, not "no publishers", before the first
+- [x] 4.2 Sidebar shows a loading indicator, not "no publishers", before the first
       catalog page or collections response arrives
