@@ -12,6 +12,6 @@
 
 - [x] 3.1 Run `cargo check --all-targets` — no compile errors
 - [x] 3.2 Run `cargo clippy --all-targets --all-features -- -D warnings` — no new warnings
-- [ ] 3.3 Launch the app in list view; resize a column; change the sort order; confirm the column width is unchanged
-- [ ] 3.4 Resize a column; change the sidebar filter; confirm the column width is unchanged
-- [ ] 3.5 Resize two columns independently; change sort; confirm both widths are retained and neither affected the other
+- [x] 3.3 Launch the app in list view; resize a column; change the sort order; confirm the column width is unchanged
+- [x] 3.4 Resize a column; change the sidebar filter; confirm the column width is unchanged
+- [x] 3.5 Resize two columns independently; change sort; confirm both widths are retained and neither affected the other
