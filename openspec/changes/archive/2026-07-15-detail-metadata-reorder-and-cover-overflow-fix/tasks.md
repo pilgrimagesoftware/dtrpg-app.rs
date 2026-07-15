@@ -19,7 +19,7 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 Open a detail tab and confirm system/released share a row, format/file-size share
+- [x] 4.1 Open a detail tab and confirm system/released share a row, format/file-size share
       a row, and category is last with a folder icon
-- [ ] 4.2 Resize the sidebar/tab narrower and confirm the cover no longer paints past the
+- [x] 4.2 Resize the sidebar/tab narrower and confirm the cover no longer paints past the
       tab content boundary into the sidebar
