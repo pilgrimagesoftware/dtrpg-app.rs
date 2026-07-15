@@ -13,5 +13,6 @@ pub mod size;
 pub mod sort;
 #[cfg(test)]
 pub mod stubs;
+pub mod symlink;
 pub mod text;
 pub mod zip_preview;

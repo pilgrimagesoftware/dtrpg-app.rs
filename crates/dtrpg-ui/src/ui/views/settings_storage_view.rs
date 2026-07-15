@@ -10,6 +10,7 @@ use gpui::{
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
+use gpui_component::switch::Switch;
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
@@ -32,10 +33,11 @@ const MAX_CONCURRENT_DOWNLOADS: usize = 10;
 /// and "Show in Finder/Explorer/Files", an optional warning row when
 /// `storage_path_exists` is `false`, and a stepper for the shared
 /// thumbnail/download concurrency limit.
+#[allow(clippy::too_many_arguments)]
 pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: bool,
                               entity: Entity<SettingsController>, colors: &ColorTokens,
                               storage_path_input: Option<Entity<InputState>>,
-                              max_concurrent_downloads: usize)
+                              max_concurrent_downloads: usize, create_collections: bool)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -161,7 +163,61 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            // ── Divider ───────────────────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
            // ── Concurrency stepper ─────────────────────────────────────────
-           .child(render_concurrency_stepper(max_concurrent_downloads, entity, colors))
+           .child(render_concurrency_stepper(max_concurrent_downloads, entity.clone(), colors))
+           // ── Divider ───────────────────────────────────────────────────────
+           .child(div().h(px(1.0)).bg(border))
+           // ── Create collections toggle ───────────────────────────────────
+           .child(render_create_collections_toggle(create_collections, entity, colors))
+}
+
+/// Renders the "Create collections" toggle row: a label/note pair and a
+/// switch, matching the layout style used for the concurrency stepper above.
+fn render_create_collections_toggle(create_collections: bool,
+                                    entity: Entity<SettingsController>, colors: &ColorTokens)
+                                    -> impl IntoElement + 'static + use<> {
+    let text_primary = colors.text_primary;
+    let text_secondary = colors.text_secondary;
+
+    div().flex()
+         .flex_col()
+         .gap(px(6.0))
+         .child(
+             div().flex()
+                 .items_center()
+                 .justify_between()
+                 .child(
+                     div().text_sm()
+                         .font_weight(gpui::FontWeight::SEMIBOLD)
+                         .text_color(text_primary)
+                         .child(t!("settings.create_collections_title")),
+                 )
+                 .child(
+                     Switch::new("create-collections")
+                         .checked(create_collections)
+                         .tooltip(t!("settings.create_collections_tooltip").to_string())
+                         .on_click(move |checked, _window, cx| {
+                             let checked = *checked;
+                             entity.update(cx, |ctrl, cx| {
+                                       ctrl.set_create_collections(checked, cx);
+                                   });
+                         }),
+                 ),
+         )
+         .child(div().text_xs()
+                     .text_color(text_secondary)
+                     .child(create_collections_note()))
+}
+
+/// Returns the "Create collections" note text, appending the Windows
+/// Developer Mode caveat only when running on Windows — it does not apply
+/// to macOS or Linux, where symlink creation needs no elevated privilege.
+fn create_collections_note() -> String {
+    #[cfg(target_os = "windows")]
+    return format!("{} {}",
+                   t!("settings.create_collections_note"),
+                   t!("settings.create_collections_note_windows"));
+    #[cfg(not(target_os = "windows"))]
+    t!("settings.create_collections_note").to_string()
 }
 
 /// Renders the "Max concurrent downloads" stepper row: a label/note pair and

@@ -125,6 +125,10 @@ pub struct SettingsSnapshot {
     pub cache_counts:             CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
     pub max_concurrent_downloads: usize,
+    /// `true` when completing a download should also symlink the item under
+    /// `{root}/collections/{collection name}/` for each collection it
+    /// belongs to.
+    pub create_collections:       bool,
     /// Font picker state for the Appearance page's body-font row.
     pub body_font_select:         Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row.
@@ -405,6 +409,15 @@ impl SettingsController {
     /// limit on its next drain.
     pub fn set_max_concurrent_downloads(&mut self, n: usize, cx: &mut Context<Self>) {
         self.storage.set_max_concurrent_downloads(n);
+        cx.emit(SettingsChanged);
+    }
+
+    /// Saves `enabled` as the new "Create collections" storage setting.
+    ///
+    /// Emits [`SettingsChanged`] so the library controller picks up the new
+    /// setting on its next download completion.
+    pub fn set_create_collections(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.storage.set_create_collections(enabled);
         cx.emit(SettingsChanged);
     }
 
@@ -771,6 +784,7 @@ impl SettingsController {
                            active_page_ix: self.active_page_ix,
                            cache_counts: self.cache_counts(),
                            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
+                           create_collections: self.storage.create_collections(),
                            body_font_select: self.body_font_select.clone(),
                            value_font_select: self.value_font_select.clone(),
                            label_font_select: self.label_font_select.clone(),

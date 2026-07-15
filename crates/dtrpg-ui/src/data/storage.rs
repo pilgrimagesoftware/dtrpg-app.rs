@@ -72,6 +72,8 @@ struct StorageConfigFile {
     root_path:                Option<String>,
     #[serde(default = "default_max_concurrent_downloads")]
     max_concurrent_downloads: usize,
+    #[serde(default)]
+    create_collections:       bool,
 }
 
 /// Manages the root directory where downloaded catalog files are stored, and
@@ -85,6 +87,7 @@ struct StorageConfigFile {
 pub struct StorageConfig {
     override_path:            Option<PathBuf>,
     max_concurrent_downloads: usize,
+    create_collections:       bool,
 }
 
 impl StorageConfig {
@@ -96,11 +99,12 @@ impl StorageConfig {
         let override_path = file.as_ref()
                                 .and_then(|cfg| cfg.root_path.clone())
                                 .map(PathBuf::from);
-        let max_concurrent_downloads = file.map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS, |cfg| {
-                                               cfg.max_concurrent_downloads
-                                           });
+        let max_concurrent_downloads = file.as_ref().map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                                            |cfg| cfg.max_concurrent_downloads);
+        let create_collections = file.is_some_and(|cfg| cfg.create_collections);
         Self { override_path,
-               max_concurrent_downloads }
+               max_concurrent_downloads,
+               create_collections }
     }
 
     /// Returns the resolved download root (saved override, or platform
@@ -148,6 +152,14 @@ impl StorageConfig {
         publisher_dir(&self.root_path(), publisher)
     }
 
+    /// Derives the directory a collection's symlinked files live in.
+    ///
+    /// Maps to `{root}/collections/{sanitized collection name}/` — see
+    /// [`collection_dir`].
+    pub fn path_for_collection(&self, collection_name: &str) -> PathBuf {
+        collection_dir(&self.root_path(), collection_name)
+    }
+
     /// Saves `path` as the new storage root override and updates the in-memory
     /// state.
     ///
@@ -179,6 +191,21 @@ impl StorageConfig {
         self.save();
     }
 
+    /// Returns `true` when completing a download should also create a
+    /// symlink for the item under `{root}/collections/{collection name}/`
+    /// for each collection it belongs to.
+    #[must_use]
+    pub fn create_collections(&self) -> bool {
+        self.create_collections
+    }
+
+    /// Saves `enabled` as the new "Create collections" setting and updates
+    /// the in-memory state.
+    pub fn set_create_collections(&mut self, enabled: bool) {
+        self.create_collections = enabled;
+        self.save();
+    }
+
     /// Writes the current in-memory state to
     /// `{app_preferences_dir}/storage.toml`. Silently ignores I/O errors
     /// (the state remains applied in memory).
@@ -187,7 +214,8 @@ impl StorageConfig {
                                           self.override_path
                                               .as_ref()
                                               .map(|p| p.to_string_lossy().into_owned()),
-                                      max_concurrent_downloads: self.max_concurrent_downloads, };
+                                      max_concurrent_downloads: self.max_concurrent_downloads,
+                                      create_collections:       self.create_collections, };
         let Some(config_file) = config_path()
         else {
             return;
@@ -221,11 +249,22 @@ pub fn publisher_dir(root: &Path, publisher: &str) -> PathBuf {
     root.join("items").join(sanitize_path_component(publisher))
 }
 
+/// Derives the directory a collection's symlinked files live in:
+/// `{root}/collections/{sanitized collection name}/`.
+///
+/// Sanitizes `collection_name` first so a name containing a path separator
+/// can never escape `root` or be (mis)treated as an absolute path
+/// component — see [`sanitize_path_component`].
+pub fn collection_dir(root: &Path, collection_name: &str) -> PathBuf {
+    root.join("collections")
+        .join(sanitize_path_component(collection_name))
+}
+
 /// Strips a leading path separator, replaces any remaining path separators,
 /// and converts spaces to underscores, so the result can never be (or
 /// contain) an absolute path component when joined onto another path and
 /// reads as a single filesystem-friendly token.
-fn sanitize_path_component(value: &str) -> String {
+pub(crate) fn sanitize_path_component(value: &str) -> String {
     value.trim_start_matches('/').replace(['/', ' '], "_")
 }
 
@@ -241,7 +280,8 @@ mod tests {
     #[test]
     fn default_path_is_non_empty() {
         let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         let path = cfg.root_path();
         assert!(path.components().count() > 0);
         assert!(path.ends_with("dtrpg"));
@@ -251,14 +291,16 @@ mod tests {
     fn override_path_is_returned_when_set() {
         let custom = PathBuf::from("/tmp/custom-storage");
         let cfg = StorageConfig { override_path:            Some(custom.clone()),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         assert_eq!(cfg.root_path(), custom);
     }
 
     #[test]
     fn path_for_publisher_is_under_root() {
         let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         let publisher_path = cfg.path_for_publisher("Chaosium");
         assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Chaosium"));
     }
@@ -269,7 +311,8 @@ mod tests {
         // contained a path separator, `PathBuf::join` would otherwise let it
         // escape `root` (or discard it entirely if the name looked absolute).
         let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         let publisher_path = cfg.path_for_publisher("/Evil/Publisher");
         assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Evil_Publisher"));
     }
@@ -277,7 +320,8 @@ mod tests {
     #[test]
     fn path_for_publisher_converts_spaces_to_underscores() {
         let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         let publisher_path = cfg.path_for_publisher("The Forge Studios");
         assert_eq!(publisher_path,
                    Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
@@ -305,14 +349,16 @@ mod tests {
     #[test]
     fn is_default_true_without_override() {
         let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         assert!(cfg.is_default());
     }
 
     #[test]
     fn is_default_false_with_override() {
         let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/custom-storage")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         assert!(!cfg.is_default());
     }
 
@@ -322,7 +368,8 @@ mod tests {
             std::env::temp_dir().join(format!("dtrpg-test-ensure-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let cfg = StorageConfig { override_path:            Some(root.clone()),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         assert!(!cfg.is_accessible());
         cfg.ensure_root_exists().unwrap();
         assert!(cfg.is_accessible());
@@ -333,7 +380,8 @@ mod tests {
     fn ensure_root_exists_is_idempotent_on_existing_directory() {
         let dir = std::env::temp_dir();
         let cfg = StorageConfig { override_path:            Some(dir),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         assert!(cfg.ensure_root_exists().is_ok());
         assert!(cfg.ensure_root_exists().is_ok());
     }
@@ -341,7 +389,8 @@ mod tests {
     #[test]
     fn max_concurrent_downloads_defaults_to_three() {
         let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS, };
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
         assert_eq!(cfg.max_concurrent_downloads(), 3);
     }
 
@@ -350,5 +399,51 @@ mod tests {
         let file: StorageConfigFile = toml::from_str("").unwrap();
         assert_eq!(file.max_concurrent_downloads,
                    DEFAULT_MAX_CONCURRENT_DOWNLOADS);
+    }
+
+    #[test]
+    fn create_collections_defaults_to_false() {
+        let cfg = StorageConfig { override_path:            None,
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       false, };
+        assert!(!cfg.create_collections());
+    }
+
+    #[test]
+    fn missing_create_collections_field_deserializes_to_default() {
+        let file: StorageConfigFile = toml::from_str("").unwrap();
+        assert!(!file.create_collections);
+    }
+
+    #[test]
+    fn create_collections_round_trips_through_toml_serialization() {
+        let cfg = StorageConfigFile { root_path:                None,
+                                      max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                      create_collections:       true, };
+        let text = toml::to_string(&cfg).unwrap();
+        let reloaded: StorageConfigFile = toml::from_str(&text).unwrap();
+        assert!(reloaded.create_collections);
+    }
+
+    #[test]
+    fn path_for_collection_is_under_root() {
+        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:       true, };
+        let collection_path = cfg.path_for_collection("Adventures");
+        assert_eq!(collection_path,
+                   Path::new("/tmp/dtrpg/collections/Adventures"));
+    }
+
+    #[test]
+    fn collection_dir_sanitizes_a_name_containing_a_path_separator() {
+        let dir = collection_dir(Path::new("/tmp/dtrpg"), "/Evil/Collection");
+        assert_eq!(dir, Path::new("/tmp/dtrpg/collections/Evil_Collection"));
+    }
+
+    #[test]
+    fn collection_dir_never_escapes_root_for_an_absolute_looking_name() {
+        let dir = collection_dir(Path::new("/tmp/dtrpg"), "/Evil/Collection");
+        assert!(dir.starts_with("/tmp/dtrpg"));
     }
 }
