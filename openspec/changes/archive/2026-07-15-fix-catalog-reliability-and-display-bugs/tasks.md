@@ -32,11 +32,11 @@
 ## 5. Verify
 
 - [x] 5.1 Run `cargo test --all-features --workspace`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo fmt --all -- --check`; all pass
-- [ ] 5.2 Manually launch the app and confirm the list view's column headers are
+- [x] 5.2 Manually launch the app and confirm the list view's column headers are
       vertically centered
-- [ ] 5.3 Manually trigger "Clear Cache" while a catalog load is in flight and confirm the
+- [x] 5.3 Manually trigger "Clear Cache" while a catalog load is in flight and confirm the
       fresh reload's data is what's displayed, not a stale one
-- [ ] 5.4 Manually confirm an item with no page count omits the "Pages" row, and an item
+- [x] 5.4 Manually confirm an item with no page count omits the "Pages" row, and an item
       with no game line shows an em dash for "System"
-- [ ] 5.5 Manually confirm no "auth issue"-looking alert appears in the alert history on a
+- [x] 5.5 Manually confirm no "auth issue"-looking alert appears in the alert history on a
       cold start
