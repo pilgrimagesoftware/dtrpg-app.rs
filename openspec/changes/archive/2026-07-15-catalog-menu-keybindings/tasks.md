@@ -15,7 +15,7 @@
 
 ## 3. Manual verification
 
-- [ ] 3.1 Launch the app and confirm the Catalog menu shows `⇧⌘N`, `⌘R`, and `⇧⌘R` next to Add Collection, Reload, and Refresh Thumbnails respectively
-- [ ] 3.2 With the library window focused, press `cmd-shift-n` and confirm the sidebar's new-collection input appears
-- [ ] 3.3 Press `cmd-r` and confirm the catalog loading indicator appears and a live fetch runs
-- [ ] 3.4 Press `cmd-shift-r` and confirm the "Loading thumbnails…" activity item appears and thumbnails re-fetch
+- [x] 3.1 Launch the app and confirm the Catalog menu shows `⇧⌘N`, `⌘R`, and `⇧⌘R` next to Add Collection, Reload, and Refresh Thumbnails respectively
+- [x] 3.2 With the library window focused, press `cmd-shift-n` and confirm the sidebar's new-collection input appears
+- [x] 3.3 Press `cmd-r` and confirm the catalog loading indicator appears and a live fetch runs
+- [x] 3.4 Press `cmd-shift-r` and confirm the "Loading thumbnails…" activity item appears and thumbnails re-fetch
