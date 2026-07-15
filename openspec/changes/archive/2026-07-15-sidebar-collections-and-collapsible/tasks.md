@@ -35,6 +35,6 @@
 ## 6. Verify
 
 - [x] 6.1 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 6.2 Manually launch the app and confirm the Publishers section collapses and expands on header click
-- [ ] 6.3 Confirm the Collections section appears, lists product lists by name with catalog intersection counts, and filters the catalog on click
-- [ ] 6.4 Confirm collapsing one section does not affect the other
+- [x] 6.2 Manually launch the app and confirm the Publishers section collapses and expands on header click
+- [x] 6.3 Confirm the Collections section appears, lists product lists by name with catalog intersection counts, and filters the catalog on click
+- [x] 6.4 Confirm collapsing one section does not affect the other
