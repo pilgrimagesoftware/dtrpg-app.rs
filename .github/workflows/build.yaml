@@ -58,6 +58,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # `rust-toolchain.toml` pins a specific channel, which rustup installs
+      # lazily (without the cross target) the first time cargo runs in this
+      # directory. Add the target explicitly so it's present on the pinned
+      # toolchain, not just the transient "stable" one installed above.
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
