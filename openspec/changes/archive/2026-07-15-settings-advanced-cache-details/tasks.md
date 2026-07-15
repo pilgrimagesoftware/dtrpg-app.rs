@@ -21,8 +21,8 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Manually verify: populate the cache (load the library, browse a few covers, sign in to populate avatar), open Advanced settings, confirm counts match reality.
-- [ ] 4.2 Manually verify: click "Clear cache", confirm counts drop to zero/empty on next render.
-- [ ] 4.3 Manually verify: click "Open cache folder", confirm the OS file manager opens at the app cache directory (test on at least one platform; verify the directory-creation fallback when cache is empty).
-- [ ] 4.4 Manually verify: all 6 timing values render with correct human-readable durations and each of the 9 data points (3 counts + 6 timings) shows both a label and a description.
+- [x] 4.1 Manually verify: populate the cache (load the library, browse a few covers, sign in to populate avatar), open Advanced settings, confirm counts match reality.
+- [x] 4.2 Manually verify: click "Clear cache", confirm counts drop to zero/empty on next render.
+- [x] 4.3 Manually verify: click "Open cache folder", confirm the OS file manager opens at the app cache directory (test on at least one platform; verify the directory-creation fallback when cache is empty).
+- [x] 4.4 Manually verify: all 6 timing values render with correct human-readable durations and each of the 9 data points (3 counts + 6 timings) shows both a label and a description.
 - [x] 4.5 Run `cargo clippy --all-targets --all-features -- -D warnings`, `cargo fmt --all -- --check`, and `cargo test --all-features --workspace`.
