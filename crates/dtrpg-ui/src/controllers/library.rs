@@ -2863,6 +2863,9 @@ impl LibraryController {
         let order_product_id_for_log = fetch_target.as_ref().map(|(id, _)| *id);
         let dest_for_log = fetch_target.as_ref()
                                        .map(|(_, dest)| dest.display().to_string());
+        // Captured up front for symlinking into `collections/` on success,
+        // for the same reason as `dest_for_log` above.
+        let dest_for_symlink = fetch_target.as_ref().map(|(_, dest)| dest.clone());
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
@@ -2893,10 +2896,16 @@ impl LibraryController {
                               if let Some(item) =
                                   ctrl.catalog.iter_mut().find(|i| i.id == task_item_id)
                               {
-                                  if outcome.is_ok()
-                                     && let Some(file) = item.files.get_mut(index as usize)
-                                  {
-                                      file.downloaded = true;
+                                  if outcome.is_ok() {
+                                      if let Some(file) = item.files.get_mut(index as usize) {
+                                          file.downloaded = true;
+                                      }
+                                      if let Some(dest) = &dest_for_symlink {
+                                          create_collections_symlinks(dest,
+                                                                      item.order_product_id,
+                                                                      item.product_id,
+                                                                      &ctrl.collections);
+                                      }
                                   }
                                   item.recompute_status();
                               }
@@ -3057,6 +3066,43 @@ impl LibraryController {
     #[must_use]
     pub fn total_size_mb(&self) -> f64 {
         self.catalog.iter().map(|i| i.size_mb).sum()
+    }
+}
+
+/// If the "Create collections" storage setting is enabled, creates a symlink
+/// to `dest` under `{root}/collections/{collection name}/` for each of
+/// `collections` that the downloaded item belongs to.
+///
+/// Best-effort: a failure to create any single symlink (or its parent
+/// directory) is logged via `tracing::warn!` and does not affect the
+/// caller's own success/failure outcome — see
+/// [`crate::util::symlink::ensure_symlink`].
+fn create_collections_symlinks(dest: &std::path::Path, order_product_id: u64, product_id: u64,
+                               collections: &[CollectionEntry]) {
+    let storage = crate::data::storage::StorageConfig::load();
+    if !storage.create_collections() {
+        return;
+    }
+    let Some(file_name) = dest.file_name()
+    else {
+        return;
+    };
+    let root = storage.root_path();
+    for collection in collections {
+        if !member_ids_contain(&collection.member_ids, order_product_id, product_id) {
+            continue;
+        }
+        let link_dir = crate::data::storage::collection_dir(&root, &collection.name);
+        if let Err(e) = std::fs::create_dir_all(&link_dir) {
+            tracing::warn!(dir = %link_dir.display(), error = %e,
+                           "failed to create collections symlink directory");
+            continue;
+        }
+        let link = link_dir.join(file_name);
+        if let Err(e) = crate::util::symlink::ensure_symlink(dest, &link) {
+            tracing::warn!(target = %dest.display(), link = %link.display(), error = %e,
+                           "failed to create collections symlink");
+        }
     }
 }
 

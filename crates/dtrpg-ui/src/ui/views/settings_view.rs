@@ -73,7 +73,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
                              cache_counts: CacheCounts, max_concurrent_downloads: usize,
-                             font_selects: AppearanceFontSelects)
+                             create_collections: bool, font_selects: AppearanceFontSelects)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -106,7 +106,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     entity.clone(),
                                     colors,
                                     storage_path_input,
-                                    max_concurrent_downloads).into_any_element(),
+                                    max_concurrent_downloads,
+                                    create_collections).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,
