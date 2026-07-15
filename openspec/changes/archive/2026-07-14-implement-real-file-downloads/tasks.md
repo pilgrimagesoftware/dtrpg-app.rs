@@ -25,5 +25,5 @@
 - [x] 5.1 `cargo build --workspace --all-features`
 - [x] 5.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - [x] 5.3 `cargo test --workspace --all-features` (207 dtrpg-ui tests + 11 doc-tests + 39 dtrpg-core tests, all pass)
-- [ ] 5.4 Launch app: download a real item, confirm the file lands on disk and Open/Reveal in Finder both work afterward
-- [ ] 5.5 Launch app: start a download and cancel it mid-transfer, confirm no file (partial or final) remains at the destination
+- [x] 5.4 Launch app: download a real item, confirm the file lands on disk and Open/Reveal in Finder both work afterward
+- [x] 5.5 Launch app: start a download and cancel it mid-transfer, confirm no file (partial or final) remains at the destination
