@@ -24,6 +24,6 @@
 - [x] 4.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 4.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings
 - [x] 4.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 4.4 Launch the app; confirm path field and icon buttons appear in one row; confirm tooltips appear on hover
-- [ ] 4.5 Temporarily set the storage path to a non-existent directory; confirm the warning row appears with correct colors
-- [ ] 4.6 Restore a valid storage path; confirm the warning row disappears
+- [x] 4.4 Launch the app; confirm path field and icon buttons appear in one row; confirm tooltips appear on hover
+- [x] 4.5 Temporarily set the storage path to a non-existent directory; confirm the warning row appears with correct colors
+- [x] 4.6 Restore a valid storage path; confirm the warning row disappears
