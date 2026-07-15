@@ -28,13 +28,13 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Build and run the app; open Settings → File Openers; click Add; confirm a native macOS open-file dialog appears
-- [ ] 4.2 Select an `.app` bundle; confirm the extension entry dialog appears with the correct app name displayed
-- [ ] 4.3 Type an extension and click Add; confirm the new entry appears in the list with correct extension and app name
-- [ ] 4.4 Click Add again and dismiss the native file dialog without selecting a file; confirm no new entry appears and no modal opens
-- [ ] 4.5 Add an entry with an extension that already exists; confirm the existing entry is replaced (not duplicated)
-- [ ] 4.6 Click Remove on an entry; confirm the entry disappears from the list immediately (pre-existing behavior, re-verify no regression)
-- [ ] 4.7 Open Settings → Storage; click the path field; type a new value; confirm the field accepts input (pre-existing behavior, re-verify no regression)
-- [ ] 4.8 Close and reopen Settings; confirm the path field shows the placeholder/current path (not a leftover typed value)
-- [ ] 4.9 Confirm the warning line displays in amber with a ⚠ prefix
+- [x] 4.1 Build and run the app; open Settings → File Openers; click Add; confirm a native macOS open-file dialog appears
+- [x] 4.2 Select an `.app` bundle; confirm the extension entry dialog appears with the correct app name displayed
+- [x] 4.3 Type an extension and click Add; confirm the new entry appears in the list with correct extension and app name
+- [x] 4.4 Click Add again and dismiss the native file dialog without selecting a file; confirm no new entry appears and no modal opens
+- [x] 4.5 Add an entry with an extension that already exists; confirm the existing entry is replaced (not duplicated)
+- [x] 4.6 Click Remove on an entry; confirm the entry disappears from the list immediately (pre-existing behavior, re-verify no regression)
+- [x] 4.7 Open Settings → Storage; click the path field; type a new value; confirm the field accepts input (pre-existing behavior, re-verify no regression)
+- [x] 4.8 Close and reopen Settings; confirm the path field shows the placeholder/current path (not a leftover typed value)
+- [x] 4.9 Confirm the warning line displays in amber with a ⚠ prefix
 - [x] 4.10 `cargo test --workspace --lib --bins` — 88/88 pass; `cargo clippy --all-targets --all-features -- -D warnings` — clean; `cargo fmt` — clean on touched files
