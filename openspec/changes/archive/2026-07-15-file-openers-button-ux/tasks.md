@@ -20,6 +20,6 @@
 - [x] 4.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 4.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings
 - [x] 4.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 4.4 Launch the app; confirm Add button shows "+" with tooltip "Add file opener"
-- [ ] 4.5 Confirm remove button on each entry shows "×" with tooltip "Remove"
-- [ ] 4.6 Click remove; confirm a dialog appears identifying the entry; confirm cancelling leaves the entry intact; confirm confirming removes the entry
+- [x] 4.4 Launch the app; confirm Add button shows "+" with tooltip "Add file opener"
+- [x] 4.5 Confirm remove button on each entry shows "×" with tooltip "Remove"
+- [x] 4.6 Click remove; confirm a dialog appears identifying the entry; confirm cancelling leaves the entry intact; confirm confirming removes the entry
