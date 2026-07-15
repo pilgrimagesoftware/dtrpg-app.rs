@@ -28,7 +28,7 @@
 - [x] 6.1 Run `cargo check --all-targets` and confirm no compile errors
 - [x] 6.2 Run `cargo clippy --all-targets --all-features -- -D warnings` and fix any new warnings
 - [x] 6.3 Run `cargo test --all-features --workspace` and confirm all tests pass
-- [ ] 6.4 Launch the app in thumbs view; confirm rows are taller and the thumbnail no longer overflows into adjacent rows
-- [ ] 6.5 Confirm each thumbnail shows only a coloured background and centred motif shape, with no publisher/title/line text inside the cover tile
-- [ ] 6.6 Switch to grid view; confirm cover tiles still show publisher, title, and line text as before
-- [ ] 6.7 Confirm the right-hand text column in thumbs rows (title, publisher·line, kind+details) is unaffected
+- [x] 6.4 Launch the app in thumbs view; confirm rows are taller and the thumbnail no longer overflows into adjacent rows
+- [x] 6.5 Confirm each thumbnail shows only a coloured background and centred motif shape, with no publisher/title/line text inside the cover tile
+- [x] 6.6 Switch to grid view; confirm cover tiles still show publisher, title, and line text as before
+- [x] 6.7 Confirm the right-hand text column in thumbs rows (title, publisher·line, kind+details) is unaffected
