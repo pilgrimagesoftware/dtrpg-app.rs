@@ -471,8 +471,7 @@ impl LibraryRootView {
                         window,
                         |_this, _ctrl, event: &ThumbnailRefreshStarted, window, cx| {
                             let msg = t!("notification.refresh_thumbnails_started",
-                                         count = event.count)
-                                .to_string();
+                                         count = event.count).to_string();
                             window.push_notification(Notification::info(msg), cx);
                         })
           .detach();
@@ -482,16 +481,14 @@ impl LibraryRootView {
                         |_this, _ctrl, event: &ThumbnailRefreshCompleted, window, cx| {
                             if event.failed == 0 {
                                 let msg = t!("notification.refresh_thumbnails_completed",
-                                             succeeded = event.succeeded)
-                                    .to_string();
+                                             succeeded = event.succeeded).to_string();
                                 window.push_notification(Notification::success(msg), cx);
                             }
                             else {
                                 let msg =
                                     t!("notification.refresh_thumbnails_completed_with_failures",
                                        succeeded = event.succeeded,
-                                       failed = event.failed)
-                                        .to_string();
+                                       failed = event.failed).to_string();
                                 window.push_notification(warning_notification(msg), cx);
                             }
                         })
