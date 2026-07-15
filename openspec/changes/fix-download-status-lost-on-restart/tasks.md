@@ -20,13 +20,28 @@
 - [x] 2.4 Confirm existing `reconcile_catalog` tests (is_available true/false
       for matched/unmatched/new items) still pass unmodified
 
-## 3. Build and Quality
+## 3. Persist Downloads to Disk Cache
 
-- [x] 3.1 `cargo check --workspace`
-- [x] 3.2 `cargo clippy --all-targets --all-features -- -D warnings`
-- [x] 3.3 `cargo test --workspace`
+- [x] 3.1 In `dispatch_download`'s completion handler
+      (`crates/dtrpg-ui/src/controllers/library.rs`), after the existing
+      `ctrl.update` block that sets `file.downloaded = true` and calls
+      `recompute_status()`, add a `save_catalog_cache` call guarded by
+      `!cancelled && outcome.is_ok()`
+- [x] 3.2 Clone `ctrl.catalog` and run the save on the background executor,
+      matching the pattern already used in `start_load_inner`'s full/partial
+      fetch completion
 
-## 4. Manual Verification
+## 4. Build and Quality
 
-- [ ] 4.1 Download an item, quit and relaunch the app, confirm it still shows
+- [x] 4.1 `cargo check --workspace`
+- [x] 4.2 `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] 4.3 `cargo test --workspace`
+
+## 5. Manual Verification
+
+- [ ] 5.1 Download an item, quit and relaunch the app, confirm it still shows
       as Downloaded (not Cloud) once the startup live fetch completes
+- [ ] 5.2 Download an item, quit and relaunch the app immediately (before the
+      7-day cache staleness window would force a live fetch), confirm it
+      still shows as Downloaded even when the auto-load policy skips the
+      live fetch entirely

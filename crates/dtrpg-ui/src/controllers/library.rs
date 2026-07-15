@@ -3001,6 +3001,24 @@ impl LibraryController {
                       .ok()
                       .flatten();
 
+              // Persist the download to the on-disk catalog cache immediately —
+              // otherwise a restart before the next live-fetch cache write (see
+              // `start_load_inner`) loads a cache that never recorded this
+              // download, showing `Cloud` status regardless of what
+              // `reconcile_catalog` does (see `catalog-live-data-swap`).
+              if !cancelled && outcome.is_ok() {
+                  let items_to_save = this.update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
+                                          .unwrap_or_default();
+                  let save_root = cache_dir();
+                  async_cx.background_executor()
+                          .spawn(async move {
+                              if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
+                                  tracing::warn!(error = %e, "failed to save catalog cache");
+                              }
+                          })
+                          .await;
+              }
+
               if let Err(e) = &outcome
                  && !cancelled
               {
