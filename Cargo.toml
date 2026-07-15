@@ -46,14 +46,14 @@ const_format = "0.2"
 convert_case = "0.8.0"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
-core-video = { version = "0.5.2", features = ["metal"] }
+core-video = { version = "0.6.1", features = ["metal"] }
 metal = "0.33"
 gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
 md5 = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
-rust-i18n = "3"
+rust-i18n = "4"
 chrono = "0.4"
 sys-locale = "0.3"
 open = "5"
