@@ -157,6 +157,48 @@ pub struct CollectionMemberAlreadyPresent {
 
 impl EventEmitter<CollectionMemberAlreadyPresent> for LibraryController {}
 
+// ── ThumbnailRefreshStarted
+// ────────────────────────────────────────────────
+
+/// Emitted by `LibraryController` when the "Refresh Thumbnails" catalog menu
+/// action starts re-fetching a non-empty batch of covers.
+///
+/// The receiver should show a toast indicating the refresh has started.
+pub struct ThumbnailRefreshStarted {
+    /// Number of items queued for re-fetch.
+    pub count: usize,
+}
+
+impl EventEmitter<ThumbnailRefreshStarted> for LibraryController {}
+
+// ── ThumbnailRefreshCompleted
+// ──────────────────────────────────────────
+
+/// Emitted by `LibraryController` when a "Refresh Thumbnails" batch started by
+/// [`ThumbnailRefreshStarted`] has finished draining.
+///
+/// The receiver should show a toast summarizing success/failure counts.
+pub struct ThumbnailRefreshCompleted {
+    /// Number of covers that re-fetched successfully.
+    pub succeeded: usize,
+    /// Number of covers that failed to re-fetch.
+    pub failed:    usize,
+}
+
+impl EventEmitter<ThumbnailRefreshCompleted> for LibraryController {}
+
+// ── ThumbnailRefreshNoOp
+// ────────────────────────────────────────────────────
+
+/// Emitted by `LibraryController` when the "Refresh Thumbnails" catalog menu
+/// action is invoked but no catalog item has a `cover_url`.
+///
+/// The receiver should show a brief "nothing to refresh" toast instead of
+/// leaving the action silently doing nothing.
+pub struct ThumbnailRefreshNoOp;
+
+impl EventEmitter<ThumbnailRefreshNoOp> for LibraryController {}
+
 // ── StartupAuthFailed
 // ─────────────────────────────────────────────────────────
 

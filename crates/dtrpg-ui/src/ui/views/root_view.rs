@@ -57,7 +57,7 @@ use crate::{
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
             CollectionMemberRemoveFailed, DownloadComplete, DownloadError, LibraryChanged,
             LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
-            TabsChanged,
+            TabsChanged, ThumbnailRefreshCompleted, ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
         ui_prefs::UiPrefs,
@@ -464,6 +464,44 @@ impl LibraryRootView {
                         |_this, _ctrl, event: &CollectionMemberAlreadyPresent, window, cx| {
                             window.push_notification(warning_notification(event.message.clone()),
                                                      cx);
+                        })
+          .detach();
+
+        cx.subscribe_in(&controller,
+                        window,
+                        |_this, _ctrl, event: &ThumbnailRefreshStarted, window, cx| {
+                            let msg = t!("notification.refresh_thumbnails_started",
+                                         count = event.count)
+                                .to_string();
+                            window.push_notification(Notification::info(msg), cx);
+                        })
+          .detach();
+
+        cx.subscribe_in(&controller,
+                        window,
+                        |_this, _ctrl, event: &ThumbnailRefreshCompleted, window, cx| {
+                            if event.failed == 0 {
+                                let msg = t!("notification.refresh_thumbnails_completed",
+                                             succeeded = event.succeeded)
+                                    .to_string();
+                                window.push_notification(Notification::success(msg), cx);
+                            }
+                            else {
+                                let msg =
+                                    t!("notification.refresh_thumbnails_completed_with_failures",
+                                       succeeded = event.succeeded,
+                                       failed = event.failed)
+                                        .to_string();
+                                window.push_notification(warning_notification(msg), cx);
+                            }
+                        })
+          .detach();
+
+        cx.subscribe_in(&controller,
+                        window,
+                        |_this, _ctrl, _event: &ThumbnailRefreshNoOp, window, cx| {
+                            let msg = t!("notification.refresh_thumbnails_noop").to_string();
+                            window.push_notification(warning_notification(msg), cx);
                         })
           .detach();
 

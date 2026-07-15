@@ -446,6 +446,25 @@ pub struct LibraryController {
     /// monotonically advancing progress fraction — `processed / (processed
     /// + queue.len())` — instead of an indeterminate placeholder.
     thumbnail_processed:           usize,
+    /// True while a [`Self::refresh_all_thumbnails`] batch is in progress.
+    /// Drives the distinct "Refreshing…" activity label; cleared once
+    /// `thumbnail_refresh_pending` drains to empty.
+    thumbnail_refresh_active:      bool,
+    /// Item ids belonging to the in-progress refresh batch that have not yet
+    /// reported a fetch result. `dispatch_thumbnail_fetch` removes an id here
+    /// the first time *any* fetch for it completes — including a fetch that
+    /// was already in flight from an unrelated background load before the
+    /// refresh started — so a duplicate or unrelated completion for the same
+    /// id can never be double-counted toward the refresh batch's totals, and
+    /// results from ordinary per-page loading (which shares the same queue
+    /// and activity entry) are never folded in either.
+    thumbnail_refresh_pending:     HashSet<Arc<str>>,
+    /// Number of refresh-batch fetches that completed successfully. Only
+    /// items removed from `thumbnail_refresh_pending` count here.
+    thumbnail_refresh_succeeded:   usize,
+    /// Number of refresh-batch fetches that failed. Only items removed from
+    /// `thumbnail_refresh_pending` count here.
+    thumbnail_refresh_failed:      usize,
     /// True from startup until the first `set_catalog` call completes.
     catalog_loading:               bool,
     /// Incremented each time [`start_load_inner`](Self::start_load_inner)
@@ -584,6 +603,10 @@ impl LibraryController {
                    active_thumbnail_fetches: 0,
                    thumbnail_activity_id: None,
                    thumbnail_processed: 0,
+                   thumbnail_refresh_active: false,
+                   thumbnail_refresh_pending: HashSet::new(),
+                   thumbnail_refresh_succeeded: 0,
+                   thumbnail_refresh_failed: 0,
                    catalog_loading: true,
                    load_generation: 0,
                    items_cache: None,
@@ -1704,8 +1727,13 @@ impl LibraryController {
             id
         }
         else {
-            let id = self.activity
-                         .update(cx, |a, cx| a.start("Loading thumbnails\u{2026}", None, cx));
+            let label = if self.thumbnail_refresh_active {
+                t!("activity.refreshing_thumbnails")
+            }
+            else {
+                t!("activity.loading_thumbnails")
+            };
+            let id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
             self.thumbnail_activity_id = Some(id);
             self.thumbnail_processed = 0;
             id
@@ -1758,6 +1786,7 @@ impl LibraryController {
                               ctrl.invalidate_cache();
                               ctrl.active_thumbnail_fetches =
                                   ctrl.active_thumbnail_fetches.saturating_sub(1);
+                              ctrl.record_refresh_result(&item_id, false, cx);
                               cx.emit(LibraryChanged);
                               ctrl.drain_thumbnail_queue(cx);
                           })
@@ -1775,6 +1804,7 @@ impl LibraryController {
                               ctrl.invalidate_cache();
                               ctrl.active_thumbnail_fetches =
                                   ctrl.active_thumbnail_fetches.saturating_sub(1);
+                              ctrl.record_refresh_result(&item_id, true, cx);
                               ctrl.drain_thumbnail_queue(cx);
                           })
                           .ok();
@@ -1783,12 +1813,13 @@ impl LibraryController {
 
               // Count this attempt (success or failure) toward the batch total so the
               // progress bar reflects real throughput instead of sitting indeterminate.
-              let (processed, remaining) = this.update(async_cx, |ctrl, _cx| {
-                                                   ctrl.thumbnail_processed += 1;
-                                                   (ctrl.thumbnail_processed,
-                                                    ctrl.thumbnail_queue.len())
-                                               })
-                                               .unwrap_or((0, 0));
+              let (processed, remaining, refresh_active) =
+                  this.update(async_cx, |ctrl, _cx| {
+                          ctrl.thumbnail_processed += 1;
+                          (ctrl.thumbnail_processed, ctrl.thumbnail_queue.len(),
+                           ctrl.thumbnail_refresh_active)
+                      })
+                      .unwrap_or((0, 0, false));
 
               if remaining == 0 {
                   weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
@@ -1800,7 +1831,14 @@ impl LibraryController {
                       .ok();
               }
               else {
-                  let label = format!("Loading thumbnails\u{2026} ({remaining} remaining)");
+                  let label = if refresh_active {
+                      t!("activity.refreshing_thumbnails_remaining", remaining = remaining)
+                          .to_string()
+                  }
+                  else {
+                      t!("activity.loading_thumbnails_remaining", remaining = remaining)
+                          .to_string()
+                  };
                   let total = (processed + remaining) as f32;
                   let progress = if total > 0.0 {
                       processed as f32 / total
@@ -1912,6 +1950,7 @@ impl LibraryController {
                 .collect();
 
         if to_enqueue.is_empty() {
+            cx.emit(ThumbnailRefreshNoOp);
             return;
         }
 
@@ -1920,12 +1959,47 @@ impl LibraryController {
         // progress bar denominator isn't skewed by whatever fraction of a prior batch
         // had already completed before this action was invoked.
         self.thumbnail_processed = 0;
+        self.thumbnail_refresh_active = true;
+        self.thumbnail_refresh_pending = to_enqueue.iter().map(|(id, _, _)| Arc::clone(id)).collect();
+        self.thumbnail_refresh_succeeded = 0;
+        self.thumbnail_refresh_failed = 0;
         let cache = cx.global_mut::<CoverCache>();
         for (id, _, _) in &to_enqueue {
             cache.mark_in_flight(Arc::clone(id));
         }
+        cx.emit(ThumbnailRefreshStarted { count: to_enqueue.len() });
         self.thumbnail_queue.extend(to_enqueue);
         self.drain_thumbnail_queue(cx);
+    }
+
+    /// Records a refresh-batch fetch result for `item_id`, if it belongs to the
+    /// batch currently pending in [`Self::thumbnail_refresh_pending`].
+    ///
+    /// The first completion for a given id claims membership by removing it
+    /// from the pending set — whether that completion came from the fetch the
+    /// refresh itself dispatched, or from an unrelated fetch that happened to
+    /// already be in flight for the same id when the refresh started. Any
+    /// later completion for the same id finds it already removed and is
+    /// silently ignored. This keeps [`ThumbnailRefreshCompleted`]'s totals
+    /// matching exactly what [`ThumbnailRefreshStarted`] announced, even
+    /// though refresh and ordinary per-page loads share one queue and one
+    /// activity entry and can interleave.
+    fn record_refresh_result(&mut self, item_id: &Arc<str>, failed: bool, cx: &mut Context<Self>) {
+        if !self.thumbnail_refresh_pending.remove(item_id) {
+            return;
+        }
+        if failed {
+            self.thumbnail_refresh_failed += 1;
+        }
+        else {
+            self.thumbnail_refresh_succeeded += 1;
+        }
+        if self.thumbnail_refresh_active && self.thumbnail_refresh_pending.is_empty() {
+            self.thumbnail_refresh_active = false;
+            let succeeded = std::mem::take(&mut self.thumbnail_refresh_succeeded);
+            let failed = std::mem::take(&mut self.thumbnail_refresh_failed);
+            cx.emit(ThumbnailRefreshCompleted { succeeded, failed });
+        }
     }
 
     // ── Snapshot ──────────────────────────────────────────────────────────────

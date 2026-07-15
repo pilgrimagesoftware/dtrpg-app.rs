@@ -240,6 +240,10 @@ activity:
   loading_library_page: "Loading library: page %{page}…"
   loading_library_partial: "Loading library: checking for updates…"
   loading_collections: "Loading collections…"
+  loading_thumbnails: "Loading thumbnails…"
+  loading_thumbnails_remaining: "Loading thumbnails… (%{remaining} remaining)"
+  refreshing_thumbnails: "Refreshing thumbnails…"
+  refreshing_thumbnails_remaining: "Refreshing thumbnails… (%{remaining} remaining)"
 
 alert_history:
   title: "Alert History"
@@ -254,6 +258,10 @@ notification:
   sign_in_again: "Sign In Again"
   signing_in: "Signing in to DriveThruRPG…"
   copy_tooltip: "Copy error message"
+  refresh_thumbnails_started: "Refreshing %{count} thumbnails…"
+  refresh_thumbnails_completed: "Refreshed %{succeeded} thumbnails"
+  refresh_thumbnails_completed_with_failures: "Refreshed %{succeeded} thumbnails, %{failed} failed"
+  refresh_thumbnails_noop: "No thumbnails to refresh"
 
 about:
   version: "Version %{version}"
