@@ -30,3 +30,11 @@ pub const BYTES_PER_MB: f64 = 1_048_576.0;
 /// `thumbnail`, etc.) are appended to in order to form a fetchable thumbnail
 /// URL.
 pub const DTRPG_IMAGES_BASE_URL: &str = "https://api.drivethrurpg.com/images/";
+
+/// Total attempts (including the first, non-retry attempt) `download_item`
+/// makes before giving up on a retryable transfer failure.
+pub const MAX_DOWNLOAD_ATTEMPTS: u32 = 4;
+/// Base delay in seconds for the first download retry's exponential backoff.
+pub const DOWNLOAD_RETRY_BASE_DELAY_SECS: u64 = 2;
+/// Maximum delay in seconds any single download retry will wait.
+pub const DOWNLOAD_RETRY_MAX_DELAY_SECS: u64 = 30;

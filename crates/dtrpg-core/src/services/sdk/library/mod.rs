@@ -245,9 +245,15 @@ impl LibraryService for RustSdkLibraryService {
     }
 
     fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
-                     cancel: &std::sync::atomic::AtomicBool)
+                     cancel: &std::sync::atomic::AtomicBool,
+                     on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
                      -> Result<(), LibraryServiceError> {
-        download::download_item(self.gateway.as_ref(), order_product_id, index, dest, cancel)
+        download::download_item(self.gateway.as_ref(),
+                                order_product_id,
+                                index,
+                                dest,
+                                cancel,
+                                on_retry)
     }
 }
 

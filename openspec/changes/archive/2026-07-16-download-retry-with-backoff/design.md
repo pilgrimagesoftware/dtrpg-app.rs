@@ -66,39 +66,50 @@ progress across the SDK-trait boundary.
   doesn't need retry logic at all (it never fails transiently), which
   would be awkward to express if retry orchestration lived above the trait
   boundary in the shared UI controller.
-- **A pure, testable backoff function**: `fn backoff_delay(attempt: u32,
-  jitter_source: u64) -> Duration`, exponential (`base * 2^(attempt - 1)`,
-  attempt starting at `1` for the delay before the first retry), capped at
-  a max delay, with jitter applied deterministically from `jitter_source`
-  rather than an internal RNG call. Production calls it with
-  `SystemTime::now()`'s sub-second nanoseconds as the jitter source; unit
-  tests pass fixed values and assert exact output. This avoids adding a new
-  `rand`-family direct dependency (it's only ever a transitive dependency
-  today) for what only needs "enough variance to avoid synchronized retries
-  across concurrent downloads," not cryptographic randomness.
+- **Reuse the existing shared retry helper** rather than adding a second
+  backoff implementation: `crates/dtrpg-ui/src/services/retry.rs` (landed
+  in the `catalog-maintenance-behavior` change) already provides
+  `backoff_delay(attempt, jitter_source, base_secs, max_secs) -> Duration`
+  and `retry_with_backoff(config: RetryConfig, cancel: &AtomicBool,
+  operation, is_retryable, on_retry: Option<OnRetry<'_, E>>) -> Result<T,
+  E>`, explicitly documented as intended for "catalog synchronization,
+  cover/avatar image caching, and (once implemented) download transfers."
+  `download_item` calls `retry_with_backoff` directly instead of
+  hand-rolling its own loop, sleep-tick logic, or jitter calculation —
+  those are already implemented and unit-tested in `retry.rs`. This avoids
+  adding a new `rand`-family direct dependency for what only needs "enough
+  variance to avoid synchronized retries across concurrent downloads."
 - **Constants**: `MAX_DOWNLOAD_ATTEMPTS = 4` (1 initial + 3 retries),
   `DOWNLOAD_RETRY_BASE_DELAY_SECS = 2`, `DOWNLOAD_RETRY_MAX_DELAY_SECS =
   30`, added to `crates/dtrpg-core/src/constants.rs` alongside this crate's
-  other fixed thresholds.
-- **Retry gate**: retry only when the failed attempt's error has
-  `kind == LibraryServiceErrorKind::Network` AND `!cancel.load(Ordering::SeqCst)`
-  at the moment of failure. A `Session`/`NotFound`/`NeedsReauth` error from
-  `prepare_download` never retries (retrying won't change an auth or
-  not-found outcome); an explicit cancellation never retries regardless of
-  its (currently mislabeled) `Network` kind.
-- **Backoff wait composed of short sleep ticks** (e.g. 200ms), checking
-  `cancel` between ticks and returning immediately (without retrying
-  further) if cancellation is observed — mirroring `stream_to_file`'s
-  existing per-chunk cancellation check, so cancelling during a backoff
-  pause is no less responsive than cancelling mid-transfer.
+  other fixed thresholds, and passed into `retry.rs`'s `RetryConfig` at the
+  `download_item` call site.
+- **Retry gate**: `is_retryable` closure returns `true` only when the
+  failed attempt's error has `kind == LibraryServiceErrorKind::Network`.
+  `retry_with_backoff` itself checks `!cancel.load(Ordering::SeqCst)`
+  before treating a retryable error as eligible, so cancellation-during-
+  attempt is already handled by the shared helper. A
+  `Session`/`NotFound`/`NeedsReauth` error from `prepare_download` never
+  retries (retrying won't change an auth or not-found outcome); an
+  explicit cancellation never retries regardless of its (currently
+  mislabeled) `Network` kind.
+- **Backoff wait**: `retry_with_backoff` composes the wait from short sleep
+  ticks (`BACKOFF_TICK = 200ms` in `retry.rs`), checking `cancel` between
+  ticks and returning immediately if cancellation is observed — mirroring
+  `stream_to_file`'s existing per-chunk cancellation check, so cancelling
+  during a backoff pause is no less responsive than cancelling
+  mid-transfer. `download_item` does not reimplement this.
 - **Optional retry-progress callback**: `download_item` gains an
   `on_retry: Option<&mut dyn FnMut(u32, Duration)>` parameter (attempt
   number about to be retried, delay before it), called once per retry
   right before the backoff wait starts — the same `Option<&mut dyn
-  FnMut(...)>` shape `list_items_paged` already uses for `on_page`/`on_total`,
-  so this isn't a new pattern in the codebase. `dispatch_download` passes a
-  closure that updates the activity label (e.g. "Retrying (2/3) in 4s…");
-  the stub implementation ignores the parameter (`_on_retry`).
+  FnMut(...)>` shape `list_items_paged` already uses for `on_page`/`on_total`.
+  Internally this adapts to `retry.rs`'s `OnRetry<'_, E> = &mut dyn
+  FnMut(u32, Duration, &E)` shape by discarding the error argument (the
+  trait-level callback doesn't need the error, only the UI progress
+  fields). `dispatch_download` passes a closure that updates the activity
+  label (e.g. "Retrying (2/3) in 4s…"); the stub implementation ignores
+  the parameter (`_on_retry`).
 - **Each retry re-attempts the full transfer from scratch**, including a
   fresh `prepare_download` call — the pre-signed URL a prior attempt
   resolved may have expired (observed ~30s expiry per `download.rs`'s

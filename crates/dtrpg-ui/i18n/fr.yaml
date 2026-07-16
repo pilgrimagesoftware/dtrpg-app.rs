@@ -249,6 +249,7 @@ activity:
   loading_thumbnails_remaining: "Chargement des miniatures… (%{remaining} restantes)"
   refreshing_thumbnails: "Actualisation des miniatures…"
   refreshing_thumbnails_remaining: "Actualisation des miniatures… (%{remaining} restantes)"
+  downloading_retry: "%{title} — nouvelle tentative %{attempt} dans %{delay_secs}s…"
 
 alert_history:
   title: "Historique des alertes"

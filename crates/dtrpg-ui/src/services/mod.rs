@@ -166,13 +166,21 @@ pub trait LibraryService: Send + Sync + 'static {
     /// `download-queue`) can treat any error alongside an already-set `cancel`
     /// as an expected cancellation rather than a real failure.
     ///
+    /// On a retryable transfer failure, an implementation may retry the
+    /// download with exponential backoff before returning an error. `on_retry`,
+    /// if present, is called once per retry with the attempt number about to
+    /// be retried and the delay before it, so callers can surface
+    /// retry-in-progress state (e.g. an activity label). Implementations that
+    /// never fail transiently (e.g. test stubs) may ignore this parameter.
+    ///
     /// # Errors
     ///
     /// Returns a [`LibraryServiceError`] on any preparation, network, or I/O
     /// failure, or if the transfer is cancelled. `dest` is left untouched
     /// (never partially written) on any error path.
     fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
-                     cancel: &std::sync::atomic::AtomicBool)
+                     cancel: &std::sync::atomic::AtomicBool,
+                     on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
                      -> Result<(), LibraryServiceError>;
 }
 

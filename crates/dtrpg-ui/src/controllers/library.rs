@@ -3383,20 +3383,58 @@ impl LibraryController {
         // for the same reason as `dest_for_log` above.
         let dest_for_symlink = fetch_target.as_ref().map(|(_, dest)| dest.clone());
         let service_arc = self.vm.service_arc();
+        let title_for_retry = title.clone();
 
         cx.spawn(async move |this, async_cx| {
               let outcome: Result<(), String> = match fetch_target {
                   Some((order_product_id, dest)) => {
                       let cancel_for_fetch = Arc::clone(&cancel_flag);
-                      async_cx.background_executor()
-                              .spawn(async move {
-                                  service_arc.download_item(order_product_id,
-                                                            index,
-                                                            &dest,
-                                                            &cancel_for_fetch)
-                                             .map_err(|e| e.to_string())
-                              })
-                              .await
+                      let (retry_tx, retry_rx) =
+                          std::sync::mpsc::channel::<(u32, std::time::Duration)>();
+                      let fetch = async_cx.background_executor().spawn(async move {
+                                                                    service_arc.download_item(
+                              order_product_id,
+                              index,
+                              &dest,
+                              &cancel_for_fetch,
+                              Some(&mut |attempt, delay| { retry_tx.send((attempt, delay)).ok(); }),
+                          )
+                                     .map_err(|e| e.to_string())
+                                                                });
+
+                      // Drain retry-progress notifications and update the
+                      // activity label until `download_item` returns and drops
+                      // `retry_tx`, disconnecting the channel — mirroring the
+                      // page-progress channel loop used for catalog fetches.
+                      let mut retry_rx = Some(retry_rx);
+                      loop {
+                          let Some(receiver) = retry_rx.take()
+                          else {
+                              break;
+                          };
+                          let (msg, returned_rx) = async_cx.background_executor()
+                                                           .spawn(async move {
+                                                               let msg = receiver.recv();
+                                                               (msg, receiver)
+                                                           })
+                                                           .await;
+                          match msg {
+                              Ok((attempt, delay)) => {
+                                  let label = t!("activity.downloading_retry",
+                                                 title = title_for_retry,
+                                                 attempt = attempt,
+                                                 delay_secs = delay.as_secs()).to_string();
+                                  weak_activity.update(async_cx, |a, cx| {
+                                                   a.update_label(activity_id, label, cx)
+                                               })
+                                               .ok();
+                                  retry_rx = Some(returned_rx);
+                              }
+                              Err(_) => break,
+                          }
+                      }
+
+                      fetch.await
                   }
                   None => Err("no downloadable file found for this item".to_string()),
               };
