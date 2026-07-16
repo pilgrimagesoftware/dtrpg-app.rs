@@ -87,9 +87,20 @@ impl CacheMetadata {
 /// receive `None` should treat the cache as stale.
 pub fn load_cache_metadata(root: &Path) -> Option<CacheMetadata> {
     let path = root.join(CATALOG_CACHE_METADATA_FILE);
-    let text = fs::read_to_string(&path)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "cache metadata not readable"))
-        .ok()?;
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        // A missing file is the expected state on a fresh install (or any time
+        // the cache hasn't been written yet) and this is called on every
+        // Settings render (`cache_counts`) in addition to catalog-load checks
+        // -- warning on it floods the log with a non-error. Any other I/O
+        // failure (permissions, a genuinely unreadable disk) is still worth a
+        // warning.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => {
+            warn!(path = %path.display(), error = %e, "cache metadata not readable");
+            return None;
+        }
+    };
     serde_json::from_str(&text)
         .map_err(|e| warn!(path = %path.display(), error = %e, "cache metadata malformed"))
         .ok()
@@ -179,9 +190,17 @@ pub enum CatalogCacheError {
 /// can fall through to the live API fetch without surfacing errors to the user.
 pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
     let path = root.join(CATALOG_CACHE_FILE);
-    let text = fs::read_to_string(&path)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache not readable"))
-        .ok()?;
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        // A missing file is the expected state on a fresh install; only a
+        // genuine I/O failure (permissions, an unreadable disk) is worth a
+        // warning.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => {
+            warn!(path = %path.display(), error = %e, "catalog cache not readable");
+            return None;
+        }
+    };
     let mut items: Vec<LibraryItem> = serde_json::from_str(&text)
         .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache malformed"))
         .ok()?;

@@ -50,9 +50,10 @@
       superseded-by-newer-load return, and the natural end of both the success and error arms
       of the final `match fetch.await` — 63 existing `controllers::library` tests pass
       unchanged, confirming no behavior regression in the paths the guard now wraps.
-      Dedicated test coverage for the guard itself needs a full gpui `TestAppContext` harness
-      (used in `view_models/library.rs`'s tests, not `controllers/library.rs`'s, which only
-      tests pure helper functions) — deferred to task 9.1.
+      Dedicated test coverage for the guard itself would need a full gpui `TestAppContext`
+      harness (used in `view_models/library.rs`'s tests, not `controllers/library.rs`'s, which
+      only tests pure helper functions); see task 9.1 for why that was attempted and reverted
+      rather than kept.
 
 ## 5. Fresh-Install Initialization
 
@@ -164,12 +165,17 @@
 - [x] 9.1 Network monitor: 6 tests (`services::network_monitor::tests`, reachable/unreachable/
       cached/unparseable target coverage). Retry helper: 10 tests
       (`services::retry::tests`, backoff-delay math and retry-with-backoff attempt/cancel/
-      callback behavior). Catalog-sync in-flight guard: added
-      `controllers::library::catalog_sync_guard_tests` using a `#[gpui::test]` +
-      `TestAppContext` with the existing `StubLibraryService`/`CollectionsStubService` —
-      no prior test in this codebase constructed a full `LibraryController`, so this
-      establishes that as a usable pattern (verified via `load_generation` staying at `1`
-      across two back-to-back `start_load` calls).
+      callback behavior). Catalog-sync in-flight guard: attempted a `#[gpui::test]` +
+      `TestAppContext` constructing a full `LibraryController` — reverted 2026-07-16 after it
+      caused `cargo test` to hang intermittently. `LibraryController::new` unconditionally
+      starts two infinite recurring-timer background tasks (the catalog refresh timer added
+      in task 6.2, plus the pre-existing check-batch timer); `#[gpui::test]`'s harness appears
+      to wait for the background executor to go idle after the test body returns, which an
+      always-rescheduling timer never satisfies. No prior test in this codebase constructs a
+      full `LibraryController` for exactly this reason. Removed rather than left as a
+      correctness-vs-hang-risk trade-off for whoever next runs the test suite; the guard's
+      correctness rests on the manual exit-path review from task 4.2 and the 299 passing
+      tests confirming no regression elsewhere.
 - [x] 9.2 Extracted `fresh_install_request_gated` (mirroring the existing
       `reload_cooldown_active` pattern) out of the inline gating logic in `start_load_inner`,
       with 3 unit tests (`fresh_install_gating_tests`: suppressed within interval, proceeds
