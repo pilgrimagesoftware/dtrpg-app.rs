@@ -12,10 +12,12 @@
 ## 2. Retry Helper Extraction
 
 - [x] 2.1 Build `backoff_delay(attempt, jitter_source, base_secs, max_secs)` in a new shared
-      module `crates/dtrpg-core/src/services/retry.rs`, per `download-retry-with-backoff`'s
-      design.md algorithm (exponential, base*2^(attempt-1), capped, deterministic +/-25%
-      jitter, no `rand` dependency), generalized with explicit base/max parameters so
-      catalog-sync and image-cache can use their own constants.
+      module `crates/dtrpg-ui/src/services/retry.rs` (not `dtrpg-core` — see design.md's
+      corrected Decisions section: `dtrpg-core` depends on `dtrpg-ui`, not the reverse, and
+      `LibraryController` is `dtrpg-ui` code), per `download-retry-with-backoff`'s design.md
+      algorithm (exponential, base*2^(attempt-1), capped, deterministic +/-25% jitter, no
+      `rand` dependency), generalized with explicit base/max parameters so catalog-sync and
+      image-cache can use their own constants.
 - [x] 2.2 Add a `retry_with_backoff` helper wrapping a fallible closure with max-attempts,
       a retry-gate predicate, and an `on_retry(attempt, delay, &error)` callback, built on
       `backoff_delay`, with cancel-aware short sleep ticks (200ms) during the backoff wait.

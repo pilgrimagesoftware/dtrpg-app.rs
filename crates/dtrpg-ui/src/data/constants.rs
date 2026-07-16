@@ -198,3 +198,29 @@ pub const VALUE_FONT_SIZE_RATIO: f32 = 0.9;
 /// hint) stays visually smaller than body text even as the shared scale
 /// changes.
 pub const LABEL_MONO_FONT_SIZE_PT: f32 = 13.0;
+
+/// Retry attempts (including the first) for catalog synchronization requests.
+/// See [`crate::services::retry`].
+pub const CATALOG_SYNC_MAX_ATTEMPTS: u32 = 4;
+/// Base backoff delay (seconds) for catalog synchronization retries.
+pub const CATALOG_SYNC_RETRY_BASE_DELAY_SECS: u64 = 2;
+/// Maximum backoff delay (seconds) for catalog synchronization retries.
+pub const CATALOG_SYNC_RETRY_MAX_DELAY_SECS: u64 = 30;
+
+/// Retry attempts (including the first) for cover/avatar image-cache fetches.
+pub const IMAGE_CACHE_MAX_ATTEMPTS: u32 = 4;
+/// Base backoff delay (seconds) for image-cache fetch retries.
+pub const IMAGE_CACHE_RETRY_BASE_DELAY_SECS: u64 = 2;
+/// Maximum backoff delay (seconds) for image-cache fetch retries.
+pub const IMAGE_CACHE_RETRY_MAX_DELAY_SECS: u64 = 30;
+
+/// Minimum interval between fresh-install catalog initialization requests,
+/// gating redundant requests.
+pub const CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS: u64 = 60;
+
+/// How long a network-monitor reachability check result stays cached before a
+/// new check is triggered.
+pub const NETWORK_MONITOR_CACHE_TTL_SECS: u64 = 5;
+
+/// Interval for the recurring long-running-session catalog-staleness timer.
+pub const CATALOG_REFRESH_TIMER_INTERVAL_SECS: u64 = 3600;

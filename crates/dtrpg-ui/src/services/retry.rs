@@ -23,7 +23,7 @@ const BACKOFF_TICK: Duration = Duration::from_millis(200);
 ///
 /// ```
 /// use std::time::Duration;
-/// # use dtrpg_core::services::retry::backoff_delay;
+/// # use dtrpg_ui::services::retry::backoff_delay;
 /// let delay = backoff_delay(1, 0, 2, 30);
 /// assert_eq!(delay, Duration::from_secs(2));
 /// ```
