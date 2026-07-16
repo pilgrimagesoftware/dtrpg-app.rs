@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::data::paths::app_preferences_dir;
+use crate::data::paths::app_data_dir;
 use crate::util::sort::{CollectionSortMethod, SortDirection};
 
 /// Persisted position and size of the library window, in pixels.
@@ -256,5 +256,9 @@ impl UiPrefs {
 }
 
 fn prefs_path() -> std::path::PathBuf {
-    app_preferences_dir().join("ui_prefs.toml")
+    // Application Support, not Preferences: this file holds layout/session
+    // state (panel widths, sort order, window bounds) regenerated from
+    // defaults if lost, not user-facing settings a user would expect to find
+    // or hand-edit in ~/Library/Preferences.
+    app_data_dir().join("ui_prefs.toml")
 }

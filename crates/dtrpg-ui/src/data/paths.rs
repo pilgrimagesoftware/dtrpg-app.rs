@@ -5,14 +5,14 @@
 //! reason about `dirs::*_dir()` semantics directly.
 //!
 //! - **App data** ([`app_data_dir`]): locally-generated application data that
-//!   is not a cache and not user-editable preferences (currently unused
-//!   directly, but kept as the canonical mapping for the platform "data"
-//!   location).
+//!   is not a cache and not user-editable preferences — e.g. `ui_prefs.toml`
+//!   (panel widths, sort order, window bounds: regenerated from defaults if
+//!   lost, not something a user would look for or hand-edit).
 //! - **App cache** ([`app_cache_dir`], [`cache_dir`]): regenerable data such as
 //!   the catalog/collections cache and the avatar cache.
 //! - **App preferences** ([`app_preferences_dir`]): small user preference files
-//!   (profile, UI layout, download location override). On macOS this resolves
-//!   to `~/Library/Preferences`, distinct from Application Support —
+//!   (profile, download location override). On macOS this resolves to
+//!   `~/Library/Preferences`, distinct from Application Support —
 //!   `dirs::config_dir()` maps to Application Support on macOS and would
 //!   otherwise collide with cache data.
 //! - **Default download directory** ([`default_download_dir`]): where catalog

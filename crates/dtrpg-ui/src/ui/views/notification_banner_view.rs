@@ -47,6 +47,13 @@ pub fn render_notification_banner(notices: Vec<Notice>,
                     Alert::warning(format!("notice-alert-{kind:?}"), message.to_string())
                         .banner()
                         .flex_1()
+                        // `Alert`'s own banner-mode border uses a color mixed 30% with
+                        // white, which reads as barely-there against the background.
+                        // Override with the full-strength warning color and a thicker
+                        // border so an unauthenticated/session-expired notice actually
+                        // catches the eye rather than blending in.
+                        .border_2()
+                        .border_color(colors.warning_text)
                         .on_close(move |_, _, cx| {
                             auth_entity_dismiss.update(cx, |ctrl, cx| {
                                 ctrl.dismiss_notice(kind, cx);
