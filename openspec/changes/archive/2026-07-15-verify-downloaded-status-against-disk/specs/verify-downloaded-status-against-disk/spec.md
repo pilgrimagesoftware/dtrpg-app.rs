@@ -49,3 +49,34 @@ counts (`SectionCounts`) from the current catalog.
   `Downloaded` and `Cloud`
 - **THEN** the "On This Device" section count reflects the change
   immediately
+
+### Requirement: Download-status UI SHALL show a distinct pending state while verification is in flight
+Any button, label, or status glyph that displays an item's download status
+(the catalog list/grid/thumbs status glyph, the item popover's download
+button, and the detail tab's download button and status glyph) SHALL show
+a distinct "pending verification" state, visually and via tooltip, for the
+duration of a file-presence verification pass affecting that item — whether
+the catalog-wide load-time pass or the on-demand single-item check. This
+state is distinct from the existing network-bound availability-check
+indicator, and from the Downloaded/Cloud states, so a user is never shown a
+value that verification may be about to overturn.
+
+#### Scenario: Catalog status glyph shows pending state during catalog-wide verification
+- **WHEN** a catalog load's file-presence verification pass is in flight for
+  an item
+- **THEN** that item's status glyph in the list, grid, and thumbs views
+  shows a pending indicator (not Downloaded or Cloud) with a tooltip
+  distinct from the availability-check indicator
+
+#### Scenario: Download button shows pending state during on-demand verification
+- **WHEN** the user selects an item and its on-demand file-presence
+  verification is in flight
+- **THEN** the item popover's and detail tab's download buttons are
+  disabled and show a loading/pending state with a "checking download
+  status" tooltip, until verification completes
+
+#### Scenario: Pending state clears once verification completes
+- **WHEN** a file-presence verification pass for an item completes (whether
+  or not it changed the item's `downloaded` flags)
+- **THEN** the item's download-status UI reverts to showing its current
+  Downloaded/Cloud state

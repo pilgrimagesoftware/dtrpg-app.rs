@@ -33,6 +33,11 @@ or restores a stale disk-image without the file, and the app keeps reporting
   replacing them — the merge-by-id logic still prevents unnecessary flicker
   from every live fetch/check; this verification pass is the ground-truth
   backstop for cases neither of those fixes addresses.
+- While a verification pass is in flight (catalog-wide on load, or the
+  single-item check on selection), any button, label, or status glyph that
+  shows an item's download status reflects a distinct "pending
+  verification" state — not a stale Downloaded/Cloud value and not
+  conflated with the existing network-bound availability-check indicator.
 
 ## Capabilities
 
@@ -41,7 +46,10 @@ or restores a stale disk-image without the file, and the app keeps reporting
 - `verify-downloaded-status-against-disk`: `LibraryItemFile::downloaded`
   MUST reflect actual file presence on disk, verified on catalog load and
   on selecting an individual item, in both directions (marking downloaded
-  when found, not-downloaded when missing).
+  when found, not-downloaded when missing). While verification for an item
+  is in flight, its download-status UI (catalog status glyph, item popover
+  and detail-tab download buttons/labels) MUST show a distinct pending
+  state rather than a possibly-stale Downloaded/Cloud value.
 
 ### Modified Capabilities
 
@@ -55,4 +63,12 @@ _(none)_
   destination-path computation is extracted into the new shared helper;
   `start_load_inner` gains a verification pass after each of its three
   catalog-settled points; `select_item` gains an on-demand single-item
-  verification.
+  verification; a new `verifying_downloads` set tracks in-flight
+  verification per item id, distinct from the existing `checking_items`
+  availability-check set.
+- `crates/dtrpg-ui/src/ui/views/catalog_view.rs`,
+  `item_popover_view.rs`, `detail_panel_view.rs`: download-status
+  glyphs/buttons/labels gain a pending-verification state (tinted spinner,
+  disabled/loading button, distinct tooltip).
+- `crates/dtrpg-ui/i18n/{en,de,fr}.yaml`: new
+  `detail.tooltip_verifying_download` string.
