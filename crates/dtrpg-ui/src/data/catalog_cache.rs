@@ -106,6 +106,33 @@ pub fn load_cache_metadata(root: &Path) -> Option<CacheMetadata> {
         .ok()
 }
 
+/// Writes a zeroed default `catalog_cache_meta.json` at `root` if no file
+/// exists there yet, so the metadata sidecar exists on disk from first
+/// startup rather than only appearing after the first successful catalog
+/// fetch. Called once at app boot (see `init_globals`).
+///
+/// `schema_version: 0` and `saved_at_secs: 0` both independently cause
+/// [`CacheMetadata::is_stale`] to report `true`, correctly reflecting that
+/// nothing has actually been cached yet. A file that already exists — with
+/// real data, or one that fails to parse — is left untouched.
+pub fn ensure_cache_metadata_exists(root: &Path) {
+    let path = root.join(CATALOG_CACHE_METADATA_FILE);
+    if path.exists() {
+        return;
+    }
+    let meta = CacheMetadata { saved_at_secs: 0,
+                               item_count: 0,
+                               schema_version: 0,
+                               last_item_check_batch_secs: None,
+                               last_fresh_install_request_secs: None };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(json) = serde_json::to_string(&meta) {
+        let _ = fs::write(&path, json);
+    }
+}
+
 /// Writes cache metadata for `item_count` items to
 /// `{root}/catalog_cache_meta.json`.
 ///
@@ -350,6 +377,36 @@ mod tests {
 
         let meta = meta.unwrap();
         assert_eq!(meta.item_count, 3);
+        assert!(!meta.is_stale());
+    }
+
+    #[test]
+    fn ensure_cache_metadata_exists_writes_a_stale_default_when_missing() {
+        let dir = test_dir("ensure_metadata_missing");
+        let _ = fs::remove_dir_all(&dir);
+
+        ensure_cache_metadata_exists(&dir);
+        let meta = load_cache_metadata(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let meta = meta.unwrap();
+        assert_eq!(meta.item_count, 0);
+        assert!(meta.is_stale());
+    }
+
+    #[test]
+    fn ensure_cache_metadata_exists_leaves_a_real_file_untouched() {
+        let dir = test_dir("ensure_metadata_present");
+        fs::create_dir_all(&dir).unwrap();
+        let items = vec![make_item("b1")];
+        save_catalog_cache(&dir, &items).unwrap();
+
+        ensure_cache_metadata_exists(&dir);
+        let meta = load_cache_metadata(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let meta = meta.unwrap();
+        assert_eq!(meta.item_count, 1);
         assert!(!meta.is_stale());
     }
 

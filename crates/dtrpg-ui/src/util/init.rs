@@ -1,9 +1,11 @@
 use gpui::{App, SharedString, px};
 
+use crate::data::catalog_cache::ensure_cache_metadata_exists;
 use crate::data::constants::{
     DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
     DEFAULT_VALUE_FONT,
 };
+use crate::data::paths::cache_dir;
 use crate::data::theme::{Density, FontSelections, LibriTheme, ThemeKey};
 use crate::data::ui_preferences::UiPreferences;
 use crate::i18n;
@@ -26,6 +28,12 @@ pub fn init_globals(cx: &mut App) {
     i18n::init();
     cx.set_global(initial_theme(cx));
     cx.set_global(CoverCache::new());
+    // `StorageConfig::load`/`UiPreferences::load`/`UiState::load` already
+    // write their own defaults to disk on first call; the catalog cache
+    // metadata sidecar has no such self-initializing wrapper type (it's a
+    // free function keyed by an explicit `root: &Path`), so it needs an
+    // explicit boot-time call instead.
+    ensure_cache_metadata_exists(&cache_dir());
 }
 
 /// Resolves the persisted theme key and font selections into a [`LibriTheme`],

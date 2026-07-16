@@ -46,13 +46,22 @@ pub struct UiPreferences {
 
 impl UiPreferences {
     /// Load from disk; returns defaults on any error.
+    ///
+    /// If no file exists yet (first run), writes the defaults to disk
+    /// immediately, mirroring [`crate::data::storage::StorageConfig::load`].
+    /// A file that exists but fails to parse is left untouched.
     pub fn load() -> Self {
-        let data =
-            std::fs::read_to_string(preferences_path())
-                .ok()
-                .and_then(|text| toml::from_str::<UiPreferencesFile>(&text).ok())
-                .unwrap_or_default();
-        Self { data }
+        let path = preferences_path();
+        let file_existed = path.exists();
+        let data = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| toml::from_str::<UiPreferencesFile>(&text).ok())
+            .unwrap_or_default();
+        let prefs = Self { data };
+        if !file_existed {
+            prefs.flush();
+        }
+        prefs
     }
 
     /// Persisted key of the active color theme, or `None` if never saved.

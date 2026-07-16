@@ -48,14 +48,23 @@ pub struct UiState {
 
 impl UiState {
     /// Load from disk; returns defaults on any error.
+    ///
+    /// If no file exists yet (first run), writes the defaults to disk
+    /// immediately, mirroring [`crate::data::storage::StorageConfig::load`].
+    /// A file that exists but fails to parse is left untouched.
     pub fn load() -> Self {
-        let data =
-            std::fs::read_to_string(state_path()).ok()
-                                                 .and_then(|text| {
-                                                     toml::from_str::<UiStateFile>(&text).ok()
-                                                 })
-                                                 .unwrap_or_default();
-        Self { data }
+        let path = state_path();
+        let file_existed = path.exists();
+        let data = std::fs::read_to_string(&path).ok()
+                                                  .and_then(|text| {
+                                                      toml::from_str::<UiStateFile>(&text).ok()
+                                                  })
+                                                  .unwrap_or_default();
+        let state = Self { data };
+        if !file_existed {
+            state.flush();
+        }
+        state
     }
 
     /// Width of the sidebar panel, or `None` if not saved.
