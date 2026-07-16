@@ -55,11 +55,12 @@ impl UiState {
     pub fn load() -> Self {
         let path = state_path();
         let file_existed = path.exists();
-        let data = std::fs::read_to_string(&path).ok()
-                                                  .and_then(|text| {
-                                                      toml::from_str::<UiStateFile>(&text).ok()
-                                                  })
-                                                  .unwrap_or_default();
+        let data =
+            std::fs::read_to_string(&path).ok()
+                                          .and_then(|text| {
+                                              toml::from_str::<UiStateFile>(&text).ok()
+                                          })
+                                          .unwrap_or_default();
         let state = Self { data };
         if !file_existed {
             state.flush();

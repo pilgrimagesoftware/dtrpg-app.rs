@@ -17,8 +17,8 @@ use crate::ui::library::cover::CoverCache;
 /// Detects the system locale and activates it, then registers GPUI app-level
 /// globals.
 ///
-/// Restores the persisted theme and font selections from [`UiPreferences`] (falling
-/// back to defaults for anything missing, unrecognized, or no longer
+/// Restores the persisted theme and font selections from [`UiPreferences`]
+/// (falling back to defaults for anything missing, unrecognized, or no longer
 /// installed — e.g. first launch, a prefs file predating this preference, or
 /// a font that was uninstalled since it was chosen), rather than always
 /// starting from [`LibriTheme::default_theme`].

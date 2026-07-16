@@ -3,8 +3,10 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::data::constants::{AVATAR_CACHE_FILE, GRAVATAR_HOST, IMAGE_CACHE_MAX_ATTEMPTS,
-                              IMAGE_CACHE_RETRY_BASE_DELAY_SECS, IMAGE_CACHE_RETRY_MAX_DELAY_SECS};
+use crate::data::constants::{
+    AVATAR_CACHE_FILE, GRAVATAR_HOST, IMAGE_CACHE_MAX_ATTEMPTS, IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+    IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
+};
 use crate::data::paths::app_cache_dir;
 use crate::services::network_monitor::NetworkMonitor;
 use crate::services::retry::{RetryConfig, retry_with_backoff};
@@ -80,8 +82,8 @@ pub fn fetch_avatar_bytes(email: String) -> Option<Vec<u8>> {
     let url = gravatar_url(&email);
     let cancel = std::sync::atomic::AtomicBool::new(false);
     let config = RetryConfig { max_attempts: IMAGE_CACHE_MAX_ATTEMPTS,
-                              base_secs:    IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
-                              max_secs:     IMAGE_CACHE_RETRY_MAX_DELAY_SECS };
+                               base_secs:    IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                               max_secs:     IMAGE_CACHE_RETRY_MAX_DELAY_SECS, };
     let mut on_retry = |attempt: u32, delay: Duration, reason: &AvatarFetchError| {
         if let AvatarFetchError::Transient(reason) = reason {
             tracing::debug!(url = %url,

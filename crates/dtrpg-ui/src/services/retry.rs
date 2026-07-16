@@ -36,7 +36,8 @@ pub fn backoff_delay(attempt: u32, jitter_source: u64, base_secs: u64, max_secs:
     let jitter_range = capped_secs / 4;
     let jittered_secs = if jitter_range == 0 {
         capped_secs
-    } else {
+    }
+    else {
         let offset = (jitter_source % (jitter_range * 2 + 1)) as i64 - jitter_range as i64;
         (capped_secs as i64 + offset).clamp(0, max_secs as i64) as u64
     };
@@ -88,7 +89,9 @@ pub fn retry_with_backoff<T, E>(config: RetryConfig, cancel: &AtomicBool,
                     return Err(error);
                 }
 
-                let delay = backoff_delay(attempt, jitter_source_now(), config.base_secs,
+                let delay = backoff_delay(attempt,
+                                          jitter_source_now(),
+                                          config.base_secs,
                                           config.max_secs);
                 if let Some(on_retry) = on_retry.as_deref_mut() {
                     on_retry(attempt, delay, &error);
@@ -125,8 +128,8 @@ fn wait_cancelable(delay: Duration, cancel: &AtomicBool) -> bool {
 fn jitter_source_now() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now().duration_since(UNIX_EPOCH)
-                      .map(|d| u64::from(d.subsec_nanos()))
-                      .unwrap_or(0)
+                     .map(|d| u64::from(d.subsec_nanos()))
+                     .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -160,7 +163,8 @@ mod tests {
 
     #[test]
     fn backoff_delay_is_deterministic_for_same_jitter_source() {
-        assert_eq!(backoff_delay(3, 12345, 2, 30), backoff_delay(3, 12345, 2, 30));
+        assert_eq!(backoff_delay(3, 12345, 2, 30),
+                   backoff_delay(3, 12345, 2, 30));
     }
 
     #[test]
@@ -168,14 +172,17 @@ mod tests {
         // attempt=3, base=2, max=30 → pre-jitter capped delay is 8s, +/-25% is [6, 10].
         for jitter_source in [0, 1, 100, 999_999] {
             let delay = backoff_delay(3, jitter_source, 2, 30).as_secs();
-            assert!((6..=10).contains(&delay), "delay {delay} out of expected range");
+            assert!((6..=10).contains(&delay),
+                    "delay {delay} out of expected range");
         }
     }
 
     #[test]
     fn retry_with_backoff_succeeds_without_retry() {
         let cancel = AtomicBool::new(false);
-        let config = RetryConfig { max_attempts: 3, base_secs: 0, max_secs: 0 };
+        let config = RetryConfig { max_attempts: 3,
+                                   base_secs:    0,
+                                   max_secs:     0, };
         let result: Result<u32, &str> =
             retry_with_backoff(config, &cancel, || Ok(42), |_| true, None);
         assert_eq!(result, Ok(42));
@@ -185,7 +192,9 @@ mod tests {
     fn retry_with_backoff_retries_up_to_max_attempts() {
         let cancel = AtomicBool::new(false);
         let attempts = AtomicU32::new(0);
-        let config = RetryConfig { max_attempts: 3, base_secs: 0, max_secs: 0 };
+        let config = RetryConfig { max_attempts: 3,
+                                   base_secs:    0,
+                                   max_secs:     0, };
         let result: Result<(), &str> = retry_with_backoff(config,
                                                           &cancel,
                                                           || {
@@ -203,7 +212,9 @@ mod tests {
     fn retry_with_backoff_stops_when_not_retryable() {
         let cancel = AtomicBool::new(false);
         let attempts = AtomicU32::new(0);
-        let config = RetryConfig { max_attempts: 5, base_secs: 0, max_secs: 0 };
+        let config = RetryConfig { max_attempts: 5,
+                                   base_secs:    0,
+                                   max_secs:     0, };
         let result: Result<(), &str> = retry_with_backoff(config,
                                                           &cancel,
                                                           || {
@@ -221,7 +232,9 @@ mod tests {
     fn retry_with_backoff_stops_when_cancelled_before_next_attempt() {
         let cancel = AtomicBool::new(false);
         let attempts = AtomicU32::new(0);
-        let config = RetryConfig { max_attempts: 5, base_secs: 0, max_secs: 0 };
+        let config = RetryConfig { max_attempts: 5,
+                                   base_secs:    0,
+                                   max_secs:     0, };
         let result: Result<(), &str> = retry_with_backoff(config,
                                                           &cancel,
                                                           || {
@@ -240,7 +253,9 @@ mod tests {
     fn retry_with_backoff_invokes_on_retry_callback() {
         let cancel = AtomicBool::new(false);
         let retry_calls = AtomicU32::new(0);
-        let config = RetryConfig { max_attempts: 3, base_secs: 0, max_secs: 0 };
+        let config = RetryConfig { max_attempts: 3,
+                                   base_secs:    0,
+                                   max_secs:     0, };
         let mut on_retry = |attempt: u32, _delay: Duration, _error: &&str| {
             assert!(attempt >= 1);
             retry_calls.fetch_add(1, Ordering::SeqCst);

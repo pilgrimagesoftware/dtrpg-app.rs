@@ -17,8 +17,7 @@ use crate::ui::views::root_view::LibraryRootView;
 /// does not need to conditionalize the insertion point.
 pub fn render_notification_banner(notices: Vec<Notice>,
                                   auth_entity: Entity<AuthStateController>,
-                                  root_entity: Entity<LibraryRootView>,
-                                  colors: &ColorTokens)
+                                  root_entity: Entity<LibraryRootView>, colors: &ColorTokens)
                                   -> AnyElement {
     if notices.is_empty() {
         return div().into_any_element();

@@ -133,9 +133,9 @@ impl StorageConfig {
     /// that side effect.
     #[cfg(test)]
     pub(crate) fn for_test(root: PathBuf) -> Self {
-        Self { override_path: Some(root),
+        Self { override_path:            Some(root),
                max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-               create_collections: false }
+               create_collections:       false, }
     }
 
     /// Returns the resolved download root (saved override, or platform

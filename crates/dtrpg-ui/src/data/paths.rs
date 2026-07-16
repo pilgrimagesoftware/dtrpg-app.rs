@@ -6,9 +6,8 @@
 //!
 //! - **App data** ([`app_data_dir`]): locally-generated application data that
 //!   is not a cache and not user-editable preferences — e.g. `ui_state.toml`
-//!   (panel widths, window bounds, last-active settings tab: regenerated
-//!   from defaults if lost, not something a user would look for or
-//!   hand-edit).
+//!   (panel widths, window bounds, last-active settings tab: regenerated from
+//!   defaults if lost, not something a user would look for or hand-edit).
 //! - **App cache** ([`app_cache_dir`], [`cache_dir`]): regenerable data such as
 //!   the catalog/collections cache and the avatar cache.
 //! - **App preferences** ([`app_preferences_dir`]): small user preference files

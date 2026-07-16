@@ -482,7 +482,8 @@ pub struct LibraryController {
     pub sort_direction:            SortDirection,
     /// Current sidebar Collections sort method, persisted via `UiPreferences`.
     pub collection_sort:           CollectionSortMethod,
-    /// Current sidebar Collections sort direction, persisted via `UiPreferences`.
+    /// Current sidebar Collections sort direction, persisted via
+    /// `UiPreferences`.
     pub collection_sort_direction: SortDirection,
     /// Whether the catalog is grouped by publisher.
     pub grouped:                   bool,
@@ -794,7 +795,8 @@ impl LibraryController {
                         crate::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
                     ))
                     .await;
-                  let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx)).is_ok();
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx))
+                                  .is_ok();
                   if !alive {
                       break;
                   }
@@ -1517,20 +1519,17 @@ impl LibraryController {
                                        });
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.list_collections() })
-                .await;
-            match result {
-                Ok(entries) => {
-                    tracing::debug!(
-                        count = entries.len(),
-                        "load_collections: fetched {} entries",
-                        entries.len()
-                    );
-                    let to_save = entries.clone();
-                    let save_root = cache_root.clone();
-                    async_cx
+              let result = async_cx.background_executor()
+                                   .spawn(async move { collections_service.list_collections() })
+                                   .await;
+              match result {
+                  Ok(entries) => {
+                      tracing::debug!(count = entries.len(),
+                                      "load_collections: fetched {} entries",
+                                      entries.len());
+                      let to_save = entries.clone();
+                      let save_root = cache_root.clone();
+                      async_cx
                         .background_executor()
                         .spawn(async move {
                             if let Err(e) = save_collections_cache(&save_root, &to_save) {
@@ -1538,35 +1537,34 @@ impl LibraryController {
                             }
                         })
                         .await;
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.apply_collections(entries, cx);
-                    })
-                    .ok();
-                    weak_activity
-                        .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                        .ok();
-                }
-                Err(e) => {
-                    // Session errors are expected when starting before auth completes
-                    // (see `start_load_inner`'s matching treatment for the catalog
-                    // fetch); quietly complete rather than surfacing a user-facing error.
-                    if e.kind == CollectionsServiceErrorKind::Session
-                    {
-                        tracing::warn!(error = %e,
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.apply_collections(entries, cx);
+                          })
+                          .ok();
+                      weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                   .ok();
+                  }
+                  Err(e) => {
+                      // Session errors are expected when starting before auth completes
+                      // (see `start_load_inner`'s matching treatment for the catalog
+                      // fetch); quietly complete rather than surfacing a user-facing error.
+                      if e.kind == CollectionsServiceErrorKind::Session {
+                          tracing::warn!(error = %e,
                                       "collections load skipped: no authenticated session");
-                        weak_activity
-                            .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                            .ok();
-                    } else {
-                        tracing::warn!(error = %e, "collections load failed");
-                        weak_activity
-                            .update(async_cx, |a, cx| a.error(activity_id, e.to_string(), cx))
-                            .ok();
-                    }
-                }
-            }
-        })
-        .detach();
+                          weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                       .ok();
+                      }
+                      else {
+                          tracing::warn!(error = %e, "collections load failed");
+                          weak_activity.update(async_cx, |a, cx| {
+                                           a.error(activity_id, e.to_string(), cx)
+                                       })
+                                       .ok();
+                      }
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Stores the fetched collections and emits a change event.
@@ -3453,8 +3451,8 @@ impl LibraryController {
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
 
     /// Applies a new theme key (updates the GPUI global) and persists it via
-    /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart instead of
-    /// always resetting to Parchment.
+    /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart
+    /// instead of always resetting to Parchment.
     ///
     /// Also re-syncs `gpui_component::Theme`'s colors (see
     /// [`crate::data::theme::apply_theme_colors`]) so buttons, inputs,
@@ -3484,7 +3482,8 @@ impl LibraryController {
     /// Applies a new body font family (any font installed on the user's
     /// system, not a curated list — see `settings_appearance_view`), updating
     /// the GPUI global, `gpui_component`'s `Theme.font_family`, and
-    /// persisting the selection via [`crate::data::ui_preferences::UiPreferences`].
+    /// persisting the selection via
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3539,10 +3538,10 @@ impl LibraryController {
     }
 
     /// Applies a new shared UI text size (see [`FontSelections::ui_text_size`])
-    /// and persists it via [`crate::data::ui_preferences::UiPreferences`]. Applied to each
-    /// window via `Window::set_rem_size` in `LibraryRootView::render` and
-    /// `SettingsWindowView::render`, so every `rems(...)`-based size utility
-    /// scales together, like zooming a page.
+    /// and persists it via [`crate::data::ui_preferences::UiPreferences`].
+    /// Applied to each window via `Window::set_rem_size` in
+    /// `LibraryRootView::render` and `SettingsWindowView::render`, so every
+    /// `rems(...)`-based size utility scales together, like zooming a page.
     pub fn set_ui_text_size(&self, size: Pixels, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();

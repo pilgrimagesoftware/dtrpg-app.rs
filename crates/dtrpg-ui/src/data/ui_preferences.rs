@@ -53,10 +53,11 @@ impl UiPreferences {
     pub fn load() -> Self {
         let path = preferences_path();
         let file_existed = path.exists();
-        let data = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| toml::from_str::<UiPreferencesFile>(&text).ok())
-            .unwrap_or_default();
+        let data = std::fs::read_to_string(&path).ok()
+                                                 .and_then(|text| {
+                                                     toml::from_str::<UiPreferencesFile>(&text).ok()
+                                                 })
+                                                 .unwrap_or_default();
         let prefs = Self { data };
         if !file_existed {
             prefs.flush();
