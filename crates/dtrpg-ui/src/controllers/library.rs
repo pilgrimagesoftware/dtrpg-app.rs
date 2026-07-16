@@ -561,6 +561,16 @@ pub struct LibraryController {
     ///
     /// [`start_load_inner`]: Self::start_load_inner
     catalog_sync_in_flight:        bool,
+    /// True if a load was requested (via [`start_load_inner`]) while
+    /// `catalog_sync_in_flight` was already set, so it couldn't start
+    /// immediately. Consumed by [`Self::finish_catalog_sync`], which starts
+    /// a follow-up load once the in-flight one completes rather than
+    /// silently dropping the request — critical for callers like
+    /// [`Self::replace_service`] that clear the catalog and depend on their
+    /// reload actually happening.
+    ///
+    /// [`start_load_inner`]: Self::start_load_inner
+    pending_reload:                bool,
     /// Shared connectivity monitor consulted before catalog-sync and
     /// cover-thumbnail network requests. Held as an `Arc` so background
     /// tasks spawned on gpui's executor can query it without borrowing
@@ -719,6 +729,7 @@ impl LibraryController {
                    catalog_loading: true,
                    load_generation: 0,
                    catalog_sync_in_flight: false,
+                   pending_reload: false,
                    network_monitor: Arc::new(NetworkMonitor::new()),
                    items_cache: None,
                    publisher_search_open: false,
@@ -870,6 +881,21 @@ impl LibraryController {
           .detach();
     }
 
+    /// Clears `catalog_sync_in_flight` and, if a load was requested while
+    /// this sync was running (see `start_load_inner`'s single-flight guard),
+    /// immediately starts a fresh one instead of leaving it dropped.
+    ///
+    /// Every exit path of `start_load_inner`'s background task must call
+    /// this exactly once instead of setting `catalog_sync_in_flight = false`
+    /// directly, so a queued follow-up (e.g. from `replace_service`) is
+    /// never silently lost.
+    fn finish_catalog_sync(&mut self, cx: &mut Context<Self>) {
+        self.catalog_sync_in_flight = false;
+        if std::mem::take(&mut self.pending_reload) {
+            self.start_load(cx);
+        }
+    }
+
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
         // Serial catalog-sync dispatch: never let a second catalog-sync task
         // start while one is already in flight, per
@@ -877,8 +903,17 @@ impl LibraryController {
         // (which discards a superseded load's *results*), this stops a
         // redundant load from starting — and therefore from making a
         // redundant remote request — at all.
+        //
+        // A caller that arrives here while a sync is already running (e.g.
+        // `replace_service` clearing the catalog for a newly authenticated
+        // session while the prior unauthenticated attempt is still failing
+        // out) still needs its load to happen eventually — dropping it
+        // silently would leave a just-cleared catalog empty forever. Record
+        // it as pending instead; [`Self::finish_catalog_sync`] starts a
+        // follow-up load once the in-flight one completes.
         if self.catalog_sync_in_flight {
-            tracing::debug!("catalog sync already in flight, skipping redundant load request");
+            tracing::debug!("catalog sync already in flight; queuing a follow-up reload once it completes");
+            self.pending_reload = true;
             return;
         }
         self.catalog_sync_in_flight = true;
@@ -1034,7 +1069,7 @@ impl LibraryController {
                                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                     .ok();
                                 this.update(async_cx, |ctrl, cx| {
-                                    ctrl.catalog_sync_in_flight = false;
+                                    ctrl.finish_catalog_sync(cx);
                                     if ctrl.load_generation != generation {
                                         return; // superseded by a newer load
                                     }
@@ -1114,8 +1149,8 @@ impl LibraryController {
                                         weak_activity
                                             .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                             .ok();
-                                        this.update(async_cx, |ctrl, _cx| {
-                                            ctrl.catalog_sync_in_flight = false;
+                                        this.update(async_cx, |ctrl, cx| {
+                                            ctrl.finish_catalog_sync(cx);
                                         })
                                         .ok();
                                         return;
@@ -1268,7 +1303,7 @@ impl LibraryController {
                         ctrl.catalog_loading = false;
                         cx.emit(LibraryChanged);
                     }
-                    ctrl.catalog_sync_in_flight = false;
+                    ctrl.finish_catalog_sync(cx);
                 })
                 .ok();
                 return;
@@ -1439,8 +1474,8 @@ impl LibraryController {
                         // A newer load (e.g. triggered by a cache clear) has already
                         // taken over; discard this stale result instead of clobbering it.
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
-                        this.update(async_cx, |ctrl, _cx| {
-                            ctrl.catalog_sync_in_flight = false;
+                        this.update(async_cx, |ctrl, cx| {
+                            ctrl.finish_catalog_sync(cx);
                         })
                         .ok();
                         return;
@@ -1486,8 +1521,8 @@ impl LibraryController {
                     .ok();
                 }
             }
-            this.update(async_cx, |ctrl, _cx| {
-                ctrl.catalog_sync_in_flight = false;
+            this.update(async_cx, |ctrl, cx| {
+                ctrl.finish_catalog_sync(cx);
             })
             .ok();
         })
