@@ -93,18 +93,33 @@ pub struct StorageConfig {
 impl StorageConfig {
     /// Loads the storage config from disk. Returns a default-path config on any
     /// error.
+    ///
+    /// If no config file exists yet (first run), writes the resolved
+    /// defaults to disk immediately, so `storage.toml` always exists after
+    /// the app has started once rather than only appearing the first time a
+    /// setting is changed. A file that exists but fails to parse is left
+    /// untouched — that's a different, more cautious case than "never
+    /// written," and silently overwriting it could destroy whatever is
+    /// there.
     pub fn load() -> Self {
-        let file = config_path().and_then(|p| std::fs::read_to_string(p).ok())
-                                .and_then(|text| toml::from_str::<StorageConfigFile>(&text).ok());
+        let path = config_path();
+        let file_existed = path.as_ref().is_some_and(|p| p.exists());
+        let file = path.as_ref()
+                       .and_then(|p| std::fs::read_to_string(p).ok())
+                       .and_then(|text| toml::from_str::<StorageConfigFile>(&text).ok());
         let override_path = file.as_ref()
                                 .and_then(|cfg| cfg.root_path.clone())
                                 .map(PathBuf::from);
         let max_concurrent_downloads = file.as_ref().map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                                                             |cfg| cfg.max_concurrent_downloads);
         let create_collections = file.is_some_and(|cfg| cfg.create_collections);
-        Self { override_path,
-               max_concurrent_downloads,
-               create_collections }
+        let config = Self { override_path,
+                            max_concurrent_downloads,
+                            create_collections };
+        if !file_existed {
+            config.save();
+        }
+        config
     }
 
     /// Builds an in-memory config pinned to `root`, without touching the real
