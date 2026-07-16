@@ -18,6 +18,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
+use crate::ui::actions::ShowSettings;
 
 /// Renders the title bar: app title on the left, a drag region, and the
 /// account button on the right, separated from the content below by a
@@ -162,13 +163,19 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
                                         .h(px(28.0))
                                         .child(inner)
                                         .dropdown_menu(move |menu, _, _| {
-                                            let s_settings = settings.clone();
                                             let s_logout = settings.clone();
                                             menu.item(PopupMenuItem::label(menu_email.clone()))
                 .item(PopupMenuItem::separator())
                 .item(PopupMenuItem::new(t!("toolbar.tooltip_settings")).on_click(
-                    move |_, _, cx| {
-                        s_settings.update(cx, |ctrl, cx| ctrl.toggle(cx));
+                    move |_, window, cx| {
+                        // Dispatch the same `ShowSettings` action the `cmd-,`
+                        // keybinding and native menu item use, rather than
+                        // toggling `SettingsController::is_open` — settings
+                        // renders in its own OS window (see
+                        // `open_settings_window`/`RootView::show_settings`),
+                        // not an in-app panel gated by that flag, so toggling
+                        // it alone left this menu item doing nothing.
+                        window.dispatch_action(Box::new(ShowSettings), cx);
                     },
                 ))
                 .item(
