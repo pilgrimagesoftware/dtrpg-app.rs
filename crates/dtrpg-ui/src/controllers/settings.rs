@@ -438,13 +438,18 @@ impl SettingsController {
 
     /// Saves `days` (clamped to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
     /// RECENTLY_UPDATED_WINDOW_MAX_DAYS]`) as the new "Recently Updated
-    /// window".
+    /// window", returning the clamped value actually stored.
     ///
     /// Emits [`SettingsChanged`] so the library controller picks up the new
-    /// window immediately.
-    pub fn set_recently_updated_window_days(&mut self, days: u32, cx: &mut Context<Self>) {
+    /// window immediately. Callers driving an editable number field (see
+    /// `root_view.rs`) use the returned value to write the clamped result
+    /// back into the field's own displayed text, since the field's typed
+    /// text isn't otherwise corrected when a value outside the bounds is
+    /// committed before the field loses focus.
+    pub fn set_recently_updated_window_days(&mut self, days: u32, cx: &mut Context<Self>) -> u32 {
         self.storage.set_recently_updated_window_days(days);
         cx.emit(SettingsChanged);
+        self.storage.recently_updated_window_days()
     }
 
     /// Spawns a background task to check whether `path` exists on disk.

@@ -247,18 +247,40 @@ impl LibraryRootView {
                 ))
                                               });
         let settings_for_window = settings.clone();
-        cx.subscribe(&recently_updated_window_input,
-                     move |_this, input_entity, event: &InputEvent, cx| {
-                         if matches!(event, InputEvent::Change) {
-                             let value = input_entity.read(cx).value().to_string();
-                             if let Ok(days) = value.parse::<u32>() {
-                                 settings_for_window.update(cx, |ctrl, cx| {
-                                                        ctrl.set_recently_updated_window_days(days,
-                                                                                              cx);
+        cx.subscribe_in(&recently_updated_window_input,
+                        window,
+                        move |_this, input_entity, event: &InputEvent, window, cx| {
+                            match event {
+                                InputEvent::Change => {
+                                    let value = input_entity.read(cx).value().to_string();
+                                    if let Ok(days) = value.parse::<u32>() {
+                                        settings_for_window.update(cx, |ctrl, cx| {
+                                            ctrl.set_recently_updated_window_days(days, cx);
+                                        });
+                                    }
+                                }
+                                InputEvent::Blur => {
+                                    // `NumberInput`'s own min/max clamp only corrects the
+                                    // displayed text in some focus-loss paths; explicitly
+                                    // re-syncing the field to the persisted (already-clamped)
+                                    // value on every blur guarantees the display never shows an
+                                    // out-of-range number regardless of that widget-internal
+                                    // timing.
+                                    let clamped = settings_for_window.read(cx)
+                                                                     .snapshot()
+                                                                     .recently_updated_window_days;
+                                    let current = input_entity.read(cx).value().to_string();
+                                    if current != clamped.to_string() {
+                                        input_entity.update(cx, |state, cx| {
+                                                        state.set_value(clamped.to_string(),
+                                                                        window,
+                                                                        cx);
                                                     });
-                             }
-                         }
-                     })
+                                    }
+                                }
+                                _ => {}
+                            }
+                        })
           .detach();
         settings.update(cx, |ctrl, _cx| {
                     ctrl.set_recently_updated_window_input(recently_updated_window_input)
