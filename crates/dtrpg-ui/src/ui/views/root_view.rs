@@ -927,8 +927,7 @@ impl Render for LibraryRootView {
                                      colors);
         let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
         let tab_strip = render_tab_strip(self.tabs.clone(), cx);
-        let banner =
-            render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
+        let banner = render_notification_banner(notices, auth_entity, cx.entity(), colors);
 
         let tabs_snap = self.tabs.read(cx).snapshot();
         let (active_tab_label, active_tab_count) = match &tabs_snap.active {

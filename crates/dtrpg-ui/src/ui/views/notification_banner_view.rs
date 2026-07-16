@@ -7,9 +7,9 @@ use gpui_component::button::{Button, ButtonVariants};
 use rust_i18n::t;
 
 use crate::controllers::auth_state::AuthStateController;
-use crate::controllers::settings::SettingsController;
 use crate::data::notification::{Notice, NoticeKind};
 use crate::data::theme::ColorTokens;
+use crate::ui::views::root_view::LibraryRootView;
 
 /// Renders the notification banner column.
 ///
@@ -17,7 +17,7 @@ use crate::data::theme::ColorTokens;
 /// does not need to conditionalize the insertion point.
 pub fn render_notification_banner(notices: Vec<Notice>,
                                   auth_entity: Entity<AuthStateController>,
-                                  settings_entity: Entity<SettingsController>,
+                                  root_entity: Entity<LibraryRootView>,
                                   colors: &ColorTokens)
                                   -> AnyElement {
     if notices.is_empty() {
@@ -37,7 +37,7 @@ pub fn render_notification_banner(notices: Vec<Notice>,
 
              let auth_entity_action = auth_entity.clone();
              let auth_entity_dismiss = auth_entity.clone();
-             let settings_entity = settings_entity.clone();
+             let root_entity = root_entity.clone();
 
              // Border and background live on this outer container, not the inner
              // `Alert`, so the emphasis encloses both the message and the action
@@ -71,7 +71,11 @@ pub fn render_notification_banner(notices: Vec<Notice>,
                         .label(action_label)
                         .mr(px(8.0))
                         .on_click(move |_, _, cx| {
-                            settings_entity.update(cx, |ctrl, cx| ctrl.open(cx));
+                            // `SettingsController::open` alone only flips an internal
+                            // flag — the window itself is created/tracked by
+                            // `LibraryRootView::show_settings`, so that's what actually
+                            // needs calling for a click here to do anything visible.
+                            root_entity.update(cx, |view, cx| view.show_settings(cx));
                             auth_entity_action.update(cx, |ctrl, cx| {
                                 ctrl.dismiss_notice(kind, cx);
                             });
