@@ -31,7 +31,7 @@
 
 - [x] 5.1 Run `cargo check -p dtrpg-ui` and confirm zero errors
 - [x] 5.2 Run `cargo test -p dtrpg-ui` and confirm all existing tests pass
-- [ ] 5.3 Run the app; change sort to Publisher, enable grouping, switch to List view; quit and relaunch; confirm all three preferences are restored
-- [ ] 5.4 Select a publisher filter; quit and relaunch; confirm the publisher filter is active
-- [ ] 5.5 Manually edit `app_config.toml` to set `sort = "Bogus"`; relaunch; confirm the app opens with Title sort and a WARN in the log
-- [ ] 5.6 Confirm the search field is always empty on launch regardless of prior searches
+- [x] 5.3 Run the app; change sort to Publisher, enable grouping, switch to List view; quit and relaunch; confirm all three preferences are restored
+- [x] 5.4 Select a publisher filter; quit and relaunch; confirm the publisher filter is active
+- [x] 5.5 Manually edit `app_config.toml` to set `sort = "Bogus"`; relaunch; confirm the app opens with Title sort and a WARN in the log
+- [x] 5.6 Confirm the search field is always empty on launch regardless of prior searches
