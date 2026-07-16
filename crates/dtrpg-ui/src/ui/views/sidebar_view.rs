@@ -29,7 +29,7 @@ use crate::controllers::library::LibraryController;
 use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::data::collection::CollectionEntry;
 use crate::data::library::SectionCounts;
-use crate::data::ui_prefs::UiPrefs;
+use crate::data::ui_state::UiState;
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::util::filter::SidebarFilter;
 use crate::util::matching::name_matches_query;
@@ -108,7 +108,7 @@ struct CollectionRow {
 /// count, search toggle, add-collection dialog).
 type CollectionsSuffixFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
-/// Toggles the Collections section's persisted open/closed `UiPrefs` state.
+/// Toggles the Collections section's persisted open/closed `UiState` state.
 type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// The Collections section, rendered as plain `div`s rather than
@@ -119,7 +119,7 @@ type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 /// `catalog-drag-drop-to-collection`), so only this section forgoes
 /// `SidebarMenuItem`; smart-filter and publisher rows are unaffected.
 ///
-/// The open/closed state is read from `UiPrefs` on every render (same as
+/// The open/closed state is read from `UiState` on every render (same as
 /// before), so — unlike `SidebarMenuItem`, which tracks its own internal
 /// open state — no separate collapse-toggle plumbing is needed here.
 #[derive(Clone)]
@@ -353,7 +353,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                       collection_search: SidebarSectionSearch)
                       -> impl IntoElement + 'static {
     let active = filter.clone();
-    let prefs = UiPrefs::load();
+    let prefs = UiState::load();
     let publishers_open = prefs.publishers_open();
     let collections_open = prefs.collections_open();
 
@@ -425,7 +425,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
             .default_open(publishers_open)
             .click_to_toggle(true)
             .on_click(move |_, _, cx| {
-                UiPrefs::load().save_publishers_open(!publishers_open);
+                UiState::load().save_publishers_open(!publishers_open);
                 entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
             })
             .suffix(render_section_search_suffix(
@@ -488,7 +488,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     let collection_search_open = collection_search.open;
     let collection_search_input = collection_search.input.clone();
     let on_toggle: CollectionsToggleFn = Rc::new(move |_window, cx| {
-        UiPrefs::load().save_collections_open(!collections_open);
+        UiState::load().save_collections_open(!collections_open);
         entity_for_col.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
     });
     let suffix: CollectionsSuffixFn = Rc::new({

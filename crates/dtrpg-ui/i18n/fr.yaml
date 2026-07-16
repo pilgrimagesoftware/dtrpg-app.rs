@@ -93,6 +93,7 @@ detail:
   show_in_explorer: "Afficher dans l'Explorateur"
   show_in_files: "Afficher dans Fichiers"
   tooltip_download_first: "(Téléchargez d'abord cet élément)"
+  tooltip_verifying_download: "Vérification du statut de téléchargement…"
   refresh_thumbnail_tooltip: "Actualiser la vignette"
   field_system: "Système"
   field_category: "Catégorie"
@@ -248,6 +249,7 @@ activity:
   loading_thumbnails_remaining: "Chargement des miniatures… (%{remaining} restantes)"
   refreshing_thumbnails: "Actualisation des miniatures…"
   refreshing_thumbnails_remaining: "Actualisation des miniatures… (%{remaining} restantes)"
+  downloading_retry: "%{title} — nouvelle tentative %{attempt} dans %{delay_secs}s…"
 
 alert_history:
   title: "Historique des alertes"
@@ -257,7 +259,7 @@ alert_history:
   copy_tooltip: "Copier le message d'erreur"
 
 notification:
-  set_up_account: "Configurer le compte"
+  set_up_account: "Se connecter à DriveThruRPG"
   session_expired: "Session expirée — reconnectez-vous pour actualiser votre bibliothèque"
   sign_in_again: "Se reconnecter"
   signing_in: "Connexion à DriveThruRPG en cours…"

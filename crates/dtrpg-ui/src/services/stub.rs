@@ -66,7 +66,8 @@ impl LibraryService for StubLibraryService {
     }
 
     fn download_item(&self, _order_product_id: u64, _index: u32, dest: &std::path::Path,
-                     _cancel: &std::sync::atomic::AtomicBool)
+                     _cancel: &std::sync::atomic::AtomicBool,
+                     _on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
                      -> Result<(), LibraryServiceError> {
         match self.mode {
             StubMode::Seeded | StubMode::Empty => {

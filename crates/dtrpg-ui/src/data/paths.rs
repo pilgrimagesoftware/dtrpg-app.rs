@@ -5,14 +5,15 @@
 //! reason about `dirs::*_dir()` semantics directly.
 //!
 //! - **App data** ([`app_data_dir`]): locally-generated application data that
-//!   is not a cache and not user-editable preferences (currently unused
-//!   directly, but kept as the canonical mapping for the platform "data"
-//!   location).
+//!   is not a cache and not user-editable preferences — e.g. `ui_state.toml`
+//!   (panel widths, window bounds, last-active settings tab: regenerated from
+//!   defaults if lost, not something a user would look for or hand-edit).
 //! - **App cache** ([`app_cache_dir`], [`cache_dir`]): regenerable data such as
 //!   the catalog/collections cache and the avatar cache.
 //! - **App preferences** ([`app_preferences_dir`]): small user preference files
-//!   (profile, UI layout, download location override). On macOS this resolves
-//!   to `~/Library/Preferences`, distinct from Application Support —
+//!   (profile, download location override, `ui.toml`'s theme/fonts/
+//!   text-scale/Collections-sort). On macOS this resolves to
+//!   `~/Library/Preferences`, distinct from Application Support —
 //!   `dirs::config_dir()` maps to Application Support on macOS and would
 //!   otherwise collide with cache data.
 //! - **Default download directory** ([`default_download_dir`]): where catalog
@@ -52,7 +53,17 @@ pub fn app_data_dir() -> PathBuf {
                     .join(APP_DIR_NAME)
 }
 
-/// Returns the directory for regenerable application cache data.
+/// Returns the directory for regenerable application cache data: catalog
+/// metadata ([`cache_dir`]), cover thumbnails ([`covers_dir`]), and the
+/// avatar cache.
+///
+/// On macOS this resolves to `~/Library/Caches/{MACOS_BUNDLE_ID}` — the
+/// platform convention for exactly this kind of data, deliberately: the OS
+/// may clear this directory under disk pressure, and everything here is
+/// re-fetchable from the DriveThruRPG API or Gravatar, so that's an
+/// acceptable trade-off rather than a bug. It is not the same directory as
+/// [`app_data_dir`] (Application Support), which holds state that isn't
+/// safe to have cleared out from under the app.
 ///
 /// Falls back to the current directory if the platform cache directory cannot
 /// be determined.

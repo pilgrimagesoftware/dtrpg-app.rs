@@ -33,9 +33,17 @@ pub enum CollectionsCacheError {
 /// can fall through to the live API fetch without surfacing errors to the user.
 pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
     let path = root.join(COLLECTIONS_CACHE_FILE);
-    let text = fs::read_to_string(&path)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "collections cache not readable"))
-        .ok()?;
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        // A missing file is the expected state on a fresh install; only a
+        // genuine I/O failure (permissions, an unreadable disk) is worth a
+        // warning.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => {
+            warn!(path = %path.display(), error = %e, "collections cache not readable");
+            return None;
+        }
+    };
     serde_json::from_str(&text)
         .map_err(|e| warn!(path = %path.display(), error = %e, "collections cache malformed"))
         .ok()

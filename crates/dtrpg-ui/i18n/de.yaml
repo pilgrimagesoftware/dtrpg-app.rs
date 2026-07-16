@@ -93,6 +93,7 @@ detail:
   show_in_explorer: "Im Explorer anzeigen"
   show_in_files: "In Dateien anzeigen"
   tooltip_download_first: "(Laden Sie diesen Titel zuerst herunter)"
+  tooltip_verifying_download: "Download-Status wird überprüft…"
   refresh_thumbnail_tooltip: "Miniaturansicht aktualisieren"
   field_system: "System"
   field_category: "Kategorie"
@@ -248,6 +249,7 @@ activity:
   loading_thumbnails_remaining: "Miniaturansichten werden geladen… (%{remaining} verbleibend)"
   refreshing_thumbnails: "Miniaturansichten werden aktualisiert…"
   refreshing_thumbnails_remaining: "Miniaturansichten werden aktualisiert… (%{remaining} verbleibend)"
+  downloading_retry: "%{title} — Versuch %{attempt} in %{delay_secs}s…"
 
 alert_history:
   title: "Warnungsverlauf"
@@ -257,7 +259,7 @@ alert_history:
   copy_tooltip: "Fehlermeldung kopieren"
 
 notification:
-  set_up_account: "Konto einrichten"
+  set_up_account: "Bei DriveThruRPG anmelden"
   session_expired: "Sitzung abgelaufen — melden Sie sich erneut an, um Ihre Bibliothek zu aktualisieren"
   sign_in_again: "Erneut anmelden"
   signing_in: "Bei DriveThruRPG anmelden…"

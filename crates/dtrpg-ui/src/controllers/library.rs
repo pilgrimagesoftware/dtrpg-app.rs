@@ -10,21 +10,25 @@ use rust_i18n::t;
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{
     CacheMetadata, load_cache_metadata, load_catalog_cache, save_catalog_cache,
-    save_check_batch_timestamp,
+    save_check_batch_timestamp, save_fresh_install_request_timestamp,
 };
 use crate::data::collection::CollectionEntry;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
+use crate::data::constants::CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS;
 use crate::data::cover_cache::{load_cached_cover, save_cached_cover};
 use crate::data::enums::*;
 use crate::data::events::*;
 use crate::data::library::*;
 use crate::data::paths::{cache_dir, covers_dir};
 use crate::data::selection::Selection;
+use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
-use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
+use crate::services::network_monitor::NetworkMonitor;
+use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
+use crate::util::file_presence::{resolved_file_path, verify_item_downloads};
 use crate::util::filter::*;
 use crate::util::matching::*;
 use crate::util::publisher::*;
@@ -89,7 +93,12 @@ fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, ke
 /// requirement.
 ///
 /// - An id present in both: kept at its existing position, replaced with the
-///   live item's fields, with `is_available` set to `true`.
+///   live item's fields, with `is_available` set to `true`. Live items always
+///   carry `downloaded: false` on every file (the API has no concept of local
+///   downloads), so each live file's `downloaded` flag is restored from the
+///   existing item's file with the same id (if any) before recomputing the
+///   entry's aggregate `status`, per `catalog-live-data-swap`'s per-file
+///   downloaded-state requirement.
 /// - An id present only in `existing`: kept unchanged except `is_available` is
 ///   set to `false` — the server no longer lists it, but it isn't removed.
 /// - An id present only in `live`: appended at the end, `is_available` stays
@@ -107,9 +116,20 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
     let mut reconciled: Vec<LibraryItem> =
         existing.into_iter()
                 .map(|mut item| {
-                    if let Some(live_item) = live_by_id.remove(&item.id) {
+                    if let Some(mut live_item) = live_by_id.remove(&item.id) {
+                        let downloaded_by_id: HashMap<Arc<str>, bool> =
+                            item.files
+                                .iter()
+                                .map(|f| (Arc::clone(&f.id), f.downloaded))
+                                .collect();
+                        for file in &mut live_item.files {
+                            if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
+                                file.downloaded = downloaded;
+                            }
+                        }
                         item = live_item;
                         item.is_available = true;
+                        item.recompute_status();
                     }
                     else {
                         item.is_available = false;
@@ -198,6 +218,21 @@ fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64) -> bool {
     now_secs.saturating_sub(meta.saved_at_secs) < crate::data::constants::FORCE_RELOAD_COOLDOWN_SECS
 }
 
+/// Returns `true` if a fresh-install catalog-initialization request should be
+/// suppressed because the last one happened too recently, per
+/// `CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS`.
+///
+/// `last_request_secs` is `None` when no fresh-install request has ever been
+/// recorded (first launch, or metadata missing/unreadable) — treated as "not
+/// recently requested," so a missing timestamp never blocks the request.
+fn fresh_install_request_gated(last_request_secs: Option<u64>, now_secs: u64) -> bool {
+    let Some(last) = last_request_secs
+    else {
+        return false;
+    };
+    now_secs.saturating_sub(last) < CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS
+}
+
 /// Returns `true` if an item last checked at `last_checked` is due for
 /// another availability check, per `ITEM_CHECK_COOLDOWN_SECS`. `None` (never
 /// checked) is always due.
@@ -236,11 +271,28 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
             let numeric_id = item.numeric_id;
             let order_product_id = item.order_product_id;
             let product_id = item.product_id;
+            // `downloaded` is a local-only fact the server response knows nothing
+            // about - the single-item endpoint always reports it `false`.
+            // Preserve each file's existing flag by id so a re-check (or the
+            // disk-presence verification racing it, see
+            // `verify-downloaded-status-against-disk`) doesn't get its
+            // correction wiped the moment this slower network check resolves.
+            let downloaded_by_id: HashMap<Arc<str>, bool> =
+                item.files
+                    .iter()
+                    .map(|f| (Arc::clone(&f.id), f.downloaded))
+                    .collect();
             *item = fresh;
             item.id = id;
             item.numeric_id = numeric_id;
             item.order_product_id = order_product_id;
             item.product_id = product_id;
+            for file in &mut item.files {
+                if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
+                    file.downloaded = downloaded;
+                }
+            }
+            item.recompute_status();
             item.is_available = true;
             item.availability_last_checked = Some(checked_at);
         }
@@ -428,9 +480,10 @@ pub struct LibraryController {
     pub sort:                      SortMethod,
     /// Current sort direction.
     pub sort_direction:            SortDirection,
-    /// Current sidebar Collections sort method, persisted via `UiPrefs`.
+    /// Current sidebar Collections sort method, persisted via `UiPreferences`.
     pub collection_sort:           CollectionSortMethod,
-    /// Current sidebar Collections sort direction, persisted via `UiPrefs`.
+    /// Current sidebar Collections sort direction, persisted via
+    /// `UiPreferences`.
     pub collection_sort_direction: SortDirection,
     /// Whether the catalog is grouped by publisher.
     pub grouped:                   bool,
@@ -500,6 +553,19 @@ pub struct LibraryController {
     /// writing catalog state, so a load started before a `clear_and_reload`
     /// cannot clobber it after the fact.
     load_generation:               u64,
+    /// True while a catalog-sync load (from [`start_load_inner`]) is in
+    /// flight. Unlike `load_generation` (which lets a superseded load's
+    /// *results* be discarded after the fact), this prevents a second
+    /// catalog-sync task from starting at all while one is running, per
+    /// `rust-resource-work-queue-topology`'s serial-catalog-sync requirement.
+    ///
+    /// [`start_load_inner`]: Self::start_load_inner
+    catalog_sync_in_flight:        bool,
+    /// Shared connectivity monitor consulted before catalog-sync and
+    /// cover-thumbnail network requests. Held as an `Arc` so background
+    /// tasks spawned on gpui's executor can query it without borrowing
+    /// `self`.
+    network_monitor:               Arc<NetworkMonitor>,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
@@ -569,6 +635,15 @@ pub struct LibraryController {
     /// catalog card/row rendering can query [`Self::is_checking`] and show a
     /// spinner/overlay.
     checking_items:                HashSet<Arc<str>>,
+    /// Ids of catalog items whose file-presence verification (see
+    /// `verify-downloaded-status-against-disk`) is currently in flight —
+    /// either as part of a catalog-wide load-time pass or an on-demand
+    /// single-item check. Distinct from `checking_items` (a network-bound
+    /// availability check) so catalog/popover rendering can show a visually
+    /// distinct "checking download status" indicator via
+    /// [`Self::is_verifying_downloads`] without conflating the two kinds of
+    /// check. `LibraryChanged` is emitted on insertion and removal.
+    verifying_downloads:           HashSet<Arc<str>>,
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
     check_queue:                   VecDeque<Arc<str>>,
@@ -611,7 +686,7 @@ impl LibraryController {
                activity: Entity<ActivityController>, cx: &mut Context<Self>)
                -> Self {
         let vm = LibraryViewModel::new(service);
-        let prefs = crate::data::ui_prefs::UiPrefs::load();
+        let prefs = crate::data::ui_preferences::UiPreferences::load();
 
         let mut ctrl =
             Self { vm,
@@ -642,6 +717,8 @@ impl LibraryController {
                    thumbnail_refresh_failed: 0,
                    catalog_loading: true,
                    load_generation: 0,
+                   catalog_sync_in_flight: false,
+                   network_monitor: Arc::new(NetworkMonitor::new()),
                    items_cache: None,
                    publisher_search_open: false,
                    publisher_search_query: String::new(),
@@ -655,15 +732,16 @@ impl LibraryController {
                    zip_preview: None,
                    file_info_cache: HashMap::new(),
                    checking_items: HashSet::new(),
+                   verifying_downloads: HashSet::new(),
                    check_queue: VecDeque::new(),
                    download_queue: VecDeque::new(),
                    active_downloads: 0,
                    download_cancel_flags: HashMap::new(),
                    download_activity_ids: HashMap::new(),
-                   max_concurrent_downloads:
-                       crate::data::storage::StorageConfig::load().max_concurrent_downloads() };
+                   max_concurrent_downloads: StorageConfig::load().max_concurrent_downloads() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
+        ctrl.start_periodic_catalog_refresh_timer(cx);
         ctrl
     }
 
@@ -695,6 +773,38 @@ impl LibraryController {
           .detach();
     }
 
+    /// Starts a background loop that re-runs the catalog staleness check
+    /// every `CATALOG_REFRESH_TIMER_INTERVAL_SECS`, independent of the
+    /// startup sequence, for the lifetime of the controller — a
+    /// long-running session (never restarted) still gets a refresh once its
+    /// staleness threshold elapses, per
+    /// `rust-resource-refresh-scheduling`'s recurring-timer requirement.
+    ///
+    /// Calls the same non-forced [`Self::start_load`] the startup sequence
+    /// uses: `catalog_sync_in_flight` (see `start_load_inner`) makes an
+    /// overlapping wake-up a no-op, and the existing auto-load-policy
+    /// staleness check inside `start_load_inner` decides whether this
+    /// wake-up actually triggers a fetch or is itself a no-op. The loop
+    /// exits once the controller entity is dropped.
+    fn start_periodic_catalog_refresh_timer(&self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, async_cx| {
+              loop {
+                  async_cx
+                    .background_executor()
+                    .timer(std::time::Duration::from_secs(
+                        crate::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
+                    ))
+                    .await;
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
+    }
+
     /// Spawns a background task to load collections and the catalog — from
     /// cache, then optionally from the live API.
     ///
@@ -712,7 +822,66 @@ impl LibraryController {
         self.start_load_inner(cx, false);
     }
 
+    /// Verifies every catalog item's files against disk and applies any
+    /// resulting `downloaded`/`status` changes back to the catalog, per
+    /// `verify-downloaded-status-against-disk`.
+    ///
+    /// Runs as one batched background-executor pass rather than a per-item
+    /// spawn, matching `save_catalog_cache`'s single-round-trip shape —
+    /// avoids spawning hundreds of tiny tasks for a large library. Marks
+    /// every item as verifying for the duration of the pass (see
+    /// [`Self::is_verifying_downloads`]) so catalog rendering can show a
+    /// pending indicator; catalog/section-count application to the entry
+    /// itself is skipped if nothing changed.
+    fn verify_catalog_downloads(&mut self, cx: &mut Context<Self>) {
+        let catalog = self.catalog.clone();
+        let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
+        self.verifying_downloads.extend(ids.iter().cloned());
+        cx.emit(LibraryChanged);
+
+        cx.spawn(async move |this, async_cx| {
+              let (catalog, changed) = async_cx.background_executor()
+                                               .spawn(async move {
+                                                   let storage = StorageConfig::load();
+                                                   let mut catalog = catalog;
+                                                   let mut changed = false;
+                                                   for item in &mut catalog {
+                                                       changed |=
+                                                           verify_item_downloads(item, &storage);
+                                                   }
+                                                   (catalog, changed)
+                                               })
+                                               .await;
+
+              this.update(async_cx, |ctrl, cx| {
+                      for id in &ids {
+                          ctrl.verifying_downloads.remove(id);
+                      }
+                      if changed {
+                          ctrl.catalog = catalog;
+                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.invalidate_cache();
+                      }
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
+    }
+
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
+        // Serial catalog-sync dispatch: never let a second catalog-sync task
+        // start while one is already in flight, per
+        // `rust-resource-work-queue-topology`. Unlike `load_generation` below
+        // (which discards a superseded load's *results*), this stops a
+        // redundant load from starting — and therefore from making a
+        // redundant remote request — at all.
+        if self.catalog_sync_in_flight {
+            tracing::debug!("catalog sync already in flight, skipping redundant load request");
+            return;
+        }
+        self.catalog_sync_in_flight = true;
+
         self.load_generation += 1;
         let generation = self.load_generation;
         let service_arc = self.vm.service_arc();
@@ -720,6 +889,7 @@ impl LibraryController {
         let weak_activity = self.activity.downgrade();
         let storage_root = cache_dir();
         let save_root = storage_root.clone();
+        let network_monitor = Arc::clone(&self.network_monitor);
 
         cx.spawn(async move |this, async_cx| {
             // Single activity item for the whole load. Its label is updated in
@@ -810,7 +980,12 @@ impl LibraryController {
                     // failure does not abort the catalog stages below.
                     if e.kind == CollectionsServiceErrorKind::Session
                     {
-                        tracing::debug!(error = %e, "collections load skipped: no authenticated session");
+                        // WARN, not debug: the default log filter is `warn` (see
+                        // `logging::init`), and "not signed in yet" is exactly the kind of
+                        // routine-but-worth-knowing condition a user reading logs should be
+                        // able to see without setting RUST_LOG.
+                        tracing::warn!(error = %e,
+                                      "collections load skipped: no authenticated session");
                     }
                     else {
                         tracing::warn!(error = %e, "collections load failed");
@@ -858,11 +1033,17 @@ impl LibraryController {
                                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                     .ok();
                                 this.update(async_cx, |ctrl, cx| {
+                                    ctrl.catalog_sync_in_flight = false;
                                     if ctrl.load_generation != generation {
                                         return; // superseded by a newer load
                                     }
                                     ctrl.catalog_loading = false;
                                     cx.emit(LibraryChanged);
+                                    // The skip-fetch path is exactly the case most likely to be
+                                    // showing stale `downloaded` state indefinitely — that's the
+                                    // whole reason the live fetch was skipped — so it needs
+                                    // disk verification the most.
+                                    ctrl.verify_catalog_downloads(cx);
                                 })
                                 .ok();
                                 return;
@@ -906,6 +1087,7 @@ impl LibraryController {
                                     if is_current {
                                         this.update(async_cx, |ctrl, cx| {
                                             ctrl.apply_partial_fetch(partial_items, cx);
+                                            ctrl.verify_catalog_downloads(cx);
                                         })
                                         .ok();
                                         let items_to_save = this
@@ -925,6 +1107,10 @@ impl LibraryController {
                                         weak_activity
                                             .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                             .ok();
+                                        this.update(async_cx, |ctrl, _cx| {
+                                            ctrl.catalog_sync_in_flight = false;
+                                        })
+                                        .ok();
                                         return;
                                     }
                                 }
@@ -934,7 +1120,153 @@ impl LibraryController {
                         }
             }
 
+            // ── Fresh-install initialization ─────────────────────────────────────
+            // No local catalog data was loaded from disk above: this is a fresh
+            // install (or the cache was cleared/relocated), per
+            // `rust-catalog-fresh-install-initialization`. Credentials are not
+            // pre-checked here — `list_items_paged` below already returns a
+            // `Session` error, handled as a quiet completion, when no
+            // authenticated session exists yet, which this same code path relies
+            // on regardless of fresh-install status.
+            //
+            // Issues a dedicated totals request (item count only — the API has no
+            // aggregate-size endpoint; per-file `size`/`sizeMB` only exist within
+            // an already-fetched item's file list) before any page of item data,
+            // gated by a minimum interval so repeated fresh-install attempts (e.g.
+            // relaunching shortly after a failed first attempt) don't hammer the
+            // API with a totals request every time.
+            let mut fresh_install_total: Option<usize> = None;
+            let is_fresh_install = !force_reload && cached.as_ref().is_none_or(Vec::is_empty);
+            if is_fresh_install {
+                let meta_root = storage_root.clone();
+                let last_request = async_cx
+                    .background_executor()
+                    .spawn(async move { load_cache_metadata(&meta_root) })
+                    .await
+                    .and_then(|m| m.last_fresh_install_request_secs);
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or(std::time::Duration::ZERO)
+                    .as_secs();
+                let gated = fresh_install_request_gated(last_request, now_secs);
+                let monitor_for_totals = network_monitor.clone();
+                let endpoint_reachable = async_cx
+                    .background_executor()
+                    .spawn(async move {
+                        monitor_for_totals.check_endpoint(crate::data::constants::DTRPG_API_HOST)
+                    })
+                    .await;
+                if gated {
+                    tracing::debug!(
+                        "fresh-install initialization skipped: last request was within the \
+                         minimum interval"
+                    );
+                } else if !endpoint_reachable {
+                    tracing::debug!(
+                        "fresh-install totals request skipped: DriveThruRPG API unreachable"
+                    );
+                } else {
+                    let svc = service_arc.clone();
+                    let cancel = std::sync::atomic::AtomicBool::new(false);
+                    let config = retry::RetryConfig {
+                        max_attempts: crate::data::constants::CATALOG_SYNC_MAX_ATTEMPTS,
+                        base_secs: crate::data::constants::CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
+                        max_secs: crate::data::constants::CATALOG_SYNC_RETRY_MAX_DELAY_SECS,
+                    };
+                    let mut on_retry =
+                        |attempt: u32, delay: std::time::Duration, e: &LibraryServiceError| {
+                            tracing::debug!(
+                                attempt,
+                                delay_secs = delay.as_secs(),
+                                reason = %e,
+                                "fresh-install totals request retrying"
+                            );
+                        };
+                    // `count_items()` returns `Option<Result<usize, _>>` — `None` means
+                    // "count not supported by this implementation" (not an error, nothing to
+                    // retry); folded into `Ok(None)` here so `retry_with_backoff` only sees a
+                    // plain `Result` and only retries a genuine `Network`-kind failure.
+                    let totals: Result<Option<usize>, LibraryServiceError> = async_cx
+                        .background_executor()
+                        .spawn(async move {
+                            retry::retry_with_backoff(
+                                config,
+                                &cancel,
+                                || match svc.count_items() {
+                                    None => Ok(None),
+                                    Some(Ok(n)) => Ok(Some(n)),
+                                    Some(Err(e)) => Err(e),
+                                },
+                                |e: &LibraryServiceError| {
+                                    e.kind == LibraryServiceErrorKind::Network
+                                },
+                                Some(&mut on_retry),
+                            )
+                        })
+                        .await;
+                    match totals {
+                        Ok(Some(count)) => {
+                            tracing::debug!(total_items = count, "fresh-install: totals request");
+                            fresh_install_total = Some(count);
+                        }
+                        Ok(None) => {}
+                        Err(e) if e.kind == LibraryServiceErrorKind::Session => {
+                            // Routine, not a failure: no authenticated session yet. WARN
+                            // (not debug) so it's visible under the default `warn` log
+                            // filter without setting RUST_LOG, matching the collections/
+                            // catalog-fetch Session-error branches elsewhere in this
+                            // function.
+                            tracing::warn!(
+                                error = %e,
+                                "fresh-install initialization waiting for authenticated session"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "fresh-install totals request failed");
+                        }
+                    }
+                    let request_root = storage_root.clone();
+                    async_cx
+                        .background_executor()
+                        .spawn(async move {
+                            if let Err(e) =
+                                save_fresh_install_request_timestamp(&request_root, now_secs)
+                            {
+                                tracing::warn!(
+                                    error = %e,
+                                    "failed to save fresh-install request timestamp"
+                                );
+                            }
+                        })
+                        .await;
+                }
+            }
+
             // ── Stage: page-by-page fetch from API ──────────────────────────────
+            // Query the network monitor before committing to the paginated fetch —
+            // per `rust-resource-network-monitor`, a process needing a specific
+            // endpoint stops rather than requesting when it's reported unreachable.
+            let monitor_for_fetch = network_monitor.clone();
+            let endpoint_reachable = async_cx
+                .background_executor()
+                .spawn(async move {
+                    monitor_for_fetch.check_endpoint(crate::data::constants::DTRPG_API_HOST)
+                })
+                .await;
+            if !endpoint_reachable {
+                tracing::debug!("catalog fetch skipped: DriveThruRPG API unreachable");
+                weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
+                this.update(async_cx, |ctrl, cx| {
+                    if ctrl.load_generation == generation {
+                        ctrl.catalog_loading = false;
+                        cx.emit(LibraryChanged);
+                    }
+                    ctrl.catalog_sync_in_flight = false;
+                })
+                .ok();
+                return;
+            }
+
             // Move the shared activity into its next stage — no new item is
             // created, so a count check that ran above doesn't leave a stale
             // "getting count of items…" label behind. The per-page label set
@@ -950,6 +1282,10 @@ impl LibraryController {
             let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
             let (total_tx, total_rx) = std::sync::mpsc::channel::<usize>();
 
+            // Cloned before `service_arc` moves into the fetch spawn below — used to get
+            // a live item count for progress seeding when this isn't a fresh install.
+            let svc_for_count = service_arc.clone();
+
             // Run the paginated fetch on the background executor. Each page — and, when
             // the API reports one (via `links.last`), the estimated total — is sent
             // through its channel as it arrives; the result indicates overall success/failure.
@@ -962,19 +1298,36 @@ impl LibraryController {
                     )
                 });
 
-            // Seed the progress denominator from the local cache count — a close
-            // approximation of the remote count in the common case — so the bar starts
-            // determinate and moves immediately, rather than blocking page delivery on
-            // a `total_rx.recv()` that may never resolve (the API's `links.last` is
-            // optional and often absent). If the API does report its own total later,
-            // it replaces this estimate the next time progress is recomputed below.
+            // Seed the progress denominator, preferring a fresh-install totals
+            // request (see above) since it reflects the remote count directly. For a
+            // full fetch triggered for any other reason (stale cache, count mismatch,
+            // force reload), a single best-effort `count_items()` call gets a live
+            // remote count instead — the local cache's item count is exactly the value
+            // already known (or suspected) to be wrong whenever this stage runs at all,
+            // so seeding progress from it pins the bar near 100% after only a few pages
+            // once the real catalog has grown since the cache was last saved. Only if
+            // that live request also comes back empty does the stale cache count get
+            // used, so the bar still starts determinate rather than not at all. The
+            // real DriveThruRPG API never reports `links.last`, so `total_rx` below
+            // essentially never fires in practice — this is the only correction this
+            // estimate gets before the fetch completes.
+            let live_count = if fresh_install_total.is_none() {
+                async_cx.background_executor()
+                        .spawn(async move { svc_for_count.count_items() })
+                        .await
+                        .and_then(Result::ok)
+            } else {
+                None
+            };
             let mut estimated_total: Option<usize> =
-                cached.as_ref().map(|items| items.len()).filter(|&n| n > 0);
+                fresh_install_total.or(live_count).or_else(|| {
+                    cached.as_ref().map(|items| items.len()).filter(|&n| n > 0)
+                });
             if let Some(total) = estimated_total {
                 weak_activity
                     .update(async_cx, |a, cx| a.update_progress(activity_id, 0.0, cx))
                     .ok();
-                tracing::debug!(estimated_total = total, "catalog load: seeded total from cache");
+                tracing::debug!(estimated_total = total, "catalog load: seeded total");
             }
 
             // Accumulate all live SDK pages into a local buffer so a *populated* cache
@@ -1079,10 +1432,15 @@ impl LibraryController {
                         // A newer load (e.g. triggered by a cache clear) has already
                         // taken over; discard this stale result instead of clobbering it.
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
+                        this.update(async_cx, |ctrl, _cx| {
+                            ctrl.catalog_sync_in_flight = false;
+                        })
+                        .ok();
                         return;
                     }
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.set_catalog(live_items, !catalog_was_empty, cx);
+                        ctrl.verify_catalog_downloads(cx);
                     }).ok();
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
@@ -1102,7 +1460,9 @@ impl LibraryController {
                     // treat them as a quiet completion rather than a user-facing alert.
                     // Network and other errors are genuine failures worth surfacing.
                     if e.kind == LibraryServiceErrorKind::Session {
-                        tracing::debug!(error = %e, "catalog load skipped: no authenticated session");
+                        // WARN, not debug: see the matching comment on the collections
+                        // load's Session-error branch above.
+                        tracing::warn!(error = %e, "catalog load skipped: no authenticated session");
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                     } else {
                         tracing::error!(error = %e, backtrace = %app_backtrace(), "catalog load failed");
@@ -1119,6 +1479,10 @@ impl LibraryController {
                     .ok();
                 }
             }
+            this.update(async_cx, |ctrl, _cx| {
+                ctrl.catalog_sync_in_flight = false;
+            })
+            .ok();
         })
         .detach();
     }
@@ -1191,20 +1555,17 @@ impl LibraryController {
                                        });
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.list_collections() })
-                .await;
-            match result {
-                Ok(entries) => {
-                    tracing::debug!(
-                        count = entries.len(),
-                        "load_collections: fetched {} entries",
-                        entries.len()
-                    );
-                    let to_save = entries.clone();
-                    let save_root = cache_root.clone();
-                    async_cx
+              let result = async_cx.background_executor()
+                                   .spawn(async move { collections_service.list_collections() })
+                                   .await;
+              match result {
+                  Ok(entries) => {
+                      tracing::debug!(count = entries.len(),
+                                      "load_collections: fetched {} entries",
+                                      entries.len());
+                      let to_save = entries.clone();
+                      let save_root = cache_root.clone();
+                      async_cx
                         .background_executor()
                         .spawn(async move {
                             if let Err(e) = save_collections_cache(&save_root, &to_save) {
@@ -1212,34 +1573,34 @@ impl LibraryController {
                             }
                         })
                         .await;
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.apply_collections(entries, cx);
-                    })
-                    .ok();
-                    weak_activity
-                        .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                        .ok();
-                }
-                Err(e) => {
-                    // Session errors are expected when starting before auth completes
-                    // (see `start_load_inner`'s matching treatment for the catalog
-                    // fetch); quietly complete rather than surfacing a user-facing error.
-                    if e.kind == CollectionsServiceErrorKind::Session
-                    {
-                        tracing::debug!(error = %e, "collections load skipped: no authenticated session");
-                        weak_activity
-                            .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                            .ok();
-                    } else {
-                        tracing::warn!(error = %e, "collections load failed");
-                        weak_activity
-                            .update(async_cx, |a, cx| a.error(activity_id, e.to_string(), cx))
-                            .ok();
-                    }
-                }
-            }
-        })
-        .detach();
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.apply_collections(entries, cx);
+                          })
+                          .ok();
+                      weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                   .ok();
+                  }
+                  Err(e) => {
+                      // Session errors are expected when starting before auth completes
+                      // (see `start_load_inner`'s matching treatment for the catalog
+                      // fetch); quietly complete rather than surfacing a user-facing error.
+                      if e.kind == CollectionsServiceErrorKind::Session {
+                          tracing::warn!(error = %e,
+                                      "collections load skipped: no authenticated session");
+                          weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                       .ok();
+                      }
+                      else {
+                          tracing::warn!(error = %e, "collections load failed");
+                          weak_activity.update(async_cx, |a, cx| {
+                                           a.error(activity_id, e.to_string(), cx)
+                                       })
+                                       .ok();
+                      }
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Stores the fetched collections and emits a change event.
@@ -1775,6 +2136,7 @@ impl LibraryController {
 
         let weak_activity = self.activity.downgrade();
         let url_str = url.to_string();
+        let network_monitor = Arc::clone(&self.network_monitor);
 
         cx.spawn(async move |this, async_cx| {
               // gpui's executors are not a Tokio runtime, and `dtrpg-ui` does not depend on
@@ -1790,6 +2152,8 @@ impl LibraryController {
               // network fetch to disk so the next launch is a cache hit.
               let fetch_url = url_str.clone();
               let disk_key = Arc::clone(&item_id);
+              let cancel = std::sync::atomic::AtomicBool::new(false);
+              let retry_url = fetch_url.clone();
               let result: Result<Vec<u8>, String> =
                   async_cx.background_executor()
                           .spawn(async move {
@@ -1799,9 +2163,39 @@ impl LibraryController {
                               {
                                   return Ok(bytes);
                               }
-                              let resp =
-                                  reqwest::blocking::get(&fetch_url).map_err(|e| e.to_string())?;
-                              let bytes = resp.bytes().map_err(|e| e.to_string())?.to_vec();
+                              if !network_monitor.check_endpoint(
+                                  crate::data::constants::DTRPG_API_HOST,
+                              ) {
+                                  return Err(
+                                      "DriveThruRPG API endpoint unreachable".to_string(),
+                                  );
+                              }
+                              let config = retry::RetryConfig {
+                                  max_attempts: crate::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
+                                  base_secs: crate::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                                  max_secs: crate::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
+                              };
+                              let mut on_retry =
+                                  |attempt: u32, delay: std::time::Duration, reason: &String| {
+                                      tracing::debug!(
+                                          url = %retry_url,
+                                          attempt,
+                                          delay_secs = delay.as_secs(),
+                                          reason = %reason,
+                                          "cover thumbnail fetch retrying"
+                                      );
+                                  };
+                              let bytes = retry::retry_with_backoff(
+                                  config,
+                                  &cancel,
+                                  || -> Result<Vec<u8>, String> {
+                                      let resp = reqwest::blocking::get(&fetch_url)
+                                          .map_err(|e| e.to_string())?;
+                                      Ok(resp.bytes().map_err(|e| e.to_string())?.to_vec())
+                                  },
+                                  |_| true,
+                                  Some(&mut on_retry),
+                              )?;
                               save_cached_cover(&covers_root, &disk_key, &bytes);
                               Ok(bytes)
                           })
@@ -2255,7 +2649,7 @@ impl LibraryController {
                          method,
                          self.collection_sort_direction,
                          &catalog_ids);
-        crate::data::ui_prefs::UiPrefs::load().save_collection_sort(method,
+        crate::data::ui_preferences::UiPreferences::load().save_collection_sort(method,
                                                                     self.collection_sort_direction);
         cx.emit(LibraryChanged);
     }
@@ -2270,7 +2664,7 @@ impl LibraryController {
                          self.collection_sort,
                          direction,
                          &catalog_ids);
-        crate::data::ui_prefs::UiPrefs::load().save_collection_sort(self.collection_sort,
+        crate::data::ui_preferences::UiPreferences::load().save_collection_sort(self.collection_sort,
                                                                     direction);
         cx.emit(LibraryChanged);
     }
@@ -2297,8 +2691,68 @@ impl LibraryController {
     /// double-click action handled by `TabsController::open_detail_tab`.
     pub fn select_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
         self.maybe_check_item(Arc::clone(&id), cx);
+        self.verify_selected_item_download(Arc::clone(&id), cx);
         self.selection = Selection::Item(id);
         cx.emit(LibraryChanged);
+    }
+
+    /// Verifies `id`'s files against disk in the background and applies any
+    /// resulting `downloaded`/`status` change, per
+    /// `verify-downloaded-status-against-disk`.
+    ///
+    /// Independent of [`Self::maybe_check_item`]'s network-bound
+    /// availability check (and its cooldown): a missing or reappeared file
+    /// on disk is a local fact unrelated to whether the server still lists
+    /// the item, and a local `Path::exists()` call per file is cheap enough
+    /// that gating it adds complexity without a real cost problem to solve.
+    fn verify_selected_item_download(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
+        let Some(mut item) = self.item_by_id(&id).cloned()
+        else {
+            return;
+        };
+        self.verifying_downloads.insert(Arc::clone(&id));
+        cx.emit(LibraryChanged);
+
+        cx.spawn(async move |this, async_cx| {
+              let (item, changed) = async_cx.background_executor()
+                                            .spawn(async move {
+                                                let storage = StorageConfig::load();
+                                                let changed =
+                                                    verify_item_downloads(&mut item, &storage);
+                                                (item, changed)
+                                            })
+                                            .await;
+
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.verifying_downloads.remove(&id);
+                      if changed
+                         && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
+                      {
+                          *existing = item;
+                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.invalidate_cache();
+                      }
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
+    }
+
+    /// Returns `true` if `id`'s files are currently being verified against
+    /// disk (catalog-wide load-time pass or the on-demand single-item
+    /// check), per `verify-downloaded-status-against-disk`.
+    #[must_use]
+    pub fn is_verifying_downloads(&self, id: &str) -> bool {
+        self.verifying_downloads.contains(id)
+    }
+
+    /// Returns a snapshot of every item id currently undergoing file-presence
+    /// verification, mirroring [`Self::checking_items_snapshot`]'s role for
+    /// non-virtualized render paths.
+    #[must_use]
+    pub fn verifying_downloads_snapshot(&self) -> HashSet<Arc<str>> {
+        self.verifying_downloads.clone()
     }
 
     // ── Item-level availability checks ────────────────────────────────────────
@@ -2370,6 +2824,7 @@ impl LibraryController {
             this.update(async_cx, |ctrl, cx| {
                     if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
                         apply_check_result(existing, result, std::time::SystemTime::now());
+                        ctrl.section_counts = section_counts(&ctrl.catalog);
                         ctrl.invalidate_cache();
                     }
                     ctrl.checking_items.remove(&id);
@@ -2903,9 +3358,7 @@ impl LibraryController {
                         .find(|i| i.id == item_id)
                         .and_then(|item| {
                             item.files.get(index as usize).map(|file| {
-                    let dest = crate::data::storage::StorageConfig::load()
-                        .path_for_publisher(&item.publisher)
-                        .join(file.name.as_ref());
+                    let dest = resolved_file_path(&StorageConfig::load(), item, file);
                     (item.order_product_id, file.name.to_string(), dest)
                 })
                         });
@@ -2930,20 +3383,58 @@ impl LibraryController {
         // for the same reason as `dest_for_log` above.
         let dest_for_symlink = fetch_target.as_ref().map(|(_, dest)| dest.clone());
         let service_arc = self.vm.service_arc();
+        let title_for_retry = title.clone();
 
         cx.spawn(async move |this, async_cx| {
               let outcome: Result<(), String> = match fetch_target {
                   Some((order_product_id, dest)) => {
                       let cancel_for_fetch = Arc::clone(&cancel_flag);
-                      async_cx.background_executor()
-                              .spawn(async move {
-                                  service_arc.download_item(order_product_id,
-                                                            index,
-                                                            &dest,
-                                                            &cancel_for_fetch)
-                                             .map_err(|e| e.to_string())
-                              })
-                              .await
+                      let (retry_tx, retry_rx) =
+                          std::sync::mpsc::channel::<(u32, std::time::Duration)>();
+                      let fetch = async_cx.background_executor().spawn(async move {
+                                                                    service_arc.download_item(
+                              order_product_id,
+                              index,
+                              &dest,
+                              &cancel_for_fetch,
+                              Some(&mut |attempt, delay| { retry_tx.send((attempt, delay)).ok(); }),
+                          )
+                                     .map_err(|e| e.to_string())
+                                                                });
+
+                      // Drain retry-progress notifications and update the
+                      // activity label until `download_item` returns and drops
+                      // `retry_tx`, disconnecting the channel — mirroring the
+                      // page-progress channel loop used for catalog fetches.
+                      let mut retry_rx = Some(retry_rx);
+                      loop {
+                          let Some(receiver) = retry_rx.take()
+                          else {
+                              break;
+                          };
+                          let (msg, returned_rx) = async_cx.background_executor()
+                                                           .spawn(async move {
+                                                               let msg = receiver.recv();
+                                                               (msg, receiver)
+                                                           })
+                                                           .await;
+                          match msg {
+                              Ok((attempt, delay)) => {
+                                  let label = t!("activity.downloading_retry",
+                                                 title = title_for_retry,
+                                                 attempt = attempt,
+                                                 delay_secs = delay.as_secs()).to_string();
+                                  weak_activity.update(async_cx, |a, cx| {
+                                                   a.update_label(activity_id, label, cx)
+                                               })
+                                               .ok();
+                                  retry_rx = Some(returned_rx);
+                              }
+                              Err(_) => break,
+                          }
+                      }
+
+                      fetch.await
                   }
                   None => Err("no downloadable file found for this item".to_string()),
               };
@@ -2985,6 +3476,24 @@ impl LibraryController {
                       .ok()
                       .flatten();
 
+              // Persist the download to the on-disk catalog cache immediately —
+              // otherwise a restart before the next live-fetch cache write (see
+              // `start_load_inner`) loads a cache that never recorded this
+              // download, showing `Cloud` status regardless of what
+              // `reconcile_catalog` does (see `catalog-live-data-swap`).
+              if !cancelled && outcome.is_ok() {
+                  let items_to_save = this.update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
+                                          .unwrap_or_default();
+                  let save_root = cache_dir();
+                  async_cx.background_executor()
+                          .spawn(async move {
+                              if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
+                                  tracing::warn!(error = %e, "failed to save catalog cache");
+                              }
+                          })
+                          .await;
+              }
+
               if let Err(e) = &outcome
                  && !cancelled
               {
@@ -3016,8 +3525,8 @@ impl LibraryController {
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
 
     /// Applies a new theme key (updates the GPUI global) and persists it via
-    /// [`crate::data::ui_prefs::UiPrefs`] so it survives a restart instead of
-    /// always resetting to Parchment.
+    /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart
+    /// instead of always resetting to Parchment.
     ///
     /// Also re-syncs `gpui_component::Theme`'s colors (see
     /// [`crate::data::theme::apply_theme_colors`]) so buttons, inputs,
@@ -3032,7 +3541,7 @@ impl LibraryController {
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
               apply_theme_colors(theme, &colors);
           });
-        crate::data::ui_prefs::UiPrefs::load().save_theme_key(key.as_str());
+        crate::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
         cx.notify();
     }
 
@@ -3047,7 +3556,8 @@ impl LibraryController {
     /// Applies a new body font family (any font installed on the user's
     /// system, not a curated list — see `settings_appearance_view`), updating
     /// the GPUI global, `gpui_component`'s `Theme.font_family`, and
-    /// persisting the selection via [`crate::data::ui_prefs::UiPrefs`].
+    /// persisting the selection via
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3058,12 +3568,12 @@ impl LibraryController {
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
               theme.font_family = font.clone();
           });
-        crate::data::ui_prefs::UiPrefs::load().save_body_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new value font family and persists the selection via
-    /// [`crate::data::ui_prefs::UiPrefs`].
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_value_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3071,12 +3581,12 @@ impl LibraryController {
         fonts.value_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_value_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_value_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new label font family and persists the selection via
-    /// [`crate::data::ui_prefs::UiPrefs`].
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_label_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3084,12 +3594,12 @@ impl LibraryController {
         fonts.label_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_label_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_label_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new monospace font family and persists the selection via
-    /// [`crate::data::ui_prefs::UiPrefs`].
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_mono_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3097,22 +3607,26 @@ impl LibraryController {
         fonts.mono_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_mono_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_mono_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new shared UI text size (see [`FontSelections::ui_text_size`])
-    /// and persists it via [`crate::data::ui_prefs::UiPrefs`]. Applied to each
-    /// window via `Window::set_rem_size` in `LibraryRootView::render` and
-    /// `SettingsWindowView::render`, so every `rems(...)`-based size utility
-    /// scales together, like zooming a page.
+    /// and persists it via [`crate::data::ui_preferences::UiPreferences`].
+    /// Applied to each window via `Window::set_rem_size` in
+    /// `LibraryRootView::render` and `SettingsWindowView::render`, so every
+    /// `rems(...)`-based size utility scales together, like zooming a page.
     pub fn set_ui_text_size(&self, size: Pixels, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();
         fonts.ui_text_size = size;
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_ui_text_size(size.as_f32());
+        // Persisted as the scale multiplier shown in Settings > Appearance
+        // (e.g. 1.1), not the derived absolute pixel size, so the file's
+        // stored value matches what the UI displays.
+        let scale = size.as_f32() / crate::data::constants::DEFAULT_UI_TEXT_SIZE;
+        crate::data::ui_preferences::UiPreferences::load().save_text_scale(scale);
         cx.notify();
     }
 
@@ -3144,7 +3658,7 @@ impl LibraryController {
 /// [`crate::util::symlink::ensure_symlink`].
 fn create_collections_symlinks(dest: &Path, order_product_id: u64, product_id: u64,
                                collections: &[CollectionEntry]) {
-    let storage = crate::data::storage::StorageConfig::load();
+    let storage = StorageConfig::load();
     if !storage.create_collections() {
         return;
     }
@@ -4207,7 +4721,7 @@ mod bulk_download_target_tests {
 mod reconcile_catalog_tests {
     use super::reconcile_catalog;
     use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
 
     fn item(id: &str, title: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -4224,6 +4738,15 @@ mod reconcile_catalog_tests {
                          "#000000",
                          "",
                          None)
+    }
+
+    fn file(id: &str, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded }
     }
 
     #[test]
@@ -4283,6 +4806,62 @@ mod reconcile_catalog_tests {
         assert_eq!(reconciled[0].id.as_ref(), "b1");
         assert_eq!(reconciled[1].id.as_ref(), "b2");
     }
+
+    #[test]
+    fn downloaded_status_survives_reconcile_against_a_live_fetch() {
+        let mut local = item("b1", "Old Title");
+        local.files = vec![file("f1", true), file("f2", true)];
+        local.recompute_status();
+        assert_eq!(local.status, ItemStatus::Downloaded);
+
+        let mut live = item("b1", "New Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        assert!(reconciled[0].files.iter().all(|f| f.downloaded));
+        assert_eq!(reconciled[0].status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn live_file_with_no_cached_counterpart_is_not_downloaded() {
+        let mut local = item("b1", "Title");
+        local.files = vec![file("f1", true)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
+        assert_eq!(f2_downloaded, Some(false));
+    }
+
+    #[test]
+    fn partially_downloaded_item_keeps_its_per_file_state() {
+        let mut local = item("b1", "Title");
+        local.files = vec![file("f1", true), file("f2", false)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let f1_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f1")
+                                         .map(|f| f.downloaded);
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
+        assert_eq!(f1_downloaded, Some(true));
+        assert_eq!(f2_downloaded, Some(false));
+        assert_eq!(reconciled[0].status, ItemStatus::Cloud);
+    }
 }
 
 #[cfg(test)]
@@ -4294,7 +4873,8 @@ mod reload_cooldown_tests {
         CacheMetadata { saved_at_secs,
                         item_count: 10,
                         schema_version: 2,
-                        last_item_check_batch_secs: None }
+                        last_item_check_batch_secs: None,
+                        last_fresh_install_request_secs: None }
     }
 
     #[test]
@@ -4322,12 +4902,35 @@ mod reload_cooldown_tests {
 }
 
 #[cfg(test)]
+mod fresh_install_gating_tests {
+    use super::fresh_install_request_gated;
+
+    #[test]
+    fn request_is_suppressed_within_the_minimum_interval() {
+        let now = 1_000;
+        assert!(fresh_install_request_gated(Some(now - 10), now)); // 10s ago, within 60s
+    }
+
+    #[test]
+    fn request_proceeds_once_the_minimum_interval_elapses() {
+        let now = 1_000;
+        assert!(!fresh_install_request_gated(Some(now - 61), now)); // just past 60s
+    }
+
+    #[test]
+    fn request_proceeds_when_never_recorded() {
+        let now = 1_000;
+        assert!(!fresh_install_request_gated(None, now));
+    }
+}
+
+#[cfg(test)]
 mod item_check_tests {
     use std::time::{Duration, SystemTime};
 
     use super::{apply_check_result, item_check_due};
     use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
     use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
     fn item(id: &str, title: &str) -> LibraryItem {
@@ -4345,6 +4948,15 @@ mod item_check_tests {
                          "#000000",
                          "",
                          None)
+    }
+
+    fn file(id: &str, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: format!("{id}.pdf").into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded }
     }
 
     #[test]
@@ -4429,6 +5041,60 @@ mod item_check_tests {
 
         assert!(existing.is_available);
         assert_eq!(existing.availability_last_checked, None);
+    }
+
+    #[test]
+    fn ok_result_preserves_downloaded_files_and_keeps_status_downloaded() {
+        // Regression: a single-item availability re-check must not let the
+        // fresh server response (which never reports `downloaded` — that's a
+        // local-only fact) wipe files already marked downloaded on disk. See
+        // `verify-downloaded-status-against-disk`, whose on-demand disk
+        // verification races this same check on item selection.
+        let mut existing = item("b1", "Title");
+        existing.files = vec![file("f1", true), file("f2", true)];
+        existing.recompute_status();
+        assert_eq!(existing.status, ItemStatus::Downloaded);
+
+        let mut fresh = item("b1", "Title");
+        fresh.files = vec![file("f1", false), file("f2", false)];
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert!(existing.files.iter().all(|f| f.downloaded));
+        assert_eq!(existing.status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn ok_result_defaults_a_new_file_id_to_not_downloaded() {
+        let mut existing = item("b1", "Title");
+        existing.files = vec![file("f1", true)];
+        existing.recompute_status();
+
+        let mut fresh = item("b1", "Title");
+        fresh.files = vec![file("f1", false), file("f2", false)];
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert!(existing.files[0].downloaded);
+        assert!(!existing.files[1].downloaded);
+        assert_eq!(existing.status, ItemStatus::Cloud);
+    }
+
+    #[test]
+    fn ok_result_preserves_partial_download_and_keeps_status_cloud() {
+        let mut existing = item("b1", "Title");
+        existing.files = vec![file("f1", true), file("f2", false)];
+        existing.recompute_status();
+        assert_eq!(existing.status, ItemStatus::Cloud);
+
+        let mut fresh = item("b1", "Title");
+        fresh.files = vec![file("f1", false), file("f2", false)];
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert!(existing.files[0].downloaded);
+        assert!(!existing.files[1].downloaded);
+        assert_eq!(existing.status, ItemStatus::Cloud);
     }
 }
 

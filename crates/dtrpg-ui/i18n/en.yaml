@@ -94,6 +94,7 @@ detail:
   show_in_explorer: "Show in Explorer"
   show_in_files: "Show in Files"
   tooltip_download_first: "(Download this item first)"
+  tooltip_verifying_download: "Checking download status…"
   refresh_thumbnail_tooltip: "Refresh thumbnail"
   field_system: "System"
   field_category: "Category"
@@ -249,6 +250,7 @@ activity:
   loading_thumbnails_remaining: "Loading thumbnails… (%{remaining} remaining)"
   refreshing_thumbnails: "Refreshing thumbnails…"
   refreshing_thumbnails_remaining: "Refreshing thumbnails… (%{remaining} remaining)"
+  downloading_retry: "%{title} — retrying (attempt %{attempt}) in %{delay_secs}s…"
 
 alert_history:
   title: "Alert History"
@@ -258,7 +260,7 @@ alert_history:
   copy_tooltip: "Copy error message"
 
 notification:
-  set_up_account: "Set Up Account"
+  set_up_account: "Login to DriveThruRPG"
   session_expired: "Session expired — sign in again to refresh your library"
   sign_in_again: "Sign In Again"
   signing_in: "Signing in to DriveThruRPG…"

@@ -8,7 +8,7 @@
 //! the active page to the first one every time the settings window is closed
 //! and reopened (a new window has its own state). Driving the active page
 //! from `SettingsController::active_page_ix` instead lets it persist across
-//! close/reopen (see `crate::data::ui_prefs::UiPrefs`).
+//! close/reopen (see `crate::data::ui_state::UiState`).
 
 use std::path::PathBuf;
 
