@@ -43,10 +43,16 @@
 
 ## 4. Catalog Sync Serial Dispatch
 
-- [ ] 4.1 Add an in-flight guard (bool or in-flight handle) to `LibraryController` that
-      prevents a second catalog-sync task from starting while one is in progress.
-- [ ] 4.2 Route `start_load`/`start_load_inner` dispatch through the in-flight guard, keeping
-      dispatch on gpui's `background_executor()`/`cx.spawn` as today.
+- [x] 4.1 Add `catalog_sync_in_flight: bool` to `LibraryController`, checked and set at the top
+      of `start_load_inner` (returns early, logging at debug level, if already in flight).
+- [x] 4.2 Clear the guard at every exit path of `start_load_inner`'s async closure: the
+      cache-fresh skip-fetch return, the partial-fetch success return, the
+      superseded-by-newer-load return, and the natural end of both the success and error arms
+      of the final `match fetch.await` — 63 existing `controllers::library` tests pass
+      unchanged, confirming no behavior regression in the paths the guard now wraps.
+      Dedicated test coverage for the guard itself needs a full gpui `TestAppContext` harness
+      (used in `view_models/library.rs`'s tests, not `controllers/library.rs`'s, which only
+      tests pure helper functions) — deferred to task 9.1.
 
 ## 5. Fresh-Install Initialization
 

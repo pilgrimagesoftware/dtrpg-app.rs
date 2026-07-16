@@ -535,6 +535,14 @@ pub struct LibraryController {
     /// writing catalog state, so a load started before a `clear_and_reload`
     /// cannot clobber it after the fact.
     load_generation:               u64,
+    /// True while a catalog-sync load (from [`start_load_inner`]) is in
+    /// flight. Unlike `load_generation` (which lets a superseded load's
+    /// *results* be discarded after the fact), this prevents a second
+    /// catalog-sync task from starting at all while one is running, per
+    /// `rust-resource-work-queue-topology`'s serial-catalog-sync requirement.
+    ///
+    /// [`start_load_inner`]: Self::start_load_inner
+    catalog_sync_in_flight:        bool,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
@@ -686,6 +694,7 @@ impl LibraryController {
                    thumbnail_refresh_failed: 0,
                    catalog_loading: true,
                    load_generation: 0,
+                   catalog_sync_in_flight: false,
                    items_cache: None,
                    publisher_search_open: false,
                    publisher_search_query: String::new(),
@@ -804,6 +813,18 @@ impl LibraryController {
     }
 
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
+        // Serial catalog-sync dispatch: never let a second catalog-sync task
+        // start while one is already in flight, per
+        // `rust-resource-work-queue-topology`. Unlike `load_generation` below
+        // (which discards a superseded load's *results*), this stops a
+        // redundant load from starting — and therefore from making a
+        // redundant remote request — at all.
+        if self.catalog_sync_in_flight {
+            tracing::debug!("catalog sync already in flight, skipping redundant load request");
+            return;
+        }
+        self.catalog_sync_in_flight = true;
+
         self.load_generation += 1;
         let generation = self.load_generation;
         let service_arc = self.vm.service_arc();
@@ -949,6 +970,7 @@ impl LibraryController {
                                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                     .ok();
                                 this.update(async_cx, |ctrl, cx| {
+                                    ctrl.catalog_sync_in_flight = false;
                                     if ctrl.load_generation != generation {
                                         return; // superseded by a newer load
                                     }
@@ -1022,6 +1044,10 @@ impl LibraryController {
                                         weak_activity
                                             .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                             .ok();
+                                        this.update(async_cx, |ctrl, _cx| {
+                                            ctrl.catalog_sync_in_flight = false;
+                                        })
+                                        .ok();
                                         return;
                                     }
                                 }
@@ -1176,6 +1202,10 @@ impl LibraryController {
                         // A newer load (e.g. triggered by a cache clear) has already
                         // taken over; discard this stale result instead of clobbering it.
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
+                        this.update(async_cx, |ctrl, _cx| {
+                            ctrl.catalog_sync_in_flight = false;
+                        })
+                        .ok();
                         return;
                     }
                     this.update(async_cx, |ctrl, cx| {
@@ -1217,6 +1247,10 @@ impl LibraryController {
                     .ok();
                 }
             }
+            this.update(async_cx, |ctrl, _cx| {
+                ctrl.catalog_sync_in_flight = false;
+            })
+            .ok();
         })
         .detach();
     }
