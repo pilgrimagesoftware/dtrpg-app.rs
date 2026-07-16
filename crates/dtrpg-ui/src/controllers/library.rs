@@ -255,7 +255,7 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
             let order_product_id = item.order_product_id;
             let product_id = item.product_id;
             // `downloaded` is a local-only fact the server response knows nothing
-            // about — the single-item endpoint always reports it `false`.
+            // about - the single-item endpoint always reports it `false`.
             // Preserve each file's existing flag by id so a re-check (or the
             // disk-presence verification racing it, see
             // `verify-downloaded-status-against-disk`) doesn't get its

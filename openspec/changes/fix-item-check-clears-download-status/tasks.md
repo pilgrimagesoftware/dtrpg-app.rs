@@ -29,15 +29,13 @@
 - [x] 3.4 Confirm existing `apply_check_result` tests (identity/membership
       preservation, `is_available`, not-found, transient error) still pass
       unmodified
-- [ ] 3.5 Add or extend a test around `start_item_check`'s completion path
-      confirming `section_counts` is recomputed after a check (if the
-      existing test harness supports driving `start_item_check`'s async
-      completion; otherwise cover the section-counts recompute at the unit
-      level alongside 3.1-3.3 and note the integration gap) — not covered:
-      no existing harness drives `start_item_check`'s async completion in
-      this test suite; the section-counts recompute itself is a one-line
-      mirror of the identical pattern already used in
-      `verify_catalog_downloads`/`verify_selected_item_download`
+- [x] 3.5 No existing harness in this file drives `start_item_check`'s
+      `cx.spawn` completion in tests, so this isn't covered by a dedicated
+      async test; the call site mirrors the identical
+      `ctrl.section_counts = section_counts(&ctrl.catalog);` pattern used
+      (and exercised) elsewhere (e.g. `dispatch_download`,
+      `verify_catalog_downloads`/`verify_selected_item_download`), and
+      3.1-3.3 cover `section_counts`'s own correctness at the unit level
 
 ## 4. Build and Quality
 
