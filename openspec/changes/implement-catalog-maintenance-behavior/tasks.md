@@ -135,13 +135,29 @@
 
 ## 8. Caveat Scenarios
 
-- [ ] 8.1 Empty or relocated local catalog with valid credentials re-runs fresh-install
-      initialization (task 5) rather than treating it as a routine startup.
-- [ ] 8.2 Inaccessible or expired credentials with a valid local catalog: keep serving cached
-      data and show a non-intrusive re-authentication banner instead of blocking the user.
-- [ ] 8.3 Verify the long-running-session timer (task 6.2) operates independent of any startup
-      event, including when the app has been running long enough to cross the staleness
-      threshold without a restart.
+- [x] 8.1 Already satisfied by task 5.1's `is_fresh_install` detection: it's based on
+      `cached.as_ref().is_none_or(Vec::is_empty)`, which is true whenever no catalog cache is
+      found at the current storage root — equally true for a first-ever install, an emptied
+      cache, or storage relocated to a path with no cache file. No distinct "relocated" case
+      exists in the code to special-case; the same disk read covers both.
+- [x] 8.2 Corrected 2026-07-16: verified already satisfied by existing shipped behavior, not a
+      conflict to resolve. `openspec/specs/silent-startup-reauth/spec.md`'s "login window opens
+      on auth failure" text is stale — it predates `openspec/specs/unauthenticated-main-window/
+      spec.md` (`always-open-main-window`), which explicitly supersedes it: "No standalone
+      login window SHALL be presented at startup or at any other time" and "app starts, an API
+      key is found, and the silent re-authentication call fails → THEN the main library window
+      opens with an unauthenticated auth state rather than blocking or showing a login window."
+      Confirmed via `grep`: no `open_login_window` function exists anywhere in the codebase.
+      The library window already stays open with cached/downloaded content and a dismissible
+      "Not signed in"/"Sign in again" banner (`StartupAuthFailed` → `set_auth_pending(false)`,
+      banner shown per `unauthenticated-main-window`'s notification-banner requirement) on auth
+      failure. No new code needed; `silent-startup-reauth`'s stale spec text is a
+      pre-existing documentation gap in `openspec/specs/`, out of scope for this change to fix.
+- [x] 8.3 Verified by construction: `start_periodic_catalog_refresh_timer` (task 6.2) is a
+      standalone loop started once in `LibraryController::new`, independent of `start_load`'s
+      own startup call — it keeps firing every `CATALOG_REFRESH_TIMER_INTERVAL_SECS` for the
+      controller's lifetime regardless of whether the initial startup load succeeded, failed,
+      or was itself skipped by the auto-load-policy.
 
 ## 9. Verification
 
