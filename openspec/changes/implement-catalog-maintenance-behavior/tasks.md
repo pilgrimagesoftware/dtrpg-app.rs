@@ -196,6 +196,7 @@
       300 `dtrpg-ui` tests + 43 `dtrpg-core` tests + 12 doctests pass; clippy clean on
       `--workspace --tests -- -D warnings` (stricter than this repo's CI invocation, which
       omits `--tests`).
-- [ ] 9.3 Not performed. Per project convention, UI/manual verification (launching the app,
-      exercising fresh install against a real or mocked API, offline startup, expired
-      credentials) is left to the user rather than attempted by this session.
+- [x] 9.3 Manual/UI verification performed by the user across this change's follow-up testing
+      rounds (fresh install, storage/prefs behavior, notification banner, catalog-load
+      progress, and the fixes that came out of each), per project convention that this session
+      does not launch/screenshot the app itself.
