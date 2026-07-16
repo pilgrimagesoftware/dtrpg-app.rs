@@ -977,7 +977,12 @@ impl LibraryController {
                     // failure does not abort the catalog stages below.
                     if e.kind == CollectionsServiceErrorKind::Session
                     {
-                        tracing::debug!(error = %e, "collections load skipped: no authenticated session");
+                        // WARN, not debug: the default log filter is `warn` (see
+                        // `logging::init`), and "not signed in yet" is exactly the kind of
+                        // routine-but-worth-knowing condition a user reading logs should be
+                        // able to see without setting RUST_LOG.
+                        tracing::warn!(error = %e,
+                                      "collections load skipped: no authenticated session");
                     }
                     else {
                         tracing::warn!(error = %e, "collections load failed");
@@ -1185,11 +1190,26 @@ impl LibraryController {
                             )
                         })
                         .await;
-                    if let Ok(Some(count)) = totals {
-                        tracing::debug!(total_items = count, "fresh-install: totals request");
-                        fresh_install_total = Some(count);
-                    } else if let Err(e) = totals {
-                        tracing::warn!(error = %e, "fresh-install totals request failed");
+                    match totals {
+                        Ok(Some(count)) => {
+                            tracing::debug!(total_items = count, "fresh-install: totals request");
+                            fresh_install_total = Some(count);
+                        }
+                        Ok(None) => {}
+                        Err(e) if e.kind == LibraryServiceErrorKind::Session => {
+                            // Routine, not a failure: no authenticated session yet. WARN
+                            // (not debug) so it's visible under the default `warn` log
+                            // filter without setting RUST_LOG, matching the collections/
+                            // catalog-fetch Session-error branches elsewhere in this
+                            // function.
+                            tracing::warn!(
+                                error = %e,
+                                "fresh-install initialization waiting for authenticated session"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "fresh-install totals request failed");
+                        }
                     }
                     let request_root = storage_root.clone();
                     async_cx
@@ -1384,7 +1404,9 @@ impl LibraryController {
                     // treat them as a quiet completion rather than a user-facing alert.
                     // Network and other errors are genuine failures worth surfacing.
                     if e.kind == LibraryServiceErrorKind::Session {
-                        tracing::debug!(error = %e, "catalog load skipped: no authenticated session");
+                        // WARN, not debug: see the matching comment on the collections
+                        // load's Session-error branch above.
+                        tracing::warn!(error = %e, "catalog load skipped: no authenticated session");
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
                     } else {
                         tracing::error!(error = %e, backtrace = %app_backtrace(), "catalog load failed");
@@ -1512,7 +1534,8 @@ impl LibraryController {
                     // fetch); quietly complete rather than surfacing a user-facing error.
                     if e.kind == CollectionsServiceErrorKind::Session
                     {
-                        tracing::debug!(error = %e, "collections load skipped: no authenticated session");
+                        tracing::warn!(error = %e,
+                                      "collections load skipped: no authenticated session");
                         weak_activity
                             .update(async_cx, |a, cx| a.complete(activity_id, cx))
                             .ok();
