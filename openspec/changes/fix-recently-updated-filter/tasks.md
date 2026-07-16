@@ -72,10 +72,10 @@
 
 ## 8. Manual Verification
 
-- [ ] 8.1 Confirm the sidebar shows "Recently Updated" (not "Recently Added")
+- [x] 8.1 Confirm the sidebar shows "Recently Updated" (not "Recently Added")
       and its badge count matches the number of items added or updated in
       the last 30 days
-- [ ] 8.2 Confirm the toolbar title shows "Recently Updated" when that
+- [x] 8.2 Confirm the toolbar title shows "Recently Updated" when that
       filter is active
 
 ## 9. Preference Constants and Predicate
@@ -156,7 +156,7 @@
 
 ## 15. Manual Verification (additional)
 
-- [ ] 15.1 Confirm the "Recently Updated window" field at the top of the
+- [x] 15.1 Confirm the "Recently Updated window" field at the top of the
       Advanced settings page is directly editable (typing a value) and its
       +/- buttons work, that it won't go below 7 or above 90, and that
       changing it immediately updates the sidebar's "Recently Updated"
