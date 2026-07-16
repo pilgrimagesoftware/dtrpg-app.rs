@@ -39,21 +39,26 @@ pub fn render_notification_banner(notices: Vec<Notice>,
              let auth_entity_dismiss = auth_entity.clone();
              let settings_entity = settings_entity.clone();
 
+             // Border and background live on this outer container, not the inner
+             // `Alert`, so the emphasis encloses both the message and the action
+             // button as one banner rather than boxing the message alone.
+             // `Alert`'s own banner-mode border/background use a warning color
+             // mixed with white, which reads as barely-there; its own border is
+             // muted to `warning_bg` here so it doesn't compete with the outer one.
              div()
                 .flex()
                 .items_center()
                 .gap(px(8.0))
+                .px(px(8.0))
+                .py(px(4.0))
+                .bg(colors.warning_bg)
+                .border_2()
+                .border_color(colors.warning_text)
                 .child(
                     Alert::warning(format!("notice-alert-{kind:?}"), message.to_string())
                         .banner()
                         .flex_1()
-                        // `Alert`'s own banner-mode border uses a color mixed 30% with
-                        // white, which reads as barely-there against the background.
-                        // Override with the full-strength warning color and a thicker
-                        // border so an unauthenticated/session-expired notice actually
-                        // catches the eye rather than blending in.
-                        .border_2()
-                        .border_color(colors.warning_text)
+                        .border_color(colors.warning_bg)
                         .on_close(move |_, _, cx| {
                             auth_entity_dismiss.update(cx, |ctrl, cx| {
                                 ctrl.dismiss_notice(kind, cx);
