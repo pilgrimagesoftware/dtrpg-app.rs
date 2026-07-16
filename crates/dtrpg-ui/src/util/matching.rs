@@ -2,13 +2,28 @@
 
 use std::collections::HashSet;
 
-use crate::data::constants::RECENTLY_ADDED_THRESHOLD;
+use crate::data::constants::RECENTLY_UPDATED_WINDOW_SECS;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::util::filter::SidebarFilter;
 
 // ── Matching functions
 // ─────────────────────────────────────────────────────────────────
+
+/// Returns `true` if `item`'s most recent timestamp (`date_updated`, falling
+/// back to `date_added`) falls within the last
+/// [`RECENTLY_UPDATED_WINDOW_SECS`] relative to `now_secs`.
+///
+/// Returns `false` if neither timestamp is set — an item can't be "recent"
+/// without a date.
+#[must_use]
+pub fn item_recently_updated(item: &LibraryItem, now_secs: i64) -> bool {
+    let Some(ts) = item.date_updated.or(item.date_added)
+    else {
+        return false;
+    };
+    ts >= now_secs - RECENTLY_UPDATED_WINDOW_SECS
+}
 
 /// Returns `true` if `item` passes the given sidebar filter.
 ///
@@ -18,11 +33,11 @@ use crate::util::filter::SidebarFilter;
 /// `productId` while catalog items carry both IDs.
 #[must_use]
 pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
-                           collection_members: &HashSet<u64>)
+                           collection_members: &HashSet<u64>, now_secs: i64)
                            -> bool {
     match filter {
         SidebarFilter::AllTitles => true,
-        SidebarFilter::RecentlyAdded => item.added_order <= RECENTLY_ADDED_THRESHOLD,
+        SidebarFilter::RecentlyUpdated => item_recently_updated(item, now_secs),
         SidebarFilter::OnDevice => item.status == ItemStatus::Downloaded,
         SidebarFilter::InCloud => item.status == ItemStatus::Cloud,
         SidebarFilter::Publisher(name) => item.publisher.as_ref() == name.as_ref(),
@@ -119,5 +134,60 @@ mod tests {
     #[test]
     fn member_ids_contain_returns_false_when_neither_id_present() {
         assert!(!member_ids_contain(&[1, 2, 3], 42, 99));
+    }
+
+    fn item(date_added: Option<i64>, date_updated: Option<i64>) -> LibraryItem {
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        date_added);
+        item.date_updated = date_updated;
+        item
+    }
+
+    const DAY_SECS: i64 = 24 * 60 * 60;
+
+    #[test]
+    fn item_recently_updated_matches_within_30_days_via_date_updated() {
+        let now = 1_800_000_000;
+        assert!(item_recently_updated(&item(None, Some(now - 10 * DAY_SECS)), now));
+    }
+
+    #[test]
+    fn item_recently_updated_falls_back_to_date_added_when_no_date_updated() {
+        let now = 1_800_000_000;
+        assert!(item_recently_updated(&item(Some(now - 10 * DAY_SECS), None), now));
+    }
+
+    #[test]
+    fn item_recently_updated_excludes_just_past_the_30_day_window() {
+        let now = 1_800_000_000;
+        assert!(!item_recently_updated(&item(None, Some(now - 30 * DAY_SECS - 1)), now));
+    }
+
+    #[test]
+    fn item_recently_updated_false_when_no_timestamps() {
+        let now = 1_800_000_000;
+        assert!(!item_recently_updated(&item(None, None), now));
+    }
+
+    #[test]
+    fn item_matches_filter_delegates_to_item_recently_updated() {
+        let now = 1_800_000_000;
+        let recent = item(None, Some(now - 10 * DAY_SECS));
+        let stale = item(None, Some(now - 40 * DAY_SECS));
+        let members = HashSet::new();
+        assert!(item_matches_filter(&recent, &SidebarFilter::RecentlyUpdated, &members, now));
+        assert!(!item_matches_filter(&stale, &SidebarFilter::RecentlyUpdated, &members, now));
     }
 }

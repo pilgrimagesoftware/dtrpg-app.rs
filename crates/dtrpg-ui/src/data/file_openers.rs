@@ -79,7 +79,7 @@ impl CatalogViewPrefs {
                       -> Self {
         let (filter_name, filter_publisher) = match filter {
             SidebarFilter::AllTitles => (Some("AllTitles"), None),
-            SidebarFilter::RecentlyAdded => (Some("RecentlyAdded"), None),
+            SidebarFilter::RecentlyUpdated => (Some("RecentlyUpdated"), None),
             SidebarFilter::OnDevice => (Some("OnDevice"), None),
             SidebarFilter::InCloud => (Some("InCloud"), None),
             SidebarFilter::Publisher(name) => (Some("Publisher"), Some(name.to_string())),
@@ -147,7 +147,7 @@ impl CatalogViewPrefs {
         match self.filter.as_deref() {
             None => SidebarFilter::default(),
             Some("AllTitles") => SidebarFilter::AllTitles,
-            Some("RecentlyAdded") => SidebarFilter::RecentlyAdded,
+            Some("RecentlyUpdated") => SidebarFilter::RecentlyUpdated,
             Some("OnDevice") => SidebarFilter::OnDevice,
             Some("InCloud") => SidebarFilter::InCloud,
             Some("Publisher") => match self.filter_publisher.as_deref() {

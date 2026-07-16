@@ -10,6 +10,12 @@ fn from_epoch(ts: i64) -> DateTime<Utc> {
     DateTime::from_timestamp(ts, 0).unwrap_or(DateTime::<Utc>::MIN_UTC)
 }
 
+/// Returns the current Unix timestamp in seconds.
+#[must_use]
+pub fn now_secs() -> i64 {
+    Utc::now().timestamp()
+}
+
 /// Returns the whole number of calendar months between `then` (earlier) and
 /// `now` (later), based on year/month/day components rather than a fixed
 /// day-count division — so "5 months ago" lines up with the calendar month

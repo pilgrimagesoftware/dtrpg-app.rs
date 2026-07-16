@@ -28,6 +28,7 @@ use crate::services::collections::{CollectionsService, CollectionsServiceErrorKi
 use crate::services::network_monitor::NetworkMonitor;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
+use crate::util::datetime::now_secs;
 use crate::util::file_presence::{resolved_file_path, verify_item_downloads};
 use crate::util::filter::*;
 use crate::util::matching::*;
@@ -871,7 +872,7 @@ impl LibraryController {
                       }
                       if changed {
                           ctrl.catalog = catalog;
-                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
                           ctrl.invalidate_cache();
                       }
                       cx.emit(LibraryChanged);
@@ -1549,7 +1550,7 @@ impl LibraryController {
             items
         };
         self.catalog_loading = false;
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts = section_counts(&self.catalog, now_secs());
         self.publishers = publisher_entries(&self.catalog);
         self.revalidate_publisher_filter();
         self.invalidate_cache();
@@ -1602,7 +1603,7 @@ impl LibraryController {
         self.enqueue_thumbnails(&partial, cx);
         self.catalog = merge_partial_fetch(std::mem::take(&mut self.catalog), partial);
         self.catalog_loading = false;
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts = section_counts(&self.catalog, now_secs());
         self.publishers = publisher_entries(&self.catalog);
         self.revalidate_publisher_filter();
         self.invalidate_cache();
@@ -1617,7 +1618,7 @@ impl LibraryController {
     fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog.extend(items);
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts = section_counts(&self.catalog, now_secs());
         self.publishers = publisher_entries(&self.catalog);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -1728,7 +1729,7 @@ impl LibraryController {
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
         self.catalog.clear();
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts = section_counts(&self.catalog, now_secs());
         self.publishers = publisher_entries(&self.catalog);
         self.collections.clear();
         self.collections_loaded = false;
@@ -2517,7 +2518,9 @@ impl LibraryController {
         let filter_count =
             self.catalog
                 .iter()
-                .filter(|i| item_matches_filter(i, &self.filter, &self.collection_members))
+                .filter(|i| {
+                    item_matches_filter(i, &self.filter, &self.collection_members, now_secs())
+                })
                 .count();
         let items = self.visible_items();
         let matched_count = items.len();
@@ -2590,7 +2593,7 @@ impl LibraryController {
             self.catalog
                 .iter()
                 .filter(|i| {
-                    item_matches_filter(i, &self.filter, &self.collection_members)
+                    item_matches_filter(i, &self.filter, &self.collection_members, now_secs())
                     && item_matches_query(i, &self.search_query)
                 })
                 .cloned()
@@ -2822,7 +2825,7 @@ impl LibraryController {
                          && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
                       {
                           *existing = item;
-                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
                           ctrl.invalidate_cache();
                       }
                       cx.emit(LibraryChanged);
@@ -2917,7 +2920,7 @@ impl LibraryController {
             this.update(async_cx, |ctrl, cx| {
                     if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
                         apply_check_result(existing, result, std::time::SystemTime::now());
-                        ctrl.section_counts = section_counts(&ctrl.catalog);
+                        ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
                         ctrl.invalidate_cache();
                     }
                     ctrl.checking_items.remove(&id);
@@ -3276,7 +3279,7 @@ impl LibraryController {
                 file.downloaded = false;
             }
             item.recompute_status();
-            self.section_counts = section_counts(&self.catalog);
+            self.section_counts = section_counts(&self.catalog, now_secs());
             self.invalidate_cache();
             self.file_info_cache
                 .retain(|(entry_id, _), _| entry_id.as_ref() != id);
@@ -3558,7 +3561,7 @@ impl LibraryController {
                                   }
                                   item.recompute_status();
                               }
-                              ctrl.section_counts = section_counts(&ctrl.catalog);
+                              ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
                               ctrl.invalidate_cache();
                               cx.emit(LibraryChanged);
                           }

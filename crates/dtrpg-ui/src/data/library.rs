@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::data::constants::{RECENTLY_ADDED_THRESHOLD, THUMBNAIL_COOLDOWN_SECS};
+use crate::data::constants::THUMBNAIL_COOLDOWN_SECS;
 use crate::data::enums::ItemStatus;
+use crate::util::matching::item_recently_updated;
 
 // ── LibraryItem
 // ───────────────────────────────────────────────────────────────
@@ -215,25 +216,25 @@ pub struct LibraryItemFile {
 /// Counts for each smart sidebar section given the full catalog.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SectionCounts {
-    pub all:            usize,
-    pub recently_added: usize,
-    pub on_device:      usize,
-    pub in_cloud:       usize,
+    pub all:              usize,
+    pub recently_updated: usize,
+    pub on_device:        usize,
+    pub in_cloud:         usize,
 }
 
 /// Computes smart section counts from the full catalog.
 #[must_use]
-pub fn section_counts(catalog: &[LibraryItem]) -> SectionCounts {
-    SectionCounts { all:            catalog.len(),
-                    recently_added: catalog.iter()
-                                           .filter(|i| i.added_order <= RECENTLY_ADDED_THRESHOLD)
-                                           .count(),
-                    on_device:      catalog.iter()
-                                           .filter(|i| i.status == ItemStatus::Downloaded)
-                                           .count(),
-                    in_cloud:       catalog.iter()
-                                           .filter(|i| i.status == ItemStatus::Cloud)
-                                           .count(), }
+pub fn section_counts(catalog: &[LibraryItem], now_secs: i64) -> SectionCounts {
+    SectionCounts { all:              catalog.len(),
+                    recently_updated: catalog.iter()
+                                             .filter(|i| item_recently_updated(i, now_secs))
+                                             .count(),
+                    on_device:        catalog.iter()
+                                             .filter(|i| i.status == ItemStatus::Downloaded)
+                                             .count(),
+                    in_cloud:         catalog.iter()
+                                             .filter(|i| i.status == ItemStatus::Cloud)
+                                             .count(), }
 }
 
 // ── Thumbnail cooldown
@@ -457,5 +458,37 @@ mod tests {
 
         assert_eq!(item.files.len(), 2);
         assert!(item.is_multi_item());
+    }
+
+    fn item_with_dates(status: ItemStatus, date_updated: Option<i64>) -> LibraryItem {
+        let mut item = LibraryItem::new("e1",
+                                        "Moria",
+                                        "Free League",
+                                        "",
+                                        "",
+                                        "",
+                                        0,
+                                        0.0,
+                                        0,
+                                        0,
+                                        status,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.date_updated = date_updated;
+        item
+    }
+
+    #[test]
+    fn section_counts_recently_updated_reflects_only_items_in_window() {
+        let now = 1_800_000_000;
+        const DAY_SECS: i64 = 24 * 60 * 60;
+        let catalog = vec![item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
+                           item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),];
+
+        let counts = section_counts(&catalog, now);
+
+        assert_eq!(counts.all, 2);
+        assert_eq!(counts.recently_updated, 1);
     }
 }

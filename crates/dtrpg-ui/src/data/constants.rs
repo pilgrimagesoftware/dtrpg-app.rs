@@ -6,9 +6,9 @@
 //! inline strings to ensure consistent namespacing and enable targeted
 //! deletion on uninstall.
 
-/// The threshold (in `added_order`) below which an item counts as recently
-/// added.
-pub const RECENTLY_ADDED_THRESHOLD: u32 = 90;
+/// 30 days in seconds — the window within which an item's `date_added` or
+/// `date_updated` counts as "recently updated".
+pub const RECENTLY_UPDATED_WINDOW_SECS: i64 = 30 * 24 * 60 * 60;
 
 pub const MONTH_ABBRS: [&str; 12] =
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
