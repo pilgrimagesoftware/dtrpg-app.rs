@@ -277,7 +277,7 @@ pub(crate) fn render_checking_indicator(is_checking: bool)
 fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens,
                          storage_root: &Path, controller: &Entity<LibraryController>,
                          tabs: &Entity<TabsController>, column_width: Pixels, window: &Window,
-                         is_checking: bool)
+                         is_checking: bool, is_verifying: bool)
                          -> AnyElement {
     match col_ix {
         0 => {
@@ -369,7 +369,7 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                   .flex()
                   .items_center()
                   .justify_center()
-                  .child(render_status(item.status, colors))
+                  .child(render_status(&item.id, item.status, is_verifying, colors))
                   .into_any_element(),
 
         7 => {
@@ -603,6 +603,7 @@ impl TableDelegate for CatalogListDelegate {
         let colors = cx.global::<LibriTheme>().colors.clone();
         let column_width = self.column(col_ix, cx).width;
         let is_checking = self.controller.read(cx).is_checking(&item.id);
+        let is_verifying = self.controller.read(cx).is_verifying_downloads(&item.id);
         render_list_item_cell(&item,
                               col_ix,
                               &colors,
@@ -611,7 +612,8 @@ impl TableDelegate for CatalogListDelegate {
                               &self.tabs,
                               column_width,
                               window,
-                              is_checking)
+                              is_checking,
+                              is_verifying)
     }
 
     fn render_th(&mut self, col_ix: usize, _window: &mut Window,
@@ -821,6 +823,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
             Some(GroupedRow::Item(item)) => {
                 let column_width = self.column(col_ix, cx).width;
                 let is_checking = self.controller.read(cx).is_checking(&item.id);
+                let is_verifying = self.controller.read(cx).is_verifying_downloads(&item.id);
                 render_list_item_cell(item,
                                       col_ix,
                                       &colors,
@@ -829,7 +832,8 @@ impl TableDelegate for GroupedCatalogListDelegate {
                                       &self.tabs,
                                       column_width,
                                       window,
-                                      is_checking)
+                                      is_checking,
+                                      is_verifying)
             }
             None => div().into_any_element(),
         }
@@ -1181,12 +1185,11 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement =
-            match (snap.presentation, snap.grouped) {
-                // ── List, ungrouped — DataTable (handles header/row alignment) ──
-                (CatalogPresentation::List, false) => {
-                    use gpui_component::Size;
-                    root.px(pad_side)
+        let content: AnyElement = match (snap.presentation, snap.grouped) {
+            // ── List, ungrouped — DataTable (handles header/row alignment) ──
+            (CatalogPresentation::List, false) => {
+                use gpui_component::Size;
+                root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1194,15 +1197,15 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-                }
+            }
 
-                // ── List, grouped — DataTable over a flattened header/item row
-                // list, so it gets the same virtualization as the ungrouped
-                // branch instead of hand-rolled, fully-materialized rows ──
-                (CatalogPresentation::List, true) => {
-                    use gpui_component::Size;
-                    self.grouped_items(cx);
-                    root.px(pad_side)
+            // ── List, grouped — DataTable over a flattened header/item row
+            // list, so it gets the same virtualization as the ungrouped
+            // branch instead of hand-rolled, fully-materialized rows ──
+            (CatalogPresentation::List, true) => {
+                use gpui_component::Size;
+                self.grouped_items(cx);
+                root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_grouped_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1210,64 +1213,69 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-                }
+            }
 
-                // ── Thumbs, ungrouped — virtualized ───────────────────────────
-                (CatalogPresentation::Thumbs, false) => {
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let s = storage_root.clone();
-                    let t = tabs_entity.clone();
-                    root.px(pad_side)
-                        .child(
-                               div().relative()
-                                    .flex_1()
-                                    .min_h_0()
-                                    .child(
-                        uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
-                            let items = ctrl.read(cx).visible_items_slice(range);
-                            let covers: Vec<Option<Arc<Image>>> = {
-                                let cache = cx.global::<CoverCache>();
-                                items.iter().map(|item| cache.get(&item.id)).collect()
-                            };
-                            let checking: Vec<bool> = {
-                                let ctrl_ref = ctrl.read(cx);
-                                items.iter()
-                                     .map(|item| ctrl_ref.is_checking(&item.id))
-                                     .collect()
-                            };
+            // ── Thumbs, ungrouped — virtualized ───────────────────────────
+            (CatalogPresentation::Thumbs, false) => {
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                let t = tabs_entity.clone();
+                root.px(pad_side)
+                    .child(
+                           div().relative()
+                                .flex_1()
+                                .min_h_0()
+                                .child(
+                    uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
+                        let items = ctrl.read(cx).visible_items_slice(range);
+                        let covers: Vec<Option<Arc<Image>>> = {
+                            let cache = cx.global::<CoverCache>();
+                            items.iter().map(|item| cache.get(&item.id)).collect()
+                        };
+                        let checking: Vec<(bool, bool)> = {
+                            let ctrl_ref = ctrl.read(cx);
                             items.iter()
-                                 .zip(covers)
-                                 .zip(checking)
-                                 .map(|((item, cover), is_checking)| {
-                                     render_thumb_row(item,
-                                                      cover,
-                                                      &c,
-                                                      &d,
-                                                      ctrl.clone(),
-                                                      t.clone(),
-                                                      s.clone(),
-                                                      window,
-                                                      is_checking).into_any_element()
+                                 .map(|item| {
+                                     (ctrl_ref.is_checking(&item.id),
+                                      ctrl_ref.is_verifying_downloads(&item.id))
                                  })
                                  .collect()
-                        }).track_scroll(&scroll_handle)
-                          .size_full(),
-                    )
-                                    .vertical_scrollbar(&scroll_handle),
-                    )
-                        .into_any_element()
-                }
+                        };
+                        items.iter()
+                             .zip(covers)
+                             .zip(checking)
+                             .map(|((item, cover), (is_checking, is_verifying))| {
+                                 render_thumb_row(item,
+                                                  cover,
+                                                  &c,
+                                                  &d,
+                                                  ctrl.clone(),
+                                                  t.clone(),
+                                                  s.clone(),
+                                                  window,
+                                                  is_checking,
+                                                  is_verifying).into_any_element()
+                             })
+                             .collect()
+                    }).track_scroll(&scroll_handle)
+                      .size_full(),
+                )
+                                .vertical_scrollbar(&scroll_handle),
+                )
+                    .into_any_element()
+            }
 
-                // ── Thumbs, grouped — non-virtualized ─────────────────────────
-                (CatalogPresentation::Thumbs, true) => {
-                    let groups = self.grouped_items(cx);
-                    let cover_cache = {
-                        let cache = cx.global::<CoverCache>();
-                        cache.images.clone()
-                    };
-                    let checking_items = self.controller.read(cx).checking_items_snapshot();
-                    root.overflow_y_scrollbar()
+            // ── Thumbs, grouped — non-virtualized ─────────────────────────
+            (CatalogPresentation::Thumbs, true) => {
+                let groups = self.grouped_items(cx);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
+                let checking_items = self.controller.read(cx).checking_items_snapshot();
+                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
+                root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                         let c = colors.clone();
@@ -1277,6 +1285,7 @@ impl Render for CatalogView {
                         let s = storage_root.clone();
                         let cc = cover_cache.clone();
                         let checking_items = checking_items.clone();
+                        let verifying_downloads = verifying_downloads.clone();
                         // Reborrow as `&Window` (Copy) so the nested
                         // `move` closure can capture it on every
                         // outer iteration without moving `window`.
@@ -1287,6 +1296,8 @@ impl Render for CatalogView {
                                                               let cover = cc.get(&item.id).cloned();
                                                               let is_checking =
                                                                   checking_items.contains(&item.id);
+                                                              let is_verifying = verifying_downloads
+                                                                  .contains(&item.id);
                                                               render_thumb_row(&item,
                                                                                cover,
                                                                                &c,
@@ -1295,20 +1306,21 @@ impl Render for CatalogView {
                                                                                t.clone(),
                                                                                s.clone(),
                                                                                window,
-                                                                               is_checking)
+                                                                               is_checking,
+                                                                               is_verifying)
                                                           }))
                     }))
                     .into_any_element()
-                }
+            }
 
-                // ── Grid, ungrouped — row-virtualized ─────────────────────────
-                (CatalogPresentation::Grid, false) => {
-                    let row_count = item_count.div_ceil(items_per_row);
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let s = storage_root.clone();
-                    let t = tabs_entity.clone();
-                    root.px(pad_side)
+            // ── Grid, ungrouped — row-virtualized ─────────────────────────
+            (CatalogPresentation::Grid, false) => {
+                let row_count = item_count.div_ceil(items_per_row);
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                let t = tabs_entity.clone();
+                root.px(pad_side)
                     .child(
                            div().relative()
                                 .flex_1()
@@ -1323,10 +1335,13 @@ impl Render for CatalogView {
                             let cache = cx.global::<CoverCache>();
                             items.iter().map(|item| cache.get(&item.id)).collect()
                         };
-                        let checking: Vec<bool> = {
+                        let checking: Vec<(bool, bool)> = {
                             let ctrl_ref = ctrl.read(cx);
                             items.iter()
-                                 .map(|item| ctrl_ref.is_checking(&item.id))
+                                 .map(|item| {
+                                     (ctrl_ref.is_checking(&item.id),
+                                      ctrl_ref.is_verifying_downloads(&item.id))
+                                 })
                                  .collect()
                         };
                         row_range.map(|row| {
@@ -1345,7 +1360,10 @@ impl Render for CatalogView {
                                                             .zip(row_covers.iter())
                                                             .zip(row_checking.iter())
                                                             .map(
-                                                                |((item, cover), &is_checking)| {
+                                                                |(
+                                                                    (item, cover),
+                                                                    &(is_checking, is_verifying),
+                                                                )| {
                                                                     render_grid_card(
                                                                         item,
                                                                         cover.clone(),
@@ -1356,6 +1374,7 @@ impl Render for CatalogView {
                                                                         s.clone(),
                                                                         window,
                                                                         is_checking,
+                                                                        is_verifying,
                                                                     )
                                                                 },
                                                             ),
@@ -1369,17 +1388,18 @@ impl Render for CatalogView {
                                 .vertical_scrollbar(&scroll_handle),
                 )
                     .into_any_element()
-                }
+            }
 
-                // ── Grid, grouped — non-virtualized ───────────────────────────
-                (CatalogPresentation::Grid, true) => {
-                    let groups = self.grouped_items(cx);
-                    let cover_cache = {
-                        let cache = cx.global::<CoverCache>();
-                        cache.images.clone()
-                    };
-                    let checking_items = self.controller.read(cx).checking_items_snapshot();
-                    root.overflow_y_scrollbar()
+            // ── Grid, grouped — non-virtualized ───────────────────────────
+            (CatalogPresentation::Grid, true) => {
+                let groups = self.grouped_items(cx);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
+                let checking_items = self.controller.read(cx).checking_items_snapshot();
+                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
+                root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                                                     let c = colors.clone();
@@ -1389,15 +1409,18 @@ impl Render for CatalogView {
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
                                                     let ci = checking_items.clone();
+                                                    let vd = verifying_downloads.clone();
                                                     div().child(render_group_header(&g.publisher,
                                                                                     g.items.len(),
-                                                                                    &c, e.clone()))
-                                                         .child(render_grid(g.items, cc, ci, c, d,
-                                                                            e, t, s, &*window))
+                                                                                    &c,
+                                                                                    e.clone()))
+                                                         .child(render_grid(g.items, cc, ci, vd,
+                                                                            c, d, e, t, s,
+                                                                            &*window))
                                                 }))
                     .into_any_element()
-                }
-            };
+            }
+        };
 
         let mut result =
             outer.relative()
@@ -1419,12 +1442,14 @@ impl Render for CatalogView {
                                               px(ITEM_POPOVER_MARGIN),
                                               window.viewport_size().width);
             let is_checking = self.controller.read(cx).is_checking(&item.id);
+            let is_verifying = self.controller.read(cx).is_verifying_downloads(&item.id);
             result = result.child(render_item_popover(item,
                                                       anchor,
                                                       self.controller.clone(),
                                                       tabs_entity.clone(),
                                                       &colors,
-                                                      is_checking));
+                                                      is_checking,
+                                                      is_verifying));
         }
 
         result.into_any_element()
@@ -1504,7 +1529,16 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
 // ── Status glyph
 // ──────────────────────────────────────────────────────────────
 
-fn render_status(status: ItemStatus, colors: &ColorTokens) -> AnyElement {
+/// Renders the download-status glyph for `id`. While `is_verifying` is true
+/// (a file-presence check per `verify-downloaded-status-against-disk` is in
+/// flight for this item), the glyph is replaced by a tinted spinner with its
+/// own tooltip rather than showing a downloaded/cloud state that may be
+/// stale.
+fn render_status(id: &Arc<str>, status: ItemStatus, is_verifying: bool, colors: &ColorTokens)
+                 -> AnyElement {
+    if is_verifying {
+        return render_verifying_indicator(id, colors).into_any_element();
+    }
     let accent = colors.accent;
     let text_tertiary = colors.text_tertiary;
     match status {
@@ -1519,6 +1553,25 @@ fn render_status(status: ItemStatus, colors: &ColorTokens) -> AnyElement {
                                   .child("☁")
                                   .into_any_element(),
     }
+}
+
+/// Renders a small tinted spinner with a "checking download status" tooltip
+/// for a catalog entry whose file-presence verification is currently in
+/// flight (`LibraryController::is_verifying_downloads`, see
+/// `verify-downloaded-status-against-disk`). Distinct from
+/// [`render_checking_indicator`]'s untinted spinner (a network-bound
+/// availability check) so the two kinds of in-flight check are never
+/// visually conflated.
+fn render_verifying_indicator(id: &Arc<str>, colors: &ColorTokens)
+                              -> impl IntoElement + 'static + use<> {
+    let elem_id: Arc<str> = Arc::from(format!("verifying-{id}"));
+    div().id(elem_id)
+         .flex_none()
+         .child(Spinner::new().with_size(Size::XSmall)
+                              .color(colors.text_tertiary))
+         .tooltip(|window, cx| {
+             Tooltip::new(t!("detail.tooltip_verifying_download").to_string()).build(window, cx)
+         })
 }
 
 // ── Thumbnail context menu
@@ -1572,7 +1625,7 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     density: &DensityConstants, entity: Entity<LibraryController>,
                     tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
-                    is_checking: bool)
+                    is_checking: bool, is_verifying: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1701,7 +1754,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                               .children(render_unavailable_badge(item, &colors))
                               .children(render_checking_indicator(is_checking)))
          })
-         .child(render_status(status, &colors))
+         .child(render_status(&id, status, is_verifying, &colors))
          .child(ctx_menu)
          .context_menu(move |menu, window, cx| {
              let menu = match status {
@@ -1828,9 +1881,10 @@ fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem,
 // delegates' own parameter lists.
 #[allow(clippy::too_many_arguments)]
 fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image>>,
-               checking_items: HashSet<Arc<str>>, colors: ColorTokens,
-               density: DensityConstants, entity: Entity<LibraryController>,
-               tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window)
+               checking_items: HashSet<Arc<str>>, verifying_downloads: HashSet<Arc<str>>,
+               colors: ColorTokens, density: DensityConstants,
+               entity: Entity<LibraryController>, tabs: Entity<TabsController>,
+               storage_root_path: PathBuf, window: &Window)
                -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -1843,6 +1897,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
          .children(items.into_iter().map(|item| {
                                         let cover = cover_cache.get(&item.id).cloned();
                                         let is_checking = checking_items.contains(&item.id);
+                                        let is_verifying = verifying_downloads.contains(&item.id);
                                         render_grid_card(&item,
                                                          cover,
                                                          &colors,
@@ -1851,7 +1906,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
                                                          tabs.clone(),
                                                          storage_root_path.clone(),
                                                          window,
-                                                         is_checking)
+                                                         is_checking,
+                                                         is_verifying)
                                     }))
 }
 
@@ -1861,7 +1917,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
 fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     card_w: f32, entity: Entity<LibraryController>,
                     tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
-                    is_checking: bool)
+                    is_checking: bool, is_verifying: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1998,7 +2054,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                              .text_color(colors.text_tertiary)
                                              .truncate()
                                              .child(publisher))
-                                 .child(render_status(status, &colors)))
+                                 .child(render_status(&id, status, is_verifying, &colors)))
                      .child(reveal_row)
                      .child(ctx_menu))
          .context_menu(move |menu, window, cx| {

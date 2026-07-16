@@ -94,6 +94,7 @@ detail:
   show_in_explorer: "Show in Explorer"
   show_in_files: "Show in Files"
   tooltip_download_first: "(Download this item first)"
+  tooltip_verifying_download: "Checking download status…"
   refresh_thumbnail_tooltip: "Refresh thumbnail"
   field_system: "System"
   field_category: "Category"

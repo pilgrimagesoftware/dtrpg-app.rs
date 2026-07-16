@@ -14,6 +14,7 @@ use gpui_component::Disableable;
 use gpui_component::ElementExt as _;
 use gpui_component::Icon;
 use gpui_component::IconName;
+use gpui_component::Sizable;
 use gpui_component::Size;
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
@@ -21,6 +22,7 @@ use gpui_component::clipboard::Clipboard;
 use gpui_component::collapsible::Collapsible;
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
 use gpui_component::scroll::ScrollableElement as _;
+use gpui_component::spinner::Spinner;
 use gpui_component::table::{Column, DataTable, TableDelegate, TableState};
 use gpui_component::text::Text;
 use gpui_component::tooltip::Tooltip;
@@ -65,6 +67,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 
     let item = item.clone();
     let is_checking = entity.read(cx).is_checking(&item.id);
+    let is_verifying = entity.read(cx).is_verifying_downloads(&item.id);
     let entity_download = entity.clone();
     let entity_refresh_thumbnail = entity.clone();
     let entity_other_details = entity.clone();
@@ -161,7 +164,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                             .font_weight(gpui::FontWeight::SEMIBOLD)
                                             .text_color(text_primary),
                                     )
-                                    .child(render_status_icon(is_downloaded, text_secondary))
+                                    .child(render_status_icon(is_downloaded, is_verifying,
+                                                              text_secondary))
                                     .children(render_checking_indicator(is_checking)),
                             )
                             .child(
@@ -232,12 +236,16 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                 Button::new("detail-tab-download")
                                     .ghost()
                                     .outline()
+                                    .disabled(is_verifying)
+                                    .loading(is_verifying)
                                     .icon(if is_downloaded {
                                         IconName::CircleCheck
                                     } else {
                                         IconName::ArrowDown
                                     })
-                                    .tooltip(if is_downloaded {
+                                    .tooltip(if is_verifying {
+                                        t!("detail.tooltip_verifying_download")
+                                    } else if is_downloaded {
                                         t!("detail.downloaded_button")
                                     } else {
                                         t!("detail.download_button")
@@ -533,8 +541,24 @@ impl TableDelegate for ItemListDelegate {
                 let is_downloading = self.controller
                                          .read(cx)
                                          .is_file_queued_or_active(&self.entry_id, row_ix as u32);
+                let is_verifying = self.controller
+                                       .read(cx)
+                                       .is_verifying_downloads(&self.entry_id);
 
-                if file.downloaded {
+                if is_verifying {
+                    div().h_full()
+                         .flex()
+                         .items_center()
+                         .id(SharedString::from(format!("item-row-{row_ix}-verifying")))
+                         .tooltip(move |window, cx| {
+                             Tooltip::new(t!("detail.tooltip_verifying_download").to_string())
+                                .build(window, cx)
+                         })
+                         .child(Spinner::new().with_size(Size::XSmall)
+                                              .color(colors.text_tertiary))
+                         .into_any_element()
+                }
+                else if file.downloaded {
                     div().h_full()
                          .flex()
                          .items_center()
@@ -1124,8 +1148,16 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 /// Renders a small status icon next to the item title: a checkmark when
 /// downloaded, a cloud glyph otherwise. Replaces the old text-only "Status" row
 /// in the metadata table.
-fn render_status_icon(is_downloaded: bool, color: gpui::Hsla) -> impl IntoElement + 'static {
-    let (glyph, tooltip_text) = if is_downloaded {
+/// Renders the detail tab's title-row status glyph. While `is_verifying` is
+/// true (a file-presence check per `verify-downloaded-status-against-disk`
+/// is in flight), shows a distinct pending glyph and tooltip rather than a
+/// downloaded/cloud state that may be stale.
+fn render_status_icon(is_downloaded: bool, is_verifying: bool, color: gpui::Hsla)
+                      -> impl IntoElement + 'static {
+    let (glyph, tooltip_text) = if is_verifying {
+        ("\u{22ef}", t!("detail.tooltip_verifying_download").to_string())
+    }
+    else if is_downloaded {
         ("\u{2713}", t!("detail.status_on_device").to_string())
     }
     else {

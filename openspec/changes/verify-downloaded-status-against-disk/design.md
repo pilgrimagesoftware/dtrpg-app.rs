@@ -103,6 +103,22 @@ file-presence check for that one item.
   `Downloaded`) requires downgrading `true → false`, not just detecting a
   previously-missed download. `verify_item_downloads` always sets
   `downloaded = path.exists()` rather than only setting it `true`.
+- **Pending-verification UI covers both trigger scopes.** A user-facing
+  clarification during implementation confirmed the pending indicator
+  applies to the catalog-wide load-time pass (every item id is marked
+  verifying for the duration of the batch) as well as the on-demand
+  single-item check, not just the latter.
+- **Distinct indicator, not reuse of `checking_items`.** The pending state
+  is tracked in its own `verifying_downloads: HashSet<Arc<str>>` field
+  rather than folded into the existing availability-check `checking_items`
+  set. Reusing `checking_items` would have been simpler plumbing, but that
+  set also gates `should_enqueue_check`'s cooldown logic — inserting
+  file-verification ids into it would incorrectly block real availability
+  checks from starting for the same id. The UI layer renders a separate
+  tinted spinner (`render_verifying_indicator`) with its own
+  `detail.tooltip_verifying_download` tooltip so a local disk check and a
+  network availability check are never visually conflated, per explicit
+  user clarification.
 
 ## Risks / Trade-offs
 
