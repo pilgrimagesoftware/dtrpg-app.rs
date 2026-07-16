@@ -1039,6 +1039,12 @@ impl LibraryController {
                                         return; // superseded by a newer load
                                     }
                                     ctrl.catalog_loading = false;
+                                    // This branch completes the load without ever calling
+                                    // `set_catalog` — a restored `Publisher` filter that no
+                                    // longer matches must be corrected here too, or it stays
+                                    // applied (filtering the catalog to nothing) until a
+                                    // forced reload happens to reach `set_catalog` instead.
+                                    ctrl.revalidate_publisher_filter();
                                     cx.emit(LibraryChanged);
                                     // The skip-fetch path is exactly the case most likely to be
                                     // showing stale `downloaded` state indefinitely — that's the
@@ -1510,11 +1516,7 @@ impl LibraryController {
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
-        let known_publishers: Vec<Arc<str>> = self.publishers
-                                                  .iter()
-                                                  .map(|p| Arc::clone(&p.name))
-                                                  .collect();
-        self.validate_publisher_filter(&known_publishers);
+        self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -1536,6 +1538,24 @@ impl LibraryController {
         }
     }
 
+    /// Convenience wrapper around [`Self::validate_publisher_filter`] using
+    /// the just-recomputed `self.publishers` as the known set.
+    ///
+    /// Every catalog-load completion path that (re)computes `self.publishers`
+    /// must call this — not just the full live-fetch path
+    /// ([`Self::set_catalog`]) — since the cache-fresh skip-fetch branch in
+    /// [`Self::start_load_inner`] and [`Self::apply_partial_fetch`] both also
+    /// complete a load without ever calling `set_catalog`. Missing one of
+    /// these left a restored `Publisher` filter that no longer matched
+    /// permanently un-validated on an ordinary cache-hit cold start.
+    fn revalidate_publisher_filter(&mut self) {
+        let known_publishers: Vec<Arc<str>> = self.publishers
+                                                  .iter()
+                                                  .map(|p| Arc::clone(&p.name))
+                                                  .collect();
+        self.validate_publisher_filter(&known_publishers);
+    }
+
     /// Merges a partial date-filtered fetch's `partial` results into the
     /// catalog additively (see [`merge_partial_fetch`]) and performs the
     /// same finalization as [`Self::set_catalog`] (thumbnail enqueue,
@@ -1549,6 +1569,7 @@ impl LibraryController {
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
