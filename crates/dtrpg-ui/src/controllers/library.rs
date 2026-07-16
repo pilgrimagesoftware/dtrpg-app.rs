@@ -889,6 +889,7 @@ impl LibraryController {
         let weak_activity = self.activity.downgrade();
         let storage_root = cache_dir();
         let save_root = storage_root.clone();
+        let network_monitor = Arc::clone(&self.network_monitor);
 
         cx.spawn(async move |this, async_cx| {
             // Single activity item for the whole load. Its label is updated in
@@ -1148,10 +1149,21 @@ impl LibraryController {
                     .unwrap_or(std::time::Duration::ZERO)
                     .as_secs();
                 let gated = fresh_install_request_gated(last_request, now_secs);
+                let monitor_for_totals = network_monitor.clone();
+                let endpoint_reachable = async_cx
+                    .background_executor()
+                    .spawn(async move {
+                        monitor_for_totals.check_endpoint(crate::data::constants::DTRPG_API_HOST)
+                    })
+                    .await;
                 if gated {
                     tracing::debug!(
                         "fresh-install initialization skipped: last request was within the \
                          minimum interval"
+                    );
+                } else if !endpoint_reachable {
+                    tracing::debug!(
+                        "fresh-install totals request skipped: DriveThruRPG API unreachable"
                     );
                 } else {
                     let svc = service_arc.clone();
@@ -1231,6 +1243,30 @@ impl LibraryController {
             }
 
             // ── Stage: page-by-page fetch from API ──────────────────────────────
+            // Query the network monitor before committing to the paginated fetch —
+            // per `rust-resource-network-monitor`, a process needing a specific
+            // endpoint stops rather than requesting when it's reported unreachable.
+            let monitor_for_fetch = network_monitor.clone();
+            let endpoint_reachable = async_cx
+                .background_executor()
+                .spawn(async move {
+                    monitor_for_fetch.check_endpoint(crate::data::constants::DTRPG_API_HOST)
+                })
+                .await;
+            if !endpoint_reachable {
+                tracing::debug!("catalog fetch skipped: DriveThruRPG API unreachable");
+                weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
+                this.update(async_cx, |ctrl, cx| {
+                    if ctrl.load_generation == generation {
+                        ctrl.catalog_loading = false;
+                        cx.emit(LibraryChanged);
+                    }
+                    ctrl.catalog_sync_in_flight = false;
+                })
+                .ok();
+                return;
+            }
+
             // Move the shared activity into its next stage — no new item is
             // created, so a count check that ran above doesn't leave a stale
             // "getting count of items…" label behind. The per-page label set

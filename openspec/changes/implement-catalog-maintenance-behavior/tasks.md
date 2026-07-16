@@ -36,10 +36,16 @@
 - [x] 3.2 Cache each check's result (`NETWORK_MONITOR_CACHE_TTL_SECS` = 5s) in an in-memory
       `Mutex<HashMap<String, CachedState>>` keyed by target, to bound check frequency under
       bursts of calling requests.
-- [ ] 3.3 Wire the monitor's query calls into catalog-sync, download, cover-cache, and
-      avatar-cache request paths, stopping the request when the monitor reports unreachable.
-      Threaded through as each call site is touched: catalog-sync in tasks 4-5, cover/avatar
-      cache alongside their retry wiring in task 7.1.
+- [x] 3.3 Wired into 3 of 4 request paths, stopping the request when the monitor reports
+      unreachable: catalog-sync (`start_load_inner` — checked before the fresh-install totals
+      request, skipping just that request if unreachable while still allowing the gating
+      timestamp logic to run only when actually attempted; and again before the main paginated
+      fetch, where an unreachable endpoint now returns early with a quiet activity completion
+      instead of attempting the fetch), cover-cache (`dispatch_thumbnail_fetch`), and
+      avatar-cache (`fetch_avatar_bytes`). **Not wired**: the actual file-download path
+      (`download.rs`) — no retry/monitor infrastructure exists there yet since
+      `download-retry-with-backoff` (the sibling change it depends on) hasn't been
+      implemented; left for that change or a follow-up once it lands.
 
 ## 4. Catalog Sync Serial Dispatch
 
