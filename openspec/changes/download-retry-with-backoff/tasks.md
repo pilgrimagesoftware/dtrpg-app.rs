@@ -67,9 +67,9 @@
 
 ## 7. Manual Verification
 
-- [ ] 7.1 Simulate a transient failure (e.g. disconnect networking briefly
+- [x] 7.1 Simulate a transient failure (e.g. disconnect networking briefly
       during a download) and confirm the app retries and eventually
       succeeds once connectivity returns, with the activity label showing
       retry progress
-- [ ] 7.2 Cancel a download while it's waiting between retry attempts and
+- [x] 7.2 Cancel a download while it's waiting between retry attempts and
       confirm it stops immediately with no partial file left behind
