@@ -718,6 +718,7 @@ impl LibraryController {
                    max_concurrent_downloads: StorageConfig::load().max_concurrent_downloads() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
+        ctrl.start_periodic_catalog_refresh_timer(cx);
         ctrl
     }
 
@@ -741,6 +742,37 @@ impl LibraryController {
                     .await;
                   let alive = this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
                                   .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
+    }
+
+    /// Starts a background loop that re-runs the catalog staleness check
+    /// every `CATALOG_REFRESH_TIMER_INTERVAL_SECS`, independent of the
+    /// startup sequence, for the lifetime of the controller — a
+    /// long-running session (never restarted) still gets a refresh once its
+    /// staleness threshold elapses, per
+    /// `rust-resource-refresh-scheduling`'s recurring-timer requirement.
+    ///
+    /// Calls the same non-forced [`Self::start_load`] the startup sequence
+    /// uses: `catalog_sync_in_flight` (see `start_load_inner`) makes an
+    /// overlapping wake-up a no-op, and the existing auto-load-policy
+    /// staleness check inside `start_load_inner` decides whether this
+    /// wake-up actually triggers a fetch or is itself a no-op. The loop
+    /// exits once the controller entity is dropped.
+    fn start_periodic_catalog_refresh_timer(&self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, async_cx| {
+              loop {
+                  async_cx
+                    .background_executor()
+                    .timer(std::time::Duration::from_secs(
+                        crate::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
+                    ))
+                    .await;
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx)).is_ok();
                   if !alive {
                       break;
                   }

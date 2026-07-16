@@ -88,10 +88,21 @@
 
 ## 6. Cache-Control Staleness Signal and Recurring Timer
 
-- [ ] 6.1 Extend the remote-fetch call in `catalog-auto-load-policy`'s staleness check to also
-      evaluate a cache-control header or update query parameter from the SDK response.
-- [ ] 6.2 Add a recurring long-running-session timer, independent of startup, that re-runs the
-      staleness check and triggers a fetch through the catalog-sync serial dispatch path.
+- [x] 6.1 Corrected 2026-07-16 (user decision): the real API has no cache-control/ETag
+      mechanism (`openapi.yaml` has neither); the only update-detection signal is the
+      `updatedDate[after]` query parameter, already wired into `start_load_inner`'s
+      auto-load-policy branch via `should_attempt_partial_fetch`/`partial_fetch_since`/
+      `list_items_updated_since` (triggered on a remote-count mismatch). This existing
+      mechanism already satisfies the requirement's intent; no new code needed. Documented
+      here rather than editing the parent spec's wording, per user decision.
+- [x] 6.2 Added `start_periodic_catalog_refresh_timer` to `LibraryController` (mirrors the
+      existing `start_periodic_check_batch_timer` idiom exactly), waking every
+      `CATALOG_REFRESH_TIMER_INTERVAL_SECS` (1h) to call the same non-forced `start_load` the
+      startup sequence uses. Composes with the group-4 `catalog_sync_in_flight` guard (an
+      overlapping wake-up is a no-op) and the existing auto-load-policy staleness check inside
+      `start_load_inner` (decides whether the wake-up actually triggers a fetch). Started
+      alongside the existing check-batch timer in the constructor. 296 tests pass, clippy
+      clean.
 
 ## 7. Error Handling, Retry, and Logging Conventions
 
