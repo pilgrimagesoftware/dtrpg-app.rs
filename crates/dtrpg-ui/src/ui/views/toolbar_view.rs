@@ -22,7 +22,7 @@ use crate::util::sort::*;
 pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
     match filter {
         SidebarFilter::AllTitles => t!("sidebar.all_titles").to_string(),
-        SidebarFilter::RecentlyAdded => t!("sidebar.recently_added").to_string(),
+        SidebarFilter::RecentlyUpdated => t!("sidebar.recently_updated").to_string(),
         SidebarFilter::OnDevice => t!("sidebar.on_this_device").to_string(),
         SidebarFilter::InCloud => t!("sidebar.in_the_cloud").to_string(),
         SidebarFilter::Publisher(name) => {
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn non_dynamic_filters_return_nonempty_string() {
         for filter in [SidebarFilter::AllTitles,
-                       SidebarFilter::RecentlyAdded,
+                       SidebarFilter::RecentlyUpdated,
                        SidebarFilter::OnDevice,
                        SidebarFilter::InCloud]
         {

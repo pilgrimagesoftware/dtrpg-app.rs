@@ -1,6 +1,6 @@
 sidebar:
   all_titles: "All Titles"
-  recently_added: "Recently Added"
+  recently_updated: "Recently Updated"
   on_this_device: "On This Device"
   in_the_cloud: "In the Cloud"
   publishers: "Publishers"
@@ -154,6 +154,8 @@ settings:
   max_concurrent_downloads_note: "Shared limit for thumbnail loading and file downloads."
   max_concurrent_downloads_decrement_tooltip: "Decrease"
   max_concurrent_downloads_increment_tooltip: "Increase"
+  recently_updated_window_title: "Recently Updated window"
+  recently_updated_window_note: "Number of days an item stays in the sidebar's Recently Updated section after being added or updated (7-90)."
   create_collections_title: "Create collections"
   create_collections_note: "Mirror downloads into a collections/ folder alongside the publisher folders, organized by the collections you've added each item to."
   create_collections_note_windows: "Requires Developer Mode (or an elevated process); if symlink creation fails, the setting has no effect."

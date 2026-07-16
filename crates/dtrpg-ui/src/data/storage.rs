@@ -12,6 +12,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::data::constants::{
+    RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, RECENTLY_UPDATED_WINDOW_MAX_DAYS,
+    RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+};
 use crate::data::paths::{app_preferences_dir, default_download_dir};
 
 // ── StorageError
@@ -67,13 +71,26 @@ fn default_max_concurrent_downloads() -> usize {
     DEFAULT_MAX_CONCURRENT_DOWNLOADS
 }
 
+fn default_recently_updated_window_days() -> u32 {
+    RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS
+}
+
+/// Clamps `days` to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+/// RECENTLY_UPDATED_WINDOW_MAX_DAYS]`.
+fn clamp_recently_updated_window_days(days: u32) -> u32 {
+    days.clamp(RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+               RECENTLY_UPDATED_WINDOW_MAX_DAYS)
+}
+
 #[derive(Serialize, Deserialize)]
 struct StorageConfigFile {
-    root_path:                Option<String>,
+    root_path:                    Option<String>,
     #[serde(default = "default_max_concurrent_downloads")]
-    max_concurrent_downloads: usize,
+    max_concurrent_downloads:     usize,
     #[serde(default)]
-    create_collections:       bool,
+    create_collections:           bool,
+    #[serde(default = "default_recently_updated_window_days")]
+    recently_updated_window_days: u32,
 }
 
 /// Manages the root directory where downloaded catalog files are stored, and
@@ -82,12 +99,14 @@ struct StorageConfigFile {
 /// Persists the user's chosen overrides in
 /// `{app_preferences_dir}/storage.toml`. Falls back to the platform default
 /// download directory (e.g. `~/Downloads/dtrpg`) when no root path override is
-/// set, and to [`DEFAULT_MAX_CONCURRENT_DOWNLOADS`] when no concurrency
-/// override is set.
+/// set, to [`DEFAULT_MAX_CONCURRENT_DOWNLOADS`] when no concurrency override
+/// is set, and to [`RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS`] when no
+/// "Recently Updated window" override is set.
 pub struct StorageConfig {
-    override_path:            Option<PathBuf>,
-    max_concurrent_downloads: usize,
-    create_collections:       bool,
+    override_path:                Option<PathBuf>,
+    max_concurrent_downloads:     usize,
+    create_collections:           bool,
+    recently_updated_window_days: u32,
 }
 
 impl StorageConfig {
@@ -112,10 +131,15 @@ impl StorageConfig {
                                 .map(PathBuf::from);
         let max_concurrent_downloads = file.as_ref().map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                                                             |cfg| cfg.max_concurrent_downloads);
+        let recently_updated_window_days = file.as_ref()
+                                               .map_or(RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, |cfg| {
+                                                   cfg.recently_updated_window_days
+                                               });
         let create_collections = file.is_some_and(|cfg| cfg.create_collections);
         let config = Self { override_path,
                             max_concurrent_downloads,
-                            create_collections };
+                            create_collections,
+                            recently_updated_window_days };
         if !file_existed {
             config.save();
         }
@@ -133,9 +157,10 @@ impl StorageConfig {
     /// that side effect.
     #[cfg(test)]
     pub(crate) fn for_test(root: PathBuf) -> Self {
-        Self { override_path:            Some(root),
-               max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-               create_collections:       false, }
+        Self { override_path:                Some(root),
+               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+               create_collections:           false,
+               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, }
     }
 
     /// Returns the resolved download root (saved override, or platform
@@ -237,6 +262,24 @@ impl StorageConfig {
         self.save();
     }
 
+    /// Returns the configured "Recently Updated window", in days.
+    #[must_use]
+    pub fn recently_updated_window_days(&self) -> u32 {
+        self.recently_updated_window_days
+    }
+
+    /// Saves `days` (clamped to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+    /// RECENTLY_UPDATED_WINDOW_MAX_DAYS]`) as the new "Recently Updated
+    /// window" and updates the in-memory state.
+    ///
+    /// Clamped here rather than only in the settings UI's stepper, so a
+    /// hand-edited `storage.toml` with an out-of-range value can never
+    /// propagate past this setter.
+    pub fn set_recently_updated_window_days(&mut self, days: u32) {
+        self.recently_updated_window_days = clamp_recently_updated_window_days(days);
+        self.save();
+    }
+
     /// Writes the current in-memory state to
     /// `{app_preferences_dir}/storage.toml`. Silently ignores I/O errors
     /// (the state remains applied in memory).
@@ -245,8 +288,10 @@ impl StorageConfig {
                                           self.override_path
                                               .as_ref()
                                               .map(|p| p.to_string_lossy().into_owned()),
-                                      max_concurrent_downloads: self.max_concurrent_downloads,
-                                      create_collections:       self.create_collections, };
+                                      max_concurrent_downloads:     self.max_concurrent_downloads,
+                                      create_collections:           self.create_collections,
+                                      recently_updated_window_days:
+                                          self.recently_updated_window_days, };
         let Some(config_file) = config_path()
         else {
             return;
@@ -310,9 +355,11 @@ mod tests {
 
     #[test]
     fn default_path_is_non_empty() {
-        let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                None,
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         let path = cfg.root_path();
         assert!(path.components().count() > 0);
         assert!(path.ends_with("dtrpg"));
@@ -321,17 +368,21 @@ mod tests {
     #[test]
     fn override_path_is_returned_when_set() {
         let custom = PathBuf::from("/tmp/custom-storage");
-        let cfg = StorageConfig { override_path:            Some(custom.clone()),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(custom.clone()),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert_eq!(cfg.root_path(), custom);
     }
 
     #[test]
     fn path_for_publisher_is_under_root() {
-        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         let publisher_path = cfg.path_for_publisher("Chaosium");
         assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Chaosium"));
     }
@@ -341,18 +392,22 @@ mod tests {
         // A publisher name is untrusted display text from the API; if it ever
         // contained a path separator, `PathBuf::join` would otherwise let it
         // escape `root` (or discard it entirely if the name looked absolute).
-        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         let publisher_path = cfg.path_for_publisher("/Evil/Publisher");
         assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Evil_Publisher"));
     }
 
     #[test]
     fn path_for_publisher_converts_spaces_to_underscores() {
-        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         let publisher_path = cfg.path_for_publisher("The Forge Studios");
         assert_eq!(publisher_path,
                    Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
@@ -379,17 +434,21 @@ mod tests {
 
     #[test]
     fn is_default_true_without_override() {
-        let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                None,
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert!(cfg.is_default());
     }
 
     #[test]
     fn is_default_false_with_override() {
-        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/custom-storage")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/custom-storage")),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert!(!cfg.is_default());
     }
 
@@ -398,9 +457,11 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("dtrpg-test-ensure-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let cfg = StorageConfig { override_path:            Some(root.clone()),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(root.clone()),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert!(!cfg.is_accessible());
         cfg.ensure_root_exists().unwrap();
         assert!(cfg.is_accessible());
@@ -410,18 +471,22 @@ mod tests {
     #[test]
     fn ensure_root_exists_is_idempotent_on_existing_directory() {
         let dir = std::env::temp_dir();
-        let cfg = StorageConfig { override_path:            Some(dir),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                Some(dir),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert!(cfg.ensure_root_exists().is_ok());
         assert!(cfg.ensure_root_exists().is_ok());
     }
 
     #[test]
     fn max_concurrent_downloads_defaults_to_three() {
-        let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                None,
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert_eq!(cfg.max_concurrent_downloads(), 3);
     }
 
@@ -434,9 +499,11 @@ mod tests {
 
     #[test]
     fn create_collections_defaults_to_false() {
-        let cfg = StorageConfig { override_path:            None,
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       false, };
+        let cfg = StorageConfig { override_path:                None,
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         assert!(!cfg.create_collections());
     }
 
@@ -448,9 +515,12 @@ mod tests {
 
     #[test]
     fn create_collections_round_trips_through_toml_serialization() {
-        let cfg = StorageConfigFile { root_path:                None,
-                                      max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                      create_collections:       true, };
+        let cfg = StorageConfigFile { root_path:                    None,
+                                      max_concurrent_downloads:
+                                          DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                      create_collections:           true,
+                                      recently_updated_window_days:
+                                          RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         let text = toml::to_string(&cfg).unwrap();
         let reloaded: StorageConfigFile = toml::from_str(&text).unwrap();
         assert!(reloaded.create_collections);
@@ -458,9 +528,11 @@ mod tests {
 
     #[test]
     fn path_for_collection_is_under_root() {
-        let cfg = StorageConfig { override_path:            Some(PathBuf::from("/tmp/dtrpg")),
-                                  max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:       true, };
+        let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           true,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
         let collection_path = cfg.path_for_collection("Adventures");
         assert_eq!(collection_path,
                    Path::new("/tmp/dtrpg/collections/Adventures"));
@@ -476,5 +548,39 @@ mod tests {
     fn collection_dir_never_escapes_root_for_an_absolute_looking_name() {
         let dir = collection_dir(Path::new("/tmp/dtrpg"), "/Evil/Collection");
         assert!(dir.starts_with("/tmp/dtrpg"));
+    }
+
+    #[test]
+    fn recently_updated_window_days_defaults_to_thirty() {
+        let cfg = StorageConfig { override_path:                None,
+                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                  create_collections:           false,
+                                  recently_updated_window_days:
+                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, };
+        assert_eq!(cfg.recently_updated_window_days(), 30);
+    }
+
+    #[test]
+    fn missing_recently_updated_window_days_field_deserializes_to_default() {
+        let file: StorageConfigFile = toml::from_str("").unwrap();
+        assert_eq!(file.recently_updated_window_days,
+                   RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS);
+    }
+
+    #[test]
+    fn clamp_recently_updated_window_days_clamps_below_minimum() {
+        assert_eq!(clamp_recently_updated_window_days(1),
+                   RECENTLY_UPDATED_WINDOW_MIN_DAYS);
+    }
+
+    #[test]
+    fn clamp_recently_updated_window_days_clamps_above_maximum() {
+        assert_eq!(clamp_recently_updated_window_days(365),
+                   RECENTLY_UPDATED_WINDOW_MAX_DAYS);
+    }
+
+    #[test]
+    fn clamp_recently_updated_window_days_passes_through_in_range_values() {
+        assert_eq!(clamp_recently_updated_window_days(45), 45);
     }
 }
