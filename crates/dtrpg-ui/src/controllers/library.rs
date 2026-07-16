@@ -687,19 +687,20 @@ impl LibraryController {
                -> Self {
         let vm = LibraryViewModel::new(service);
         let prefs = crate::data::ui_preferences::UiPreferences::load();
+        let view_prefs = crate::data::file_openers::CatalogViewPrefs::load();
 
         let mut ctrl =
             Self { vm,
                    activity,
                    catalog: Vec::new(),
-                   filter: SidebarFilter::default(),
+                   filter: view_prefs.to_filter(),
                    search_query: String::new(),
-                   sort: SortMethod::default(),
+                   sort: view_prefs.to_sort(),
                    sort_direction: SortDirection::default(),
                    collection_sort: prefs.collection_sort(),
                    collection_sort_direction: prefs.collection_sort_direction(),
-                   grouped: false,
-                   presentation: CatalogPresentation::default(),
+                   grouped: view_prefs.grouped.unwrap_or(false),
+                   presentation: view_prefs.to_presentation(),
                    selection: Selection::default(),
                    section_counts: SectionCounts::default(),
                    publishers: Vec::new(),
@@ -1509,8 +1510,30 @@ impl LibraryController {
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        let known_publishers: Vec<Arc<str>> = self.publishers
+                                                  .iter()
+                                                  .map(|p| Arc::clone(&p.name))
+                                                  .collect();
+        self.validate_publisher_filter(&known_publishers);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
+    }
+
+    /// Resets `self.filter` to [`SidebarFilter::AllTitles`] if it is a
+    /// `Publisher` filter whose publisher is not present in
+    /// `known_publishers`.
+    ///
+    /// Called once the catalog-load's item list is available, since a
+    /// `Publisher` filter restored from disk at [`Self::new`] (before any
+    /// items have loaded) can't be validated synchronously. Does not save
+    /// the reset — the persisted preference is left untouched, so a launch
+    /// where the publisher reappears restores it.
+    pub fn validate_publisher_filter(&mut self, known_publishers: &[Arc<str>]) {
+        if let SidebarFilter::Publisher(name) = &self.filter
+           && !known_publishers.contains(name)
+        {
+            self.filter = SidebarFilter::AllTitles;
+        }
     }
 
     /// Merges a partial date-filtered fetch's `partial` results into the
@@ -2567,6 +2590,7 @@ impl LibraryController {
         self.filter = filter;
         self.selection = Selection::None;
         self.invalidate_cache();
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
@@ -2630,6 +2654,7 @@ impl LibraryController {
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
         self.sort = sort;
         self.invalidate_cache();
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
@@ -2674,13 +2699,25 @@ impl LibraryController {
     /// Toggles publisher grouping on or off.
     pub fn set_grouped(&mut self, grouped: bool, cx: &mut Context<Self>) {
         self.grouped = grouped;
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
     /// Switches the catalog presentation mode.
     pub fn set_presentation(&mut self, mode: CatalogPresentation, cx: &mut Context<Self>) {
         self.presentation = mode;
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
+    }
+
+    /// Persists the current sidebar filter, sort, grouped, and presentation
+    /// state to disk. Best-effort — I/O failures are logged and ignored (see
+    /// [`crate::data::file_openers::CatalogViewPrefs::save`]).
+    fn save_view_prefs(&self) {
+        crate::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
+                                                                self.sort,
+                                                                self.grouped,
+                                                                self.presentation).save();
     }
 
     // ── Selection mutations ───────────────────────────────────────────────────
