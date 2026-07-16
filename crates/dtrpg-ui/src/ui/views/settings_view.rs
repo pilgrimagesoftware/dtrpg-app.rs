@@ -74,6 +74,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
                              cache_counts: CacheCounts, max_concurrent_downloads: usize,
                              create_collections: bool, recently_updated_window_days: u32,
+                             recently_updated_window_input: Option<Entity<InputState>>,
                              font_selects: AppearanceFontSelects)
                              -> AnyElement {
     let surface = colors.surface;
@@ -108,8 +109,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     colors,
                                     storage_path_input,
                                     max_concurrent_downloads,
-                                    create_collections,
-                                    recently_updated_window_days).into_any_element(),
+                                    create_collections).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,
@@ -119,7 +119,9 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                      cache_counts,
                                      colors,
                                      &theme.fonts.label_font,
-                                     &theme.fonts.value_font).into_any_element(),
+                                     &theme.fonts.value_font,
+                                     recently_updated_window_days,
+                                     recently_updated_window_input).into_any_element(),
         5 => render_about_section(colors).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),

@@ -22,10 +22,11 @@ library, never a later update (e.g. a re-download or metadata refresh).
   `sidebar.recently_updated`, value updated in all three locales).
 - `RECENTLY_ADDED_THRESHOLD` (rank-based) is removed and replaced with a
   duration constant for the default 30-day window.
-- The window is now a user preference, adjustable from a Storage settings
-  page stepper, bounded to 7-90 days (default 30). Persisted alongside the
-  existing `max_concurrent_downloads`/`create_collections` settings in
-  `storage.toml`, following the same load/set/persist/broadcast pattern.
+- The window is now a user preference, editable via a bounded (7-90 days,
+  default 30) `NumberInput` field at the top of the Advanced settings page.
+  Persisted alongside the existing `max_concurrent_downloads`/
+  `create_collections` settings in `storage.toml`, following the same
+  load/set/persist/broadcast pattern.
 
 ## Capabilities
 
@@ -41,10 +42,10 @@ _(none)_
   off `date_added`/`date_updated`.
 - `string-catalog`: The sidebar navigation label scenario's literal label set
   changes from "Recently Added" to "Recently Updated".
-- `thumbnail-queue-concurrency`'s sibling Storage-settings-page conventions
-  (bounded stepper, `storage.toml` persistence, `SettingsChanged` broadcast)
-  are reused for the new preference; no capability spec changes there since
-  the pattern itself isn't a requirement.
+- `thumbnail-queue-concurrency`'s sibling settings-page conventions (bounded
+  numeric field, `storage.toml` persistence, `SettingsChanged` broadcast) are
+  reused for the new preference; no capability spec changes there since the
+  pattern itself isn't a requirement.
 
 ## Impact
 
@@ -63,10 +64,13 @@ _(none)_
   `crates/dtrpg-ui/src/controllers/library.rs`: settings snapshot/setter and
   the `SettingsChanged`-driven sync into `LibraryController`, mirroring
   `max_concurrent_downloads`'s existing wiring.
-- `crates/dtrpg-ui/src/ui/views/settings_storage_view.rs`: new stepper row
-  for the window, reusing the concurrency stepper's layout.
-- `crates/dtrpg-ui/src/ui/views/root_view.rs`: new `SettingsChanged`
-  subscription propagating the window to `LibraryController`.
+- `crates/dtrpg-ui/src/ui/views/settings_advanced_view.rs`: new editable
+  `NumberInput` row for the window (bounded 7-90), at the top of the
+  Advanced settings page.
+- `crates/dtrpg-ui/src/ui/views/root_view.rs`: creates the window's
+  `InputState` (with `min`/`max` bounds), a `SettingsChanged` subscription
+  propagating the window to `LibraryController`, and a subscription
+  committing the input's own `InputEvent::Change` to `SettingsController`.
 - `crates/dtrpg-ui/src/ui/views/toolbar_view.rs`,
   `crates/dtrpg-ui/src/ui/views/sidebar_view.rs`: references to
   `SidebarFilter::RecentlyAdded` and the `sidebar.recently_added` i18n key

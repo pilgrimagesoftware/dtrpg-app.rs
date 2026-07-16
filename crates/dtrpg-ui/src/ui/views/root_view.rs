@@ -232,6 +232,38 @@ impl LibraryRootView {
                     ctrl.set_storage_path_input(storage_path_input)
                 });
 
+        let recently_updated_window_days_initial = {
+            use crate::data::storage::StorageConfig;
+            StorageConfig::load().recently_updated_window_days()
+        };
+        let recently_updated_window_input = cx.new(|cx| {
+                                                  InputState::new(window, cx)
+                .default_value(recently_updated_window_days_initial.to_string())
+                .min(f64::from(
+                    crate::data::constants::RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+                ))
+                .max(f64::from(
+                    crate::data::constants::RECENTLY_UPDATED_WINDOW_MAX_DAYS,
+                ))
+                                              });
+        let settings_for_window = settings.clone();
+        cx.subscribe(&recently_updated_window_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             if let Ok(days) = value.parse::<u32>() {
+                                 settings_for_window.update(cx, |ctrl, cx| {
+                                                        ctrl.set_recently_updated_window_days(days,
+                                                                                              cx);
+                                                    });
+                             }
+                         }
+                     })
+          .detach();
+        settings.update(cx, |ctrl, _cx| {
+                    ctrl.set_recently_updated_window_input(recently_updated_window_input)
+                });
+
         // ── Appearance page font pickers ─────────────────────────────────────
         //
         // Built once here (like the inputs above) rather than in

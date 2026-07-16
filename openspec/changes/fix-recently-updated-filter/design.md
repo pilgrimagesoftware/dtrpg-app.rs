@@ -32,10 +32,8 @@ sites that need the new predicate; both currently duplicate the same
   change — `date_updated: None` falls back to `date_added`, which is already
   populated for every synced item.
 - A dedicated "Catalog" settings tab. The window preference is a small,
-  infrequently-touched numeric setting; it reuses the Storage tab (which
-  already hosts `max_concurrent_downloads` and `create_collections`, neither
-  of which is strictly about the storage *path* either) rather than
-  justifying a new tab for one control.
+  infrequently-touched numeric setting; it lives at the top of the existing
+  Advanced tab rather than justifying a new tab for one control.
 
 ## Decisions
 
@@ -57,12 +55,18 @@ sites that need the new predicate; both currently duplicate the same
   `RECENTLY_UPDATED_WINDOW_MIN_DAYS: u32 = 7`,
   `RECENTLY_UPDATED_WINDOW_MAX_DAYS: u32 = 90` in `constants.rs` replace the
   old fixed `RECENTLY_ADDED_THRESHOLD`/`RECENTLY_UPDATED_WINDOW_SECS`.
-- **The bound is enforced once, at the setter**
+- **Editable via `gpui_component::input::NumberInput`**, not a hand-rolled
+  +/- button pair. `NumberInput` already provides an editable text field,
+  built-in increment/decrement buttons (default step 1), and
+  clamp-to-`min`/`max` on blur when `InputState::min`/`max` are set — reusing
+  it avoids reimplementing bounded-numeric-field behavior the component
+  library already has.
+- **The bound is enforced once more, at the setter**
   (`StorageConfig::set_recently_updated_window_days`), which clamps to
-  `[MIN, MAX]` before persisting — mirrors how the UI stepper itself can
-  only ever request values inside the range, but a hand-edited `storage.toml`
-  could contain anything, so the clamp lives in the data layer rather than
-  only in the stepper's `on_click` guard.
+  `[MIN, MAX]` before persisting — `NumberInput`'s own clamp only fires on
+  blur (an in-range value can transiently commit while typing, e.g. "4" of
+  "45"), and a hand-edited `storage.toml` could contain anything, so the
+  data-layer clamp is the actual guarantee; the UI clamp is a nicety.
 - **Persisted in `StorageConfig`/`storage.toml`**, not `CatalogViewPrefs`.
   `CatalogViewPrefs` (`app_config.toml`) captures ambient, continuously
   re-saved view state (whatever filter/sort was last active); this is a

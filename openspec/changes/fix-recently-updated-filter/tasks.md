@@ -126,15 +126,17 @@
 
 ## 12. Settings UI
 
-- [x] 12.1 In `crates/dtrpg-ui/src/ui/views/settings_storage_view.rs`, add a
-      "Recently Updated window" stepper row (7-90 days) reusing
-      `render_concurrency_stepper`'s layout, wired to
-      `SettingsController::set_recently_updated_window_days`
-- [x] 12.2 Add `settings.recently_updated_window_title`,
-      `settings.recently_updated_window_note`,
-      `settings.recently_updated_window_decrement_tooltip`, and
-      `settings.recently_updated_window_increment_tooltip` i18n keys to
-      `en.yaml`, `de.yaml`, `fr.yaml`
+- [x] 12.1 In `crates/dtrpg-ui/src/ui/views/settings_advanced_view.rs`, add
+      an editable "Recently Updated window" row (7-90 days) at the top of
+      the Advanced section, using `gpui_component::input::NumberInput`
+      bound to an `InputState` with `min`/`max` set, wired to
+      `SettingsController::set_recently_updated_window_days` via an
+      `InputEvent::Change` subscription created in `root_view.rs`
+- [x] 12.2 Add `settings.recently_updated_window_title` and
+      `settings.recently_updated_window_note` i18n keys to `en.yaml`,
+      `de.yaml`, `fr.yaml` (the decrement/increment tooltip keys from the
+      earlier hand-rolled stepper are no longer needed — `NumberInput`
+      supplies its own step buttons)
 
 ## 13. Tests
 
@@ -154,7 +156,8 @@
 
 ## 15. Manual Verification (additional)
 
-- [ ] 15.1 Confirm the Storage settings page shows the new stepper, that it
-      won't go below 7 or above 90, and that changing it immediately updates
-      the sidebar's "Recently Updated" badge count without restarting the
-      app
+- [ ] 15.1 Confirm the "Recently Updated window" field at the top of the
+      Advanced settings page is directly editable (typing a value) and its
+      +/- buttons work, that it won't go below 7 or above 90, and that
+      changing it immediately updates the sidebar's "Recently Updated"
+      badge count without restarting the app

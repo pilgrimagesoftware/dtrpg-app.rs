@@ -85,95 +85,98 @@ pub struct AuthStateSnapshot {
 
 /// Snapshot of settings state needed by the views for a single render pass.
 pub struct SettingsSnapshot {
-    pub is_open:                      bool,
-    pub file_openers:                 Vec<FileOpenerEntry>,
+    pub is_open:                       bool,
+    pub file_openers:                  Vec<FileOpenerEntry>,
     /// `true` when credentials are present in the keyring.
-    pub is_authenticated:             bool,
+    pub is_authenticated:              bool,
     /// Resolved storage root path (override or platform default).
-    pub storage_root_path:            PathBuf,
+    pub storage_root_path:             PathBuf,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
-    pub storage_unavailable:          bool,
+    pub storage_unavailable:           bool,
     /// `true` when the configured storage root exists on disk.
-    pub storage_path_exists:          bool,
+    pub storage_path_exists:           bool,
     /// Current auth state for the toolbar avatar button.
-    pub auth:                         AuthStateSnapshot,
+    pub auth:                          AuthStateSnapshot,
     /// Current value of the email draft field in the Account tab.
-    pub email_draft:                  String,
+    pub email_draft:                   String,
     /// Current value of the password draft field in the Account tab.
-    pub password_draft:               String,
+    pub password_draft:                String,
     /// `true` while a sign-in request is in flight.
-    pub sign_in_in_progress:          bool,
+    pub sign_in_in_progress:           bool,
     /// Error message from the last failed sign-in attempt, if any.
-    pub sign_in_error:                Option<String>,
+    pub sign_in_error:                 Option<String>,
     /// Shared input state for the email text field in the Account tab.
-    pub email_input:                  Option<Entity<InputState>>,
+    pub email_input:                   Option<Entity<InputState>>,
     /// Shared input state for the password text field in the Account tab.
-    pub password_input:               Option<Entity<InputState>>,
+    pub password_input:                Option<Entity<InputState>>,
     /// Current draft value of the storage path text field.
-    pub storage_path_draft:           String,
+    pub storage_path_draft:            String,
     /// Shared input state for the storage path text field in the Storage tab.
-    pub storage_path_input:           Option<Entity<InputState>>,
+    pub storage_path_input:            Option<Entity<InputState>>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pub pending_file_opener:          Option<PathBuf>,
+    pub pending_file_opener:           Option<PathBuf>,
     /// Index of the currently active settings page.
-    pub active_page_ix:               usize,
+    pub active_page_ix:                usize,
     /// Current per-type counts of cached data, for the Advanced section's
     /// "Cache details" area.
-    pub cache_counts:                 CacheCounts,
+    pub cache_counts:                  CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
-    pub max_concurrent_downloads:     usize,
+    pub max_concurrent_downloads:      usize,
     /// `true` when completing a download should also symlink the item under
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
-    pub create_collections:           bool,
+    pub create_collections:            bool,
     /// User-configured "Recently Updated" sidebar window, in days.
-    pub recently_updated_window_days: u32,
+    pub recently_updated_window_days:  u32,
+    /// Shared input state for the "Recently Updated window" number field in
+    /// the Advanced tab.
+    pub recently_updated_window_input: Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row.
-    pub body_font_select:             Option<FontSelectState>,
+    pub body_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row.
-    pub value_font_select:            Option<FontSelectState>,
+    pub value_font_select:             Option<FontSelectState>,
     /// Font picker state for the Appearance page's label-font row.
-    pub label_font_select:            Option<FontSelectState>,
+    pub label_font_select:             Option<FontSelectState>,
     /// Font picker state for the Appearance page's monospace-font row.
-    pub mono_font_select:             Option<FontSelectState>,
+    pub mono_font_select:              Option<FontSelectState>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
 /// catalog storage configuration, and sign-in form state.
 pub struct SettingsController {
-    is_open:             bool,
-    file_openers:        FileOpenerConfig,
-    is_authenticated:    bool,
-    auth_state:          AuthState,
-    storage:             StorageConfig,
-    storage_unavailable: bool,
-    storage_path_exists: bool,
-    login_service:       Arc<dyn LoginService>,
-    email_draft:         String,
-    password_draft:      String,
-    sign_in_in_progress: bool,
-    sign_in_error:       Option<String>,
+    is_open:                       bool,
+    file_openers:                  FileOpenerConfig,
+    is_authenticated:              bool,
+    auth_state:                    AuthState,
+    storage:                       StorageConfig,
+    storage_unavailable:           bool,
+    storage_path_exists:           bool,
+    login_service:                 Arc<dyn LoginService>,
+    email_draft:                   String,
+    password_draft:                String,
+    sign_in_in_progress:           bool,
+    sign_in_error:                 Option<String>,
     /// Input state for the email text field; set by the root view after
     /// creation.
-    email_input:         Option<Entity<InputState>>,
+    email_input:                   Option<Entity<InputState>>,
     /// Input state for the password text field; set by the root view after
     /// creation.
-    password_input:      Option<Entity<InputState>>,
+    password_input:                Option<Entity<InputState>>,
     /// Draft value of the storage path text field.
-    storage_path_draft:  String,
+    storage_path_draft:            String,
     /// Input state for the storage path text field; set by the root view after
     /// creation.
-    storage_path_input:  Option<Entity<InputState>>,
+    storage_path_input:            Option<Entity<InputState>>,
     /// Masked API key hint computed at sign-in time (first 4 + bullets + last
     /// 1).
-    api_key_hint:        Option<String>,
+    api_key_hint:                  Option<String>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pending_file_opener: Option<PathBuf>,
+    pending_file_opener:           Option<PathBuf>,
     /// Index of the currently active settings page.
     ///
     /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
@@ -182,19 +185,22 @@ pub struct SettingsController {
     /// tracks page selection in its own per-window state with no way to read
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
-    active_page_ix:      usize,
+    active_page_ix:                usize,
+    /// Input state for the "Recently Updated window" number field; set by
+    /// the root view after creation.
+    recently_updated_window_input: Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row; set by the
     /// root view after creation.
-    body_font_select:    Option<FontSelectState>,
+    body_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row; set by the
     /// root view after creation.
-    value_font_select:   Option<FontSelectState>,
+    value_font_select:             Option<FontSelectState>,
     /// Font picker state for the Appearance page's label-font row; set by the
     /// root view after creation.
-    label_font_select:   Option<FontSelectState>,
+    label_font_select:             Option<FontSelectState>,
     /// Font picker state for the Appearance page's monospace-font row; set by
     /// the root view after creation.
-    mono_font_select:    Option<FontSelectState>,
+    mono_font_select:              Option<FontSelectState>,
 }
 
 impl SettingsController {
@@ -270,6 +276,7 @@ impl SettingsController {
                               active_page_ix:
                                   crate::data::ui_state::UiState::load().settings_page_ix()
                                                                         .unwrap_or(0),
+                              recently_updated_window_input: None,
                               body_font_select: None,
                               value_font_select: None,
                               label_font_select: None,
@@ -291,6 +298,12 @@ impl SettingsController {
     /// Attaches the storage path input state entity created by the root view.
     pub fn set_storage_path_input(&mut self, input: Entity<InputState>) {
         self.storage_path_input = Some(input);
+    }
+
+    /// Attaches the "Recently Updated window" number input state entity
+    /// created by the root view.
+    pub fn set_recently_updated_window_input(&mut self, input: Entity<InputState>) {
+        self.recently_updated_window_input = Some(input);
     }
 
     /// Attaches the body-font picker state entity created by the root view.
@@ -800,6 +813,8 @@ impl SettingsController {
                            create_collections: self.storage.create_collections(),
                            recently_updated_window_days: self.storage
                                                              .recently_updated_window_days(),
+                           recently_updated_window_input: self.recently_updated_window_input
+                                                              .clone(),
                            body_font_select: self.body_font_select.clone(),
                            value_font_select: self.value_font_select.clone(),
                            label_font_select: self.label_font_select.clone(),
