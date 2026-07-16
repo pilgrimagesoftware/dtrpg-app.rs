@@ -480,9 +480,9 @@ pub struct LibraryController {
     pub sort:                      SortMethod,
     /// Current sort direction.
     pub sort_direction:            SortDirection,
-    /// Current sidebar Collections sort method, persisted via `UiPrefs`.
+    /// Current sidebar Collections sort method, persisted via `UiPreferences`.
     pub collection_sort:           CollectionSortMethod,
-    /// Current sidebar Collections sort direction, persisted via `UiPrefs`.
+    /// Current sidebar Collections sort direction, persisted via `UiPreferences`.
     pub collection_sort_direction: SortDirection,
     /// Whether the catalog is grouped by publisher.
     pub grouped:                   bool,
@@ -685,7 +685,7 @@ impl LibraryController {
                activity: Entity<ActivityController>, cx: &mut Context<Self>)
                -> Self {
         let vm = LibraryViewModel::new(service);
-        let prefs = crate::data::ui_prefs::UiPrefs::load();
+        let prefs = crate::data::ui_preferences::UiPreferences::load();
 
         let mut ctrl =
             Self { vm,
@@ -2597,7 +2597,7 @@ impl LibraryController {
                          method,
                          self.collection_sort_direction,
                          &catalog_ids);
-        crate::data::ui_prefs::UiPrefs::load().save_collection_sort(method,
+        crate::data::ui_preferences::UiPreferences::load().save_collection_sort(method,
                                                                     self.collection_sort_direction);
         cx.emit(LibraryChanged);
     }
@@ -2612,7 +2612,7 @@ impl LibraryController {
                          self.collection_sort,
                          direction,
                          &catalog_ids);
-        crate::data::ui_prefs::UiPrefs::load().save_collection_sort(self.collection_sort,
+        crate::data::ui_preferences::UiPreferences::load().save_collection_sort(self.collection_sort,
                                                                     direction);
         cx.emit(LibraryChanged);
     }
@@ -3435,7 +3435,7 @@ impl LibraryController {
     // ── Theme / density mutations (dispatched via callbacks) ──────────────────
 
     /// Applies a new theme key (updates the GPUI global) and persists it via
-    /// [`crate::data::ui_prefs::UiPrefs`] so it survives a restart instead of
+    /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart instead of
     /// always resetting to Parchment.
     ///
     /// Also re-syncs `gpui_component::Theme`'s colors (see
@@ -3451,7 +3451,7 @@ impl LibraryController {
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
               apply_theme_colors(theme, &colors);
           });
-        crate::data::ui_prefs::UiPrefs::load().save_theme_key(key.as_str());
+        crate::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
         cx.notify();
     }
 
@@ -3466,7 +3466,7 @@ impl LibraryController {
     /// Applies a new body font family (any font installed on the user's
     /// system, not a curated list — see `settings_appearance_view`), updating
     /// the GPUI global, `gpui_component`'s `Theme.font_family`, and
-    /// persisting the selection via [`crate::data::ui_prefs::UiPrefs`].
+    /// persisting the selection via [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3477,12 +3477,12 @@ impl LibraryController {
         cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
               theme.font_family = font.clone();
           });
-        crate::data::ui_prefs::UiPrefs::load().save_body_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new value font family and persists the selection via
-    /// [`crate::data::ui_prefs::UiPrefs`].
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_value_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3490,12 +3490,12 @@ impl LibraryController {
         fonts.value_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_value_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_value_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new label font family and persists the selection via
-    /// [`crate::data::ui_prefs::UiPrefs`].
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_label_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3503,12 +3503,12 @@ impl LibraryController {
         fonts.label_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_label_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_label_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new monospace font family and persists the selection via
-    /// [`crate::data::ui_prefs::UiPrefs`].
+    /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_mono_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -3516,12 +3516,12 @@ impl LibraryController {
         fonts.mono_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_mono_font_name(&font);
+        crate::data::ui_preferences::UiPreferences::load().save_mono_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new shared UI text size (see [`FontSelections::ui_text_size`])
-    /// and persists it via [`crate::data::ui_prefs::UiPrefs`]. Applied to each
+    /// and persists it via [`crate::data::ui_preferences::UiPreferences`]. Applied to each
     /// window via `Window::set_rem_size` in `LibraryRootView::render` and
     /// `SettingsWindowView::render`, so every `rems(...)`-based size utility
     /// scales together, like zooming a page.
@@ -3531,7 +3531,11 @@ impl LibraryController {
         fonts.ui_text_size = size;
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_prefs::UiPrefs::load().save_ui_text_size(size.as_f32());
+        // Persisted as the scale multiplier shown in Settings > Appearance
+        // (e.g. 1.1), not the derived absolute pixel size, so the file's
+        // stored value matches what the UI displays.
+        let scale = size.as_f32() / crate::data::constants::DEFAULT_UI_TEXT_SIZE;
+        crate::data::ui_preferences::UiPreferences::load().save_text_scale(scale);
         cx.notify();
     }
 

@@ -16,4 +16,5 @@ pub mod profile;
 pub mod selection;
 pub mod storage;
 pub mod theme;
-pub mod ui_prefs;
+pub mod ui_preferences;
+pub mod ui_state;

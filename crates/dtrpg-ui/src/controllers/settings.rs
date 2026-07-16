@@ -174,7 +174,7 @@ pub struct SettingsController {
     pending_file_opener: Option<PathBuf>,
     /// Index of the currently active settings page.
     ///
-    /// Persisted to [`crate::data::ui_prefs::UiPrefs`] so the settings window
+    /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
     /// reopens on the same page it was closed on, rather than always
     /// resetting to the first page — gpui-component's `Settings` widget
     /// tracks page selection in its own per-window state with no way to read
@@ -266,7 +266,7 @@ impl SettingsController {
                               api_key_hint: None,
                               pending_file_opener: None,
                               active_page_ix:
-                                  crate::data::ui_prefs::UiPrefs::load().settings_page_ix()
+                                  crate::data::ui_state::UiState::load().settings_page_ix()
                                                                         .unwrap_or(0),
                               body_font_select: None,
                               value_font_select: None,
@@ -322,7 +322,7 @@ impl SettingsController {
     /// settings window reopens on the same page next time.
     pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
         self.active_page_ix = ix;
-        crate::data::ui_prefs::UiPrefs::load().save_settings_page_ix(ix);
+        crate::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
     }
 }

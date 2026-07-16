@@ -6,7 +6,7 @@
 //! Font/theme changes apply immediately via `LibraryController`'s
 //! `set_body_font`/`set_value_font`/`set_label_font`/`set_mono_font`/
 //! `set_ui_text_size`/`set_theme`, which also persist the selection through
-//! `crate::data::ui_prefs::UiPrefs` — see `settings-appearance-fonts`.
+//! `crate::data::ui_preferences::UiPreferences` — see `settings-appearance-fonts`.
 
 use gpui::{
     Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
