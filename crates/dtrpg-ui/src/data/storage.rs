@@ -107,6 +107,22 @@ impl StorageConfig {
                create_collections }
     }
 
+    /// Builds an in-memory config pinned to `root`, without touching the real
+    /// on-disk `storage.toml` — neither reading nor writing it.
+    ///
+    /// For tests only. [`load`](Self::load) followed by
+    /// [`set_root_path`](Self::set_root_path) both reads and persists to the
+    /// real, shared config file at [`config_path`], which corrupts a
+    /// developer's actual settings the moment `cargo test` runs; this
+    /// constructor exists so tests can exercise path-derivation logic without
+    /// that side effect.
+    #[cfg(test)]
+    pub(crate) fn for_test(root: PathBuf) -> Self {
+        Self { override_path: Some(root),
+               max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+               create_collections: false }
+    }
+
     /// Returns the resolved download root (saved override, or platform
     /// default).
     pub fn root_path(&self) -> PathBuf {
