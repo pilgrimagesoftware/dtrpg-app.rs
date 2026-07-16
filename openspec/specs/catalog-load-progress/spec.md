@@ -4,15 +4,38 @@
 TBD - created by archiving change catalog-load-progress. Update Purpose after archive.
 ## Requirements
 ### Requirement: Catalog load SHALL report estimated total item count
-Before delivering any catalog items to the UI, the catalog load pipeline SHALL determine an estimated total item count by parsing the `last` page URL from the first API page response. If the URL is absent or unparseable, the count SHALL be treated as unknown and progress SHALL remain indeterminate.
+Before delivering any catalog items to the UI, the catalog load pipeline SHALL determine the
+total item count from, in order of preference: a dedicated fresh-install totals request (see
+`rust-catalog-fresh-install-initialization`); otherwise a live, best-effort remote item-count
+request; otherwise the local catalog cache's item count; otherwise by parsing the `last` page
+URL from the first API page response. The local cache's count SHALL NOT be used when a live
+remote count is available, since a full fetch only runs when the cache is already known or
+suspected to be stale, making its count an unreliable progress denominator. If no source
+yields a count, the count SHALL be treated as unknown and progress SHALL remain indeterminate.
+
+#### Scenario: Total count derived from a fresh-install totals request
+- **WHEN** fresh-install initialization has issued its totals request and received a total
+  item count
+- **THEN** the system uses that count as `estimated_total` and makes it available to the
+  progress tracker before requesting any page of item data
+
+#### Scenario: Total count derived from a live remote count for a non-fresh-install fetch
+- **WHEN** a full paginated fetch runs for a reason other than a fresh install (stale cache,
+  count mismatch, force reload) and a live remote item-count request succeeds
+- **THEN** the system uses that live count as `estimated_total`, not the local cache's
+  (potentially stale) item count
 
 #### Scenario: Total count derived from first page
-- **WHEN** the first page of library items is received and `links.last` contains a page number parameter
-- **THEN** the system computes `estimated_total = last_page_number * items_per_page` and makes it available to the progress tracker
+- **WHEN** no fresh-install totals request or live remote count applies and the first page of
+  library items is received with a `links.last` URL containing a page number parameter
+- **THEN** the system computes `estimated_total = last_page_number * items_per_page` and makes
+  it available to the progress tracker
 
-#### Scenario: Total count unknown when links.last is absent
-- **WHEN** the first page response has no `links.last` URL or the URL has no parseable page number
-- **THEN** the system treats the total as unknown and the progress indicator remains indeterminate
+#### Scenario: Total count unknown when no source is available
+- **WHEN** no fresh-install totals request, live remote count, or `links.last` URL is
+  available
+- **THEN** the system treats the total as unknown and the progress indicator remains
+  indeterminate
 
 ### Requirement: Catalog load SHALL update activity panel progress after each page
 The catalog load activity entry SHALL update its progress value after each page of items is received. Progress SHALL be computed as `items_loaded / estimated_total`, clamped to the range [0.0, 1.0].

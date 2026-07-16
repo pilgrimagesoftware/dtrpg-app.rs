@@ -72,17 +72,22 @@ Alternative considered: a background polling loop pushing state on every tick. R
 adds a persistent background task and unbounded resource use for a capability the spec marks
 optional; on-demand query satisfies every mandatory requirement.
 
-**Retry helper is generalized as a standalone function/struct in `dtrpg-core`, parameterized by
-attempt count and retry-gate predicate, reusing `download-retry-with-backoff`'s
-`backoff_delay(attempt, jitter_source)` unchanged.**
-`backoff_delay` is already pure and dependency-free (no `rand`, deterministic jitter from
-`SystemTime`). Lifting it out of `download.rs` into a shared module (e.g.
-`crates/dtrpg-core/src/services/retry.rs`) and wrapping it with a small `retry_with_backoff`
-helper that takes a fallible closure, max attempts, and an `on_retry(attempt, reason, delay)`
-callback lets catalog-sync and image-cache call sites reuse it without duplicating the backoff
-math. Download-transfer retry itself keeps calling the same function; only its home module
-moves. Alternative considered: leave `backoff_delay` in `download.rs` and duplicate it for
-catalog sync. Rejected — the parent proposal explicitly asks not to duplicate this logic.
+**Retry helper lives in `dtrpg-ui`, not `dtrpg-core`, since `dtrpg-core` depends on `dtrpg-ui`
+(not the reverse) and the primary callers — `LibraryController`'s catalog-sync dispatch and
+cover/avatar image caching — are `dtrpg-ui` code.**
+`crates/dtrpg-core/Cargo.toml` depends on `dtrpg-ui`; `dtrpg-ui` has no dependency back on
+`dtrpg-core`. A shared helper usable by both catalog-sync (`dtrpg-ui`) and, eventually,
+download-transfer retry (`dtrpg-core`, behind the `LibraryService` trait implemented there)
+must live on the `dtrpg-ui` side of that boundary, the same side `LibraryServiceError` and the
+`LibraryService` trait itself already live on. Corrected from an earlier draft of this design
+that placed it in `dtrpg-core/src/services/retry.rs`, which would have made it unreachable from
+`LibraryController`.
+**`download-retry-with-backoff`'s `backoff_delay` did not exist yet at implementation time (0/22
+tasks, no code)**, so it was built here from scratch per that change's own design.md algorithm —
+exponential, base 2s, cap 30s, deterministic jitter, no `rand` dependency — generalized with
+explicit `base_secs`/`max_secs` parameters so catalog-sync and image-cache can use their own
+constants. `download-retry-with-backoff` will call this same `dtrpg_ui::services::retry` module
+when it's implemented, rather than either change duplicating the backoff math.
 
 **Logging convention: `tracing::debug!`/`warn!`/`error!` carry full internal detail (endpoint,
 status code, retry reason); user-facing surfaces (activity panel, toast) receive only a

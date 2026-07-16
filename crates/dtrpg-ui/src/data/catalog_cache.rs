@@ -43,12 +43,12 @@ const CACHE_SCHEMA_VERSION: u32 = 3;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheMetadata {
     /// Unix timestamp (seconds since epoch) when the cache was written.
-    pub saved_at_secs:              u64,
+    pub saved_at_secs:                   u64,
     /// Number of items in the cache at write time.
-    pub item_count:                 usize,
+    pub item_count:                      usize,
     /// Schema version the cache was written with; see [`CACHE_SCHEMA_VERSION`].
     #[serde(default)]
-    pub schema_version:             u32,
+    pub schema_version:                  u32,
     /// Unix timestamp (seconds since epoch) of the last per-item availability
     /// check batch (manual or automatic), gating
     /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `#[serde(default)]` so metadata
@@ -56,7 +56,14 @@ pub struct CacheMetadata {
     /// first post-upgrade batch is never blocked by a cooldown it has no
     /// record of.
     #[serde(default)]
-    pub last_item_check_batch_secs: Option<u64>,
+    pub last_item_check_batch_secs:      Option<u64>,
+    /// Unix timestamp (seconds since epoch) of the last fresh-install
+    /// catalog-initialization request (see
+    /// `rust-catalog-fresh-install-initialization`), gating
+    /// `CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS`. `#[serde(default)]`
+    /// for the same reason as `last_item_check_batch_secs`.
+    #[serde(default)]
+    pub last_fresh_install_request_secs: Option<u64>,
 }
 
 impl CacheMetadata {
@@ -80,12 +87,50 @@ impl CacheMetadata {
 /// receive `None` should treat the cache as stale.
 pub fn load_cache_metadata(root: &Path) -> Option<CacheMetadata> {
     let path = root.join(CATALOG_CACHE_METADATA_FILE);
-    let text = fs::read_to_string(&path)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "cache metadata not readable"))
-        .ok()?;
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        // A missing file is the expected state on a fresh install (or any time
+        // the cache hasn't been written yet) and this is called on every
+        // Settings render (`cache_counts`) in addition to catalog-load checks
+        // -- warning on it floods the log with a non-error. Any other I/O
+        // failure (permissions, a genuinely unreadable disk) is still worth a
+        // warning.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => {
+            warn!(path = %path.display(), error = %e, "cache metadata not readable");
+            return None;
+        }
+    };
     serde_json::from_str(&text)
         .map_err(|e| warn!(path = %path.display(), error = %e, "cache metadata malformed"))
         .ok()
+}
+
+/// Writes a zeroed default `catalog_cache_meta.json` at `root` if no file
+/// exists there yet, so the metadata sidecar exists on disk from first
+/// startup rather than only appearing after the first successful catalog
+/// fetch. Called once at app boot (see `init_globals`).
+///
+/// `schema_version: 0` and `saved_at_secs: 0` both independently cause
+/// [`CacheMetadata::is_stale`] to report `true`, correctly reflecting that
+/// nothing has actually been cached yet. A file that already exists — with
+/// real data, or one that fails to parse — is left untouched.
+pub fn ensure_cache_metadata_exists(root: &Path) {
+    let path = root.join(CATALOG_CACHE_METADATA_FILE);
+    if path.exists() {
+        return;
+    }
+    let meta = CacheMetadata { saved_at_secs:                   0,
+                               item_count:                      0,
+                               schema_version:                  0,
+                               last_item_check_batch_secs:      None,
+                               last_fresh_install_request_secs: None, };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(json) = serde_json::to_string(&meta) {
+        let _ = fs::write(&path, json);
+    }
 }
 
 /// Writes cache metadata for `item_count` items to
@@ -98,12 +143,15 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
     let saved_at_secs = SystemTime::now().duration_since(UNIX_EPOCH)
                                          .unwrap_or(Duration::ZERO)
                                          .as_secs();
-    let last_item_check_batch_secs =
-        load_cache_metadata(root).and_then(|m| m.last_item_check_batch_secs);
+    let existing = load_cache_metadata(root);
+    let last_item_check_batch_secs = existing.as_ref().and_then(|m| m.last_item_check_batch_secs);
+    let last_fresh_install_request_secs = existing.as_ref()
+                                                  .and_then(|m| m.last_fresh_install_request_secs);
     let meta = CacheMetadata { saved_at_secs,
                                item_count,
                                schema_version: CACHE_SCHEMA_VERSION,
-                               last_item_check_batch_secs };
+                               last_item_check_batch_secs,
+                               last_fresh_install_request_secs };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
@@ -115,11 +163,31 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// run before any catalog has ever been successfully synced).
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
     let mut meta =
-        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:              0,
-                                                            item_count:                 0,
-                                                            schema_version:             0,
-                                                            last_item_check_batch_secs: None, });
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+                                   item_count:                      0,
+                                   schema_version:                  0,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, });
     meta.last_item_check_batch_secs = Some(now_secs);
+    let json = serde_json::to_string(&meta)?;
+    fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
+    Ok(())
+}
+
+/// Persists `now_secs` as the last fresh-install catalog-initialization
+/// request timestamp, preserving the rest of the existing cache metadata (or
+/// using zeroed placeholders if no metadata file exists yet — the
+/// fresh-install request happens before any catalog has ever been
+/// successfully synced).
+pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
+                                            -> Result<(), CatalogCacheError> {
+    let mut meta =
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+                                   item_count:                      0,
+                                   schema_version:                  0,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, });
+    meta.last_fresh_install_request_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
@@ -148,9 +216,17 @@ pub enum CatalogCacheError {
 /// can fall through to the live API fetch without surfacing errors to the user.
 pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
     let path = root.join(CATALOG_CACHE_FILE);
-    let text = fs::read_to_string(&path)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache not readable"))
-        .ok()?;
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        // A missing file is the expected state on a fresh install; only a
+        // genuine I/O failure (permissions, an unreadable disk) is worth a
+        // warning.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => {
+            warn!(path = %path.display(), error = %e, "catalog cache not readable");
+            return None;
+        }
+    };
     let mut items: Vec<LibraryItem> = serde_json::from_str(&text)
         .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache malformed"))
         .ok()?;
@@ -238,18 +314,20 @@ mod tests {
                                        SystemTime::now().duration_since(UNIX_EPOCH)
                                                         .unwrap()
                                                         .as_secs(),
-                                   item_count:                 10,
-                                   schema_version:             CACHE_SCHEMA_VERSION,
-                                   last_item_check_batch_secs: None, };
+                                   item_count:                      10,
+                                   schema_version:                  CACHE_SCHEMA_VERSION,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, };
         assert!(!meta.is_stale());
     }
 
     #[test]
     fn old_metadata_is_stale() {
-        let meta = CacheMetadata { saved_at_secs:              0, // epoch — very old
-                                   item_count:                 10,
-                                   schema_version:             CACHE_SCHEMA_VERSION,
-                                   last_item_check_batch_secs: None, };
+        let meta = CacheMetadata { saved_at_secs:                   0, // epoch — very old
+                                   item_count:                      10,
+                                   schema_version:                  CACHE_SCHEMA_VERSION,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, };
         assert!(meta.is_stale());
     }
 
@@ -262,9 +340,10 @@ mod tests {
                                        SystemTime::now().duration_since(UNIX_EPOCH)
                                                         .unwrap()
                                                         .as_secs(),
-                                   item_count:                 10,
-                                   schema_version:             CACHE_SCHEMA_VERSION - 1,
-                                   last_item_check_batch_secs: None, };
+                                   item_count:                      10,
+                                   schema_version:                  CACHE_SCHEMA_VERSION - 1,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, };
         assert!(meta.is_stale());
     }
 
@@ -297,6 +376,36 @@ mod tests {
 
         let meta = meta.unwrap();
         assert_eq!(meta.item_count, 3);
+        assert!(!meta.is_stale());
+    }
+
+    #[test]
+    fn ensure_cache_metadata_exists_writes_a_stale_default_when_missing() {
+        let dir = test_dir("ensure_metadata_missing");
+        let _ = fs::remove_dir_all(&dir);
+
+        ensure_cache_metadata_exists(&dir);
+        let meta = load_cache_metadata(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let meta = meta.unwrap();
+        assert_eq!(meta.item_count, 0);
+        assert!(meta.is_stale());
+    }
+
+    #[test]
+    fn ensure_cache_metadata_exists_leaves_a_real_file_untouched() {
+        let dir = test_dir("ensure_metadata_present");
+        fs::create_dir_all(&dir).unwrap();
+        let items = vec![make_item("b1")];
+        save_catalog_cache(&dir, &items).unwrap();
+
+        ensure_cache_metadata_exists(&dir);
+        let meta = load_cache_metadata(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let meta = meta.unwrap();
+        assert_eq!(meta.item_count, 1);
         assert!(!meta.is_stale());
     }
 

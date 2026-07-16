@@ -6,7 +6,10 @@
 //! - Windows: `%APPDATA%\com.pilgrimagesoftware.dtrpg\logs\`
 //!
 //! The default filter level is `WARN`. Set `RUST_LOG` to override (e.g.
-//! `RUST_LOG=debug cargo run` for verbose output during development).
+//! `RUST_LOG=debug cargo run` for verbose output during development). The
+//! `gpui` crate's own internal logging (window/accessibility-tree chatter)
+//! is always capped at `INFO`, regardless of `RUST_LOG`, since its DEBUG
+//! output is high-volume and rarely useful outside gpui development itself.
 //!
 //! When compiled with the `sentry` feature and `DTRPG_SENTRY_DSN` is set at
 //! runtime, ERROR-level `tracing` events are additionally forwarded to
@@ -80,7 +83,7 @@ pub fn init() -> LogGuards {
 
     let guards = if let Err(e) = std::fs::create_dir_all(&log_dir) {
         // Can't create log dir — set up console-only and continue.
-        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+        let filter = build_filter();
         tracing_subscriber::registry().with(filter)
                                       .with(fmt::layer().with_writer(std::io::stderr).compact())
                                       .with(sentry_layer(sentry_active))
@@ -95,7 +98,7 @@ pub fn init() -> LogGuards {
         let file_appender = tracing_appender::rolling::daily(&log_dir, "libri.log");
         let (non_blocking, worker_guard) = tracing_appender::non_blocking(file_appender);
 
-        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+        let filter = build_filter();
 
         tracing_subscriber::registry().with(filter)
                                       .with(fmt::layer().with_writer(std::io::stderr).compact())
@@ -200,6 +203,21 @@ impl<S> tracing_subscriber::Layer<S> for NoopLayer<S> where S: tracing::Subscrib
 fn sentry_layer<S>(_active: bool) -> Option<NoopLayer<S>>
     where S: tracing::Subscriber {
     None
+}
+
+/// Builds the log filter: `RUST_LOG` if set, otherwise `warn`, with an
+/// always-applied `gpui=info` directive layered on top.
+///
+/// `gpui` logs its own internal window/accessibility-tree chatter at DEBUG
+/// (e.g. "Sending a11y tree update"), which floods the log whenever
+/// verbosity is raised (e.g. `RUST_LOG=debug`) to see this app's own
+/// debug-level logging. Requiring at least INFO for the `gpui` target keeps
+/// its warnings and errors (e.g. a window `RefCell` panic) visible while
+/// suppressing that routine noise — appended after the base filter so it
+/// takes effect regardless of whether `RUST_LOG` is set.
+fn build_filter() -> EnvFilter {
+    let base = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
+    EnvFilter::try_new(format!("{base},gpui=info")).unwrap_or_else(|_| EnvFilter::new("warn,gpui=info"))
 }
 
 fn platform_log_dir() -> PathBuf {

@@ -258,7 +258,7 @@ alert_history:
   copy_tooltip: "Copier le message d'erreur"
 
 notification:
-  set_up_account: "Configurer le compte"
+  set_up_account: "Se connecter à DriveThruRPG"
   session_expired: "Session expirée — reconnectez-vous pour actualiser votre bibliothèque"
   sign_in_again: "Se reconnecter"
   signing_in: "Connexion à DriveThruRPG en cours…"

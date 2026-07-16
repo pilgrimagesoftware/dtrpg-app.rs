@@ -9,7 +9,7 @@ use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
 use crate::credentials::{CredentialStore, KeyringCredentialStore};
 use crate::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::enums::CatalogPresentation;
-use crate::data::ui_prefs::{UiPrefs, WindowBoundsPref};
+use crate::data::ui_state::{UiState, WindowBoundsPref};
 use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
 use crate::ui::views::root_view::LibraryRootView;
@@ -139,7 +139,7 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 /// nothing was ever saved, or the saved bounds no longer intersect any
 /// currently connected display.
 fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
-    let saved = UiPrefs::load().library_window_bounds()?;
+    let saved = UiState::load().library_window_bounds()?;
     let bounds = Bounds { origin: Point { x: px(saved.x),
                                           y: px(saved.y), },
                           size:   Size { width:  px(saved.width),
@@ -154,7 +154,7 @@ fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
     fits_a_display.then_some(WindowBounds::Windowed(bounds))
 }
 
-/// Saves the library window's current position/size to `UiPrefs`.
+/// Saves the library window's current position/size to `UiState`.
 ///
 /// Called both on every live resize/move (via `LibraryRootView`'s
 /// `observe_window_bounds` subscription) and once more just before the
@@ -164,7 +164,7 @@ fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
 pub fn save_library_window_bounds(window: &Window) {
     let bounds = window.bounds();
     debug!(?bounds, "saving library window bounds");
-    UiPrefs::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
+    UiState::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
                                                                   y:      bounds.origin.y.as_f32(),
                                                                   width:  bounds.size
                                                                                 .width

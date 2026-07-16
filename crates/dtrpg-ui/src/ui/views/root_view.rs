@@ -60,7 +60,7 @@ use crate::{
             TabsChanged, ThumbnailRefreshCompleted, ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
-        ui_prefs::UiPrefs,
+        ui_state::UiState,
     },
     services::{LibraryService, collections::CollectionsService},
     util::sort::{SortDirection, SortMethod},
@@ -674,15 +674,15 @@ impl LibraryRootView {
             settings.update(cx, |ctrl, cx| ctrl.startup_auth(key, cx));
         }
 
-        let ui_prefs = UiPrefs::load();
-        let sidebar_width = ui_prefs.sidebar_width().unwrap_or(250.0);
+        let ui_state = UiState::load();
+        let sidebar_width = ui_state.sidebar_width().unwrap_or(250.0);
         let resize_state = cx.new(|_| ResizableState::default());
 
         cx.subscribe(&resize_state, move |_this, state, _event, cx| {
               let sizes = state.read(cx).sizes().clone();
               if sizes.len() >= 2 {
                   let sidebar = sizes[0].as_f32();
-                  UiPrefs::load().save_sidebar_width(sidebar);
+                  UiState::load().save_sidebar_width(sidebar);
               }
           })
           .detach();
@@ -927,8 +927,7 @@ impl Render for LibraryRootView {
                                      colors);
         let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
         let tab_strip = render_tab_strip(self.tabs.clone(), cx);
-        let banner =
-            render_notification_banner(notices, auth_entity, settings_entity.clone(), colors);
+        let banner = render_notification_banner(notices, auth_entity, cx.entity(), colors);
 
         let tabs_snap = self.tabs.read(cx).snapshot();
         let (active_tab_label, active_tab_count) = match &tabs_snap.active {

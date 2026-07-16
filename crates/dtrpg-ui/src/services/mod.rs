@@ -1,6 +1,8 @@
 //! Service traits and error types for library and collections data access.
 
 pub mod collections;
+pub mod network_monitor;
+pub mod retry;
 
 use crate::data::library::LibraryItem;
 

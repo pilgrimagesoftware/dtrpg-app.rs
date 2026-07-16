@@ -51,13 +51,14 @@ mod tests {
         std::env::temp_dir().join(format!("dtrpg_file_presence_test_{name}"))
     }
 
-    /// A `StorageConfig` whose root is pinned to an isolated test directory
-    /// via the same public `set_root_path` API the Storage settings view
-    /// uses, rather than the platform default download directory.
+    /// A `StorageConfig` whose root is pinned to an isolated test directory,
+    /// entirely in-memory — does not read or write the real `storage.toml`.
+    ///
+    /// Previously used `StorageConfig::load()` + `set_root_path()`, which
+    /// both reads and persists to the developer's actual, shared config
+    /// file, silently corrupting real settings every time these tests ran.
     fn storage_at(root: &std::path::Path) -> StorageConfig {
-        let mut cfg = StorageConfig::load();
-        cfg.set_root_path(root.to_path_buf());
-        cfg
+        StorageConfig::for_test(root.to_path_buf())
     }
 
     fn make_item(id: &str, publisher: &str) -> LibraryItem {
