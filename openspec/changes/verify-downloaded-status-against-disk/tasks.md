@@ -89,12 +89,12 @@
 
 ## 6. Manual Verification
 
-- [ ] 6.1 Download an item, delete its file outside the app, restart or
+- [x] 6.1 Download an item, delete its file outside the app, restart or
       trigger a reload, confirm it no longer shows as Downloaded
-- [ ] 6.2 Place a file at an item's expected path manually (without using
+- [x] 6.2 Place a file at an item's expected path manually (without using
       the app's download flow), select that item, confirm it becomes
       marked Downloaded without a full catalog reload
-- [ ] 6.3 Confirm a fresh-cache/skip-fetch restart still catches an
+- [x] 6.3 Confirm a fresh-cache/skip-fetch restart still catches an
       externally deleted file (task 6.1's scenario, but via the skip-fetch
       path specifically — restart quickly enough that the cache is still
       within its freshness window)
