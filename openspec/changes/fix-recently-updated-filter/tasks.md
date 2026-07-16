@@ -77,3 +77,84 @@
       the last 30 days
 - [ ] 8.2 Confirm the toolbar title shows "Recently Updated" when that
       filter is active
+
+## 9. Preference Constants and Predicate
+
+- [x] 9.1 In `crates/dtrpg-ui/src/data/constants.rs`, replace
+      `RECENTLY_UPDATED_WINDOW_SECS` with `RECENTLY_UPDATED_WINDOW_MIN_DAYS:
+      u32 = 7`, `RECENTLY_UPDATED_WINDOW_MAX_DAYS: u32 = 90`, and
+      `RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS: u32 = 30`
+- [x] 9.2 In `crates/dtrpg-ui/src/util/matching.rs`, change
+      `item_recently_updated` to take `window_days: u32` instead of reading
+      the fixed constant, converting to seconds internally
+      (`i64::from(window_days) * 86_400`)
+- [x] 9.3 Thread `window_days: u32` through `item_matches_filter`'s
+      signature and its call sites (mirroring `now_secs`)
+- [x] 9.4 Thread `window_days: u32` through `section_counts`'s signature and
+      its call sites
+
+## 10. Persisted Preference
+
+- [x] 10.1 In `crates/dtrpg-ui/src/data/storage.rs`, add
+      `recently_updated_window_days: u32` to `StorageConfigFile` and
+      `StorageConfig` (default via `RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS`),
+      following `max_concurrent_downloads`'s exact field/serde pattern
+- [x] 10.2 Add `StorageConfig::recently_updated_window_days()` getter and
+      `set_recently_updated_window_days(&mut self, days: u32)` setter that
+      clamps to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+      RECENTLY_UPDATED_WINDOW_MAX_DAYS]` before storing and persisting
+
+## 11. Settings Controller and Wiring
+
+- [x] 11.1 In `crates/dtrpg-ui/src/controllers/settings.rs`, add
+      `recently_updated_window_days` to `SettingsSnapshot` and a
+      `set_recently_updated_window_days(&mut self, days: u32, cx: &mut
+      Context<Self>)` method that updates `self.storage` and emits
+      `SettingsChanged`, mirroring `set_max_concurrent_downloads`
+- [x] 11.2 In `crates/dtrpg-ui/src/controllers/library.rs`, add a
+      `recently_updated_window_days: u32` field (loaded from
+      `StorageConfig::load()` at construction) and a
+      `set_recently_updated_window_days(&mut self, days: u32, cx: &mut
+      Context<Self>)` method that updates the field and invalidates the
+      cached filtered items/section counts, mirroring
+      `set_max_concurrent_downloads`
+- [x] 11.3 In `crates/dtrpg-ui/src/ui/views/root_view.rs`, add a
+      `SettingsChanged` subscription that reads
+      `settings.snapshot().recently_updated_window_days` and calls
+      `controller.set_recently_updated_window_days`, mirroring the existing
+      `max_concurrent_downloads` subscription
+
+## 12. Settings UI
+
+- [x] 12.1 In `crates/dtrpg-ui/src/ui/views/settings_storage_view.rs`, add a
+      "Recently Updated window" stepper row (7-90 days) reusing
+      `render_concurrency_stepper`'s layout, wired to
+      `SettingsController::set_recently_updated_window_days`
+- [x] 12.2 Add `settings.recently_updated_window_title`,
+      `settings.recently_updated_window_note`,
+      `settings.recently_updated_window_decrement_tooltip`, and
+      `settings.recently_updated_window_increment_tooltip` i18n keys to
+      `en.yaml`, `de.yaml`, `fr.yaml`
+
+## 13. Tests
+
+- [x] 13.1 Unit test: `item_recently_updated` respects a non-default
+      `window_days` (e.g. an item 10 days old matches a 7-day window's
+      complement but not a narrower one)
+- [x] 13.2 Unit test: `StorageConfig::set_recently_updated_window_days`
+      clamps values below 7 and above 90
+- [x] 13.3 Unit test: `section_counts` reflects a non-default `window_days`
+
+## 14. Build and Quality (re-run)
+
+- [x] 14.1 `cargo check --workspace`
+- [x] 14.2 `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] 14.3 `cargo test --workspace`
+- [x] 14.4 `cargo +nightly fmt --all -- --check`
+
+## 15. Manual Verification (additional)
+
+- [ ] 15.1 Confirm the Storage settings page shows the new stepper, that it
+      won't go below 7 or above 90, and that changing it immediately updates
+      the sidebar's "Recently Updated" badge count without restarting the
+      app

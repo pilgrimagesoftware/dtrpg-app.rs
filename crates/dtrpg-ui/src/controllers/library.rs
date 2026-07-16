@@ -679,6 +679,11 @@ pub struct LibraryController {
     /// [`crate::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].
     max_concurrent_downloads:      usize,
+    /// User-configured "Recently Updated" sidebar window, in days.
+    /// Initialized from [`crate::data::storage::StorageConfig`] and kept in
+    /// sync with the Storage settings page via
+    /// [`Self::set_recently_updated_window_days`].
+    recently_updated_window_days:  u32,
 }
 
 impl LibraryController {
@@ -699,6 +704,7 @@ impl LibraryController {
         let vm = LibraryViewModel::new(service);
         let prefs = crate::data::ui_preferences::UiPreferences::load();
         let view_prefs = crate::data::file_openers::CatalogViewPrefs::load();
+        let storage = StorageConfig::load();
 
         let mut ctrl =
             Self { vm,
@@ -751,7 +757,8 @@ impl LibraryController {
                    active_downloads: 0,
                    download_cancel_flags: HashMap::new(),
                    download_activity_ids: HashMap::new(),
-                   max_concurrent_downloads: StorageConfig::load().max_concurrent_downloads() };
+                   max_concurrent_downloads: storage.max_concurrent_downloads(),
+                   recently_updated_window_days: storage.recently_updated_window_days() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
@@ -872,7 +879,9 @@ impl LibraryController {
                       }
                       if changed {
                           ctrl.catalog = catalog;
-                          ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
+                          ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                               now_secs(),
+                                                               ctrl.recently_updated_window_days);
                           ctrl.invalidate_cache();
                       }
                       cx.emit(LibraryChanged);
@@ -1550,7 +1559,8 @@ impl LibraryController {
             items
         };
         self.catalog_loading = false;
-        self.section_counts = section_counts(&self.catalog, now_secs());
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
         self.revalidate_publisher_filter();
         self.invalidate_cache();
@@ -1603,7 +1613,8 @@ impl LibraryController {
         self.enqueue_thumbnails(&partial, cx);
         self.catalog = merge_partial_fetch(std::mem::take(&mut self.catalog), partial);
         self.catalog_loading = false;
-        self.section_counts = section_counts(&self.catalog, now_secs());
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
         self.revalidate_publisher_filter();
         self.invalidate_cache();
@@ -1618,7 +1629,8 @@ impl LibraryController {
     fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog.extend(items);
-        self.section_counts = section_counts(&self.catalog, now_secs());
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -1729,7 +1741,8 @@ impl LibraryController {
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
         self.catalog.clear();
-        self.section_counts = section_counts(&self.catalog, now_secs());
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
         self.collections.clear();
         self.collections_loaded = false;
@@ -2142,6 +2155,23 @@ impl LibraryController {
         self.drain_download_queue(cx);
     }
 
+    /// Updates the "Recently Updated" sidebar window and recomputes the
+    /// section counts and cached filtered items so the change is reflected
+    /// immediately.
+    ///
+    /// Called when [`crate::controllers::settings::SettingsController`]
+    /// reports a `SettingsChanged` event, so a change made on the Storage
+    /// settings page takes effect immediately.
+    pub fn set_recently_updated_window_days(&mut self, days: u32, cx: &mut Context<Self>) {
+        if self.recently_updated_window_days == days {
+            return;
+        }
+        self.recently_updated_window_days = days;
+        self.section_counts = section_counts(&self.catalog, now_secs(), days);
+        self.invalidate_cache();
+        cx.emit(LibraryChanged);
+    }
+
     // ── Thumbnail loading ──────────────────────────────────────────────────────
 
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
@@ -2515,13 +2545,18 @@ impl LibraryController {
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
-        let filter_count =
-            self.catalog
-                .iter()
-                .filter(|i| {
-                    item_matches_filter(i, &self.filter, &self.collection_members, now_secs())
-                })
-                .count();
+        let now_secs = now_secs();
+        let window_days = self.recently_updated_window_days;
+        let filter_count = self.catalog
+                               .iter()
+                               .filter(|i| {
+                                   item_matches_filter(i,
+                                                       &self.filter,
+                                                       &self.collection_members,
+                                                       now_secs,
+                                                       window_days)
+                               })
+                               .count();
         let items = self.visible_items();
         let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
@@ -2589,15 +2624,20 @@ impl LibraryController {
     /// Called eagerly at every mutation site that changes any of those inputs
     /// so render-path accessors never re-scan the catalog.
     fn invalidate_cache(&mut self) {
-        let mut items: Vec<LibraryItem> =
-            self.catalog
-                .iter()
-                .filter(|i| {
-                    item_matches_filter(i, &self.filter, &self.collection_members, now_secs())
-                    && item_matches_query(i, &self.search_query)
-                })
-                .cloned()
-                .collect();
+        let now_secs = now_secs();
+        let window_days = self.recently_updated_window_days;
+        let mut items: Vec<LibraryItem> = self.catalog
+                                              .iter()
+                                              .filter(|i| {
+                                                  item_matches_filter(i,
+                                                                      &self.filter,
+                                                                      &self.collection_members,
+                                                                      now_secs,
+                                                                      window_days)
+                                                  && item_matches_query(i, &self.search_query)
+                                              })
+                                              .cloned()
+                                              .collect();
         sort_items(&mut items, self.sort, self.sort_direction);
         self.items_cache = Some(items);
     }
@@ -2825,7 +2865,9 @@ impl LibraryController {
                          && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
                       {
                           *existing = item;
-                          ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
+                          ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                               now_secs(),
+                                                               ctrl.recently_updated_window_days);
                           ctrl.invalidate_cache();
                       }
                       cx.emit(LibraryChanged);
@@ -2920,7 +2962,9 @@ impl LibraryController {
             this.update(async_cx, |ctrl, cx| {
                     if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
                         apply_check_result(existing, result, std::time::SystemTime::now());
-                        ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
+                        ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                             now_secs(),
+                                                             ctrl.recently_updated_window_days);
                         ctrl.invalidate_cache();
                     }
                     ctrl.checking_items.remove(&id);
@@ -3279,7 +3323,8 @@ impl LibraryController {
                 file.downloaded = false;
             }
             item.recompute_status();
-            self.section_counts = section_counts(&self.catalog, now_secs());
+            self.section_counts =
+                section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
             self.invalidate_cache();
             self.file_info_cache
                 .retain(|(entry_id, _), _| entry_id.as_ref() != id);
@@ -3561,7 +3606,10 @@ impl LibraryController {
                                   }
                                   item.recompute_status();
                               }
-                              ctrl.section_counts = section_counts(&ctrl.catalog, now_secs());
+                              ctrl.section_counts =
+                                  section_counts(&ctrl.catalog,
+                                                 now_secs(),
+                                                 ctrl.recently_updated_window_days);
                               ctrl.invalidate_cache();
                               cx.emit(LibraryChanged);
                           }

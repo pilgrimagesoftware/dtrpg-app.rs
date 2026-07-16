@@ -7,9 +7,13 @@ The sidebar MUST render a "Library" section group containing four nav items: All
 - **WHEN** the library has been loaded
 - **THEN** the "All Titles" nav item badge shows the total number of library items
 
-#### Scenario: Recently Updated shows items added or updated within the last 30 days
+#### Scenario: Recently Updated shows items added or updated within the configured window
 - **WHEN** the library has been loaded
-- **THEN** the "Recently Updated" nav item badge shows the count of items whose `date_added` or `date_updated` (whichever is more recent) falls within the last 30 days of the current time
+- **THEN** the "Recently Updated" nav item badge shows the count of items whose `date_added` or `date_updated` (whichever is more recent) falls within the user-configured window (default 30 days) of the current time
+
+#### Scenario: Recently Updated window is a bounded user preference
+- **WHEN** the user adjusts the "Recently Updated window" stepper in Settings > Storage
+- **THEN** the value is clamped to between 7 and 90 days, persisted, and takes effect immediately for both the sidebar badge count and the filtered item list without restarting the app
 
 #### Scenario: On This Device shows downloaded item count
 - **WHEN** the library has been loaded

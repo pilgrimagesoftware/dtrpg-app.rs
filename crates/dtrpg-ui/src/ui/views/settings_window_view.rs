@@ -100,6 +100,7 @@ impl Render for SettingsWindowView {
                                           snap.cache_counts,
                                           snap.max_concurrent_downloads,
                                           snap.create_collections,
+                                          snap.recently_updated_window_days,
                                           font_selects);
 
         div().size_full()

@@ -580,6 +580,22 @@ impl LibraryRootView {
                      })
           .detach();
 
+        // Propagate a `recently_updated_window_days` change from the Storage
+        // settings page to the controller that actually applies it, so it
+        // takes effect immediately rather than only on next app launch.
+        let controller_for_window = controller.clone();
+        let settings_for_window = settings.clone();
+        cx.subscribe(&settings,
+                     move |_this, _ctrl, _event: &SettingsChanged, cx| {
+                         let days = settings_for_window.read(cx)
+                                                       .snapshot()
+                                                       .recently_updated_window_days;
+                         controller_for_window.update(cx, |ctrl, cx| {
+                                                  ctrl.set_recently_updated_window_days(days, cx);
+                                              });
+                     })
+          .detach();
+
         cx.subscribe(&auth_state,
                      |_this, _ctrl, _event: &AuthStateChanged, cx| {
                          cx.notify();

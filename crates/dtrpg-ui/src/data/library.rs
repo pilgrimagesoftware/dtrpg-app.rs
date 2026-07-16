@@ -223,12 +223,16 @@ pub struct SectionCounts {
 }
 
 /// Computes smart section counts from the full catalog.
+///
+/// `window_days` is the user-configured "Recently Updated window" applied to
+/// the `recently_updated` count.
 #[must_use]
-pub fn section_counts(catalog: &[LibraryItem], now_secs: i64) -> SectionCounts {
+pub fn section_counts(catalog: &[LibraryItem], now_secs: i64, window_days: u32) -> SectionCounts {
     SectionCounts { all:              catalog.len(),
-                    recently_updated: catalog.iter()
-                                             .filter(|i| item_recently_updated(i, now_secs))
-                                             .count(),
+                    recently_updated:
+                        catalog.iter()
+                               .filter(|i| item_recently_updated(i, now_secs, window_days))
+                               .count(),
                     on_device:        catalog.iter()
                                              .filter(|i| i.status == ItemStatus::Downloaded)
                                              .count(),
@@ -479,16 +483,29 @@ mod tests {
         item
     }
 
+    const DAY_SECS: i64 = 24 * 60 * 60;
+
     #[test]
     fn section_counts_recently_updated_reflects_only_items_in_window() {
         let now = 1_800_000_000;
-        const DAY_SECS: i64 = 24 * 60 * 60;
         let catalog = vec![item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
                            item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),];
 
-        let counts = section_counts(&catalog, now);
+        let counts = section_counts(&catalog, now, 30);
 
         assert_eq!(counts.all, 2);
         assert_eq!(counts.recently_updated, 1);
+    }
+
+    #[test]
+    fn section_counts_recently_updated_respects_a_non_default_window() {
+        let now = 1_800_000_000;
+        let catalog = vec![item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
+                           item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),];
+
+        // A 7-day window excludes the item that a 30-day default includes.
+        let counts = section_counts(&catalog, now, 7);
+
+        assert_eq!(counts.recently_updated, 0);
     }
 }

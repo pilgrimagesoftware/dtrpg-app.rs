@@ -6,9 +6,14 @@
 //! inline strings to ensure consistent namespacing and enable targeted
 //! deletion on uninstall.
 
-/// 30 days in seconds — the window within which an item's `date_added` or
-/// `date_updated` counts as "recently updated".
-pub const RECENTLY_UPDATED_WINDOW_SECS: i64 = 30 * 24 * 60 * 60;
+/// Default number of days within which an item's `date_added` or
+/// `date_updated` counts as "recently updated", when no user preference has
+/// been saved.
+pub const RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS: u32 = 30;
+/// Lower bound for the "Recently Updated window" stepper, in days.
+pub const RECENTLY_UPDATED_WINDOW_MIN_DAYS: u32 = 7;
+/// Upper bound for the "Recently Updated window" stepper, in days.
+pub const RECENTLY_UPDATED_WINDOW_MAX_DAYS: u32 = 90;
 
 pub const MONTH_ABBRS: [&str; 12] =
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
