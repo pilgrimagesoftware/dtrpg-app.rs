@@ -54,7 +54,17 @@ pub fn app_data_dir() -> PathBuf {
                     .join(APP_DIR_NAME)
 }
 
-/// Returns the directory for regenerable application cache data.
+/// Returns the directory for regenerable application cache data: catalog
+/// metadata ([`cache_dir`]), cover thumbnails ([`covers_dir`]), and the
+/// avatar cache.
+///
+/// On macOS this resolves to `~/Library/Caches/{MACOS_BUNDLE_ID}` — the
+/// platform convention for exactly this kind of data, deliberately: the OS
+/// may clear this directory under disk pressure, and everything here is
+/// re-fetchable from the DriveThruRPG API or Gravatar, so that's an
+/// acceptable trade-off rather than a bug. It is not the same directory as
+/// [`app_data_dir`] (Application Support), which holds state that isn't
+/// safe to have cleared out from under the app.
 ///
 /// Falls back to the current directory if the platform cache directory cannot
 /// be determined.
