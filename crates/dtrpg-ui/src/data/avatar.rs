@@ -3,8 +3,20 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::data::constants::AVATAR_CACHE_FILE;
+use crate::data::constants::{AVATAR_CACHE_FILE, GRAVATAR_HOST, IMAGE_CACHE_MAX_ATTEMPTS,
+                              IMAGE_CACHE_RETRY_BASE_DELAY_SECS, IMAGE_CACHE_RETRY_MAX_DELAY_SECS};
 use crate::data::paths::app_cache_dir;
+use crate::services::network_monitor::NetworkMonitor;
+use crate::services::retry::{RetryConfig, retry_with_backoff};
+
+/// Internal fetch-failure classification: only [`AvatarFetchError::Transient`]
+/// is retried. A non-success HTTP status (e.g. `404` for an unregistered
+/// Gravatar email) retrying wouldn't fix, so it's treated as final.
+#[derive(Debug)]
+enum AvatarFetchError {
+    Transient(String),
+    Final,
+}
 
 fn avatar_cache_path() -> PathBuf {
     app_cache_dir().join(AVATAR_CACHE_FILE)
@@ -59,15 +71,60 @@ pub fn fetch_avatar_bytes(email: String) -> Option<Vec<u8>> {
         return Some(cached);
     }
 
-    let url = gravatar_url(&email);
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(5))
-                                                     .build()
-                                                     .ok()?;
-    let response = client.get(&url).send().ok()?;
-    if !response.status().is_success() {
+    let monitor = NetworkMonitor::new();
+    if !monitor.check_endpoint(GRAVATAR_HOST) {
+        tracing::debug!("avatar fetch skipped: Gravatar endpoint unreachable");
         return None;
     }
-    let bytes = response.bytes().ok().map(|b| b.to_vec())?;
-    save_cached_avatar(&bytes);
-    Some(bytes)
+
+    let url = gravatar_url(&email);
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let config = RetryConfig { max_attempts: IMAGE_CACHE_MAX_ATTEMPTS,
+                              base_secs:    IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                              max_secs:     IMAGE_CACHE_RETRY_MAX_DELAY_SECS };
+    let mut on_retry = |attempt: u32, delay: Duration, reason: &AvatarFetchError| {
+        if let AvatarFetchError::Transient(reason) = reason {
+            tracing::debug!(url = %url,
+                            attempt,
+                            delay_secs = delay.as_secs(),
+                            %reason,
+                            "avatar fetch retrying");
+        }
+    };
+    let result = retry_with_backoff(config,
+                                    &cancel,
+                                    || -> Result<Vec<u8>, AvatarFetchError> {
+                                        let client =
+                                            reqwest::blocking::Client::builder()
+                                                .timeout(Duration::from_secs(5))
+                                                .build()
+                                                .map_err(|e| {
+                                                    AvatarFetchError::Transient(e.to_string())
+                                                })?;
+                                        let response = client.get(&url).send().map_err(|e| {
+                                            AvatarFetchError::Transient(e.to_string())
+                                        })?;
+                                        if !response.status().is_success() {
+                                            return Err(AvatarFetchError::Final);
+                                        }
+                                        response.bytes()
+                                                .map(|b| b.to_vec())
+                                                .map_err(|e| {
+                                                    AvatarFetchError::Transient(e.to_string())
+                                                })
+                                    },
+                                    |e| matches!(e, AvatarFetchError::Transient(_)),
+                                    Some(&mut on_retry));
+
+    match result {
+        Ok(bytes) => {
+            save_cached_avatar(&bytes);
+            Some(bytes)
+        }
+        Err(AvatarFetchError::Transient(reason)) => {
+            tracing::warn!(reason = %reason, "avatar fetch failed after retries");
+            None
+        }
+        Err(AvatarFetchError::Final) => None,
+    }
 }

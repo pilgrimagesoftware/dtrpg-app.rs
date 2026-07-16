@@ -25,7 +25,8 @@ use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
-use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
+use crate::services::network_monitor::NetworkMonitor;
+use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use crate::util::file_presence::{resolved_file_path, verify_item_downloads};
 use crate::util::filter::*;
@@ -544,6 +545,11 @@ pub struct LibraryController {
     ///
     /// [`start_load_inner`]: Self::start_load_inner
     catalog_sync_in_flight:        bool,
+    /// Shared connectivity monitor consulted before catalog-sync and
+    /// cover-thumbnail network requests. Held as an `Arc` so background
+    /// tasks spawned on gpui's executor can query it without borrowing
+    /// `self`.
+    network_monitor:               Arc<NetworkMonitor>,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
@@ -696,6 +702,7 @@ impl LibraryController {
                    catalog_loading: true,
                    load_generation: 0,
                    catalog_sync_in_flight: false,
+                   network_monitor: Arc::new(NetworkMonitor::new()),
                    items_cache: None,
                    publisher_search_open: false,
                    publisher_search_query: String::new(),
@@ -1128,13 +1135,48 @@ impl LibraryController {
                     );
                 } else {
                     let svc = service_arc.clone();
-                    let totals = async_cx
+                    let cancel = std::sync::atomic::AtomicBool::new(false);
+                    let config = retry::RetryConfig {
+                        max_attempts: crate::data::constants::CATALOG_SYNC_MAX_ATTEMPTS,
+                        base_secs: crate::data::constants::CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
+                        max_secs: crate::data::constants::CATALOG_SYNC_RETRY_MAX_DELAY_SECS,
+                    };
+                    let mut on_retry =
+                        |attempt: u32, delay: std::time::Duration, e: &LibraryServiceError| {
+                            tracing::debug!(
+                                attempt,
+                                delay_secs = delay.as_secs(),
+                                reason = %e,
+                                "fresh-install totals request retrying"
+                            );
+                        };
+                    // `count_items()` returns `Option<Result<usize, _>>` — `None` means
+                    // "count not supported by this implementation" (not an error, nothing to
+                    // retry); folded into `Ok(None)` here so `retry_with_backoff` only sees a
+                    // plain `Result` and only retries a genuine `Network`-kind failure.
+                    let totals: Result<Option<usize>, LibraryServiceError> = async_cx
                         .background_executor()
-                        .spawn(async move { svc.count_items() })
+                        .spawn(async move {
+                            retry::retry_with_backoff(
+                                config,
+                                &cancel,
+                                || match svc.count_items() {
+                                    None => Ok(None),
+                                    Some(Ok(n)) => Ok(Some(n)),
+                                    Some(Err(e)) => Err(e),
+                                },
+                                |e: &LibraryServiceError| {
+                                    e.kind == LibraryServiceErrorKind::Network
+                                },
+                                Some(&mut on_retry),
+                            )
+                        })
                         .await;
-                    if let Some(Ok(count)) = totals {
+                    if let Ok(Some(count)) = totals {
                         tracing::debug!(total_items = count, "fresh-install: totals request");
                         fresh_install_total = Some(count);
+                    } else if let Err(e) = totals {
+                        tracing::warn!(error = %e, "fresh-install totals request failed");
                     }
                     let request_root = storage_root.clone();
                     async_cx
@@ -2006,6 +2048,7 @@ impl LibraryController {
 
         let weak_activity = self.activity.downgrade();
         let url_str = url.to_string();
+        let network_monitor = Arc::clone(&self.network_monitor);
 
         cx.spawn(async move |this, async_cx| {
               // gpui's executors are not a Tokio runtime, and `dtrpg-ui` does not depend on
@@ -2021,6 +2064,8 @@ impl LibraryController {
               // network fetch to disk so the next launch is a cache hit.
               let fetch_url = url_str.clone();
               let disk_key = Arc::clone(&item_id);
+              let cancel = std::sync::atomic::AtomicBool::new(false);
+              let retry_url = fetch_url.clone();
               let result: Result<Vec<u8>, String> =
                   async_cx.background_executor()
                           .spawn(async move {
@@ -2030,9 +2075,39 @@ impl LibraryController {
                               {
                                   return Ok(bytes);
                               }
-                              let resp =
-                                  reqwest::blocking::get(&fetch_url).map_err(|e| e.to_string())?;
-                              let bytes = resp.bytes().map_err(|e| e.to_string())?.to_vec();
+                              if !network_monitor.check_endpoint(
+                                  crate::data::constants::DTRPG_API_HOST,
+                              ) {
+                                  return Err(
+                                      "DriveThruRPG API endpoint unreachable".to_string(),
+                                  );
+                              }
+                              let config = retry::RetryConfig {
+                                  max_attempts: crate::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
+                                  base_secs: crate::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                                  max_secs: crate::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
+                              };
+                              let mut on_retry =
+                                  |attempt: u32, delay: std::time::Duration, reason: &String| {
+                                      tracing::debug!(
+                                          url = %retry_url,
+                                          attempt,
+                                          delay_secs = delay.as_secs(),
+                                          reason = %reason,
+                                          "cover thumbnail fetch retrying"
+                                      );
+                                  };
+                              let bytes = retry::retry_with_backoff(
+                                  config,
+                                  &cancel,
+                                  || -> Result<Vec<u8>, String> {
+                                      let resp = reqwest::blocking::get(&fetch_url)
+                                          .map_err(|e| e.to_string())?;
+                                      Ok(resp.bytes().map_err(|e| e.to_string())?.to_vec())
+                                  },
+                                  |_| true,
+                                  Some(&mut on_retry),
+                              )?;
                               save_cached_cover(&covers_root, &disk_key, &bytes);
                               Ok(bytes)
                           })

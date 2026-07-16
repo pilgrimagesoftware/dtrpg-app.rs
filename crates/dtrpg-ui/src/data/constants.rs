@@ -199,6 +199,15 @@ pub const VALUE_FONT_SIZE_RATIO: f32 = 0.9;
 /// changes.
 pub const LABEL_MONO_FONT_SIZE_PT: f32 = 13.0;
 
+/// Host (with port) the network monitor checks for DriveThruRPG API
+/// endpoint-specific reachability. See
+/// [`crate::services::network_monitor::NetworkMonitor::check_endpoint`].
+pub const DTRPG_API_HOST: &str = "api.drivethrurpg.com:443";
+
+/// Host (with port) the network monitor checks for Gravatar endpoint-specific
+/// reachability before an avatar fetch.
+pub const GRAVATAR_HOST: &str = "www.gravatar.com:443";
+
 /// Retry attempts (including the first) for catalog synchronization requests.
 /// See [`crate::services::retry`].
 pub const CATALOG_SYNC_MAX_ATTEMPTS: u32 = 4;
