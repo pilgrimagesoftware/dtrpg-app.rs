@@ -561,6 +561,16 @@ pub struct LibraryController {
     ///
     /// [`start_load_inner`]: Self::start_load_inner
     catalog_sync_in_flight:        bool,
+    /// True if a load was requested (via [`start_load_inner`]) while
+    /// `catalog_sync_in_flight` was already set, so it couldn't start
+    /// immediately. Consumed by [`Self::finish_catalog_sync`], which starts
+    /// a follow-up load once the in-flight one completes rather than
+    /// silently dropping the request — critical for callers like
+    /// [`Self::replace_service`] that clear the catalog and depend on their
+    /// reload actually happening.
+    ///
+    /// [`start_load_inner`]: Self::start_load_inner
+    pending_reload:                bool,
     /// Shared connectivity monitor consulted before catalog-sync and
     /// cover-thumbnail network requests. Held as an `Arc` so background
     /// tasks spawned on gpui's executor can query it without borrowing
@@ -687,19 +697,20 @@ impl LibraryController {
                -> Self {
         let vm = LibraryViewModel::new(service);
         let prefs = crate::data::ui_preferences::UiPreferences::load();
+        let view_prefs = crate::data::file_openers::CatalogViewPrefs::load();
 
         let mut ctrl =
             Self { vm,
                    activity,
                    catalog: Vec::new(),
-                   filter: SidebarFilter::default(),
+                   filter: view_prefs.to_filter(),
                    search_query: String::new(),
-                   sort: SortMethod::default(),
+                   sort: view_prefs.to_sort(),
                    sort_direction: SortDirection::default(),
                    collection_sort: prefs.collection_sort(),
                    collection_sort_direction: prefs.collection_sort_direction(),
-                   grouped: false,
-                   presentation: CatalogPresentation::default(),
+                   grouped: view_prefs.grouped.unwrap_or(false),
+                   presentation: view_prefs.to_presentation(),
                    selection: Selection::default(),
                    section_counts: SectionCounts::default(),
                    publishers: Vec::new(),
@@ -718,6 +729,7 @@ impl LibraryController {
                    catalog_loading: true,
                    load_generation: 0,
                    catalog_sync_in_flight: false,
+                   pending_reload: false,
                    network_monitor: Arc::new(NetworkMonitor::new()),
                    items_cache: None,
                    publisher_search_open: false,
@@ -869,6 +881,21 @@ impl LibraryController {
           .detach();
     }
 
+    /// Clears `catalog_sync_in_flight` and, if a load was requested while
+    /// this sync was running (see `start_load_inner`'s single-flight guard),
+    /// immediately starts a fresh one instead of leaving it dropped.
+    ///
+    /// Every exit path of `start_load_inner`'s background task must call
+    /// this exactly once instead of setting `catalog_sync_in_flight = false`
+    /// directly, so a queued follow-up (e.g. from `replace_service`) is
+    /// never silently lost.
+    fn finish_catalog_sync(&mut self, cx: &mut Context<Self>) {
+        self.catalog_sync_in_flight = false;
+        if std::mem::take(&mut self.pending_reload) {
+            self.start_load(cx);
+        }
+    }
+
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
         // Serial catalog-sync dispatch: never let a second catalog-sync task
         // start while one is already in flight, per
@@ -876,8 +903,17 @@ impl LibraryController {
         // (which discards a superseded load's *results*), this stops a
         // redundant load from starting — and therefore from making a
         // redundant remote request — at all.
+        //
+        // A caller that arrives here while a sync is already running (e.g.
+        // `replace_service` clearing the catalog for a newly authenticated
+        // session while the prior unauthenticated attempt is still failing
+        // out) still needs its load to happen eventually — dropping it
+        // silently would leave a just-cleared catalog empty forever. Record
+        // it as pending instead; [`Self::finish_catalog_sync`] starts a
+        // follow-up load once the in-flight one completes.
         if self.catalog_sync_in_flight {
-            tracing::debug!("catalog sync already in flight, skipping redundant load request");
+            tracing::debug!("catalog sync already in flight; queuing a follow-up reload once it completes");
+            self.pending_reload = true;
             return;
         }
         self.catalog_sync_in_flight = true;
@@ -1033,11 +1069,17 @@ impl LibraryController {
                                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                     .ok();
                                 this.update(async_cx, |ctrl, cx| {
-                                    ctrl.catalog_sync_in_flight = false;
+                                    ctrl.finish_catalog_sync(cx);
                                     if ctrl.load_generation != generation {
                                         return; // superseded by a newer load
                                     }
                                     ctrl.catalog_loading = false;
+                                    // This branch completes the load without ever calling
+                                    // `set_catalog` — a restored `Publisher` filter that no
+                                    // longer matches must be corrected here too, or it stays
+                                    // applied (filtering the catalog to nothing) until a
+                                    // forced reload happens to reach `set_catalog` instead.
+                                    ctrl.revalidate_publisher_filter();
                                     cx.emit(LibraryChanged);
                                     // The skip-fetch path is exactly the case most likely to be
                                     // showing stale `downloaded` state indefinitely — that's the
@@ -1107,8 +1149,8 @@ impl LibraryController {
                                         weak_activity
                                             .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                             .ok();
-                                        this.update(async_cx, |ctrl, _cx| {
-                                            ctrl.catalog_sync_in_flight = false;
+                                        this.update(async_cx, |ctrl, cx| {
+                                            ctrl.finish_catalog_sync(cx);
                                         })
                                         .ok();
                                         return;
@@ -1261,7 +1303,7 @@ impl LibraryController {
                         ctrl.catalog_loading = false;
                         cx.emit(LibraryChanged);
                     }
-                    ctrl.catalog_sync_in_flight = false;
+                    ctrl.finish_catalog_sync(cx);
                 })
                 .ok();
                 return;
@@ -1432,8 +1474,8 @@ impl LibraryController {
                         // A newer load (e.g. triggered by a cache clear) has already
                         // taken over; discard this stale result instead of clobbering it.
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
-                        this.update(async_cx, |ctrl, _cx| {
-                            ctrl.catalog_sync_in_flight = false;
+                        this.update(async_cx, |ctrl, cx| {
+                            ctrl.finish_catalog_sync(cx);
                         })
                         .ok();
                         return;
@@ -1479,8 +1521,8 @@ impl LibraryController {
                     .ok();
                 }
             }
-            this.update(async_cx, |ctrl, _cx| {
-                ctrl.catalog_sync_in_flight = false;
+            this.update(async_cx, |ctrl, cx| {
+                ctrl.finish_catalog_sync(cx);
             })
             .ok();
         })
@@ -1509,8 +1551,44 @@ impl LibraryController {
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
+    }
+
+    /// Resets `self.filter` to [`SidebarFilter::AllTitles`] if it is a
+    /// `Publisher` filter whose publisher is not present in
+    /// `known_publishers`.
+    ///
+    /// Called once the catalog-load's item list is available, since a
+    /// `Publisher` filter restored from disk at [`Self::new`] (before any
+    /// items have loaded) can't be validated synchronously. Does not save
+    /// the reset — the persisted preference is left untouched, so a launch
+    /// where the publisher reappears restores it.
+    pub fn validate_publisher_filter(&mut self, known_publishers: &[Arc<str>]) {
+        if let SidebarFilter::Publisher(name) = &self.filter
+           && !known_publishers.contains(name)
+        {
+            self.filter = SidebarFilter::AllTitles;
+        }
+    }
+
+    /// Convenience wrapper around [`Self::validate_publisher_filter`] using
+    /// the just-recomputed `self.publishers` as the known set.
+    ///
+    /// Every catalog-load completion path that (re)computes `self.publishers`
+    /// must call this — not just the full live-fetch path
+    /// ([`Self::set_catalog`]) — since the cache-fresh skip-fetch branch in
+    /// [`Self::start_load_inner`] and [`Self::apply_partial_fetch`] both also
+    /// complete a load without ever calling `set_catalog`. Missing one of
+    /// these left a restored `Publisher` filter that no longer matched
+    /// permanently un-validated on an ordinary cache-hit cold start.
+    fn revalidate_publisher_filter(&mut self) {
+        let known_publishers: Vec<Arc<str>> = self.publishers
+                                                  .iter()
+                                                  .map(|p| Arc::clone(&p.name))
+                                                  .collect();
+        self.validate_publisher_filter(&known_publishers);
     }
 
     /// Merges a partial date-filtered fetch's `partial` results into the
@@ -1526,6 +1604,7 @@ impl LibraryController {
         self.catalog_loading = false;
         self.section_counts = section_counts(&self.catalog);
         self.publishers = publisher_entries(&self.catalog);
+        self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -2567,6 +2646,7 @@ impl LibraryController {
         self.filter = filter;
         self.selection = Selection::None;
         self.invalidate_cache();
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
@@ -2630,6 +2710,7 @@ impl LibraryController {
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
         self.sort = sort;
         self.invalidate_cache();
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
@@ -2674,13 +2755,25 @@ impl LibraryController {
     /// Toggles publisher grouping on or off.
     pub fn set_grouped(&mut self, grouped: bool, cx: &mut Context<Self>) {
         self.grouped = grouped;
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
     /// Switches the catalog presentation mode.
     pub fn set_presentation(&mut self, mode: CatalogPresentation, cx: &mut Context<Self>) {
         self.presentation = mode;
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
+    }
+
+    /// Persists the current sidebar filter, sort, grouped, and presentation
+    /// state to disk. Best-effort — I/O failures are logged and ignored (see
+    /// [`crate::data::file_openers::CatalogViewPrefs::save`]).
+    fn save_view_prefs(&self) {
+        crate::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
+                                                                self.sort,
+                                                                self.grouped,
+                                                                self.presentation).save();
     }
 
     // ── Selection mutations ───────────────────────────────────────────────────

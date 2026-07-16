@@ -1,8 +1,13 @@
 //! File-opener override configuration: persists extension → app-path mappings.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+
+use crate::data::enums::CatalogPresentation;
+use crate::util::filter::SidebarFilter;
+use crate::util::sort::SortMethod;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,13 +39,168 @@ pub struct FileOpenerConfig {
     entries: Vec<FileOpenerEntry>,
 }
 
+/// Persisted catalog view preferences: sidebar filter, sort, grouping, and
+/// presentation mode. Serializes as the `[catalog_view]` section of the
+/// shared app config file (see [`config_path`]). The search query is
+/// intentionally absent — it is never persisted.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CatalogViewPrefs {
+    #[serde(default)]
+    sort:             Option<String>,
+    #[serde(default)]
+    pub grouped:      Option<bool>,
+    #[serde(default)]
+    presentation:     Option<String>,
+    #[serde(default)]
+    filter:           Option<String>,
+    #[serde(default)]
+    filter_publisher: Option<String>,
+}
+
+impl CatalogViewPrefs {
+    /// Loads catalog view preferences from the shared app config file,
+    /// defaulting any absent or unparseable value.
+    pub fn load() -> Self {
+        load_app_config().catalog_view
+    }
+
+    /// Persists `self` as the `[catalog_view]` section of the shared app
+    /// config file, leaving other sections untouched. Silently ignores I/O
+    /// errors (logged at `WARN`).
+    pub fn save(&self) {
+        let mut cfg = load_app_config();
+        cfg.catalog_view = self.clone();
+        save_app_config(&cfg);
+    }
+
+    /// Builds preferences from the controller's current view state.
+    pub fn from_state(filter: &SidebarFilter, sort: SortMethod, grouped: bool,
+                      presentation: CatalogPresentation)
+                      -> Self {
+        let (filter_name, filter_publisher) = match filter {
+            SidebarFilter::AllTitles => (Some("AllTitles"), None),
+            SidebarFilter::RecentlyAdded => (Some("RecentlyAdded"), None),
+            SidebarFilter::OnDevice => (Some("OnDevice"), None),
+            SidebarFilter::InCloud => (Some("InCloud"), None),
+            SidebarFilter::Publisher(name) => (Some("Publisher"), Some(name.to_string())),
+            // Collection filters carry a numeric id with no stable name to
+            // validate against the library on next launch (unlike
+            // Publisher); out of scope for this persistence layer, so they
+            // simply aren't remembered.
+            SidebarFilter::Collection(..) => (None, None),
+        };
+        Self { sort: Some(match sort {
+                              SortMethod::Title => "Title",
+                              SortMethod::Publisher => "Publisher",
+                              SortMethod::DateAdded => "DateAdded",
+                              SortMethod::PageCount => "PageCount",
+                              SortMethod::Custom { .. } => "Custom",
+                          }.to_string()),
+               grouped: Some(grouped),
+               presentation: Some(match presentation {
+                                      CatalogPresentation::List => "List",
+                                      CatalogPresentation::Thumbs => "Thumbs",
+                                      CatalogPresentation::Grid => "Grid",
+                                  }.to_string()),
+               filter: filter_name.map(str::to_string),
+               filter_publisher }
+    }
+
+    /// Resolves the persisted sort method, defaulting (with a `WARN` log)
+    /// for unrecognized values. Absent values silently default.
+    pub fn to_sort(&self) -> SortMethod {
+        match self.sort.as_deref() {
+            None => SortMethod::default(),
+            Some("Title") => SortMethod::Title,
+            Some("Publisher") => SortMethod::Publisher,
+            Some("DateAdded") => SortMethod::DateAdded,
+            Some("PageCount") => SortMethod::PageCount,
+            Some(other) => {
+                tracing::warn!(value = other,
+                               "unrecognized catalog sort preference; using default");
+                SortMethod::default()
+            }
+        }
+    }
+
+    /// Resolves the persisted presentation mode, defaulting (with a `WARN`
+    /// log) for unrecognized values. Absent values silently default.
+    pub fn to_presentation(&self) -> CatalogPresentation {
+        match self.presentation.as_deref() {
+            None => CatalogPresentation::default(),
+            Some("List") => CatalogPresentation::List,
+            Some("Thumbs") => CatalogPresentation::Thumbs,
+            Some("Grid") => CatalogPresentation::Grid,
+            Some(other) => {
+                tracing::warn!(value = other,
+                               "unrecognized catalog presentation preference; using default");
+                CatalogPresentation::default()
+            }
+        }
+    }
+
+    /// Resolves the persisted sidebar filter, defaulting to
+    /// [`SidebarFilter::AllTitles`] (with a `WARN` log) for unrecognized
+    /// values. Absent values silently default. A `Publisher` filter with no
+    /// stored name also falls back to `AllTitles`.
+    pub fn to_filter(&self) -> SidebarFilter {
+        match self.filter.as_deref() {
+            None => SidebarFilter::default(),
+            Some("AllTitles") => SidebarFilter::AllTitles,
+            Some("RecentlyAdded") => SidebarFilter::RecentlyAdded,
+            Some("OnDevice") => SidebarFilter::OnDevice,
+            Some("InCloud") => SidebarFilter::InCloud,
+            Some("Publisher") => match self.filter_publisher.as_deref() {
+                Some(name) => SidebarFilter::Publisher(Arc::from(name)),
+                None => SidebarFilter::AllTitles,
+            },
+            Some(other) => {
+                tracing::warn!(value = other,
+                               "unrecognized catalog filter preference; using default");
+                SidebarFilter::AllTitles
+            }
+        }
+    }
+}
+
 // ── Wrapper used for TOML round-trips
 // ─────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Default)]
-struct AppConfigFile {
+pub(crate) struct AppConfigFile {
     #[serde(default)]
     file_openers: Vec<FileOpenerEntry>,
+    #[serde(default)]
+    catalog_view: CatalogViewPrefs,
+}
+
+/// Loads the shared app config file from disk, returning defaults if the
+/// file is absent or unparseable.
+pub(crate) fn load_app_config() -> AppConfigFile {
+    let Some(path) = config_path()
+    else {
+        return AppConfigFile::default();
+    };
+    let Ok(text) = std::fs::read_to_string(&path)
+    else {
+        return AppConfigFile::default();
+    };
+    toml::from_str(&text).unwrap_or_default()
+}
+
+/// Saves the shared app config file to disk, creating parent directories if
+/// needed. Silently ignores I/O errors.
+pub(crate) fn save_app_config(cfg: &AppConfigFile) {
+    let Some(path) = config_path()
+    else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(text) = toml::to_string(cfg) {
+        let _ = std::fs::write(path, text);
+    }
 }
 
 // ── FileOpenerConfig impl
@@ -52,33 +212,16 @@ impl FileOpenerConfig {
     /// Loads the config from disk, returning a default if the file is absent or
     /// unparseable.
     pub fn load() -> Self {
-        let Some(path) = config_path()
-        else {
-            return Self::default();
-        };
-        let Ok(text) = std::fs::read_to_string(&path)
-        else {
-            return Self::default();
-        };
-        let parsed: AppConfigFile = toml::from_str(&text).unwrap_or_default();
-        Self { entries: parsed.file_openers, }
+        Self { entries: load_app_config().file_openers, }
     }
 
     /// Saves the config to disk, creating parent directories if needed.
     ///
     /// Silently ignores I/O errors.
     pub fn save(&self) {
-        let Some(path) = config_path()
-        else {
-            return;
-        };
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let file = AppConfigFile { file_openers: self.entries.clone(), };
-        if let Ok(text) = toml::to_string(&file) {
-            let _ = std::fs::write(path, text);
-        }
+        let mut cfg = load_app_config();
+        cfg.file_openers = self.entries.clone();
+        save_app_config(&cfg);
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -155,7 +298,7 @@ fn normalize_ext(ext: &str) -> String {
 
 /// Returns the path to `~/.config/dtrpg/app_config.toml` (macOS/Linux) or
 /// `%APPDATA%\dtrpg\app_config.toml` (Windows).
-fn config_path() -> Option<PathBuf> {
+pub(crate) fn config_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     let base = std::env::var("APPDATA").ok().map(PathBuf::from)?;
     #[cfg(not(target_os = "windows"))]
