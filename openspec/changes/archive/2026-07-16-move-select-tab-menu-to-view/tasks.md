@@ -17,13 +17,13 @@
 
 ## 3. Manual Verification
 
-- [ ] 3.1 Open the app; confirm the Window menu shows Minimize, Zoom, Show Activity, Show
+- [x] 3.1 Open the app; confirm the Window menu shows Minimize, Zoom, Show Activity, Show
       Alert History — no "Select Tab" submenu and no dangling trailing separator
-- [ ] 3.2 Confirm the View menu shows Full Screen, Presentation, Sort, Find in Library,
+- [x] 3.2 Confirm the View menu shows Full Screen, Presentation, Sort, Find in Library,
       and a "Select Tab" submenu with ten items
-- [ ] 3.3 With one detail tab open, confirm the View > Select Tab submenu's position-1
+- [x] 3.3 With one detail tab open, confirm the View > Select Tab submenu's position-1
       item is enabled and labeled with that tab's title, and positions 2-9 are disabled
-- [ ] 3.4 Click View > Select Tab > position-1 item; confirm that tab becomes active
-- [ ] 3.5 Confirm `cmd-0`..`cmd-9` shortcuts still work identically to before this change
-- [ ] 3.6 Confirm the checkmark in View > Select Tab tracks the currently active tab as
+- [x] 3.4 Click View > Select Tab > position-1 item; confirm that tab becomes active
+- [x] 3.5 Confirm `cmd-0`..`cmd-9` shortcuts still work identically to before this change
+- [x] 3.6 Confirm the checkmark in View > Select Tab tracks the currently active tab as
       tabs are switched via the tab strip
