@@ -1,18 +1,27 @@
 ## 1. Sibling-Change Reconciliation
 
-- [ ] 1.1 Confirm `download-retry-with-backoff`'s status and final shape of `backoff_delay`
+- [x] 1.1 Confirm `download-retry-with-backoff`'s status and final shape of `backoff_delay`
       before extracting it into a shared module, so the retry-helper generalization (task 3)
       rebases onto its finished form rather than racing an in-progress change.
+      Corrected 2026-07-16: `download-retry-with-backoff` is 0/22 tasks — no `backoff_delay` or
+      retry code exists anywhere in the codebase yet. Per user decision, built the shared
+      `backoff_delay`/`retry_with_backoff` helper here from scratch (matching that change's own
+      design.md algorithm) rather than relocating existing code; `download-retry-with-backoff`
+      will consume this same module when it's implemented.
 
 ## 2. Retry Helper Extraction
 
-- [ ] 2.1 Move `backoff_delay(attempt, jitter_source)` from
-      `crates/dtrpg-core/src/services/sdk/library/download.rs` into a new shared module
-      (e.g. `crates/dtrpg-core/src/services/retry.rs`), unchanged.
-- [ ] 2.2 Add a `retry_with_backoff` helper wrapping a fallible closure with max-attempts and
-      an `on_retry(attempt, reason, delay)` callback, built on `backoff_delay`.
-- [ ] 2.3 Update `download.rs`'s existing retry call site to use the relocated `backoff_delay`
-      via the new module, with no behavior change.
+- [x] 2.1 Build `backoff_delay(attempt, jitter_source, base_secs, max_secs)` in a new shared
+      module `crates/dtrpg-core/src/services/retry.rs`, per `download-retry-with-backoff`'s
+      design.md algorithm (exponential, base*2^(attempt-1), capped, deterministic +/-25%
+      jitter, no `rand` dependency), generalized with explicit base/max parameters so
+      catalog-sync and image-cache can use their own constants.
+- [x] 2.2 Add a `retry_with_backoff` helper wrapping a fallible closure with max-attempts,
+      a retry-gate predicate, and an `on_retry(attempt, delay, &error)` callback, built on
+      `backoff_delay`, with cancel-aware short sleep ticks (200ms) during the backoff wait.
+- [x] 2.3 N/A — `download.rs` has no retry call site to update yet (see 1.1 correction);
+      nothing to change here without also implementing `download-retry-with-backoff` itself,
+      which is out of this change's scope.
 
 ## 3. Network Monitor
 
