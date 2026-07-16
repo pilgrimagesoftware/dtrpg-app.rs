@@ -8,20 +8,64 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
+use dtrpg_ui::services::retry::{RetryConfig, retry_with_backoff};
 use dtrpg_ui::services::{LibraryServiceError, LibraryServiceErrorKind};
 
 use super::gateway::SdkLibraryGateway;
+use crate::constants::{
+    DOWNLOAD_RETRY_BASE_DELAY_SECS, DOWNLOAD_RETRY_MAX_DELAY_SECS, MAX_DOWNLOAD_ATTEMPTS,
+};
 
 const CHUNK_SIZE: usize = 64 * 1024;
 
 /// Downloads the file identified by `(order_product_id, index)` to `dest`,
-/// via `gateway.prepare_download`. See
+/// via `gateway.prepare_download`, retrying a retryable transfer failure with
+/// exponential backoff. See
 /// [`LibraryService::download_item`](dtrpg_ui::services::LibraryService::download_item)
-/// for the cancellation and temp-file contract.
+/// for the cancellation, temp-file, and retry-progress contract.
 pub(super) fn download_item(gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32,
-                            dest: &Path, cancel: &AtomicBool)
+                            dest: &Path, cancel: &AtomicBool,
+                            on_retry: Option<&mut dyn FnMut(u32, Duration)>)
                             -> Result<(), LibraryServiceError> {
+    let config = RetryConfig { max_attempts: MAX_DOWNLOAD_ATTEMPTS,
+                               base_secs:    DOWNLOAD_RETRY_BASE_DELAY_SECS,
+                               max_secs:     DOWNLOAD_RETRY_MAX_DELAY_SECS, };
+    download_item_with_config(gateway,
+                              order_product_id,
+                              index,
+                              dest,
+                              cancel,
+                              config,
+                              on_retry)
+}
+
+/// Same as [`download_item`] with an injectable retry policy, so tests can
+/// use a zero-delay [`RetryConfig`] instead of the production backoff
+/// schedule.
+fn download_item_with_config(gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32,
+                             dest: &Path, cancel: &AtomicBool, config: RetryConfig,
+                             mut on_retry: Option<&mut dyn FnMut(u32, Duration)>)
+                             -> Result<(), LibraryServiceError> {
+    let mut adapted_on_retry = |attempt: u32, delay: Duration, _error: &LibraryServiceError| {
+        if let Some(f) = on_retry.as_deref_mut() {
+            f(attempt, delay);
+        }
+    };
+
+    retry_with_backoff(config,
+                       cancel,
+                       || attempt_download(gateway, order_product_id, index, dest, cancel),
+                       |e: &LibraryServiceError| e.kind == LibraryServiceErrorKind::Network,
+                       Some(&mut adapted_on_retry))
+}
+
+/// Makes a single download attempt: resolves the transfer URL, streams to a
+/// `.part` file, then renames it to `dest` on success.
+fn attempt_download(gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32,
+                    dest: &Path, cancel: &AtomicBool)
+                    -> Result<(), LibraryServiceError> {
     let response = gateway.prepare_download(order_product_id, index)?;
     let url = response
         .pointer("/data/attributes/url")
@@ -115,7 +159,12 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use std::sync::atomic::AtomicU32;
+
+    use dtrpg_sdk::{LibraryItemsParams, OrderProductItemResponse, OrderProductListResponse};
+
     use super::*;
 
     #[test]
@@ -129,5 +178,198 @@ mod tests {
     fn part_path_handles_no_extension() {
         let dest = Path::new("/tmp/items/b1/README");
         assert_eq!(part_path_for(dest), Path::new("/tmp/items/b1/README.part"));
+    }
+
+    // ── Retry loop tests ─────────────────────────────────────────────────
+
+    fn fast_config(max_attempts: u32) -> RetryConfig {
+        RetryConfig { max_attempts,
+                      base_secs: 0,
+                      max_secs: 0 }
+    }
+
+    fn temp_dest(name: &str) -> PathBuf {
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::SeqCst);
+        std::env::temp_dir().join(format!("dtrpg-download-test-{}-{name}-{unique}",
+                                          std::process::id()))
+    }
+
+    /// What a scripted mock HTTP connection does when the download stream
+    /// tries to fetch it.
+    enum MockResponse {
+        /// Drops the connection without writing anything, simulating a
+        /// network failure.
+        ConnectionReset,
+        /// Writes a 503 status, simulating a retryable server failure.
+        ServerError,
+        /// Writes a 200 with the given body.
+        Success(&'static [u8]),
+    }
+
+    /// Serves one response per script entry, in order, on a background
+    /// thread bound to an ephemeral local port. Returns the base URL and the
+    /// thread's join handle.
+    fn spawn_mock_server(script: Vec<MockResponse>) -> (String, std::thread::JoinHandle<()>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/file", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            for resp in script {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                match resp {
+                    MockResponse::ConnectionReset => drop(stream),
+                    MockResponse::ServerError => {
+                        let _ = stream.write_all(
+                            b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                        );
+                    }
+                    MockResponse::Success(body) => {
+                        let header = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                                             body.len());
+                        let _ = stream.write_all(header.as_bytes());
+                        let _ = stream.write_all(body);
+                    }
+                }
+            }
+        });
+        (url, handle)
+    }
+
+    /// A gateway whose `prepare_download` always resolves to `url`, counting
+    /// how many times it was called.
+    struct CountingGateway {
+        url:   String,
+        calls: AtomicU32,
+    }
+
+    impl SdkLibraryGateway for CountingGateway {
+        fn list_order_products(&self, _params: LibraryItemsParams)
+                               -> Result<OrderProductListResponse, LibraryServiceError> {
+            unimplemented!("not exercised by download tests")
+        }
+
+        fn get_order_product(&self, _id: u64)
+                             -> Result<OrderProductItemResponse, LibraryServiceError> {
+            unimplemented!("not exercised by download tests")
+        }
+
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(serde_json::json!({ "data": { "attributes": { "url": self.url } } }))
+        }
+    }
+
+    /// A gateway whose `prepare_download` always fails with a non-`Network`
+    /// error, counting how many times it was called.
+    struct AlwaysSessionErrorGateway {
+        calls: AtomicU32,
+    }
+
+    impl SdkLibraryGateway for AlwaysSessionErrorGateway {
+        fn list_order_products(&self, _params: LibraryItemsParams)
+                               -> Result<OrderProductListResponse, LibraryServiceError> {
+            unimplemented!("not exercised by download tests")
+        }
+
+        fn get_order_product(&self, _id: u64)
+                             -> Result<OrderProductItemResponse, LibraryServiceError> {
+            unimplemented!("not exercised by download tests")
+        }
+
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::Session,
+                                         "stub: simulated session error"))
+        }
+    }
+
+    #[test]
+    fn download_item_succeeds_after_retryable_failures() {
+        let (url, server) = spawn_mock_server(vec![MockResponse::ConnectionReset,
+                                                   MockResponse::ServerError,
+                                                   MockResponse::Success(b"file contents")]);
+        let gateway = CountingGateway { url,
+                                        calls: AtomicU32::new(0) };
+        let dest = temp_dest("succeeds-after-retries");
+        let cancel = AtomicBool::new(false);
+
+        let result =
+            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+
+        server.join().unwrap();
+        assert!(result.is_ok(), "expected success, got {result:?}");
+        assert_eq!(gateway.calls.load(Ordering::SeqCst), 3);
+        assert_eq!(std::fs::read(&dest).unwrap(), b"file contents");
+        assert!(!part_path_for(&dest).exists());
+        let _ = std::fs::remove_file(&dest);
+    }
+
+    #[test]
+    fn download_item_fails_after_exhausting_all_retryable_attempts() {
+        let (url, server) = spawn_mock_server(vec![MockResponse::ConnectionReset,
+                                                   MockResponse::ConnectionReset,
+                                                   MockResponse::ConnectionReset]);
+        let gateway = CountingGateway { url,
+                                        calls: AtomicU32::new(0) };
+        let dest = temp_dest("exhausts-retries");
+        let cancel = AtomicBool::new(false);
+
+        let result =
+            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+
+        server.join().unwrap();
+        assert!(result.is_err());
+        assert_eq!(gateway.calls.load(Ordering::SeqCst), 3);
+        assert!(!dest.exists());
+        assert!(!part_path_for(&dest).exists());
+    }
+
+    #[test]
+    fn download_item_does_not_retry_a_non_retryable_failure() {
+        let gateway = AlwaysSessionErrorGateway { calls: AtomicU32::new(0), };
+        let dest = temp_dest("non-retryable");
+        let cancel = AtomicBool::new(false);
+
+        let result =
+            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+
+        assert!(matches!(result, Err(e) if e.kind == LibraryServiceErrorKind::Session));
+        assert_eq!(gateway.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn download_item_stops_retrying_once_cancelled_during_backoff() {
+        // Only the first script entry is ever consumed: cancellation during
+        // the backoff wait stops the loop before a second attempt is made,
+        // so the mock server's background thread is left parked in its
+        // second `accept()` for the lifetime of the test process — harmless
+        // for a short-lived test binary, and not joined here.
+        let (url, _server) =
+            spawn_mock_server(vec![MockResponse::ConnectionReset,
+                                   MockResponse::Success(b"should never be fetched")]);
+        let gateway = CountingGateway { url,
+                                        calls: AtomicU32::new(0) };
+        let dest = temp_dest("cancel-during-backoff");
+        let cancel = AtomicBool::new(false);
+
+        let mut on_retry = |_attempt: u32, _delay: Duration| {
+            cancel.store(true, Ordering::SeqCst);
+        };
+        let result = download_item_with_config(&gateway,
+                                               1,
+                                               0,
+                                               &dest,
+                                               &cancel,
+                                               fast_config(3),
+                                               Some(&mut on_retry));
+
+        assert!(result.is_err());
+        assert_eq!(gateway.calls.load(Ordering::SeqCst), 1);
+        assert!(!dest.exists());
+        assert!(!part_path_for(&dest).exists());
     }
 }

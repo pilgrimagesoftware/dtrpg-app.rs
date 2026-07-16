@@ -249,6 +249,7 @@ activity:
   loading_thumbnails_remaining: "Miniaturansichten werden geladen… (%{remaining} verbleibend)"
   refreshing_thumbnails: "Miniaturansichten werden aktualisiert…"
   refreshing_thumbnails_remaining: "Miniaturansichten werden aktualisiert… (%{remaining} verbleibend)"
+  downloading_retry: "%{title} — Versuch %{attempt} in %{delay_secs}s…"
 
 alert_history:
   title: "Warnungsverlauf"

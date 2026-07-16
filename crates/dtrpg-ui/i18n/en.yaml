@@ -250,6 +250,7 @@ activity:
   loading_thumbnails_remaining: "Loading thumbnails… (%{remaining} remaining)"
   refreshing_thumbnails: "Refreshing thumbnails…"
   refreshing_thumbnails_remaining: "Refreshing thumbnails… (%{remaining} remaining)"
+  downloading_retry: "%{title} — retrying (attempt %{attempt}) in %{delay_secs}s…"
 
 alert_history:
   title: "Alert History"
