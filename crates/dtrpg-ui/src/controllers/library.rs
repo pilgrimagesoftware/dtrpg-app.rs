@@ -20,11 +20,13 @@ use crate::data::events::*;
 use crate::data::library::*;
 use crate::data::paths::{cache_dir, covers_dir};
 use crate::data::selection::Selection;
+use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
+use crate::util::file_presence::{resolved_file_path, verify_item_downloads};
 use crate::util::filter::*;
 use crate::util::matching::*;
 use crate::util::publisher::*;
@@ -89,7 +91,12 @@ fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, ke
 /// requirement.
 ///
 /// - An id present in both: kept at its existing position, replaced with the
-///   live item's fields, with `is_available` set to `true`.
+///   live item's fields, with `is_available` set to `true`. Live items always
+///   carry `downloaded: false` on every file (the API has no concept of local
+///   downloads), so each live file's `downloaded` flag is restored from the
+///   existing item's file with the same id (if any) before recomputing the
+///   entry's aggregate `status`, per `catalog-live-data-swap`'s per-file
+///   downloaded-state requirement.
 /// - An id present only in `existing`: kept unchanged except `is_available` is
 ///   set to `false` — the server no longer lists it, but it isn't removed.
 /// - An id present only in `live`: appended at the end, `is_available` stays
@@ -107,9 +114,20 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
     let mut reconciled: Vec<LibraryItem> =
         existing.into_iter()
                 .map(|mut item| {
-                    if let Some(live_item) = live_by_id.remove(&item.id) {
+                    if let Some(mut live_item) = live_by_id.remove(&item.id) {
+                        let downloaded_by_id: HashMap<Arc<str>, bool> =
+                            item.files
+                                .iter()
+                                .map(|f| (Arc::clone(&f.id), f.downloaded))
+                                .collect();
+                        for file in &mut live_item.files {
+                            if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
+                                file.downloaded = downloaded;
+                            }
+                        }
                         item = live_item;
                         item.is_available = true;
+                        item.recompute_status();
                     }
                     else {
                         item.is_available = false;
@@ -236,10 +254,12 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
             let numeric_id = item.numeric_id;
             let order_product_id = item.order_product_id;
             let product_id = item.product_id;
-            // Live single-item responses always carry `downloaded: false` on
-            // every file (the API has no concept of local downloads); merge
-            // by file id so a wholesale field replace below doesn't discard
-            // download state the same way `reconcile_catalog` used to.
+            // `downloaded` is a local-only fact the server response knows nothing
+            // about - the single-item endpoint always reports it `false`.
+            // Preserve each file's existing flag by id so a re-check (or the
+            // disk-presence verification racing it, see
+            // `verify-downloaded-status-against-disk`) doesn't get its
+            // correction wiped the moment this slower network check resolves.
             let downloaded_by_id: HashMap<Arc<str>, bool> =
                 item.files
                     .iter()
@@ -584,6 +604,15 @@ pub struct LibraryController {
     /// catalog card/row rendering can query [`Self::is_checking`] and show a
     /// spinner/overlay.
     checking_items:                HashSet<Arc<str>>,
+    /// Ids of catalog items whose file-presence verification (see
+    /// `verify-downloaded-status-against-disk`) is currently in flight —
+    /// either as part of a catalog-wide load-time pass or an on-demand
+    /// single-item check. Distinct from `checking_items` (a network-bound
+    /// availability check) so catalog/popover rendering can show a visually
+    /// distinct "checking download status" indicator via
+    /// [`Self::is_verifying_downloads`] without conflating the two kinds of
+    /// check. `LibraryChanged` is emitted on insertion and removal.
+    verifying_downloads:           HashSet<Arc<str>>,
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
     check_queue:                   VecDeque<Arc<str>>,
@@ -670,13 +699,13 @@ impl LibraryController {
                    zip_preview: None,
                    file_info_cache: HashMap::new(),
                    checking_items: HashSet::new(),
+                   verifying_downloads: HashSet::new(),
                    check_queue: VecDeque::new(),
                    download_queue: VecDeque::new(),
                    active_downloads: 0,
                    download_cancel_flags: HashMap::new(),
                    download_activity_ids: HashMap::new(),
-                   max_concurrent_downloads:
-                       crate::data::storage::StorageConfig::load().max_concurrent_downloads() };
+                   max_concurrent_downloads: StorageConfig::load().max_concurrent_downloads() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl
@@ -725,6 +754,53 @@ impl LibraryController {
     /// update before the next page arrives.
     fn start_load(&mut self, cx: &mut Context<Self>) {
         self.start_load_inner(cx, false);
+    }
+
+    /// Verifies every catalog item's files against disk and applies any
+    /// resulting `downloaded`/`status` changes back to the catalog, per
+    /// `verify-downloaded-status-against-disk`.
+    ///
+    /// Runs as one batched background-executor pass rather than a per-item
+    /// spawn, matching `save_catalog_cache`'s single-round-trip shape —
+    /// avoids spawning hundreds of tiny tasks for a large library. Marks
+    /// every item as verifying for the duration of the pass (see
+    /// [`Self::is_verifying_downloads`]) so catalog rendering can show a
+    /// pending indicator; catalog/section-count application to the entry
+    /// itself is skipped if nothing changed.
+    fn verify_catalog_downloads(&mut self, cx: &mut Context<Self>) {
+        let catalog = self.catalog.clone();
+        let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
+        self.verifying_downloads.extend(ids.iter().cloned());
+        cx.emit(LibraryChanged);
+
+        cx.spawn(async move |this, async_cx| {
+              let (catalog, changed) = async_cx.background_executor()
+                                               .spawn(async move {
+                                                   let storage = StorageConfig::load();
+                                                   let mut catalog = catalog;
+                                                   let mut changed = false;
+                                                   for item in &mut catalog {
+                                                       changed |=
+                                                           verify_item_downloads(item, &storage);
+                                                   }
+                                                   (catalog, changed)
+                                               })
+                                               .await;
+
+              this.update(async_cx, |ctrl, cx| {
+                      for id in &ids {
+                          ctrl.verifying_downloads.remove(id);
+                      }
+                      if changed {
+                          ctrl.catalog = catalog;
+                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.invalidate_cache();
+                      }
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
@@ -878,6 +954,11 @@ impl LibraryController {
                                     }
                                     ctrl.catalog_loading = false;
                                     cx.emit(LibraryChanged);
+                                    // The skip-fetch path is exactly the case most likely to be
+                                    // showing stale `downloaded` state indefinitely — that's the
+                                    // whole reason the live fetch was skipped — so it needs
+                                    // disk verification the most.
+                                    ctrl.verify_catalog_downloads(cx);
                                 })
                                 .ok();
                                 return;
@@ -921,6 +1002,7 @@ impl LibraryController {
                                     if is_current {
                                         this.update(async_cx, |ctrl, cx| {
                                             ctrl.apply_partial_fetch(partial_items, cx);
+                                            ctrl.verify_catalog_downloads(cx);
                                         })
                                         .ok();
                                         let items_to_save = this
@@ -1098,6 +1180,7 @@ impl LibraryController {
                     }
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.set_catalog(live_items, !catalog_was_empty, cx);
+                        ctrl.verify_catalog_downloads(cx);
                     }).ok();
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
@@ -2312,8 +2395,68 @@ impl LibraryController {
     /// double-click action handled by `TabsController::open_detail_tab`.
     pub fn select_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
         self.maybe_check_item(Arc::clone(&id), cx);
+        self.verify_selected_item_download(Arc::clone(&id), cx);
         self.selection = Selection::Item(id);
         cx.emit(LibraryChanged);
+    }
+
+    /// Verifies `id`'s files against disk in the background and applies any
+    /// resulting `downloaded`/`status` change, per
+    /// `verify-downloaded-status-against-disk`.
+    ///
+    /// Independent of [`Self::maybe_check_item`]'s network-bound
+    /// availability check (and its cooldown): a missing or reappeared file
+    /// on disk is a local fact unrelated to whether the server still lists
+    /// the item, and a local `Path::exists()` call per file is cheap enough
+    /// that gating it adds complexity without a real cost problem to solve.
+    fn verify_selected_item_download(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
+        let Some(mut item) = self.item_by_id(&id).cloned()
+        else {
+            return;
+        };
+        self.verifying_downloads.insert(Arc::clone(&id));
+        cx.emit(LibraryChanged);
+
+        cx.spawn(async move |this, async_cx| {
+              let (item, changed) = async_cx.background_executor()
+                                            .spawn(async move {
+                                                let storage = StorageConfig::load();
+                                                let changed =
+                                                    verify_item_downloads(&mut item, &storage);
+                                                (item, changed)
+                                            })
+                                            .await;
+
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.verifying_downloads.remove(&id);
+                      if changed
+                         && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
+                      {
+                          *existing = item;
+                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.invalidate_cache();
+                      }
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
+    }
+
+    /// Returns `true` if `id`'s files are currently being verified against
+    /// disk (catalog-wide load-time pass or the on-demand single-item
+    /// check), per `verify-downloaded-status-against-disk`.
+    #[must_use]
+    pub fn is_verifying_downloads(&self, id: &str) -> bool {
+        self.verifying_downloads.contains(id)
+    }
+
+    /// Returns a snapshot of every item id currently undergoing file-presence
+    /// verification, mirroring [`Self::checking_items_snapshot`]'s role for
+    /// non-virtualized render paths.
+    #[must_use]
+    pub fn verifying_downloads_snapshot(&self) -> HashSet<Arc<str>> {
+        self.verifying_downloads.clone()
     }
 
     // ── Item-level availability checks ────────────────────────────────────────
@@ -2919,9 +3062,7 @@ impl LibraryController {
                         .find(|i| i.id == item_id)
                         .and_then(|item| {
                             item.files.get(index as usize).map(|file| {
-                    let dest = crate::data::storage::StorageConfig::load()
-                        .path_for_publisher(&item.publisher)
-                        .join(file.name.as_ref());
+                    let dest = resolved_file_path(&StorageConfig::load(), item, file);
                     (item.order_product_id, file.name.to_string(), dest)
                 })
                         });
@@ -3000,6 +3141,24 @@ impl LibraryController {
                       })
                       .ok()
                       .flatten();
+
+              // Persist the download to the on-disk catalog cache immediately —
+              // otherwise a restart before the next live-fetch cache write (see
+              // `start_load_inner`) loads a cache that never recorded this
+              // download, showing `Cloud` status regardless of what
+              // `reconcile_catalog` does (see `catalog-live-data-swap`).
+              if !cancelled && outcome.is_ok() {
+                  let items_to_save = this.update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
+                                          .unwrap_or_default();
+                  let save_root = cache_dir();
+                  async_cx.background_executor()
+                          .spawn(async move {
+                              if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
+                                  tracing::warn!(error = %e, "failed to save catalog cache");
+                              }
+                          })
+                          .await;
+              }
 
               if let Err(e) = &outcome
                  && !cancelled
@@ -3160,7 +3319,7 @@ impl LibraryController {
 /// [`crate::util::symlink::ensure_symlink`].
 fn create_collections_symlinks(dest: &Path, order_product_id: u64, product_id: u64,
                                collections: &[CollectionEntry]) {
-    let storage = crate::data::storage::StorageConfig::load();
+    let storage = StorageConfig::load();
     if !storage.create_collections() {
         return;
     }
@@ -4223,7 +4382,7 @@ mod bulk_download_target_tests {
 mod reconcile_catalog_tests {
     use super::reconcile_catalog;
     use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
 
     fn item(id: &str, title: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -4240,6 +4399,15 @@ mod reconcile_catalog_tests {
                          "#000000",
                          "",
                          None)
+    }
+
+    fn file(id: &str, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded }
     }
 
     #[test]
@@ -4298,6 +4466,62 @@ mod reconcile_catalog_tests {
         assert_eq!(reconciled.len(), 2);
         assert_eq!(reconciled[0].id.as_ref(), "b1");
         assert_eq!(reconciled[1].id.as_ref(), "b2");
+    }
+
+    #[test]
+    fn downloaded_status_survives_reconcile_against_a_live_fetch() {
+        let mut local = item("b1", "Old Title");
+        local.files = vec![file("f1", true), file("f2", true)];
+        local.recompute_status();
+        assert_eq!(local.status, ItemStatus::Downloaded);
+
+        let mut live = item("b1", "New Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        assert!(reconciled[0].files.iter().all(|f| f.downloaded));
+        assert_eq!(reconciled[0].status, ItemStatus::Downloaded);
+    }
+
+    #[test]
+    fn live_file_with_no_cached_counterpart_is_not_downloaded() {
+        let mut local = item("b1", "Title");
+        local.files = vec![file("f1", true)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
+        assert_eq!(f2_downloaded, Some(false));
+    }
+
+    #[test]
+    fn partially_downloaded_item_keeps_its_per_file_state() {
+        let mut local = item("b1", "Title");
+        local.files = vec![file("f1", true), file("f2", false)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![file("f1", false), file("f2", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let f1_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f1")
+                                         .map(|f| f.downloaded);
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
+        assert_eq!(f1_downloaded, Some(true));
+        assert_eq!(f2_downloaded, Some(false));
+        assert_eq!(reconciled[0].status, ItemStatus::Cloud);
     }
 }
 
@@ -4366,7 +4590,7 @@ mod item_check_tests {
     fn file(id: &str, downloaded: bool) -> LibraryItemFile {
         LibraryItemFile { id: id.into(),
                           index: 0,
-                          name: "File".into(),
+                          name: format!("{id}.pdf").into(),
                           format: "PDF".into(),
                           size_mb: 1.0,
                           downloaded }
@@ -4457,13 +4681,18 @@ mod item_check_tests {
     }
 
     #[test]
-    fn downloaded_status_survives_a_single_item_check() {
-        let mut existing = item("b1", "Old Title");
+    fn ok_result_preserves_downloaded_files_and_keeps_status_downloaded() {
+        // Regression: a single-item availability re-check must not let the
+        // fresh server response (which never reports `downloaded` — that's a
+        // local-only fact) wipe files already marked downloaded on disk. See
+        // `verify-downloaded-status-against-disk`, whose on-demand disk
+        // verification races this same check on item selection.
+        let mut existing = item("b1", "Title");
         existing.files = vec![file("f1", true), file("f2", true)];
         existing.recompute_status();
         assert_eq!(existing.status, ItemStatus::Downloaded);
 
-        let mut fresh = item("b1", "New Title");
+        let mut fresh = item("b1", "Title");
         fresh.files = vec![file("f1", false), file("f2", false)];
 
         apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
@@ -4473,42 +4702,35 @@ mod item_check_tests {
     }
 
     #[test]
-    fn fresh_file_with_no_existing_counterpart_is_not_downloaded() {
+    fn ok_result_defaults_a_new_file_id_to_not_downloaded() {
         let mut existing = item("b1", "Title");
         existing.files = vec![file("f1", true)];
+        existing.recompute_status();
 
         let mut fresh = item("b1", "Title");
         fresh.files = vec![file("f1", false), file("f2", false)];
 
         apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
 
-        let f2_downloaded = existing.files
-                                    .iter()
-                                    .find(|f| f.id.as_ref() == "f2")
-                                    .map(|f| f.downloaded);
-        assert_eq!(f2_downloaded, Some(false));
+        assert!(existing.files[0].downloaded);
+        assert!(!existing.files[1].downloaded);
+        assert_eq!(existing.status, ItemStatus::Cloud);
     }
 
     #[test]
-    fn partially_downloaded_item_keeps_its_per_file_state_after_a_check() {
+    fn ok_result_preserves_partial_download_and_keeps_status_cloud() {
         let mut existing = item("b1", "Title");
         existing.files = vec![file("f1", true), file("f2", false)];
+        existing.recompute_status();
+        assert_eq!(existing.status, ItemStatus::Cloud);
 
         let mut fresh = item("b1", "Title");
         fresh.files = vec![file("f1", false), file("f2", false)];
 
         apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
 
-        let f1_downloaded = existing.files
-                                    .iter()
-                                    .find(|f| f.id.as_ref() == "f1")
-                                    .map(|f| f.downloaded);
-        let f2_downloaded = existing.files
-                                    .iter()
-                                    .find(|f| f.id.as_ref() == "f2")
-                                    .map(|f| f.downloaded);
-        assert_eq!(f1_downloaded, Some(true));
-        assert_eq!(f2_downloaded, Some(false));
+        assert!(existing.files[0].downloaded);
+        assert!(!existing.files[1].downloaded);
         assert_eq!(existing.status, ItemStatus::Cloud);
     }
 }

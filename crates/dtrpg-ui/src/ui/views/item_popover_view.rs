@@ -40,7 +40,7 @@ use crate::util::datetime::{format_absolute, format_relative};
 /// catalog entry rather than over it.
 pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                            entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-                           colors: &ColorTokens, is_checking: bool)
+                           colors: &ColorTokens, is_checking: bool, is_verifying: bool)
                            -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
@@ -166,10 +166,14 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .primary()
                         .small()
                         .disabled(true)
+                        .loading(is_verifying)
                         .icon(if is_downloaded {
                             IconName::ArrowDown // TODO: FileCheckCorner
                         } else {
                             IconName::Globe // TODO: CloudCog
+                        })
+                        .when(is_verifying, |btn| {
+                            btn.tooltip(t!("detail.tooltip_verifying_download"))
                         }),
                 )
                 .child(
@@ -178,8 +182,12 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .outline()
                         .compact()
                         .small()
+                        .disabled(is_verifying)
+                        .loading(is_verifying)
                         .icon(download_button_icon(is_downloaded))
-                        .tooltip(if is_downloaded {
+                        .tooltip(if is_verifying {
+                            t!("detail.tooltip_verifying_download")
+                        } else if is_downloaded {
                             t!("catalog.action_remove_download")
                         } else {
                             t!("catalog.action_download")

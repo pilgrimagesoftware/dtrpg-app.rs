@@ -33,8 +33,9 @@
       `cx.spawn` completion in tests, so this isn't covered by a dedicated
       async test; the call site mirrors the identical
       `ctrl.section_counts = section_counts(&ctrl.catalog);` pattern used
-      (and exercised) elsewhere (e.g. `dispatch_download`), and 3.1-3.3
-      cover `section_counts`'s own correctness at the unit level
+      (and exercised) elsewhere (e.g. `dispatch_download`,
+      `verify_catalog_downloads`/`verify_selected_item_download`), and
+      3.1-3.3 cover `section_counts`'s own correctness at the unit level
 
 ## 4. Build and Quality
 

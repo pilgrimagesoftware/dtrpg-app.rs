@@ -93,6 +93,7 @@ detail:
   show_in_explorer: "Im Explorer anzeigen"
   show_in_files: "In Dateien anzeigen"
   tooltip_download_first: "(Laden Sie diesen Titel zuerst herunter)"
+  tooltip_verifying_download: "Download-Status wird überprüft…"
   refresh_thumbnail_tooltip: "Miniaturansicht aktualisieren"
   field_system: "System"
   field_category: "Kategorie"
