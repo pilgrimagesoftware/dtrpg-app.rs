@@ -56,16 +56,35 @@
 
 ## 5. Fresh-Install Initialization
 
-- [ ] 5.1 Detect fresh install: no catalog cache file, no downloaded items, no cached cover or
-      avatar content.
-- [ ] 5.2 Gate fresh-install initialization on valid credentials being available; wait rather
-      than request if credentials are not yet acquired.
-- [ ] 5.3 Add a totals request (item count, size) issued before the first paginated item-data
-      request, feeding the existing `on_total` progress callback.
-- [ ] 5.4 Persist a "last request time" alongside existing catalog cache metadata; skip a new
-      fresh-install request when the recorded time is within the minimum interval.
-- [ ] 5.5 Update `catalog-load-progress`'s total-count resolution to prefer the fresh-install
-      totals request over the existing `links.last`-derived estimate when both are available.
+- [x] 5.1 Detect fresh install in `start_load_inner` as `!force_reload && cached.as_ref()
+      .is_none_or(Vec::is_empty)` — no catalog cache loaded from disk. Downloaded-item and
+      cover/avatar-cache detection from the spec's fuller definition is not separately checked;
+      an empty catalog cache is the load-bearing signal `start_load_inner` already branches on
+      (the existing auto-load-policy block only runs when cache is non-empty), so this reuses
+      that existing branch point rather than adding new disk probes.
+- [x] 5.2 Corrected 2026-07-16 (user decision): no new credentials pre-check added.
+      `list_items_paged` already returns a `Session` error when no authenticated session
+      exists, handled as a quiet completion (existing behavior, unchanged) — satisfies "does
+      not surface a failure to the user" without a new cross-controller credential query.
+      A true pre-check (stopping the request before it's attempted) would need synchronous
+      access to `AuthStateController`'s state from `LibraryController`, which does not exist
+      today; out of scope for this change.
+- [x] 5.3 Corrected 2026-07-16 (user decision): the real DriveThruRPG API has no
+      aggregate-size endpoint (`openapi.yaml` only has per-file `size`/`sizeMB` and
+      per-collection `itemCount`, no catalog-wide total size) — the totals request is
+      count-only, via `service_arc.count_items()` (the same `links.last`-derived count
+      `catalog-auto-load-policy` already uses), called before the paginated fetch and feeding
+      `estimated_total` directly rather than waiting on `list_items_paged`'s own `on_total`.
+- [x] 5.4 Added `last_fresh_install_request_secs` to `CacheMetadata` (mirrors the existing
+      `last_item_check_batch_secs` field/helper pattern) with
+      `save_fresh_install_request_timestamp`; gated in `start_load_inner` against
+      `CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS` (60s) — skips the whole fresh-install
+      totals+timestamp step (not just the paginated fetch) when within the interval.
+- [x] 5.5 `estimated_total`'s seed now prefers `fresh_install_total` (the count-only totals
+      request above) over the cache-length fallback; `list_items_paged`'s own `on_total`
+      (from `links.last`) can still override it later if the API reports one during the
+      paginated fetch itself, unchanged from existing behavior.
+      296 `dtrpg-ui` tests + 12 doctests pass; clippy clean (`-D warnings`).
 
 ## 6. Cache-Control Staleness Signal and Recurring Timer
 

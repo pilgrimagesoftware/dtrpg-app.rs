@@ -57,6 +57,13 @@ pub struct CacheMetadata {
     /// record of.
     #[serde(default)]
     pub last_item_check_batch_secs: Option<u64>,
+    /// Unix timestamp (seconds since epoch) of the last fresh-install
+    /// catalog-initialization request (see
+    /// `rust-catalog-fresh-install-initialization`), gating
+    /// `CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS`. `#[serde(default)]`
+    /// for the same reason as `last_item_check_batch_secs`.
+    #[serde(default)]
+    pub last_fresh_install_request_secs: Option<u64>,
 }
 
 impl CacheMetadata {
@@ -98,12 +105,16 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
     let saved_at_secs = SystemTime::now().duration_since(UNIX_EPOCH)
                                          .unwrap_or(Duration::ZERO)
                                          .as_secs();
+    let existing = load_cache_metadata(root);
     let last_item_check_batch_secs =
-        load_cache_metadata(root).and_then(|m| m.last_item_check_batch_secs);
+        existing.as_ref().and_then(|m| m.last_item_check_batch_secs);
+    let last_fresh_install_request_secs =
+        existing.as_ref().and_then(|m| m.last_fresh_install_request_secs);
     let meta = CacheMetadata { saved_at_secs,
                                item_count,
                                schema_version: CACHE_SCHEMA_VERSION,
-                               last_item_check_batch_secs };
+                               last_item_check_batch_secs,
+                               last_fresh_install_request_secs };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
@@ -115,11 +126,31 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// run before any catalog has ever been successfully synced).
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
     let mut meta =
-        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:              0,
-                                                            item_count:                 0,
-                                                            schema_version:             0,
-                                                            last_item_check_batch_secs: None, });
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs: 0,
+                                                            item_count: 0,
+                                                            schema_version: 0,
+                                                            last_item_check_batch_secs: None,
+                                                            last_fresh_install_request_secs: None });
     meta.last_item_check_batch_secs = Some(now_secs);
+    let json = serde_json::to_string(&meta)?;
+    fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
+    Ok(())
+}
+
+/// Persists `now_secs` as the last fresh-install catalog-initialization
+/// request timestamp, preserving the rest of the existing cache metadata (or
+/// using zeroed placeholders if no metadata file exists yet — the
+/// fresh-install request happens before any catalog has ever been
+/// successfully synced).
+pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
+                                            -> Result<(), CatalogCacheError> {
+    let mut meta =
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs: 0,
+                                                            item_count: 0,
+                                                            schema_version: 0,
+                                                            last_item_check_batch_secs: None,
+                                                            last_fresh_install_request_secs: None });
+    meta.last_fresh_install_request_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
@@ -240,7 +271,8 @@ mod tests {
                                                         .as_secs(),
                                    item_count:                 10,
                                    schema_version:             CACHE_SCHEMA_VERSION,
-                                   last_item_check_batch_secs: None, };
+                                   last_item_check_batch_secs: None,
+                                   last_fresh_install_request_secs: None, };
         assert!(!meta.is_stale());
     }
 
@@ -249,7 +281,8 @@ mod tests {
         let meta = CacheMetadata { saved_at_secs:              0, // epoch — very old
                                    item_count:                 10,
                                    schema_version:             CACHE_SCHEMA_VERSION,
-                                   last_item_check_batch_secs: None, };
+                                   last_item_check_batch_secs: None,
+                                   last_fresh_install_request_secs: None, };
         assert!(meta.is_stale());
     }
 
@@ -264,7 +297,8 @@ mod tests {
                                                         .as_secs(),
                                    item_count:                 10,
                                    schema_version:             CACHE_SCHEMA_VERSION - 1,
-                                   last_item_check_batch_secs: None, };
+                                   last_item_check_batch_secs: None,
+                                   last_fresh_install_request_secs: None, };
         assert!(meta.is_stale());
     }
 

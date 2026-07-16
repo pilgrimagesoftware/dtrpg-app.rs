@@ -10,10 +10,11 @@ use rust_i18n::t;
 use crate::controllers::activity::ActivityController;
 use crate::data::catalog_cache::{
     CacheMetadata, load_cache_metadata, load_catalog_cache, save_catalog_cache,
-    save_check_batch_timestamp,
+    save_check_batch_timestamp, save_fresh_install_request_timestamp,
 };
 use crate::data::collection::CollectionEntry;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
+use crate::data::constants::CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS;
 use crate::data::cover_cache::{load_cached_cover, save_cached_cover};
 use crate::data::enums::*;
 use crate::data::events::*;
@@ -1057,6 +1058,69 @@ impl LibraryController {
                         }
             }
 
+            // ── Fresh-install initialization ─────────────────────────────────────
+            // No local catalog data was loaded from disk above: this is a fresh
+            // install (or the cache was cleared/relocated), per
+            // `rust-catalog-fresh-install-initialization`. Credentials are not
+            // pre-checked here — `list_items_paged` below already returns a
+            // `Session` error, handled as a quiet completion, when no
+            // authenticated session exists yet, which this same code path relies
+            // on regardless of fresh-install status.
+            //
+            // Issues a dedicated totals request (item count only — the API has no
+            // aggregate-size endpoint; per-file `size`/`sizeMB` only exist within
+            // an already-fetched item's file list) before any page of item data,
+            // gated by a minimum interval so repeated fresh-install attempts (e.g.
+            // relaunching shortly after a failed first attempt) don't hammer the
+            // API with a totals request every time.
+            let mut fresh_install_total: Option<usize> = None;
+            let is_fresh_install = !force_reload && cached.as_ref().is_none_or(Vec::is_empty);
+            if is_fresh_install {
+                let meta_root = storage_root.clone();
+                let last_request = async_cx
+                    .background_executor()
+                    .spawn(async move { load_cache_metadata(&meta_root) })
+                    .await
+                    .and_then(|m| m.last_fresh_install_request_secs);
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or(std::time::Duration::ZERO)
+                    .as_secs();
+                let gated = last_request.is_some_and(|last| {
+                    now_secs.saturating_sub(last) < CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS
+                });
+                if gated {
+                    tracing::debug!(
+                        "fresh-install initialization skipped: last request was within the \
+                         minimum interval"
+                    );
+                } else {
+                    let svc = service_arc.clone();
+                    let totals = async_cx
+                        .background_executor()
+                        .spawn(async move { svc.count_items() })
+                        .await;
+                    if let Some(Ok(count)) = totals {
+                        tracing::debug!(total_items = count, "fresh-install: totals request");
+                        fresh_install_total = Some(count);
+                    }
+                    let request_root = storage_root.clone();
+                    async_cx
+                        .background_executor()
+                        .spawn(async move {
+                            if let Err(e) =
+                                save_fresh_install_request_timestamp(&request_root, now_secs)
+                            {
+                                tracing::warn!(
+                                    error = %e,
+                                    "failed to save fresh-install request timestamp"
+                                );
+                            }
+                        })
+                        .await;
+                }
+            }
+
             // ── Stage: page-by-page fetch from API ──────────────────────────────
             // Move the shared activity into its next stage — no new item is
             // created, so a count check that ran above doesn't leave a stale
@@ -1085,19 +1149,22 @@ impl LibraryController {
                     )
                 });
 
-            // Seed the progress denominator from the local cache count — a close
+            // Seed the progress denominator, preferring a fresh-install totals
+            // request (see above) since it reflects the remote count directly;
+            // otherwise fall back to the local cache count — a close
             // approximation of the remote count in the common case — so the bar starts
             // determinate and moves immediately, rather than blocking page delivery on
             // a `total_rx.recv()` that may never resolve (the API's `links.last` is
             // optional and often absent). If the API does report its own total later,
             // it replaces this estimate the next time progress is recomputed below.
-            let mut estimated_total: Option<usize> =
-                cached.as_ref().map(|items| items.len()).filter(|&n| n > 0);
+            let mut estimated_total: Option<usize> = fresh_install_total.or_else(|| {
+                cached.as_ref().map(|items| items.len()).filter(|&n| n > 0)
+            });
             if let Some(total) = estimated_total {
                 weak_activity
                     .update(async_cx, |a, cx| a.update_progress(activity_id, 0.0, cx))
                     .ok();
-                tracing::debug!(estimated_total = total, "catalog load: seeded total from cache");
+                tracing::debug!(estimated_total = total, "catalog load: seeded total");
             }
 
             // Accumulate all live SDK pages into a local buffer so a *populated* cache
@@ -4568,7 +4635,8 @@ mod reload_cooldown_tests {
         CacheMetadata { saved_at_secs,
                         item_count: 10,
                         schema_version: 2,
-                        last_item_check_batch_secs: None }
+                        last_item_check_batch_secs: None,
+                        last_fresh_install_request_secs: None }
     }
 
     #[test]
