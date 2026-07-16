@@ -3,7 +3,7 @@
 //! are choices a user made deliberately and would expect to survive
 //! independently of transient window/panel layout.
 //!
-//! Backed by `{app_preferences_dir}/ui_preferences.toml`.
+//! Backed by `{app_preferences_dir}/ui.toml`.
 
 use serde::{Deserialize, Serialize};
 
@@ -39,7 +39,7 @@ pub struct UiPreferencesFile {
 
 /// Persists and restores user-facing UI preferences.
 ///
-/// Backed by `{app_preferences_dir}/ui_preferences.toml`.
+/// Backed by `{app_preferences_dir}/ui.toml`.
 pub struct UiPreferences {
     data: UiPreferencesFile,
 }
@@ -178,5 +178,5 @@ impl UiPreferences {
 }
 
 fn preferences_path() -> std::path::PathBuf {
-    app_preferences_dir().join("ui_preferences.toml")
+    app_preferences_dir().join("ui.toml")
 }

@@ -12,8 +12,8 @@
 //! - **App cache** ([`app_cache_dir`], [`cache_dir`]): regenerable data such as
 //!   the catalog/collections cache and the avatar cache.
 //! - **App preferences** ([`app_preferences_dir`]): small user preference files
-//!   (profile, download location override, `ui_preferences.toml`'s theme/
-//!   fonts/text-scale/Collections-sort). On macOS this resolves to
+//!   (profile, download location override, `ui.toml`'s theme/fonts/
+//!   text-scale/Collections-sort). On macOS this resolves to
 //!   `~/Library/Preferences`, distinct from Application Support —
 //!   `dirs::config_dir()` maps to Application Support on macOS and would
 //!   otherwise collide with cache data.
