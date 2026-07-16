@@ -111,6 +111,7 @@ fn probe_general(addr: &str) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use std::net::{SocketAddr, TcpListener};
 

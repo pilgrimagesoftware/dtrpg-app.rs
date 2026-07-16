@@ -218,6 +218,21 @@ fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64) -> bool {
     now_secs.saturating_sub(meta.saved_at_secs) < crate::data::constants::FORCE_RELOAD_COOLDOWN_SECS
 }
 
+/// Returns `true` if a fresh-install catalog-initialization request should be
+/// suppressed because the last one happened too recently, per
+/// `CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS`.
+///
+/// `last_request_secs` is `None` when no fresh-install request has ever been
+/// recorded (first launch, or metadata missing/unreadable) — treated as "not
+/// recently requested," so a missing timestamp never blocks the request.
+fn fresh_install_request_gated(last_request_secs: Option<u64>, now_secs: u64) -> bool {
+    let Some(last) = last_request_secs
+    else {
+        return false;
+    };
+    now_secs.saturating_sub(last) < CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS
+}
+
 /// Returns `true` if an item last checked at `last_checked` is due for
 /// another availability check, per `ITEM_CHECK_COOLDOWN_SECS`. `None` (never
 /// checked) is always due.
@@ -1125,9 +1140,7 @@ impl LibraryController {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or(std::time::Duration::ZERO)
                     .as_secs();
-                let gated = last_request.is_some_and(|last| {
-                    now_secs.saturating_sub(last) < CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS
-                });
+                let gated = fresh_install_request_gated(last_request, now_secs);
                 if gated {
                     tracing::debug!(
                         "fresh-install initialization skipped: last request was within the \
@@ -4771,6 +4784,29 @@ mod reload_cooldown_tests {
 }
 
 #[cfg(test)]
+mod fresh_install_gating_tests {
+    use super::fresh_install_request_gated;
+
+    #[test]
+    fn request_is_suppressed_within_the_minimum_interval() {
+        let now = 1_000;
+        assert!(fresh_install_request_gated(Some(now - 10), now)); // 10s ago, within 60s
+    }
+
+    #[test]
+    fn request_proceeds_once_the_minimum_interval_elapses() {
+        let now = 1_000;
+        assert!(!fresh_install_request_gated(Some(now - 61), now)); // just past 60s
+    }
+
+    #[test]
+    fn request_proceeds_when_never_recorded() {
+        let now = 1_000;
+        assert!(!fresh_install_request_gated(None, now));
+    }
+}
+
+#[cfg(test)]
 mod item_check_tests {
     use std::time::{Duration, SystemTime};
 
@@ -5198,5 +5234,46 @@ mod partial_fetch_tests {
     #[test]
     fn since_is_none_for_an_empty_catalog() {
         assert_eq!(partial_fetch_since(&[]), None);
+    }
+}
+
+#[cfg(test)]
+mod catalog_sync_guard_tests {
+    use gpui::{AppContext, TestAppContext};
+
+    use super::LibraryController;
+    use crate::controllers::activity::ActivityController;
+    use crate::services::collections::stub::{CollectionsStubMode, CollectionsStubService};
+    use crate::services::stub::{StubLibraryService, StubMode};
+
+    /// A second `start_load_inner` call while one is already in flight must
+    /// not start an overlapping load — verified by `load_generation` (which
+    /// increments only on a load that actually starts) staying at `1` after
+    /// two back-to-back calls, per `rust-resource-work-queue-topology`'s
+    /// serial-catalog-sync requirement.
+    #[gpui::test]
+    fn second_start_load_call_is_a_no_op_while_the_first_is_in_flight(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|cx| {
+                        let activity = cx.new(|_| ActivityController::new());
+                        let service = Box::new(StubLibraryService::new(StubMode::Seeded));
+                        let collections_service =
+                            Box::new(CollectionsStubService::new(CollectionsStubMode::Seeded));
+                        LibraryController::new(service, collections_service, activity, cx)
+                    });
+
+        // `LibraryController::new` already triggers one `start_load` internally,
+        // leaving `catalog_sync_in_flight` set and `load_generation` at `1` before
+        // this test calls anything itself.
+        let generation_after_construction =
+            ctrl.read_with(cx, |ctrl, _| ctrl.load_generation);
+        assert_eq!(generation_after_construction, 1);
+
+        ctrl.update(cx, |ctrl, cx| ctrl.start_load(cx));
+
+        let generation_after_second_call = ctrl.read_with(cx, |ctrl, _| ctrl.load_generation);
+        assert_eq!(generation_after_second_call,
+                   1,
+                   "a second start_load call while the first is in flight must not start a \
+                    new load");
     }
 }
