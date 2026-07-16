@@ -1244,6 +1244,10 @@ impl LibraryController {
             let (tx, rx) = std::sync::mpsc::channel::<Vec<LibraryItem>>();
             let (total_tx, total_rx) = std::sync::mpsc::channel::<usize>();
 
+            // Cloned before `service_arc` moves into the fetch spawn below — used to get
+            // a live item count for progress seeding when this isn't a fresh install.
+            let svc_for_count = service_arc.clone();
+
             // Run the paginated fetch on the background executor. Each page — and, when
             // the API reports one (via `links.last`), the estimated total — is sent
             // through its channel as it arrives; the result indicates overall success/failure.
@@ -1257,16 +1261,30 @@ impl LibraryController {
                 });
 
             // Seed the progress denominator, preferring a fresh-install totals
-            // request (see above) since it reflects the remote count directly;
-            // otherwise fall back to the local cache count — a close
-            // approximation of the remote count in the common case — so the bar starts
-            // determinate and moves immediately, rather than blocking page delivery on
-            // a `total_rx.recv()` that may never resolve (the API's `links.last` is
-            // optional and often absent). If the API does report its own total later,
-            // it replaces this estimate the next time progress is recomputed below.
-            let mut estimated_total: Option<usize> = fresh_install_total.or_else(|| {
-                cached.as_ref().map(|items| items.len()).filter(|&n| n > 0)
-            });
+            // request (see above) since it reflects the remote count directly. For a
+            // full fetch triggered for any other reason (stale cache, count mismatch,
+            // force reload), a single best-effort `count_items()` call gets a live
+            // remote count instead — the local cache's item count is exactly the value
+            // already known (or suspected) to be wrong whenever this stage runs at all,
+            // so seeding progress from it pins the bar near 100% after only a few pages
+            // once the real catalog has grown since the cache was last saved. Only if
+            // that live request also comes back empty does the stale cache count get
+            // used, so the bar still starts determinate rather than not at all. The
+            // real DriveThruRPG API never reports `links.last`, so `total_rx` below
+            // essentially never fires in practice — this is the only correction this
+            // estimate gets before the fetch completes.
+            let live_count = if fresh_install_total.is_none() {
+                async_cx.background_executor()
+                        .spawn(async move { svc_for_count.count_items() })
+                        .await
+                        .and_then(Result::ok)
+            } else {
+                None
+            };
+            let mut estimated_total: Option<usize> =
+                fresh_install_total.or(live_count).or_else(|| {
+                    cached.as_ref().map(|items| items.len()).filter(|&n| n > 0)
+                });
             if let Some(total) = estimated_total {
                 weak_activity
                     .update(async_cx, |a, cx| a.update_progress(activity_id, 0.0, cx))
