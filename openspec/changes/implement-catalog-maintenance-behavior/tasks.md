@@ -27,13 +27,19 @@
 
 ## 3. Network Monitor
 
-- [ ] 3.1 Add a network-monitor module with a general-connectivity check (short-timeout DNS
-      resolution or TCP connect to a well-known host) and an endpoint-specific check (reusing
-      the SDK/`reqwest` client with a short timeout).
-- [ ] 3.2 Cache each check's result for a short interval to bound check frequency under bursts
-      of calling requests.
+- [x] 3.1 Add `crates/dtrpg-ui/src/services/network_monitor.rs`: a general-connectivity check
+      (short-timeout TCP connect to a fixed IP, deliberately DNS- and DriveThruRPG-independent
+      so a DriveThruRPG-specific outage doesn't read as a general outage) and an
+      endpoint-specific check (`std::net` TCP connect with DNS resolution via
+      `ToSocketAddrs`, short timeout) — no new HTTP/TCP crate; reuses `std::net`, already a
+      dependency-free standard-library facility.
+- [x] 3.2 Cache each check's result (`NETWORK_MONITOR_CACHE_TTL_SECS` = 5s) in an in-memory
+      `Mutex<HashMap<String, CachedState>>` keyed by target, to bound check frequency under
+      bursts of calling requests.
 - [ ] 3.3 Wire the monitor's query calls into catalog-sync, download, cover-cache, and
       avatar-cache request paths, stopping the request when the monitor reports unreachable.
+      Threaded through as each call site is touched: catalog-sync in tasks 4-5, cover/avatar
+      cache alongside their retry wiring in task 7.1.
 
 ## 4. Catalog Sync Serial Dispatch
 
