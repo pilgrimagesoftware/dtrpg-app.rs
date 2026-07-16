@@ -1,19 +1,19 @@
 ## 1. Menu Bar
 
-- [ ] 1.1 In `crates/dtrpg-ui/src/ui/app/mod.rs::build_menus`, remove the "Select Tab"
+- [x] 1.1 In `crates/dtrpg-ui/src/ui/app/mod.rs::build_menus`, remove the "Select Tab"
       `MenuItem::submenu(...)` block (and its preceding separator) from the Window
       `Menu`'s `.items([...])` array
-- [ ] 1.2 Add the same "Select Tab" `MenuItem::submenu(...)` block to the View `Menu`'s
+- [x] 1.2 Add the same "Select Tab" `MenuItem::submenu(...)` block to the View `Menu`'s
       `.items([...])` array, after the existing "Find in Library" item
-- [ ] 1.3 Confirm the `tab_label` closure and the `SelectTab0`..`SelectTab9` action
+- [x] 1.3 Confirm the `tab_label` closure and the `SelectTab0`..`SelectTab9` action
       dispatch are unchanged — only the block's position in the returned `Vec<Menu>` moves
 
 ## 2. Build and Quality
 
-- [ ] 2.1 `cargo check --workspace`
-- [ ] 2.2 `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] 2.3 `cargo +nightly fmt --all -- --check`
-- [ ] 2.4 `cargo test --workspace`
+- [x] 2.1 `cargo check --workspace`
+- [x] 2.2 `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] 2.3 `cargo +nightly fmt --all -- --check`
+- [x] 2.4 `cargo test --workspace`
 
 ## 3. Manual Verification
 
