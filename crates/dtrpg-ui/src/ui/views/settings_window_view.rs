@@ -71,6 +71,20 @@ impl Render for SettingsWindowView {
         // zooming a page — see `LibraryController::set_ui_text_size`.
         window.set_rem_size(theme.fonts.ui_text_size);
         let snap = self.settings.read(cx).snapshot();
+
+        // One-shot focus request from the "Login to DriveThruRPG" banner
+        // action (`LibraryRootView::show_settings_focused_on_email`) — must
+        // run here rather than at the click site, since that site only has
+        // the main window's `Window`, not this settings window's.
+        let focus_email_pending = self.settings
+                                      .update(cx, |ctrl, _cx| ctrl.take_focus_email_pending());
+        if focus_email_pending
+           && !snap.auth.is_logged_in
+           && let Some(email_state) = snap.email_input.clone()
+        {
+            email_state.update(cx, |input, cx| input.focus(window, cx));
+        }
+
         let sign_in_enabled = !snap.sign_in_in_progress
                               && !snap.email_draft.trim().is_empty()
                               && !snap.password_draft.trim().is_empty();

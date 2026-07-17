@@ -74,7 +74,13 @@ pub fn render_notification_banner(notices: Vec<Notice>,
                             // flag — the window itself is created/tracked by
                             // `LibraryRootView::show_settings`, so that's what actually
                             // needs calling for a click here to do anything visible.
-                            root_entity.update(cx, |view, cx| view.show_settings(cx));
+                            // The `_focused_on_email` variant also switches to the
+                            // Account tab and focuses the email input, since the whole
+                            // point of this action is to get the user signing in as
+                            // fast as possible.
+                            root_entity.update(cx, |view, cx| {
+                                view.show_settings_focused_on_email(cx);
+                            });
                             auth_entity_action.update(cx, |ctrl, cx| {
                                 ctrl.dismiss_notice(kind, cx);
                             });

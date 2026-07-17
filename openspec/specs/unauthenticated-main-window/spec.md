@@ -50,7 +50,10 @@ sign-in action when the user is not authenticated, replacing the removed
 standalone login window. On submission, the app SHALL exchange the email and
 password for an application key via the SDK credential exchange, then
 exchange that application key for session tokens via the existing
-authentication call.
+authentication call. When Settings is opened via the "not signed in"
+notification banner's sign-in action, the Account tab's email input SHALL
+be focused as soon as the tab is shown, without requiring the user to click
+into it first.
 
 #### Scenario: Account tab shows sign-in form when unauthenticated
 - **WHEN** the user opens Settings and the Account tab while not signed in
@@ -91,6 +94,16 @@ authentication call.
   key is invalid or expired
 - **THEN** the Account tab pre-fills the email field so the user only
   re-enters their password
+
+#### Scenario: Email input is focused when Settings opens via the sign-in banner
+- **WHEN** the user clicks the "not signed in" notification banner's sign-in action
+- **THEN** the Settings window opens (or comes to front) on the Account tab
+- **AND** the email input field receives keyboard focus without any further click
+
+#### Scenario: Manually opening the Account tab does not force focus
+- **WHEN** the user manually switches to the Account tab while Settings is already open
+  (not via the banner's sign-in action)
+- **THEN** the email input's focus state is left as it was, matching today's behavior
 
 ### Requirement: Avatar button MUST provide sign-in action when unauthenticated
 When the user is not authenticated, the avatar button MUST show a sign-in affordance (tooltip or menu item) in addition to the existing "Not signed in" visual state.
