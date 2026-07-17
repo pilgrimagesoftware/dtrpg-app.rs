@@ -33,8 +33,8 @@
 
 - [x] 6.1 Run `cargo check -p dtrpg-ui` and confirm zero errors
 - [x] 6.2 Run `cargo test -p dtrpg-ui` and confirm all existing tests pass; add unit tests for the size-aggregation helpers (missing-file sum, multi-item sum) and for `PendingDownloadRequest` confirm/cancel clearing state correctly
-- [ ] 6.3 Run the app; trigger an entry-level download where the entry's total size exceeds available free space (e.g. temporarily point the storage root at a near-full or small test volume); confirm the warning dialog appears before anything downloads
-- [ ] 6.4 Confirm the dialog and verify the download proceeds and completes normally
-- [ ] 6.5 Cancel the dialog and verify nothing was queued
-- [ ] 6.6 Repeat for a collection's and a publisher's "Download All" action, confirming the check is evaluated once as an aggregate, not per item
-- [ ] 6.7 Confirm a download well within available free space queues immediately with no dialog
+- [x] 6.3 Run the app; trigger an entry-level download where the entry's total size exceeds available free space (e.g. temporarily point the storage root at a near-full or small test volume); confirm the warning dialog appears before anything downloads
+- [x] 6.4 Confirm the dialog and verify the download proceeds and completes normally
+- [x] 6.5 Cancel the dialog and verify nothing was queued
+- [x] 6.6 Repeat for a collection's and a publisher's "Download All" action, confirming the check is evaluated once as an aggregate, not per item
+- [x] 6.7 Confirm a download well within available free space queues immediately with no dialog
