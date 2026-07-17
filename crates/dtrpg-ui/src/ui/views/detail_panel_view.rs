@@ -277,7 +277,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                         }
                                         else {
                                             entity_download.update(cx, |ctrl, cx| {
-                                                ctrl.enqueue_download(&id, download_title.clone(), cx);
+                                                ctrl.request_download(&id, download_title.clone(), cx);
                                             });
                                         }
                                     }),
@@ -614,7 +614,7 @@ impl TableDelegate for ItemListDelegate {
                          .on_click(move |_, _, cx| {
                              cx.stop_propagation();
                              controller.update(cx, |ctrl, cx| {
-                                           ctrl.enqueue_item_download(&entry_id,
+                                           ctrl.request_item_download(&entry_id,
                                                                       row_ix as u32,
                                                                       title.clone(),
                                                                       cx);

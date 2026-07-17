@@ -300,7 +300,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                            let entity = download_entity.clone();
                            move |_, _, cx| {
                                entity.update(cx, |ctrl, cx| {
-                                         ctrl.download_all_for_collection(col_id, cx);
+                                         ctrl.request_download_all_for_collection(col_id, cx);
                                      });
                            }
                        }))

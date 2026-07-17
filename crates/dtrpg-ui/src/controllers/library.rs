@@ -161,6 +161,34 @@ fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
          .collect()
 }
 
+/// Sums `size_mb` across every not-yet-downloaded file in `files`.
+///
+/// Used by the `request_*` gating wrappers to compute the aggregate size a
+/// queuing action would enqueue, for comparison against
+/// [`crate::data::storage::available_space_mb`].
+fn missing_files_size_mb(files: &[LibraryItemFile]) -> f64 {
+    files.iter()
+         .filter(|f| !f.downloaded)
+         .map(|f| f.size_mb)
+         .sum()
+}
+
+/// Sums [`missing_files_size_mb`] across every item in `catalog` whose id is
+/// in `ids`.
+///
+/// Used by the collection/publisher `request_download_all_for_*` wrappers to
+/// compute one aggregate size across every matching item's missing files,
+/// rather than checking each item individually.
+fn missing_files_size_mb_for_items<'a>(catalog: &[LibraryItem],
+                                       ids: impl Iterator<Item = &'a str>)
+                                       -> f64 {
+    let ids: HashSet<&str> = ids.collect();
+    catalog.iter()
+           .filter(|item| ids.contains(item.id.as_ref()))
+           .map(|item| missing_files_size_mb(&item.files))
+           .sum()
+}
+
 /// Returns `(id, title)` for every `catalog` item that is a member of
 /// `member_ids`, in catalog order.
 ///
@@ -704,6 +732,51 @@ pub struct LibraryController {
     /// sync with the Storage settings page via
     /// [`Self::set_recently_updated_window_days`].
     recently_updated_window_days:  u32,
+    /// A queuing action stashed by a `request_*` gating wrapper after it
+    /// found free disk space insufficient, awaiting the user's response to
+    /// the resulting [`LowDiskSpaceWarning`]. Consumed by
+    /// [`Self::confirm_pending_download`] or cleared by
+    /// [`Self::cancel_pending_download`].
+    pending_download:              Option<PendingDownloadRequest>,
+}
+
+/// A user-initiated download-queuing action stashed while a
+/// [`LowDiskSpaceWarning`] confirmation is pending.
+///
+/// One variant per `request_*` gating wrapper — see `LibraryController`'s
+/// `request_download`, `request_item_download`,
+/// `request_download_all_for_collection`, and
+/// `request_download_all_for_publisher`.
+enum PendingDownloadRequest {
+    /// Stashed by [`LibraryController::request_download`].
+    Item {
+        /// Entry id to pass to [`LibraryController::enqueue_download`].
+        id:    Arc<str>,
+        /// Display title to pass to [`LibraryController::enqueue_download`].
+        title: String,
+    },
+    /// Stashed by [`LibraryController::request_item_download`].
+    ItemFile {
+        /// Entry id to pass to [`LibraryController::enqueue_item_download`].
+        id:    Arc<str>,
+        /// File index to pass to [`LibraryController::enqueue_item_download`].
+        index: u32,
+        /// Display title to pass to
+        /// [`LibraryController::enqueue_item_download`].
+        title: String,
+    },
+    /// Stashed by [`LibraryController::request_download_all_for_collection`].
+    Collection {
+        /// Collection id to pass to
+        /// [`LibraryController::download_all_for_collection`].
+        collection_id: u64,
+    },
+    /// Stashed by [`LibraryController::request_download_all_for_publisher`].
+    Publisher {
+        /// Publisher name to pass to
+        /// [`LibraryController::download_all_for_publisher`].
+        publisher: Arc<str>,
+    },
 }
 
 impl LibraryController {
@@ -778,7 +851,8 @@ impl LibraryController {
                    download_cancel_flags: HashMap::new(),
                    download_activity_ids: HashMap::new(),
                    max_concurrent_downloads: storage.max_concurrent_downloads(),
-                   recently_updated_window_days: storage.recently_updated_window_days() };
+                   recently_updated_window_days: storage.recently_updated_window_days(),
+                   pending_download: None };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
@@ -3511,6 +3585,133 @@ impl LibraryController {
         self.drain_download_queue(cx);
     }
 
+    /// Gates [`Self::enqueue_download`] behind a free-disk-space check.
+    ///
+    /// Computes the entry's aggregate missing-file size and compares it to
+    /// [`crate::data::storage::available_space_mb`]. If space is sufficient
+    /// or can't be determined, queues immediately; otherwise stashes the
+    /// request and emits [`LowDiskSpaceWarning`] instead of queuing anything.
+    pub fn request_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
+        let title = title.into();
+        let Some(needed_mb) = self.catalog
+                                  .iter()
+                                  .find(|i| i.id.as_ref() == id)
+                                  .map(|item| missing_files_size_mb(&item.files))
+        else {
+            return;
+        };
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::Item { id: Arc::from(id),
+                                                                        title });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.enqueue_download(id, title, cx);
+    }
+
+    /// Gates [`Self::enqueue_item_download`] behind a free-disk-space check.
+    ///
+    /// Same pattern as [`Self::request_download`], but for a single file.
+    pub fn request_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
+                                 cx: &mut Context<Self>) {
+        let title = title.into();
+        let Some(needed_mb) = self.catalog
+                                  .iter()
+                                  .find(|i| i.id.as_ref() == id)
+                                  .and_then(|item| item.files.get(index as usize))
+                                  .filter(|f| !f.downloaded)
+                                  .map(|f| f.size_mb)
+        else {
+            return;
+        };
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::ItemFile { id: Arc::from(id),
+                                                                            index,
+                                                                            title });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.enqueue_item_download(id, index, title, cx);
+    }
+
+    /// Gates [`Self::download_all_for_collection`] behind a free-disk-space
+    /// check.
+    ///
+    /// The check is evaluated once as an aggregate across every matching
+    /// item's missing files, not per item — see [`Self::request_download`].
+    pub fn request_download_all_for_collection(&mut self, collection_id: u64,
+                                               cx: &mut Context<Self>) {
+        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        else {
+            return;
+        };
+        let member_ids = Arc::clone(&collection.member_ids);
+        let targets = collection_download_targets(&self.catalog, &member_ids);
+        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
+                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::Collection { collection_id });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.download_all_for_collection(collection_id, cx);
+    }
+
+    /// Gates [`Self::download_all_for_publisher`] behind a free-disk-space
+    /// check.
+    ///
+    /// The check is evaluated once as an aggregate across every matching
+    /// item's missing files, not per item — see [`Self::request_download`].
+    pub fn request_download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
+        let targets = publisher_download_targets(&self.catalog, publisher);
+        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
+                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download =
+                Some(PendingDownloadRequest::Publisher { publisher: Arc::from(publisher), });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.download_all_for_publisher(publisher, cx);
+    }
+
+    /// Returns `Some(free_mb)` if `needed_mb` exceeds the free space at the
+    /// storage root; `None` if space is sufficient or can't be determined
+    /// (fail open — see `download-disk-space-check`).
+    fn warn_if_insufficient_space(needed_mb: f64) -> Option<f64> {
+        let free_mb = crate::data::storage::available_space_mb()?;
+        (needed_mb > free_mb).then_some(free_mb)
+    }
+
+    /// Queues the download stashed in `pending_download` (if any) via the
+    /// corresponding unconditional method, then clears it.
+    ///
+    /// Calls the unconditional method directly — never a `request_*`
+    /// wrapper — so confirming can't re-trigger the same space check and
+    /// loop back into another warning.
+    pub fn confirm_pending_download(&mut self, cx: &mut Context<Self>) {
+        match self.pending_download.take() {
+            Some(PendingDownloadRequest::Item { id, title }) => {
+                self.enqueue_download(&id, title, cx);
+            }
+            Some(PendingDownloadRequest::ItemFile { id, index, title }) => {
+                self.enqueue_item_download(&id, index, title, cx);
+            }
+            Some(PendingDownloadRequest::Collection { collection_id }) => {
+                self.download_all_for_collection(collection_id, cx);
+            }
+            Some(PendingDownloadRequest::Publisher { publisher }) => {
+                self.download_all_for_publisher(&publisher, cx);
+            }
+            None => {}
+        }
+    }
+
+    /// Clears a stashed `pending_download` without queuing anything.
+    pub fn cancel_pending_download(&mut self, _cx: &mut Context<Self>) {
+        self.pending_download = None;
+    }
+
     /// Cancels a single file's download that has not yet completed.
     ///
     /// If `(id, index)` is still waiting in `download_queue`, removes it —
@@ -4803,6 +5004,75 @@ mod download_queue_tests {
 
         assert!(!removed);
         assert_eq!(queue.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod disk_space_check_tests {
+    use super::{missing_files_size_mb, missing_files_size_mb_for_items};
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
+
+    fn file(size_mb: f64, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: "f".into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb,
+                          downloaded }
+    }
+
+    fn item(id: &str, files: Vec<LibraryItemFile>) -> LibraryItem {
+        let mut item = LibraryItem::new(id,
+                                        "Title",
+                                        "Pub",
+                                        "Line",
+                                        "Core",
+                                        "PDF",
+                                        0,
+                                        0.0,
+                                        2020,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.files = files;
+        item
+    }
+
+    #[test]
+    fn missing_files_size_mb_sums_only_not_yet_downloaded_files() {
+        let files = vec![file(10.0, false), file(5.0, true), file(2.5, false)];
+
+        assert_eq!(missing_files_size_mb(&files), 12.5);
+    }
+
+    #[test]
+    fn missing_files_size_mb_is_zero_when_all_downloaded() {
+        let files = vec![file(10.0, true), file(5.0, true)];
+
+        assert_eq!(missing_files_size_mb(&files), 0.0);
+    }
+
+    #[test]
+    fn missing_files_size_mb_for_items_sums_across_matching_items_only() {
+        let catalog = vec![item("a", vec![file(10.0, false), file(5.0, true)]),
+                           item("b", vec![file(3.0, false)]),
+                           item("c", vec![file(100.0, false)])];
+
+        let total = missing_files_size_mb_for_items(&catalog, ["a", "b"].into_iter());
+
+        assert_eq!(total, 13.0);
+    }
+
+    #[test]
+    fn missing_files_size_mb_for_items_ignores_unknown_ids() {
+        let catalog = vec![item("a", vec![file(10.0, false)])];
+
+        let total = missing_files_size_mb_for_items(&catalog, ["nonexistent"].into_iter());
+
+        assert_eq!(total, 0.0);
     }
 }
 
