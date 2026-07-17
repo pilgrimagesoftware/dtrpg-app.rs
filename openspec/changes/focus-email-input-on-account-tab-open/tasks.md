@@ -31,7 +31,7 @@
       `SettingsController` test patterns) confirming `request_email_focus_on_account_tab` sets
       both `active_page_ix = 0` and `focus_email_pending = true`, and that consuming the flag
       clears it.
-- [ ] 4.2 Manually verify (left to the user, per project convention): clicking "Login to
+- [x] 4.2 Manually verify (left to the user, per project convention): clicking "Login to
       DriveThruRPG" from a fresh, unauthenticated startup opens Settings on the Account tab
       with the email field focused and ready to type; manually clicking the Account tab
       afterward does not force-focus the email field again.
