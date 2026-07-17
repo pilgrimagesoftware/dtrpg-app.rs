@@ -1,22 +1,22 @@
 ## 1. Checkpoint Trigger
 
-- [ ] 1.1 Pick a checkpoint cadence (e.g. every 5 pages or every 10 seconds, whichever
+- [x] 1.1 Pick a checkpoint cadence (e.g. every 5 pages or every 10 seconds, whichever
       fires first) and thread it through the page-receive loop
-- [ ] 1.2 Spawn a background `save_catalog_cache` call against the current accumulated
+- [x] 1.2 Spawn a background `save_catalog_cache` call against the current accumulated
       buffer at each checkpoint, without blocking the page-receive loop
 
 ## 2. Safety
 
-- [ ] 2.1 Confirm checkpoint writes reuse the existing atomic `.tmp`-then-rename write
+- [x] 2.1 Confirm checkpoint writes reuse the existing atomic `.tmp`-then-rename write
       path so a crash mid-write cannot leave a corrupt cache file
-- [ ] 2.2 Confirm checkpoint writes do not race with the final post-fetch save (e.g. via a
+- [x] 2.2 Confirm checkpoint writes do not race with the final post-fetch save (e.g. via a
       simple in-flight-write guard)
 
 ## 3. Build and Quality
 
-- [ ] 3.1 `cargo check --workspace`
-- [ ] 3.2 `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] 3.3 `cargo test --workspace`
+- [x] 3.1 `cargo check --workspace`
+- [x] 3.2 `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] 3.3 `cargo test --workspace`
 
 ## 4. Manual Verification
 
