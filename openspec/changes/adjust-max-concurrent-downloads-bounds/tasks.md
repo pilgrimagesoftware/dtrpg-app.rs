@@ -63,7 +63,7 @@
 
 ## 7. Manual Verification
 
-- [ ] 7.1 Confirm the "Max concurrent downloads" field on the Storage
+- [x] 7.1 Confirm the "Max concurrent downloads" field on the Storage
       settings page is directly editable (typing a value) and its +/-
       buttons work, that it won't go below 1 or above 5, and that the
       change persists across an app restart
