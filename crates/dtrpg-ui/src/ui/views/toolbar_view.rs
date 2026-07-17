@@ -147,7 +147,8 @@ fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: 
 
     let is_custom = matches!(current, SortMethod::Custom { .. });
 
-    Button::new("sort-selector").label(label)
+    Button::new("sort-selector").icon(Icon::empty().path("icons/arrow-down-up.svg"))
+                                .label(label)
                                 .ghost()
                                 .dropdown_caret(true)
                                 .tooltip(t!("toolbar.sort_by"))
