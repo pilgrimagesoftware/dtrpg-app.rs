@@ -20,8 +20,8 @@
 
 ## 4. Manual Verification
 
-- [ ] 4.1 Start a load against a large library, kill the app after a few checkpoints but
+- [x] 4.1 Start a load against a large library, kill the app after a few checkpoints but
       before completion, and confirm the next launch shows a partial (not empty, not
       fully-stale) cache
-- [ ] 4.2 Let a load complete normally and confirm the final cache matches the full
+- [x] 4.2 Let a load complete normally and confirm the final cache matches the full
       dataset (checkpointing didn't leave a stale partial file)
