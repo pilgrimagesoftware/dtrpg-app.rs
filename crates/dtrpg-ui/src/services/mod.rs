@@ -22,22 +22,36 @@ pub enum LibraryServiceErrorKind {
     /// Full token-refresh handling is deferred until `connect-sdk-to-rust-app`
     /// lands.
     NeedsReauth,
+    /// Request failed due to an HTTP 429 (Too Many Requests) response.
+    RateLimited,
 }
 
 /// Error returned by library service operations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LibraryServiceError {
     /// The machine-classified failure kind.
-    pub kind:    LibraryServiceErrorKind,
+    pub kind:        LibraryServiceErrorKind,
     /// Human-readable baseline error message.
-    pub message: String,
+    pub message:     String,
+    /// The server-specified wait duration from a `Retry-After` header, when
+    /// the failure was a [`LibraryServiceErrorKind::RateLimited`] response
+    /// that included one.
+    pub retry_after: Option<std::time::Duration>,
 }
 
 impl LibraryServiceError {
     /// Creates a new service error.
     pub fn new(kind: LibraryServiceErrorKind, message: impl Into<String>) -> Self {
         Self { kind,
-               message: message.into() }
+               message: message.into(),
+               retry_after: None }
+    }
+
+    /// Attaches a `Retry-After`-derived wait duration to this error.
+    #[must_use]
+    pub fn with_retry_after(mut self, retry_after: Option<std::time::Duration>) -> Self {
+        self.retry_after = retry_after;
+        self
     }
 
     /// Returns a multi-line string suitable for display in the activity panel,
@@ -51,6 +65,9 @@ impl LibraryServiceError {
             LibraryServiceErrorKind::NotFound => "The requested item could not be found.",
             LibraryServiceErrorKind::NeedsReauth => {
                 "Your session has expired. Please sign out and sign back in."
+            }
+            LibraryServiceErrorKind::RateLimited => {
+                "DriveThruRPG is rate-limiting requests. Retrying automatically."
             }
         };
         format!("{self}\n{hint}")

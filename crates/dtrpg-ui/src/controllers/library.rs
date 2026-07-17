@@ -465,6 +465,23 @@ struct ZipPreviewState {
     pinned:     bool,
 }
 
+/// Error from a cover/avatar thumbnail fetch, carrying the `Retry-After`
+/// duration when the failure was an HTTP 429 response so the fetch's
+/// `retry_with_backoff` call can honor it instead of the default backoff.
+struct ThumbnailFetchError {
+    /// Human-readable description of the failure, logged as-is.
+    message:     String,
+    /// The server-specified wait duration from a `Retry-After` header, when
+    /// the failure was an HTTP 429 response that included one.
+    retry_after: Option<std::time::Duration>,
+}
+
+impl std::fmt::Display for ThumbnailFetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
@@ -1254,7 +1271,9 @@ impl LibraryController {
                                 },
                                 |e: &LibraryServiceError| {
                                     e.kind == LibraryServiceErrorKind::Network
+                                        || e.kind == LibraryServiceErrorKind::RateLimited
                                 },
+                                |e: &LibraryServiceError| e.retry_after,
                                 Some(&mut on_retry),
                             )
                         })
@@ -2315,7 +2334,7 @@ impl LibraryController {
               let disk_key = Arc::clone(&item_id);
               let cancel = std::sync::atomic::AtomicBool::new(false);
               let retry_url = fetch_url.clone();
-              let result: Result<Vec<u8>, String> =
+              let result: Result<Vec<u8>, ThumbnailFetchError> =
                   async_cx.background_executor()
                           .spawn(async move {
                               let covers_root = covers_dir();
@@ -2327,34 +2346,59 @@ impl LibraryController {
                               if !network_monitor.check_endpoint(
                                   crate::data::constants::DTRPG_API_HOST,
                               ) {
-                                  return Err(
-                                      "DriveThruRPG API endpoint unreachable".to_string(),
-                                  );
+                                  return Err(ThumbnailFetchError {
+                                      message:     "DriveThruRPG API endpoint unreachable"
+                                          .to_string(),
+                                      retry_after: None,
+                                  });
                               }
                               let config = retry::RetryConfig {
                                   max_attempts: crate::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
                                   base_secs: crate::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
                                   max_secs: crate::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
                               };
-                              let mut on_retry =
-                                  |attempt: u32, delay: std::time::Duration, reason: &String| {
-                                      tracing::debug!(
-                                          url = %retry_url,
-                                          attempt,
-                                          delay_secs = delay.as_secs(),
-                                          reason = %reason,
-                                          "cover thumbnail fetch retrying"
-                                      );
-                                  };
+                              let mut on_retry = |attempt: u32, delay: std::time::Duration,
+                                                   reason: &ThumbnailFetchError| {
+                                  tracing::debug!(
+                                      url = %retry_url,
+                                      attempt,
+                                      delay_secs = delay.as_secs(),
+                                      reason = %reason,
+                                      "cover thumbnail fetch retrying"
+                                  );
+                              };
                               let bytes = retry::retry_with_backoff(
                                   config,
                                   &cancel,
-                                  || -> Result<Vec<u8>, String> {
-                                      let resp = reqwest::blocking::get(&fetch_url)
-                                          .map_err(|e| e.to_string())?;
-                                      Ok(resp.bytes().map_err(|e| e.to_string())?.to_vec())
+                                  || -> Result<Vec<u8>, ThumbnailFetchError> {
+                                      let resp = reqwest::blocking::get(&fetch_url).map_err(
+                                          |e| ThumbnailFetchError {
+                                              message:     e.to_string(),
+                                              retry_after: None,
+                                          },
+                                      )?;
+                                      if resp.status().as_u16() == 429 {
+                                          let retry_after = resp
+                                              .headers()
+                                              .get(reqwest::header::RETRY_AFTER)
+                                              .and_then(|v| v.to_str().ok())
+                                              .and_then(|v| v.trim().parse::<u64>().ok())
+                                              .map(std::time::Duration::from_secs);
+                                          return Err(ThumbnailFetchError {
+                                              message: "rate limited (HTTP 429)".to_string(),
+                                              retry_after,
+                                          });
+                                      }
+                                      Ok(resp
+                                          .bytes()
+                                          .map_err(|e| ThumbnailFetchError {
+                                              message:     e.to_string(),
+                                              retry_after: None,
+                                          })?
+                                          .to_vec())
                                   },
                                   |_| true,
+                                  |e: &ThumbnailFetchError| e.retry_after,
                                   Some(&mut on_retry),
                               )?;
                               save_cached_cover(&covers_root, &disk_key, &bytes);
