@@ -312,6 +312,18 @@ fn config_path() -> Option<PathBuf> {
     Some(app_preferences_dir().join("storage.toml"))
 }
 
+/// Returns free disk space at the current storage root, in megabytes.
+///
+/// Returns `None` on any I/O error (e.g. an unmounted volume or unsupported
+/// filesystem) — callers should treat that identically to "space is
+/// sufficient" rather than blocking a download on an unrelated probe
+/// failure.
+#[must_use]
+pub fn available_space_mb() -> Option<f64> {
+    fs4::available_space(StorageConfig::load().root_path()).ok()
+                                                           .map(|bytes| bytes as f64 / 1_048_576.0)
+}
+
 /// Derives the directory a downloaded item's files live in:
 /// `{root}/items/{sanitized publisher}/`, grouping every item from the same
 /// publisher together under a common `items/` directory.

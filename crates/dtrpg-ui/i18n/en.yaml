@@ -76,6 +76,8 @@ catalog:
   action_remove_download: "Remove Download"
   remove_download_confirm_title: "Remove download of \"%{title}\"?"
   remove_download_confirm_description: "The local copy will be removed. You can download it again later."
+  low_disk_space_confirm_title: "Not enough free disk space?"
+  low_disk_space_confirm_description: "This download needs %{needed} MB, but only %{free} MB is free at your storage location. Download anyway?"
   action_open: "Open"
   action_load_thumbnail: "Load Thumbnail"
   action_show_in_finder: "Show in Finder"
