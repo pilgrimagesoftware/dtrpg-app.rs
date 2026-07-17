@@ -76,6 +76,8 @@ catalog:
   action_remove_download: "Supprimer le téléchargement"
   remove_download_confirm_title: "Supprimer le téléchargement de « %{title} » ?"
   remove_download_confirm_description: "La copie locale sera supprimée. Vous pourrez la retélécharger plus tard."
+  low_disk_space_confirm_title: "Espace disque insuffisant ?"
+  low_disk_space_confirm_description: "Ce téléchargement nécessite %{needed} Mo, mais seulement %{free} Mo sont disponibles à l'emplacement de stockage. Télécharger quand même ?"
   action_load_thumbnail: "Charger la vignette"
   action_show_in_finder: "Afficher dans le Finder"
   action_show_in_explorer: "Afficher dans l'Explorateur"

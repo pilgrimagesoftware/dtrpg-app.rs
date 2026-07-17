@@ -56,8 +56,9 @@ use crate::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
             CollectionMemberRemoveFailed, DownloadComplete, DownloadError, LibraryChanged,
-            LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
-            TabsChanged, ThumbnailRefreshCompleted, ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
+            LogoutRequested, LowDiskSpaceWarning, SettingsChanged, SignInSucceeded,
+            StartupAuthBegun, StartupAuthFailed, TabsChanged, ThumbnailRefreshCompleted,
+            ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
         ui_state::UiState,
@@ -584,6 +585,41 @@ impl LibraryRootView {
                         |_this, _ctrl, _event: &ThumbnailRefreshNoOp, window, cx| {
                             let msg = t!("notification.refresh_thumbnails_noop").to_string();
                             window.push_notification(warning_notification(msg), cx);
+                        })
+          .detach();
+
+        let controller_for_disk_space = controller.clone();
+        cx.subscribe_in(&controller,
+                        window,
+                        move |_this, _ctrl, event: &LowDiskSpaceWarning, window, cx| {
+                            let needed = format!("{:.0}", event.needed_mb);
+                            let free = format!("{:.0}", event.free_mb);
+                            let confirm_entity = controller_for_disk_space.clone();
+                            let cancel_entity = controller_for_disk_space.clone();
+                            window.open_alert_dialog(cx, move |alert, _, _| {
+                                      let confirm_entity = confirm_entity.clone();
+                                      let cancel_entity = cancel_entity.clone();
+                                      alert
+                                    .confirm()
+                                    .title(t!("catalog.low_disk_space_confirm_title").to_string())
+                                    .description(
+                                        t!("catalog.low_disk_space_confirm_description",
+                                           needed = needed.clone(),
+                                           free = free.clone()).to_string(),
+                                    )
+                                    .on_ok(move |_, _window, cx| {
+                                        confirm_entity.update(cx, |ctrl, cx| {
+                                                          ctrl.confirm_pending_download(cx)
+                                                      });
+                                        true
+                                    })
+                                    .on_cancel(move |_, _window, cx| {
+                                        cancel_entity.update(cx, |ctrl, cx| {
+                                                         ctrl.cancel_pending_download(cx)
+                                                     });
+                                        true
+                                    })
+                                  });
                         })
           .detach();
 

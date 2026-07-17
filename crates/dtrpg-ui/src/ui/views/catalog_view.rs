@@ -583,7 +583,7 @@ impl TableDelegate for CatalogListDelegate {
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.enqueue_download(&id, title.clone(), cx));
+                    entity.update(cx, |ctrl, cx| ctrl.request_download(&id, title.clone(), cx));
                 }),
             ),
         };
@@ -702,7 +702,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                     PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
                         move |_, _, cx| {
                             entity.update(cx, |ctrl, cx| {
-                                ctrl.download_all_for_publisher(&publisher, cx);
+                                ctrl.request_download_all_for_publisher(&publisher, cx);
                             });
                         },
                     ),
@@ -780,7 +780,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.enqueue_download(&id, title.clone(), cx));
+                    entity.update(cx, |ctrl, cx| ctrl.request_download(&id, title.clone(), cx));
                 }),
             ),
         };
@@ -1520,7 +1520,8 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
              let publisher = menu_publisher.clone();
              menu.item(PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
                  move |_, _, cx| {
-                     entity.update(cx, |ctrl, cx| ctrl.download_all_for_publisher(&publisher, cx));
+                     entity.update(cx,
+                                   |ctrl, cx| ctrl.request_download_all_for_publisher(&publisher, cx));
                  },
              ))
          })
@@ -1828,7 +1829,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                         move |_, _, cx| {
                             entity_dl.update(cx, |ctrl, cx| {
-                                ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                                ctrl.request_download(&dl_id, dl_title.clone(), cx)
                             });
                         },
                     ))
@@ -2129,7 +2130,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                         move |_, _, cx| {
                             entity_dl.update(cx, |ctrl, cx| {
-                                ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                                ctrl.request_download(&dl_id, dl_title.clone(), cx)
                             });
                         },
                     ))
