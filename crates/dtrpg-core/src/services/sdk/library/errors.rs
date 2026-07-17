@@ -24,15 +24,18 @@ pub(super) fn map_client_error(error: ClientError) -> LibraryServiceError {
         ClientError::ApiError { url,
                                 status,
                                 message,
-                                payload, } => {
+                                payload,
+                                retry_after, } => {
             let kind = match status {
                 401 => LibraryServiceErrorKind::NeedsReauth,
                 403 => LibraryServiceErrorKind::Session,
+                429 => LibraryServiceErrorKind::RateLimited,
                 _ => LibraryServiceErrorKind::Network,
             };
             let detail = message.unwrap_or(payload);
             LibraryServiceError::new(kind,
                                      format!("Request to {url} failed (HTTP {status}): {detail}"))
+                .with_retry_after(retry_after)
         }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());
@@ -95,5 +98,26 @@ pub(super) fn map_connection_error(error: ConnectionError) -> LibraryServiceErro
             LibraryServiceError::new(LibraryServiceErrorKind::Network,
                                      format!("Unable to start Rust SDK runtime: {error}"))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn map_client_error_maps_429_api_error_to_rate_limited_with_retry_after() {
+        let error = ClientError::ApiError { url:         "https://api.example/foo".to_string(),
+                                            status:      429,
+                                            message:     Some("rate limited".to_string()),
+                                            payload:     String::new(),
+                                            retry_after: Some(Duration::from_secs(30)), };
+
+        let mapped = map_client_error(error);
+
+        assert_eq!(mapped.kind, LibraryServiceErrorKind::RateLimited);
+        assert_eq!(mapped.retry_after, Some(Duration::from_secs(30)));
     }
 }
