@@ -99,7 +99,7 @@
 
 ## 7. Manual Verification
 
-- [ ] 7.1 Confirm a simulated 429 (e.g. via a local mock server swapped
+- [x] 7.1 Confirm a simulated 429 (e.g. via a local mock server swapped
       into a debug build, or observed against a real rate-limited request)
       causes the app to wait the server-specified duration rather than the
       default backoff schedule, and that the request still eventually
