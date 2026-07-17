@@ -186,6 +186,11 @@ pub struct SettingsController {
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
     active_page_ix:                usize,
+    /// `true` when the email input should be focused on the settings
+    /// window's next render pass. Set by
+    /// [`Self::request_email_focus_on_account_tab`] and consumed (cleared)
+    /// by the settings window's render — see `SettingsWindowView::render`.
+    focus_email_pending:           bool,
     /// Input state for the "Recently Updated window" number field; set by
     /// the root view after creation.
     recently_updated_window_input: Option<Entity<InputState>>,
@@ -276,6 +281,7 @@ impl SettingsController {
                               active_page_ix:
                                   crate::data::ui_state::UiState::load().settings_page_ix()
                                                                         .unwrap_or(0),
+                              focus_email_pending: false,
                               recently_updated_window_input: None,
                               body_font_select: None,
                               value_font_select: None,
@@ -283,6 +289,42 @@ impl SettingsController {
                               mono_font_select: None };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
+    }
+
+    /// Builds a controller in-memory, without touching the platform keyring
+    /// or the shared on-disk app config files.
+    ///
+    /// [`new`](Self::new) always reads the real keyring and config files
+    /// (see [`StorageConfig::for_test`] for why that's unsafe in tests); this
+    /// constructor exists so tests can exercise `cx`-requiring methods
+    /// without those side effects.
+    #[cfg(test)]
+    pub(crate) fn for_test(login_service: Arc<dyn LoginService>) -> Self {
+        Self { is_open: false,
+               file_openers: FileOpenerConfig::default(),
+               is_authenticated: false,
+               auth_state: AuthState::LoggedOut,
+               storage_path_exists: true,
+               storage: StorageConfig::for_test(std::env::temp_dir()),
+               storage_unavailable: false,
+               login_service,
+               email_draft: String::new(),
+               password_draft: String::new(),
+               sign_in_in_progress: false,
+               sign_in_error: None,
+               email_input: None,
+               password_input: None,
+               storage_path_draft: String::new(),
+               storage_path_input: None,
+               api_key_hint: None,
+               pending_file_opener: None,
+               active_page_ix: 0,
+               focus_email_pending: false,
+               recently_updated_window_input: None,
+               body_font_select: None,
+               value_font_select: None,
+               label_font_select: None,
+               mono_font_select: None }
     }
 
     /// Attaches the email input state entity created by the root view.
@@ -339,6 +381,24 @@ impl SettingsController {
         self.active_page_ix = ix;
         crate::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
+    }
+
+    /// Switches to the Account tab and marks the email input to be focused
+    /// on the settings window's next render pass.
+    ///
+    /// Used by the "Login to DriveThruRPG" notification banner action so the
+    /// user can start typing immediately instead of having to click into the
+    /// field first.
+    pub fn request_email_focus_on_account_tab(&mut self, cx: &mut Context<Self>) {
+        self.set_active_page_ix(0, cx);
+        self.focus_email_pending = true;
+    }
+
+    /// Returns and clears the pending-focus flag set by
+    /// [`Self::request_email_focus_on_account_tab`], so the settings
+    /// window's render pass consumes it exactly once.
+    pub fn take_focus_email_pending(&mut self) -> bool {
+        std::mem::take(&mut self.focus_email_pending)
     }
 }
 
@@ -848,7 +908,10 @@ fn mask_api_key(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use gpui::{AppContext, TestAppContext};
+
     use super::*;
+    use crate::services::{LoginError, LoginTokens};
 
     #[test]
     fn mask_api_key_long_key() {
@@ -863,5 +926,48 @@ mod tests {
     #[test]
     fn mask_api_key_exactly_five() {
         assert_eq!(mask_api_key("abcde"), "••••••••");
+    }
+
+    /// Never invoked by the tests below — `request_email_focus_on_account_tab`
+    /// and `take_focus_email_pending` don't touch the login flow.
+    struct UnusedLoginService;
+
+    impl LoginService for UnusedLoginService {
+        fn login_with_credentials(&self, _email: &str, _password: &str)
+                                  -> Result<String, LoginError> {
+            unimplemented!("not exercised by this test")
+        }
+
+        fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
+            unimplemented!("not exercised by this test")
+        }
+    }
+
+    #[gpui::test]
+    fn request_email_focus_sets_account_tab_and_pending_flag(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
+
+        ctrl.update(cx, |ctrl, cx| {
+                ctrl.set_active_page_ix(4, cx);
+                ctrl.request_email_focus_on_account_tab(cx);
+            });
+
+        ctrl.read_with(cx, |ctrl, _| {
+                assert_eq!(ctrl.active_page_ix, 0);
+                assert!(ctrl.focus_email_pending);
+            });
+    }
+
+    #[gpui::test]
+    fn take_focus_email_pending_clears_flag_after_reading_it(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
+
+        ctrl.update(cx, |ctrl, cx| ctrl.request_email_focus_on_account_tab(cx));
+
+        let first_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
+        assert!(first_read);
+
+        let second_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
+        assert!(!second_read);
     }
 }
