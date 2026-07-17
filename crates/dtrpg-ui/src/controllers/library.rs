@@ -1846,7 +1846,8 @@ impl LibraryController {
           .detach();
     }
 
-    /// Forces a full live catalog fetch, bypassing the auto-load policy.
+    /// Invokes the catalog auto-load freshness policy, running a full live
+    /// fetch only when the policy determines one is needed.
     ///
     /// Used by the "Catalog > Reload" menu action. Gated by
     /// [`reload_cooldown_active`]: if the on-disk cache was written more
@@ -1862,7 +1863,7 @@ impl LibraryController {
         }
         self.catalog_loading = true;
         cx.emit(LibraryChanged);
-        self.start_load_inner(cx, true);
+        self.start_load_inner(cx, false);
     }
 
     /// Drops the in-memory catalog and collections, then forces a full live
