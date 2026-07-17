@@ -152,8 +152,6 @@ settings:
   storage_change_tooltip: "Change…"
   max_concurrent_downloads_title: "Max concurrent downloads"
   max_concurrent_downloads_note: "Shared limit for thumbnail loading and file downloads."
-  max_concurrent_downloads_decrement_tooltip: "Decrease"
-  max_concurrent_downloads_increment_tooltip: "Increase"
   recently_updated_window_title: "Recently Updated window"
   recently_updated_window_note: "Number of days an item stays in the sidebar's Recently Updated section after being added or updated (7-90)."
   create_collections_title: "Create collections"

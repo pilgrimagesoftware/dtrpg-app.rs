@@ -169,8 +169,6 @@ settings:
   storage_change_tooltip: "Modifier…"
   max_concurrent_downloads_title: "Téléchargements simultanés max."
   max_concurrent_downloads_note: "Limite partagée pour le chargement des vignettes et les téléchargements de fichiers."
-  max_concurrent_downloads_decrement_tooltip: "Diminuer"
-  max_concurrent_downloads_increment_tooltip: "Augmenter"
   recently_updated_window_title: "Fenêtre « Mises à jour récentes »"
   recently_updated_window_note: "Nombre de jours pendant lesquels un article reste dans la section « Mises à jour récentes » de la barre latérale après avoir été ajouté ou mis à jour (7-90)."
   create_collections_title: "Créer des collections"

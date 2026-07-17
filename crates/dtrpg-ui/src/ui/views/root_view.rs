@@ -286,6 +286,37 @@ impl LibraryRootView {
                     ctrl.set_recently_updated_window_input(recently_updated_window_input)
                 });
 
+        let max_concurrent_downloads_initial = {
+            use crate::data::storage::StorageConfig;
+            StorageConfig::load().max_concurrent_downloads()
+        };
+        let max_concurrent_downloads_input = cx.new(|cx| {
+                                                   use crate::ui::views::settings_storage_view::{
+                                                       MAX_CONCURRENT_DOWNLOADS,
+                                                       MIN_CONCURRENT_DOWNLOADS,
+                                                   };
+                                                   InputState::new(window, cx)
+                .default_value(max_concurrent_downloads_initial.to_string())
+                .min(MIN_CONCURRENT_DOWNLOADS as f64)
+                .max(MAX_CONCURRENT_DOWNLOADS as f64)
+                                               });
+        let settings_for_concurrency_input = settings.clone();
+        cx.subscribe(&max_concurrent_downloads_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             if let Ok(n) = value.parse::<usize>() {
+                                 settings_for_concurrency_input.update(cx, |ctrl, cx| {
+                                     ctrl.set_max_concurrent_downloads(n, cx);
+                                 });
+                             }
+                         }
+                     })
+          .detach();
+        settings.update(cx, |ctrl, _cx| {
+                    ctrl.set_max_concurrent_downloads_input(max_concurrent_downloads_input)
+                });
+
         // ── Appearance page font pickers ─────────────────────────────────────
         //
         // Built once here (like the inputs above) rather than in
