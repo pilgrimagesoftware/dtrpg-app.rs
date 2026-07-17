@@ -54,19 +54,23 @@
 ## 4. SDK-Mediated Paths (blocked on `dtrpg-sdk` releasing
       `expose-retry-after-header`)
 
-- [ ] 4.1 Bump the `dtrpg-sdk` dependency version in the workspace
-      `Cargo.toml` once `expose-retry-after-header` is released
-- [ ] 4.2 In `crates/dtrpg-core/src/services/sdk/library/errors.rs`'s
+- [x] 4.1 Bump the `dtrpg-sdk` dependency version in the workspace
+      `Cargo.toml` once `expose-retry-after-header` is released —
+      `dtrpg-sdk = "1.0"` already permitted 1.1.0 under semver; ran
+      `cargo update -p dtrpg-sdk` to bump `Cargo.lock` to 1.1.0
+- [x] 4.2 In `crates/dtrpg-core/src/services/sdk/library/errors.rs`'s
       `map_client_error`, destructure `ClientError::ApiError`'s new
       `retry_after` field; when `status == 429`, return
       `LibraryServiceErrorKind::RateLimited` with that value instead of
       falling through to the generic `Network` branch
-- [ ] 4.3 Apply the same change to
+- [x] 4.3 Apply the same change to
       `crates/dtrpg-core/src/services/sdk/collections/errors.rs`'s
       `map_client_error`
-- [ ] 4.4 Wire the catalog-sync totals-request `retry_with_backoff` call
+- [x] 4.4 Wire the catalog-sync totals-request `retry_with_backoff` call
       site's `extract_retry_after` closure to read
-      `LibraryServiceError::retry_after`
+      `LibraryServiceError::retry_after` — already done in task 2.3's
+      commit, since the field existed on the app side before the SDK
+      exposed it
 
 ## 5. Tests
 
@@ -82,7 +86,7 @@
       existing `download_item_*` test style in `download.rs`): a 429 with
       `Retry-After` on the download path produces a `RateLimited` error
       with the parsed duration
-- [ ] 5.5 Test (once task group 4 is unblocked): `map_client_error` maps a
+- [x] 5.5 Test (once task group 4 is unblocked): `map_client_error` maps a
       429 `ClientError::ApiError` with `retry_after: Some(_)` to
       `LibraryServiceErrorKind::RateLimited` carrying that value
 
