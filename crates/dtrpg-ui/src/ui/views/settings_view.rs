@@ -73,6 +73,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
                              cache_counts: CacheCounts, max_concurrent_downloads: usize,
+                             max_concurrent_downloads_input: Option<Entity<InputState>>,
                              create_collections: bool, recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
                              font_selects: AppearanceFontSelects)
@@ -109,6 +110,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     colors,
                                     storage_path_input,
                                     max_concurrent_downloads,
+                                    max_concurrent_downloads_input,
                                     create_collections).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),

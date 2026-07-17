@@ -99,6 +99,7 @@ impl Render for SettingsWindowView {
                                           snap.active_page_ix,
                                           snap.cache_counts,
                                           snap.max_concurrent_downloads,
+                                          snap.max_concurrent_downloads_input,
                                           snap.create_collections,
                                           snap.recently_updated_window_days,
                                           snap.recently_updated_window_input,
