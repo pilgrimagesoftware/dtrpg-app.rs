@@ -6,4 +6,4 @@
 
 - [x] 2.1 Run `cargo check -p dtrpg-ui` and confirm zero errors
 - [x] 2.2 Run `cargo test -p dtrpg-ui` and confirm all existing tests pass
-- [ ] 2.3 Run the app and confirm the sort dropdown button shows a leading sort icon alongside its label, unchanged across every sort method, sort direction, and layout mode
+- [x] 2.3 Run the app and confirm the sort dropdown button shows a leading sort icon alongside its label, unchanged across every sort method, sort direction, and layout mode
