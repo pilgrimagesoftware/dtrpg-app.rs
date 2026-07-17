@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use std::sync::Arc;
 
-use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString};
+use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString, Task};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -14,7 +14,10 @@ use crate::data::catalog_cache::{
 };
 use crate::data::collection::CollectionEntry;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
-use crate::data::constants::CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS;
+use crate::data::constants::{
+    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
+    CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS,
+};
 use crate::data::cover_cache::{load_cached_cover, save_cached_cover};
 use crate::data::enums::*;
 use crate::data::events::*;
@@ -1398,6 +1401,16 @@ impl LibraryController {
             let mut total_rx = Some(total_rx);
             let mut live_items: Vec<LibraryItem> = Vec::new();
             let mut page_num: u32 = 0;
+            // Checkpointing state for `catalog-cache-checkpointing`: the accumulating
+            // `live_items` buffer (not `self.catalog`, which isn't swapped in until the
+            // full fetch completes) is periodically saved to disk so an interrupted load
+            // still leaves a recent cache for the next startup. `checkpoint_task` is
+            // awaited — never dropped while pending — before starting the next checkpoint
+            // or the final post-fetch save, so writes never race each other or the final
+            // save over the same `.tmp` file.
+            let mut checkpoint_task: Option<Task<()>> = None;
+            let mut last_checkpoint_page: u32 = 0;
+            let mut last_checkpoint_at = std::time::Instant::now();
             loop {
                 let Some(receiver) = rx.take() else { break; };
 
@@ -1441,6 +1454,37 @@ impl LibraryController {
                         }
                         live_items.extend(items);
                         page_num += 1;
+
+                        // Checkpoint the accumulating buffer every N pages, or after a
+                        // minimum interval, whichever fires first — see
+                        // `catalog-cache-checkpointing`.
+                        let pages_since_checkpoint = page_num - last_checkpoint_page;
+                        if pages_since_checkpoint >= CATALOG_CHECKPOINT_PAGE_INTERVAL
+                           || last_checkpoint_at.elapsed()
+                              >= std::time::Duration::from_secs(
+                                  CATALOG_CHECKPOINT_MIN_INTERVAL_SECS,
+                              )
+                        {
+                            if let Some(prev) = checkpoint_task.take() {
+                                prev.await;
+                            }
+                            let snapshot = live_items.clone();
+                            let checkpoint_root = save_root.clone();
+                            checkpoint_task = Some(async_cx.background_executor().spawn(
+                                async move {
+                                    if let Err(e) = save_catalog_cache(&checkpoint_root, &snapshot)
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            "failed to checkpoint catalog cache"
+                                        );
+                                    }
+                                },
+                            ));
+                            last_checkpoint_page = page_num;
+                            last_checkpoint_at = std::time::Instant::now();
+                        }
+
                         // Always advance the label to the current page — the
                         // real DriveThruRPG API never reports `links.last`, so a
                         // percentage is usually unavailable; the page number is
@@ -1494,6 +1538,12 @@ impl LibraryController {
                         ctrl.set_catalog(live_items, !catalog_was_empty, cx);
                         ctrl.verify_catalog_downloads(cx);
                     }).ok();
+                    // Wait for any in-flight checkpoint write to finish before writing the
+                    // final cache — both write `save_root`'s `.tmp` file, so they must never
+                    // run concurrently.
+                    if let Some(prev) = checkpoint_task.take() {
+                        prev.await;
+                    }
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
                         .unwrap_or_default();
