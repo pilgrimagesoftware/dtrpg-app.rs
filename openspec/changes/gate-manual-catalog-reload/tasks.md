@@ -12,6 +12,6 @@
 
 - [x] 3.1 Run `cargo check -p dtrpg-ui` and confirm zero errors
 - [x] 3.2 Run `cargo test -p dtrpg-ui` and confirm all existing tests pass
-- [ ] 3.3 Run the app with a fresh, count-matching cache; select "Catalog > Reload"; confirm no full paginated fetch occurs (only a lightweight count check) and the catalog is unchanged
-- [ ] 3.4 Force the cache stale (e.g. edit the cache metadata's saved timestamp, or wait past the freshness window) or clear it; select "Catalog > Reload"; confirm a full paginated fetch runs and the catalog refreshes
-- [ ] 3.5 Select "Catalog > Reload" twice within 60 seconds; confirm the second invocation is a silent no-op regardless of cache freshness (double-click throttle still applies)
+- [x] 3.3 Run the app with a fresh, count-matching cache; select "Catalog > Reload"; confirm no full paginated fetch occurs (only a lightweight count check) and the catalog is unchanged
+- [x] 3.4 Force the cache stale (e.g. edit the cache metadata's saved timestamp, or wait past the freshness window) or clear it; select "Catalog > Reload"; confirm a full paginated fetch runs and the catalog refreshes
+- [x] 3.5 Select "Catalog > Reload" twice within 60 seconds; confirm the second invocation is a silent no-op regardless of cache freshness (double-click throttle still applies)
