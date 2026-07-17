@@ -837,6 +837,16 @@ impl LibraryRootView {
         }
     }
 
+    /// Opens Settings on the Account tab with the email input focused.
+    ///
+    /// Used by the "Login to DriveThruRPG" notification banner action — see
+    /// `SettingsController::request_email_focus_on_account_tab`.
+    pub(crate) fn show_settings_focused_on_email(&mut self, cx: &mut Context<Self>) {
+        self.settings
+            .update(cx, |ctrl, cx| ctrl.request_email_focus_on_account_tab(cx));
+        self.show_settings(cx);
+    }
+
     /// Toggles the Activity panel. See [`Self::show_settings`] for why this
     /// is a method rather than inline closure logic.
     pub(crate) fn show_activity(&mut self, cx: &mut Context<Self>) {

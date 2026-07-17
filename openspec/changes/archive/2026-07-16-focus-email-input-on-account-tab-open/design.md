@@ -35,6 +35,16 @@ that window for the first time in the same call.
 **A one-shot "pending focus" flag on `SettingsController`, consumed by the Account tab's own
 render pass (which has the correct `Window`), rather than trying to focus from the banner's
 click handler directly.**
+
+> **Implementation note:** the flag is actually consumed in `SettingsWindowView::render`
+> (`settings_window_view.rs`), not `settings_account_view.rs`'s `render_unauthenticated`.
+> `SettingsWindowView::render` already has `window: &mut Window` on every render pass and is
+> where `email_input` is read out of the snapshot before being handed down to the render-helper
+> chain — consuming the flag there avoids threading `window`/`cx` through
+> `render_settings_panel` / `render_account_section` / `render_unauthenticated` just for this
+> one-shot check. Same net effect: the check still only applies while the settings window is
+> open and only fires once per banner click.
+
 The banner's click handler cannot call `.focus(window, cx)` on `email_input` itself — it only
 has the main window's `Window`, not the settings window's, and the settings window may not
 exist yet at that point in the call. Instead, the click handler sets `active_page_ix` to the
