@@ -31,7 +31,7 @@ The toolbar MUST render a search input field. When the input contains text, the 
 - **THEN** no clear button is rendered in the toolbar
 
 ### Requirement: Toolbar MUST provide a sort dropdown
-The toolbar MUST render a sort control that allows the user to choose from: Title (A–Z), Publisher, Date Added, and Page Count. The selected sort method MUST persist while the user switches layout modes.
+The toolbar MUST render a sort control that allows the user to choose from: Title (A–Z), Publisher, Date Added, and Page Count. The selected sort method MUST persist while the user switches layout modes. The control MUST display a leading sort icon alongside its label, shown regardless of which sort method or direction is currently active.
 
 #### Scenario: Selecting a sort method reorders the catalog
 - **WHEN** the user selects a sort option from the sort dropdown
@@ -40,6 +40,10 @@ The toolbar MUST render a sort control that allows the user to choose from: Titl
 #### Scenario: Sort state is preserved across layout switches
 - **WHEN** the user changes the catalog layout while a non-default sort is active
 - **THEN** the sort method remains unchanged
+
+#### Scenario: Sort icon is always visible
+- **WHEN** the toolbar is rendered, regardless of the active sort method or direction
+- **THEN** a leading sort icon is shown on the sort dropdown button alongside its label
 
 ### Requirement: Toolbar MUST provide a group-by-publisher toggle
 The toolbar MUST render a toggle control labeled "Group by publisher". When active, the catalog groups items into publisher sections. When inactive, items are shown as a flat list (or ungrouped grid).
