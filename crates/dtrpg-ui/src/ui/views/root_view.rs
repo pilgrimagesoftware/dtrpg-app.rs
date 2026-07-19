@@ -1090,11 +1090,14 @@ impl Render for LibraryRootView {
             }
         };
         let alert_snap = self.activity.read(cx).alert_snapshot();
+        let current_locale = crate::i18n::Locale::from_code(&rust_i18n::locale())
+            .unwrap_or(crate::i18n::Locale::En);
         let status_bar = render_status_bar(StatusBarSnapshot { total_count,
                                                                total_mb,
                                                                active_tab_label,
                                                                active_tab_count,
-                                                               theme_key: theme.key },
+                                                               theme_key: theme.key,
+                                                               current_locale },
                                            lib_entity.clone(),
                                            ActivityBarData { entity:     activity_entity.clone(),
                                                              snap:       &activity_snap,

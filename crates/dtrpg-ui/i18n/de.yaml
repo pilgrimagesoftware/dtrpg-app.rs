@@ -333,6 +333,7 @@ tabs:
 
 status_bar:
   theme_tooltip: "Thema: %{theme}"
+  language_tooltip: "Sprache: %{language}"
   activity_tooltip: "%{in_progress} in Bearbeitung, %{completed} abgeschlossen"
   activity_tooltip_in_progress_only: "%{in_progress} in Bearbeitung"
   notifications_tooltip_title: "Benachrichtigungen"
