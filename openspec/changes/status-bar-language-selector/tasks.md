@@ -25,4 +25,4 @@
 - [x] 5.1 `cargo build --workspace --all-features`
 - [x] 5.2 `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 - [x] 5.3 `cargo test --workspace --all-features`
-- [ ] 5.4 Launch app: open the language picker, switch locales, confirm status bar and other visible text update immediately without restart; relaunch and confirm the selected locale persists (manual verification — left for the user)
+- [x] 5.4 Launch app: open the language picker, switch locales, confirm status bar and other visible text update immediately without restart; relaunch and confirm the selected locale persists (manually verified by the user)
