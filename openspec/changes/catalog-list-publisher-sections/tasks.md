@@ -39,8 +39,8 @@ backed by a flattened row list (`GroupedRow::Header` / `GroupedRow::Item`) built
 
 ## 4. Manual Verification
 
-- [ ] 4.1 Toggle "group by publisher" in list view with a large catalog and confirm
+- [x] 4.1 Toggle "group by publisher" in list view with a large catalog and confirm
       smooth virtualized scrolling
-- [ ] 4.2 Confirm column widths/sort/resize behave identically in grouped and ungrouped
+- [x] 4.2 Confirm column widths/sort/resize behave identically in grouped and ungrouped
       list modes
-- [ ] 4.3 Confirm each publisher section header shows the correct item count
+- [x] 4.3 Confirm each publisher section header shows the correct item count
