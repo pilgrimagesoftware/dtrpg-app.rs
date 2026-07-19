@@ -266,6 +266,17 @@ pub(crate) fn render_checking_indicator(is_checking: bool)
     Some(Spinner::new().with_size(Size::XSmall))
 }
 
+/// Applies a `TableEvent::ColumnWidthsChanged` payload to a delegate's
+/// `user_widths`, ignoring mismatched-length payloads (e.g. mid-resize
+/// column-count changes).
+fn apply_column_widths(user_widths: &mut [Option<Pixels>], widths: &[Pixels]) {
+    if widths.len() == user_widths.len() {
+        for (slot, &w) in user_widths.iter_mut().zip(widths.iter()) {
+            *slot = Some(w);
+        }
+    }
+}
+
 /// Renders a single data cell (column `col_ix`) for `item`. Shared between
 /// the ungrouped `CatalogListDelegate` and the grouped
 /// `GroupedCatalogListDelegate` so grouped and ungrouped list rows stay
@@ -979,15 +990,15 @@ impl CatalogView {
                          TableEvent::ColumnWidthsChanged(widths) => {
                              let widths = widths.clone();
                              table.update(cx, |state, _cx| {
-                                      let delegate = state.delegate_mut();
-                                      if widths.len() == delegate.user_widths.len() {
-                                          for (slot, &w) in
-                                              delegate.user_widths.iter_mut().zip(widths.iter())
-                                          {
-                                              *slot = Some(w);
-                                          }
-                                      }
+                                      apply_column_widths(&mut state.delegate_mut().user_widths,
+                                                          &widths);
                                   });
+                             this.catalog_grouped_list_table.update(cx, |state, _cx| {
+                                                                apply_column_widths(
+                                &mut state.delegate_mut().user_widths,
+                                &widths,
+                            );
+                                                            });
                          }
                          _ => {}
                      })
@@ -1034,15 +1045,15 @@ impl CatalogView {
                          TableEvent::ColumnWidthsChanged(widths) => {
                              let widths = widths.clone();
                              table.update(cx, |state, _cx| {
-                                      let delegate = state.delegate_mut();
-                                      if widths.len() == delegate.user_widths.len() {
-                                          for (slot, &w) in
-                                              delegate.user_widths.iter_mut().zip(widths.iter())
-                                          {
-                                              *slot = Some(w);
-                                          }
-                                      }
+                                      apply_column_widths(&mut state.delegate_mut().user_widths,
+                                                          &widths);
                                   });
+                             this.catalog_list_table.update(cx, |state, _cx| {
+                                                        apply_column_widths(
+                                &mut state.delegate_mut().user_widths,
+                                &widths,
+                            );
+                                                    });
                          }
                          _ => {}
                      })
