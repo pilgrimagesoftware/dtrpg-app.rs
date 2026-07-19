@@ -3993,6 +3993,15 @@ impl LibraryController {
         cx.notify();
     }
 
+    /// Switches the active locale (updates `rust_i18n`'s global state) and
+    /// persists it via [`crate::data::ui_preferences::UiPreferences`] so it
+    /// takes precedence over OS-locale detection on the next launch.
+    pub fn set_locale(&self, locale: crate::i18n::Locale, cx: &mut Context<Self>) {
+        rust_i18n::set_locale(locale.code());
+        crate::data::ui_preferences::UiPreferences::load().save_locale(locale.code());
+        cx.notify();
+    }
+
     /// Applies a new body font family (any font installed on the user's
     /// system, not a curated list — see `settings_appearance_view`), updating
     /// the GPUI global, `gpui_component`'s `Theme.font_family`, and
