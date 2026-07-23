@@ -65,6 +65,12 @@ pub type OnRetry<'a, E> = &'a mut dyn FnMut(u32, Duration, &E);
 /// [`backoff_delay`] between attempts, as long as `is_retryable` returns
 /// `true` for the failure and `cancel` has not been set.
 ///
+/// `extract_retry_after(&error)` is consulted once per failed attempt; when
+/// it returns `Some(duration)`, that server-specified duration is used as the
+/// wait instead of the computed [`backoff_delay`]. Call sites with no such
+/// signal pass `|_| None` to preserve the default exponential-backoff
+/// behavior.
+///
 /// `on_retry(attempt, delay, &error)` is invoked once per retry, right before
 /// the backoff wait begins, mirroring `list_items_paged`'s `on_page`/`on_total`
 /// callback idiom used elsewhere in this codebase.
@@ -77,6 +83,7 @@ pub type OnRetry<'a, E> = &'a mut dyn FnMut(u32, Duration, &E);
 pub fn retry_with_backoff<T, E>(config: RetryConfig, cancel: &AtomicBool,
                                 mut operation: impl FnMut() -> Result<T, E>,
                                 is_retryable: impl Fn(&E) -> bool,
+                                extract_retry_after: impl Fn(&E) -> Option<Duration>,
                                 mut on_retry: Option<OnRetry<'_, E>>)
                                 -> Result<T, E> {
     let mut attempt = 1;
@@ -89,10 +96,12 @@ pub fn retry_with_backoff<T, E>(config: RetryConfig, cancel: &AtomicBool,
                     return Err(error);
                 }
 
-                let delay = backoff_delay(attempt,
-                                          jitter_source_now(),
-                                          config.base_secs,
-                                          config.max_secs);
+                let delay = extract_retry_after(&error).unwrap_or_else(|| {
+                                                           backoff_delay(attempt,
+                                                                         jitter_source_now(),
+                                                                         config.base_secs,
+                                                                         config.max_secs)
+                                                       });
                 if let Some(on_retry) = on_retry.as_deref_mut() {
                     on_retry(attempt, delay, &error);
                 }
@@ -184,7 +193,7 @@ mod tests {
                                    base_secs:    0,
                                    max_secs:     0, };
         let result: Result<u32, &str> =
-            retry_with_backoff(config, &cancel, || Ok(42), |_| true, None);
+            retry_with_backoff(config, &cancel, || Ok(42), |_| true, |_| None, None);
         assert_eq!(result, Ok(42));
     }
 
@@ -203,6 +212,7 @@ mod tests {
                                                               Err("transient")
                                                           },
                                                           |_| true,
+                                                          |_| None,
                                                           None);
         assert_eq!(result, Err("transient"));
         assert_eq!(attempts.load(Ordering::SeqCst), 3);
@@ -223,6 +233,7 @@ mod tests {
                                                               Err("fatal")
                                                           },
                                                           |_| false,
+                                                          |_| None,
                                                           None);
         assert_eq!(result, Err("fatal"));
         assert_eq!(attempts.load(Ordering::SeqCst), 1);
@@ -244,6 +255,7 @@ mod tests {
                                                               Err("transient")
                                                           },
                                                           |_| true,
+                                                          |_| None,
                                                           None);
         assert_eq!(result, Err("transient"));
         assert_eq!(attempts.load(Ordering::SeqCst), 1);
@@ -264,8 +276,49 @@ mod tests {
                                                           &cancel,
                                                           || Err("transient"),
                                                           |_| true,
+                                                          |_| None,
                                                           Some(&mut on_retry));
         assert_eq!(result, Err("transient"));
         assert_eq!(retry_calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn retry_with_backoff_waits_extract_retry_after_duration_instead_of_backoff() {
+        let cancel = AtomicBool::new(false);
+        let config = RetryConfig { max_attempts: 2,
+                                   base_secs:    100,
+                                   max_secs:     200, };
+        let mut recorded_delay = None;
+        let mut on_retry = |_attempt: u32, delay: Duration, _error: &&str| {
+            recorded_delay = Some(delay);
+        };
+        let result: Result<(), &str> = retry_with_backoff(config,
+                                                          &cancel,
+                                                          || Err("rate_limited"),
+                                                          |_| true,
+                                                          |_| Some(Duration::from_millis(5)),
+                                                          Some(&mut on_retry));
+        assert_eq!(result, Err("rate_limited"));
+        assert_eq!(recorded_delay, Some(Duration::from_millis(5)));
+    }
+
+    #[test]
+    fn retry_with_backoff_falls_back_to_computed_backoff_when_extract_retry_after_is_none() {
+        let cancel = AtomicBool::new(false);
+        let config = RetryConfig { max_attempts: 2,
+                                   base_secs:    0,
+                                   max_secs:     0, };
+        let mut recorded_delay = None;
+        let mut on_retry = |_attempt: u32, delay: Duration, _error: &&str| {
+            recorded_delay = Some(delay);
+        };
+        let result: Result<(), &str> = retry_with_backoff(config,
+                                                          &cancel,
+                                                          || Err("transient"),
+                                                          |_| true,
+                                                          |_| None,
+                                                          Some(&mut on_retry));
+        assert_eq!(result, Err("transient"));
+        assert_eq!(recorded_delay, Some(Duration::ZERO));
     }
 }

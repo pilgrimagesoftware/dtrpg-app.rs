@@ -85,93 +85,101 @@ pub struct AuthStateSnapshot {
 
 /// Snapshot of settings state needed by the views for a single render pass.
 pub struct SettingsSnapshot {
-    pub is_open:                  bool,
-    pub file_openers:             Vec<FileOpenerEntry>,
+    pub is_open:                        bool,
+    pub file_openers:                   Vec<FileOpenerEntry>,
     /// `true` when credentials are present in the keyring.
-    pub is_authenticated:         bool,
+    pub is_authenticated:               bool,
     /// Resolved storage root path (override or platform default).
-    pub storage_root_path:        PathBuf,
+    pub storage_root_path:              PathBuf,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
-    pub storage_unavailable:      bool,
+    pub storage_unavailable:            bool,
     /// `true` when the configured storage root exists on disk.
-    pub storage_path_exists:      bool,
+    pub storage_path_exists:            bool,
     /// Current auth state for the toolbar avatar button.
-    pub auth:                     AuthStateSnapshot,
+    pub auth:                           AuthStateSnapshot,
     /// Current value of the email draft field in the Account tab.
-    pub email_draft:              String,
+    pub email_draft:                    String,
     /// Current value of the password draft field in the Account tab.
-    pub password_draft:           String,
+    pub password_draft:                 String,
     /// `true` while a sign-in request is in flight.
-    pub sign_in_in_progress:      bool,
+    pub sign_in_in_progress:            bool,
     /// Error message from the last failed sign-in attempt, if any.
-    pub sign_in_error:            Option<String>,
+    pub sign_in_error:                  Option<String>,
     /// Shared input state for the email text field in the Account tab.
-    pub email_input:              Option<Entity<InputState>>,
+    pub email_input:                    Option<Entity<InputState>>,
     /// Shared input state for the password text field in the Account tab.
-    pub password_input:           Option<Entity<InputState>>,
+    pub password_input:                 Option<Entity<InputState>>,
     /// Current draft value of the storage path text field.
-    pub storage_path_draft:       String,
+    pub storage_path_draft:             String,
     /// Shared input state for the storage path text field in the Storage tab.
-    pub storage_path_input:       Option<Entity<InputState>>,
+    pub storage_path_input:             Option<Entity<InputState>>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pub pending_file_opener:      Option<PathBuf>,
+    pub pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
-    pub active_page_ix:           usize,
+    pub active_page_ix:                 usize,
     /// Current per-type counts of cached data, for the Advanced section's
     /// "Cache details" area.
-    pub cache_counts:             CacheCounts,
+    pub cache_counts:                   CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
-    pub max_concurrent_downloads: usize,
+    pub max_concurrent_downloads:       usize,
+    /// Shared input state for the "Max concurrent downloads" number field in
+    /// the Storage tab.
+    pub max_concurrent_downloads_input: Option<Entity<InputState>>,
     /// `true` when completing a download should also symlink the item under
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
-    pub create_collections:       bool,
+    pub create_collections:             bool,
+    /// User-configured "Recently Updated" sidebar window, in days.
+    pub recently_updated_window_days:   u32,
+    /// Shared input state for the "Recently Updated window" number field in
+    /// the Advanced tab.
+    pub recently_updated_window_input:  Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row.
-    pub body_font_select:         Option<FontSelectState>,
+    pub body_font_select:               Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row.
-    pub value_font_select:        Option<FontSelectState>,
+    pub value_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's label-font row.
-    pub label_font_select:        Option<FontSelectState>,
+    pub label_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's monospace-font row.
-    pub mono_font_select:         Option<FontSelectState>,
+    pub mono_font_select:               Option<FontSelectState>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
 /// catalog storage configuration, and sign-in form state.
 pub struct SettingsController {
-    is_open:             bool,
-    file_openers:        FileOpenerConfig,
-    is_authenticated:    bool,
-    auth_state:          AuthState,
-    storage:             StorageConfig,
-    storage_unavailable: bool,
-    storage_path_exists: bool,
-    login_service:       Arc<dyn LoginService>,
-    email_draft:         String,
-    password_draft:      String,
-    sign_in_in_progress: bool,
-    sign_in_error:       Option<String>,
+    is_open:                        bool,
+    file_openers:                   FileOpenerConfig,
+    is_authenticated:               bool,
+    auth_state:                     AuthState,
+    storage:                        StorageConfig,
+    storage_unavailable:            bool,
+    storage_path_exists:            bool,
+    login_service:                  Arc<dyn LoginService>,
+    email_draft:                    String,
+    password_draft:                 String,
+    sign_in_in_progress:            bool,
+    sign_in_error:                  Option<String>,
     /// Input state for the email text field; set by the root view after
     /// creation.
-    email_input:         Option<Entity<InputState>>,
+    email_input:                    Option<Entity<InputState>>,
     /// Input state for the password text field; set by the root view after
     /// creation.
-    password_input:      Option<Entity<InputState>>,
+    password_input:                 Option<Entity<InputState>>,
     /// Draft value of the storage path text field.
-    storage_path_draft:  String,
+    storage_path_draft:             String,
     /// Input state for the storage path text field; set by the root view after
     /// creation.
-    storage_path_input:  Option<Entity<InputState>>,
+    storage_path_input:             Option<Entity<InputState>>,
     /// Masked API key hint computed at sign-in time (first 4 + bullets + last
     /// 1).
-    api_key_hint:        Option<String>,
+    api_key_hint:                   Option<String>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pending_file_opener: Option<PathBuf>,
+    pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     ///
     /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
@@ -180,19 +188,30 @@ pub struct SettingsController {
     /// tracks page selection in its own per-window state with no way to read
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
-    active_page_ix:      usize,
+    active_page_ix:                 usize,
+    /// `true` when the email input should be focused on the settings
+    /// window's next render pass. Set by
+    /// [`Self::request_email_focus_on_account_tab`] and consumed (cleared)
+    /// by the settings window's render — see `SettingsWindowView::render`.
+    focus_email_pending:            bool,
+    /// Input state for the "Recently Updated window" number field; set by
+    /// the root view after creation.
+    recently_updated_window_input:  Option<Entity<InputState>>,
+    /// Input state for the "Max concurrent downloads" number field; set by
+    /// the root view after creation.
+    max_concurrent_downloads_input: Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row; set by the
     /// root view after creation.
-    body_font_select:    Option<FontSelectState>,
+    body_font_select:               Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row; set by the
     /// root view after creation.
-    value_font_select:   Option<FontSelectState>,
+    value_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's label-font row; set by the
     /// root view after creation.
-    label_font_select:   Option<FontSelectState>,
+    label_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's monospace-font row; set by
     /// the root view after creation.
-    mono_font_select:    Option<FontSelectState>,
+    mono_font_select:               Option<FontSelectState>,
 }
 
 impl SettingsController {
@@ -268,12 +287,52 @@ impl SettingsController {
                               active_page_ix:
                                   crate::data::ui_state::UiState::load().settings_page_ix()
                                                                         .unwrap_or(0),
+                              focus_email_pending: false,
+                              recently_updated_window_input: None,
+                              max_concurrent_downloads_input: None,
                               body_font_select: None,
                               value_font_select: None,
                               label_font_select: None,
                               mono_font_select: None };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl
+    }
+
+    /// Builds a controller in-memory, without touching the platform keyring
+    /// or the shared on-disk app config files.
+    ///
+    /// [`new`](Self::new) always reads the real keyring and config files
+    /// (see [`StorageConfig::for_test`] for why that's unsafe in tests); this
+    /// constructor exists so tests can exercise `cx`-requiring methods
+    /// without those side effects.
+    #[cfg(test)]
+    pub(crate) fn for_test(login_service: Arc<dyn LoginService>) -> Self {
+        Self { is_open: false,
+               file_openers: FileOpenerConfig::default(),
+               is_authenticated: false,
+               auth_state: AuthState::LoggedOut,
+               storage_path_exists: true,
+               storage: StorageConfig::for_test(std::env::temp_dir()),
+               storage_unavailable: false,
+               login_service,
+               email_draft: String::new(),
+               password_draft: String::new(),
+               sign_in_in_progress: false,
+               sign_in_error: None,
+               email_input: None,
+               password_input: None,
+               storage_path_draft: String::new(),
+               storage_path_input: None,
+               api_key_hint: None,
+               pending_file_opener: None,
+               active_page_ix: 0,
+               focus_email_pending: false,
+               recently_updated_window_input: None,
+               max_concurrent_downloads_input: None,
+               body_font_select: None,
+               value_font_select: None,
+               label_font_select: None,
+               mono_font_select: None }
     }
 
     /// Attaches the email input state entity created by the root view.
@@ -289,6 +348,18 @@ impl SettingsController {
     /// Attaches the storage path input state entity created by the root view.
     pub fn set_storage_path_input(&mut self, input: Entity<InputState>) {
         self.storage_path_input = Some(input);
+    }
+
+    /// Attaches the "Recently Updated window" number input state entity
+    /// created by the root view.
+    pub fn set_recently_updated_window_input(&mut self, input: Entity<InputState>) {
+        self.recently_updated_window_input = Some(input);
+    }
+
+    /// Attaches the "Max concurrent downloads" number input state entity
+    /// created by the root view.
+    pub fn set_max_concurrent_downloads_input(&mut self, input: Entity<InputState>) {
+        self.max_concurrent_downloads_input = Some(input);
     }
 
     /// Attaches the body-font picker state entity created by the root view.
@@ -324,6 +395,24 @@ impl SettingsController {
         self.active_page_ix = ix;
         crate::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
+    }
+
+    /// Switches to the Account tab and marks the email input to be focused
+    /// on the settings window's next render pass.
+    ///
+    /// Used by the "Login to DriveThruRPG" notification banner action so the
+    /// user can start typing immediately instead of having to click into the
+    /// field first.
+    pub fn request_email_focus_on_account_tab(&mut self, cx: &mut Context<Self>) {
+        self.set_active_page_ix(0, cx);
+        self.focus_email_pending = true;
+    }
+
+    /// Returns and clears the pending-focus flag set by
+    /// [`Self::request_email_focus_on_account_tab`], so the settings
+    /// window's render pass consumes it exactly once.
+    pub fn take_focus_email_pending(&mut self) -> bool {
+        std::mem::take(&mut self.focus_email_pending)
     }
 }
 
@@ -419,6 +508,22 @@ impl SettingsController {
     pub fn set_create_collections(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.storage.set_create_collections(enabled);
         cx.emit(SettingsChanged);
+    }
+
+    /// Saves `days` (clamped to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+    /// RECENTLY_UPDATED_WINDOW_MAX_DAYS]`) as the new "Recently Updated
+    /// window", returning the clamped value actually stored.
+    ///
+    /// Emits [`SettingsChanged`] so the library controller picks up the new
+    /// window immediately. Callers driving an editable number field (see
+    /// `root_view.rs`) use the returned value to write the clamped result
+    /// back into the field's own displayed text, since the field's typed
+    /// text isn't otherwise corrected when a value outside the bounds is
+    /// committed before the field loses focus.
+    pub fn set_recently_updated_window_days(&mut self, days: u32, cx: &mut Context<Self>) -> u32 {
+        self.storage.set_recently_updated_window_days(days);
+        cx.emit(SettingsChanged);
+        self.storage.recently_updated_window_days()
     }
 
     /// Spawns a background task to check whether `path` exists on disk.
@@ -784,7 +889,13 @@ impl SettingsController {
                            active_page_ix: self.active_page_ix,
                            cache_counts: self.cache_counts(),
                            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
+                           max_concurrent_downloads_input: self.max_concurrent_downloads_input
+                                                               .clone(),
                            create_collections: self.storage.create_collections(),
+                           recently_updated_window_days: self.storage
+                                                             .recently_updated_window_days(),
+                           recently_updated_window_input: self.recently_updated_window_input
+                                                              .clone(),
                            body_font_select: self.body_font_select.clone(),
                            value_font_select: self.value_font_select.clone(),
                            label_font_select: self.label_font_select.clone(),
@@ -813,7 +924,10 @@ fn mask_api_key(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use gpui::{AppContext, TestAppContext};
+
     use super::*;
+    use crate::services::{LoginError, LoginTokens};
 
     #[test]
     fn mask_api_key_long_key() {
@@ -828,5 +942,48 @@ mod tests {
     #[test]
     fn mask_api_key_exactly_five() {
         assert_eq!(mask_api_key("abcde"), "••••••••");
+    }
+
+    /// Never invoked by the tests below — `request_email_focus_on_account_tab`
+    /// and `take_focus_email_pending` don't touch the login flow.
+    struct UnusedLoginService;
+
+    impl LoginService for UnusedLoginService {
+        fn login_with_credentials(&self, _email: &str, _password: &str)
+                                  -> Result<String, LoginError> {
+            unimplemented!("not exercised by this test")
+        }
+
+        fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
+            unimplemented!("not exercised by this test")
+        }
+    }
+
+    #[gpui::test]
+    fn request_email_focus_sets_account_tab_and_pending_flag(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
+
+        ctrl.update(cx, |ctrl, cx| {
+                ctrl.set_active_page_ix(4, cx);
+                ctrl.request_email_focus_on_account_tab(cx);
+            });
+
+        ctrl.read_with(cx, |ctrl, _| {
+                assert_eq!(ctrl.active_page_ix, 0);
+                assert!(ctrl.focus_email_pending);
+            });
+    }
+
+    #[gpui::test]
+    fn take_focus_email_pending_clears_flag_after_reading_it(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
+
+        ctrl.update(cx, |ctrl, cx| ctrl.request_email_focus_on_account_tab(cx));
+
+        let first_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
+        assert!(first_read);
+
+        let second_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
+        assert!(!second_read);
     }
 }

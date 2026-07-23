@@ -219,7 +219,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                             }
                             else {
                                 entity_download.update(cx, |ctrl, cx| {
-                                    ctrl.enqueue_download(&id, item_title_for_download.clone(), cx);
+                                    ctrl.request_download(&id, item_title_for_download.clone(), cx);
                                 });
                             }
                         }),

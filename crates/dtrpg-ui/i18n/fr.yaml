@@ -1,6 +1,6 @@
 sidebar:
   all_titles: "Tous les titres"
-  recently_added: "Ajouts récents"
+  recently_updated: "Mises à jour récentes"
   on_this_device: "Sur cet appareil"
   in_the_cloud: "Dans le cloud"
   publishers: "Éditeurs"
@@ -76,6 +76,8 @@ catalog:
   action_remove_download: "Supprimer le téléchargement"
   remove_download_confirm_title: "Supprimer le téléchargement de « %{title} » ?"
   remove_download_confirm_description: "La copie locale sera supprimée. Vous pourrez la retélécharger plus tard."
+  low_disk_space_confirm_title: "Espace disque insuffisant ?"
+  low_disk_space_confirm_description: "Ce téléchargement nécessite %{needed} Mo, mais seulement %{free} Mo sont disponibles à l'emplacement de stockage. Télécharger quand même ?"
   action_load_thumbnail: "Charger la vignette"
   action_show_in_finder: "Afficher dans le Finder"
   action_show_in_explorer: "Afficher dans l'Explorateur"
@@ -169,8 +171,8 @@ settings:
   storage_change_tooltip: "Modifier…"
   max_concurrent_downloads_title: "Téléchargements simultanés max."
   max_concurrent_downloads_note: "Limite partagée pour le chargement des vignettes et les téléchargements de fichiers."
-  max_concurrent_downloads_decrement_tooltip: "Diminuer"
-  max_concurrent_downloads_increment_tooltip: "Augmenter"
+  recently_updated_window_title: "Fenêtre « Mises à jour récentes »"
+  recently_updated_window_note: "Nombre de jours pendant lesquels un article reste dans la section « Mises à jour récentes » de la barre latérale après avoir été ajouté ou mis à jour (7-90)."
   create_collections_title: "Créer des collections"
   create_collections_note: "Reflète les téléchargements dans un dossier collections/ à côté des dossiers d'éditeur, organisé selon les collections auxquelles chaque article a été ajouté."
   create_collections_note_windows: "Nécessite le mode développeur (ou un processus élevé) ; en cas d'échec, le paramètre est sans effet."
@@ -331,6 +333,7 @@ tabs:
 
 status_bar:
   theme_tooltip: "Thème : %{theme}"
+  language_tooltip: "Langue : %{language}"
   activity_tooltip: "%{in_progress} en cours, %{completed} terminées"
   activity_tooltip_in_progress_only: "%{in_progress} en cours"
   notifications_tooltip_title: "Notifications"

@@ -300,7 +300,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                            let entity = download_entity.clone();
                            move |_, _, cx| {
                                entity.update(cx, |ctrl, cx| {
-                                         ctrl.download_all_for_collection(col_id, cx);
+                                         ctrl.request_download_all_for_collection(col_id, cx);
                                      });
                            }
                        }))
@@ -364,10 +364,10 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                      SidebarFilter::AllTitles,
                                                      entity.clone(),
                                                      tabs.clone()))
-                                     .child(nav_item(&t!("sidebar.recently_added"),
-                                                     counts.recently_added,
-                                                     active == SidebarFilter::RecentlyAdded,
-                                                     SidebarFilter::RecentlyAdded,
+                                     .child(nav_item(&t!("sidebar.recently_updated"),
+                                                     counts.recently_updated,
+                                                     active == SidebarFilter::RecentlyUpdated,
+                                                     SidebarFilter::RecentlyUpdated,
                                                      entity.clone(),
                                                      tabs.clone()))
                                      .child(nav_item(&t!("sidebar.on_this_device"),

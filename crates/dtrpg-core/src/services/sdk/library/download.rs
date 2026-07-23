@@ -57,7 +57,11 @@ fn download_item_with_config(gateway: &dyn SdkLibraryGateway, order_product_id: 
     retry_with_backoff(config,
                        cancel,
                        || attempt_download(gateway, order_product_id, index, dest, cancel),
-                       |e: &LibraryServiceError| e.kind == LibraryServiceErrorKind::Network,
+                       |e: &LibraryServiceError| {
+                           e.kind == LibraryServiceErrorKind::Network
+                           || e.kind == LibraryServiceErrorKind::RateLimited
+                       },
+                       |e: &LibraryServiceError| e.retry_after,
                        Some(&mut adapted_on_retry))
 }
 
@@ -120,6 +124,18 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
                            LibraryServiceError::new(LibraryServiceErrorKind::Network,
                                                     format!("download request failed: {e}"))
                        })?;
+    if response.status().as_u16() == 429 {
+        let retry_after = response.headers()
+                                  .get(reqwest::header::RETRY_AFTER)
+                                  .and_then(|v| v.to_str().ok())
+                                  .and_then(|v| v.trim().parse::<u64>().ok())
+                                  .map(Duration::from_secs);
+        return Err(
+            LibraryServiceError::new(LibraryServiceErrorKind::RateLimited,
+                                     "download rate limited: HTTP 429")
+                .with_retry_after(retry_after),
+        );
+    }
     if !response.status().is_success() {
         return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
                                             format!("download failed: HTTP {}",
@@ -203,6 +219,9 @@ mod tests {
         ConnectionReset,
         /// Writes a 503 status, simulating a retryable server failure.
         ServerError,
+        /// Writes a 429 with the given `Retry-After` value (seconds),
+        /// simulating a rate-limited response.
+        RateLimited(u64),
         /// Writes a 200 with the given body.
         Success(&'static [u8]),
     }
@@ -224,6 +243,10 @@ mod tests {
                         let _ = stream.write_all(
                             b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
                         );
+                    }
+                    MockResponse::RateLimited(retry_after_secs) => {
+                        let header = format!("HTTP/1.1 429 Too Many Requests\r\nRetry-After: {retry_after_secs}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                        let _ = stream.write_all(header.as_bytes());
                     }
                     MockResponse::Success(body) => {
                         let header = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -371,5 +394,48 @@ mod tests {
         assert_eq!(gateway.calls.load(Ordering::SeqCst), 1);
         assert!(!dest.exists());
         assert!(!part_path_for(&dest).exists());
+    }
+
+    #[test]
+    fn download_item_produces_rate_limited_error_with_parsed_retry_after() {
+        // max_attempts(1) so the single 429 response is never retried — the
+        // parsed retry_after value would otherwise become a real wait time
+        // in this test (see the `extract_retry_after` override in
+        // `download_item_with_config`).
+        let (url, server) = spawn_mock_server(vec![MockResponse::RateLimited(30)]);
+        let gateway = CountingGateway { url,
+                                        calls: AtomicU32::new(0) };
+        let dest = temp_dest("rate-limited");
+        let cancel = AtomicBool::new(false);
+
+        let result =
+            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(1), None);
+
+        server.join().unwrap();
+        match result {
+            Err(e) => {
+                assert_eq!(e.kind, LibraryServiceErrorKind::RateLimited);
+                assert_eq!(e.retry_after, Some(Duration::from_secs(30)));
+            }
+            Ok(()) => panic!("expected a RateLimited error"),
+        }
+    }
+
+    #[test]
+    fn download_item_retries_a_rate_limited_response_like_a_network_failure() {
+        let (url, server) = spawn_mock_server(vec![MockResponse::RateLimited(0),
+                                                   MockResponse::Success(b"file contents")]);
+        let gateway = CountingGateway { url,
+                                        calls: AtomicU32::new(0) };
+        let dest = temp_dest("rate-limited-then-succeeds");
+        let cancel = AtomicBool::new(false);
+
+        let result =
+            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+
+        server.join().unwrap();
+        assert!(result.is_ok(), "expected success, got {result:?}");
+        assert_eq!(gateway.calls.load(Ordering::SeqCst), 2);
+        let _ = std::fs::remove_file(&dest);
     }
 }

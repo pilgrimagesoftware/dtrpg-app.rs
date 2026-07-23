@@ -1,6 +1,6 @@
 sidebar:
   all_titles: "All Titles"
-  recently_added: "Recently Added"
+  recently_updated: "Recently Updated"
   on_this_device: "On This Device"
   in_the_cloud: "In the Cloud"
   publishers: "Publishers"
@@ -76,6 +76,8 @@ catalog:
   action_remove_download: "Remove Download"
   remove_download_confirm_title: "Remove download of \"%{title}\"?"
   remove_download_confirm_description: "The local copy will be removed. You can download it again later."
+  low_disk_space_confirm_title: "Not enough free disk space?"
+  low_disk_space_confirm_description: "This download needs %{needed} MB, but only %{free} MB is free at your storage location. Download anyway?"
   action_open: "Open"
   action_load_thumbnail: "Load Thumbnail"
   action_show_in_finder: "Show in Finder"
@@ -152,8 +154,8 @@ settings:
   storage_change_tooltip: "Change…"
   max_concurrent_downloads_title: "Max concurrent downloads"
   max_concurrent_downloads_note: "Shared limit for thumbnail loading and file downloads."
-  max_concurrent_downloads_decrement_tooltip: "Decrease"
-  max_concurrent_downloads_increment_tooltip: "Increase"
+  recently_updated_window_title: "Recently Updated window"
+  recently_updated_window_note: "Number of days an item stays in the sidebar's Recently Updated section after being added or updated (7-90)."
   create_collections_title: "Create collections"
   create_collections_note: "Mirror downloads into a collections/ folder alongside the publisher folders, organized by the collections you've added each item to."
   create_collections_note_windows: "Requires Developer Mode (or an elevated process); if symlink creation fails, the setting has no effect."
@@ -332,6 +334,7 @@ tabs:
 
 status_bar:
   theme_tooltip: "Theme: %{theme}"
+  language_tooltip: "Language: %{language}"
   activity_tooltip: "%{in_progress} in progress, %{completed} completed"
   activity_tooltip_in_progress_only: "%{in_progress} in progress"
   notifications_tooltip_title: "Notifications"

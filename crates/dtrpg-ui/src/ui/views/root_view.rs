@@ -56,8 +56,9 @@ use crate::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
             CollectionMemberRemoveFailed, DownloadComplete, DownloadError, LibraryChanged,
-            LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed,
-            TabsChanged, ThumbnailRefreshCompleted, ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
+            LogoutRequested, LowDiskSpaceWarning, SettingsChanged, SignInSucceeded,
+            StartupAuthBegun, StartupAuthFailed, TabsChanged, ThumbnailRefreshCompleted,
+            ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
         ui_state::UiState,
@@ -230,6 +231,91 @@ impl LibraryRootView {
           .detach();
         settings.update(cx, |ctrl, _cx| {
                     ctrl.set_storage_path_input(storage_path_input)
+                });
+
+        let recently_updated_window_days_initial = {
+            use crate::data::storage::StorageConfig;
+            StorageConfig::load().recently_updated_window_days()
+        };
+        let recently_updated_window_input = cx.new(|cx| {
+                                                  InputState::new(window, cx)
+                .default_value(recently_updated_window_days_initial.to_string())
+                .min(f64::from(
+                    crate::data::constants::RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+                ))
+                .max(f64::from(
+                    crate::data::constants::RECENTLY_UPDATED_WINDOW_MAX_DAYS,
+                ))
+                                              });
+        let settings_for_window = settings.clone();
+        cx.subscribe_in(&recently_updated_window_input,
+                        window,
+                        move |_this, input_entity, event: &InputEvent, window, cx| {
+                            match event {
+                                InputEvent::Change => {
+                                    let value = input_entity.read(cx).value().to_string();
+                                    if let Ok(days) = value.parse::<u32>() {
+                                        settings_for_window.update(cx, |ctrl, cx| {
+                                            ctrl.set_recently_updated_window_days(days, cx);
+                                        });
+                                    }
+                                }
+                                InputEvent::Blur => {
+                                    // `NumberInput`'s own min/max clamp only corrects the
+                                    // displayed text in some focus-loss paths; explicitly
+                                    // re-syncing the field to the persisted (already-clamped)
+                                    // value on every blur guarantees the display never shows an
+                                    // out-of-range number regardless of that widget-internal
+                                    // timing.
+                                    let clamped = settings_for_window.read(cx)
+                                                                     .snapshot()
+                                                                     .recently_updated_window_days;
+                                    let current = input_entity.read(cx).value().to_string();
+                                    if current != clamped.to_string() {
+                                        input_entity.update(cx, |state, cx| {
+                                                        state.set_value(clamped.to_string(),
+                                                                        window,
+                                                                        cx);
+                                                    });
+                                    }
+                                }
+                                _ => {}
+                            }
+                        })
+          .detach();
+        settings.update(cx, |ctrl, _cx| {
+                    ctrl.set_recently_updated_window_input(recently_updated_window_input)
+                });
+
+        let max_concurrent_downloads_initial = {
+            use crate::data::storage::StorageConfig;
+            StorageConfig::load().max_concurrent_downloads()
+        };
+        let max_concurrent_downloads_input = cx.new(|cx| {
+                                                   use crate::ui::views::settings_storage_view::{
+                                                       MAX_CONCURRENT_DOWNLOADS,
+                                                       MIN_CONCURRENT_DOWNLOADS,
+                                                   };
+                                                   InputState::new(window, cx)
+                .default_value(max_concurrent_downloads_initial.to_string())
+                .min(MIN_CONCURRENT_DOWNLOADS as f64)
+                .max(MAX_CONCURRENT_DOWNLOADS as f64)
+                                               });
+        let settings_for_concurrency_input = settings.clone();
+        cx.subscribe(&max_concurrent_downloads_input,
+                     move |_this, input_entity, event: &InputEvent, cx| {
+                         if matches!(event, InputEvent::Change) {
+                             let value = input_entity.read(cx).value().to_string();
+                             if let Ok(n) = value.parse::<usize>() {
+                                 settings_for_concurrency_input.update(cx, |ctrl, cx| {
+                                     ctrl.set_max_concurrent_downloads(n, cx);
+                                 });
+                             }
+                         }
+                     })
+          .detach();
+        settings.update(cx, |ctrl, _cx| {
+                    ctrl.set_max_concurrent_downloads_input(max_concurrent_downloads_input)
                 });
 
         // ── Appearance page font pickers ─────────────────────────────────────
@@ -502,6 +588,41 @@ impl LibraryRootView {
                         })
           .detach();
 
+        let controller_for_disk_space = controller.clone();
+        cx.subscribe_in(&controller,
+                        window,
+                        move |_this, _ctrl, event: &LowDiskSpaceWarning, window, cx| {
+                            let needed = format!("{:.0}", event.needed_mb);
+                            let free = format!("{:.0}", event.free_mb);
+                            let confirm_entity = controller_for_disk_space.clone();
+                            let cancel_entity = controller_for_disk_space.clone();
+                            window.open_alert_dialog(cx, move |alert, _, _| {
+                                      let confirm_entity = confirm_entity.clone();
+                                      let cancel_entity = cancel_entity.clone();
+                                      alert
+                                    .confirm()
+                                    .title(t!("catalog.low_disk_space_confirm_title").to_string())
+                                    .description(
+                                        t!("catalog.low_disk_space_confirm_description",
+                                           needed = needed.clone(),
+                                           free = free.clone()).to_string(),
+                                    )
+                                    .on_ok(move |_, _window, cx| {
+                                        confirm_entity.update(cx, |ctrl, cx| {
+                                                          ctrl.confirm_pending_download(cx)
+                                                      });
+                                        true
+                                    })
+                                    .on_cancel(move |_, _window, cx| {
+                                        cancel_entity.update(cx, |ctrl, cx| {
+                                                         ctrl.cancel_pending_download(cx)
+                                                     });
+                                        true
+                                    })
+                                  });
+                        })
+          .detach();
+
         cx.subscribe(&controller, |this, ctrl, _event: &LibraryChanged, cx| {
               // Keep the native View menu's checkmarks (presentation, sort, grouping)
               // in sync with the toolbar/keyboard-driven selection. `LibraryChanged`
@@ -577,6 +698,22 @@ impl LibraryRootView {
                          controller_for_settings.update(cx, |ctrl, cx| {
                                                     ctrl.set_max_concurrent_downloads(n, cx);
                                                 });
+                     })
+          .detach();
+
+        // Propagate a `recently_updated_window_days` change from the Storage
+        // settings page to the controller that actually applies it, so it
+        // takes effect immediately rather than only on next app launch.
+        let controller_for_window = controller.clone();
+        let settings_for_window = settings.clone();
+        cx.subscribe(&settings,
+                     move |_this, _ctrl, _event: &SettingsChanged, cx| {
+                         let days = settings_for_window.read(cx)
+                                                       .snapshot()
+                                                       .recently_updated_window_days;
+                         controller_for_window.update(cx, |ctrl, cx| {
+                                                  ctrl.set_recently_updated_window_days(days, cx);
+                                              });
                      })
           .detach();
 
@@ -734,6 +871,16 @@ impl LibraryRootView {
                                               cx);
             self.settings_window = Some(handle);
         }
+    }
+
+    /// Opens Settings on the Account tab with the email input focused.
+    ///
+    /// Used by the "Login to DriveThruRPG" notification banner action — see
+    /// `SettingsController::request_email_focus_on_account_tab`.
+    pub(crate) fn show_settings_focused_on_email(&mut self, cx: &mut Context<Self>) {
+        self.settings
+            .update(cx, |ctrl, cx| ctrl.request_email_focus_on_account_tab(cx));
+        self.show_settings(cx);
     }
 
     /// Toggles the Activity panel. See [`Self::show_settings`] for why this
@@ -943,11 +1090,14 @@ impl Render for LibraryRootView {
             }
         };
         let alert_snap = self.activity.read(cx).alert_snapshot();
+        let current_locale =
+            crate::i18n::Locale::from_code(&rust_i18n::locale()).unwrap_or(crate::i18n::Locale::En);
         let status_bar = render_status_bar(StatusBarSnapshot { total_count,
                                                                total_mb,
                                                                active_tab_label,
                                                                active_tab_count,
-                                                               theme_key: theme.key },
+                                                               theme_key: theme.key,
+                                                               current_locale },
                                            lib_entity.clone(),
                                            ActivityBarData { entity:     activity_entity.clone(),
                                                              snap:       &activity_snap,

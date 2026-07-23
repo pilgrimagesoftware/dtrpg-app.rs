@@ -493,17 +493,6 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
             ),
             MenuItem::separator(),
             MenuItem::action(t!("menu.focus_search").to_string(), FocusSearch),
-        ]),
-        Menu::new(t!("menu.window_title").to_string()).items([
-            MenuItem::action(t!("menu.window_minimize").to_string(), Minimize),
-            MenuItem::action(t!("menu.window_zoom").to_string(), Zoom),
-            MenuItem::separator(),
-            MenuItem::action(t!("menu.window_show_activity").to_string(), ShowActivity),
-            MenuItem::action(
-                t!("menu.window_show_alert_history").to_string(),
-                ShowAlertHistory,
-            ),
-            MenuItem::separator(),
             MenuItem::submenu(
                 Menu::new(t!("menu.window_select_tab_title").to_string()).items([
                     {
@@ -567,6 +556,16 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                             .checked(checked)
                     },
                 ]),
+            ),
+        ]),
+        Menu::new(t!("menu.window_title").to_string()).items([
+            MenuItem::action(t!("menu.window_minimize").to_string(), Minimize),
+            MenuItem::action(t!("menu.window_zoom").to_string(), Zoom),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.window_show_activity").to_string(), ShowActivity),
+            MenuItem::action(
+                t!("menu.window_show_alert_history").to_string(),
+                ShowAlertHistory,
             ),
         ]),
         Menu::new(t!("menu.help_title").to_string())
