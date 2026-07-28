@@ -21,7 +21,8 @@ pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
         ClientError::ApiError { url,
                                 status,
                                 message,
-                                payload, } => {
+                                payload,
+                                retry_after, } => {
             let detail = message.unwrap_or(payload);
             // 409 on this service's endpoints means the request conflicts with
             // existing state (e.g. the item is already a member of the product
@@ -33,10 +34,12 @@ pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
             }
             let kind = match status {
                 401 | 403 => CollectionsServiceErrorKind::Session,
+                429 => CollectionsServiceErrorKind::RateLimited,
                 _ => CollectionsServiceErrorKind::Network,
             };
             CollectionsServiceError::new(kind,
                                          format!("Request to {url} failed (HTTP {status}): {detail}"))
+                .with_retry_after(retry_after)
         }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());

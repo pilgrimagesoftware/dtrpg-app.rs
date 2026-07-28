@@ -3,15 +3,11 @@
 
 use std::path::PathBuf;
 
-use gpui::{
-    AnyElement, Element, Entity, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div, px,
-};
+use gpui::{AnyElement, Element, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_component::IconName;
 use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputState};
+use gpui_component::input::{Input, InputState, NumberInput};
 use gpui_component::switch::Switch;
-use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
@@ -19,25 +15,27 @@ use crate::data::storage::validate_writable;
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 
-/// Lower bound for the concurrency stepper: 0 would mean thumbnails and
+/// Lower bound for the concurrency field: 0 would mean thumbnails and
 /// downloads never start.
-const MIN_CONCURRENT_DOWNLOADS: usize = 1;
-/// Upper bound for the concurrency stepper. There is no bandwidth throttling
+pub(crate) const MIN_CONCURRENT_DOWNLOADS: usize = 1;
+/// Upper bound for the concurrency field. There is no bandwidth throttling
 /// (see the change's design non-goals), so this caps how aggressively a
 /// misconfigured value could saturate the connection.
-const MAX_CONCURRENT_DOWNLOADS: usize = 10;
+pub(crate) const MAX_CONCURRENT_DOWNLOADS: usize = 5;
 
 /// Renders the Storage settings section.
 ///
 /// Displays the current `storage_root_path`, inline icon buttons for "Change…"
 /// and "Show in Finder/Explorer/Files", an optional warning row when
-/// `storage_path_exists` is `false`, and a stepper for the shared
+/// `storage_path_exists` is `false`, and an editable field for the shared
 /// thumbnail/download concurrency limit.
 #[allow(clippy::too_many_arguments)]
 pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: bool,
                               entity: Entity<SettingsController>, colors: &ColorTokens,
                               storage_path_input: Option<Entity<InputState>>,
-                              max_concurrent_downloads: usize, create_collections: bool)
+                              max_concurrent_downloads: usize,
+                              max_concurrent_downloads_input: Option<Entity<InputState>>,
+                              create_collections: bool)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -162,8 +160,10 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                        .child(format!("\u{26A0} {}", t!("settings.storage_note"))))
            // ── Divider ───────────────────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
-           // ── Concurrency stepper ─────────────────────────────────────────
-           .child(render_concurrency_stepper(max_concurrent_downloads, entity.clone(), colors))
+           // ── Concurrency field ─────────────────────────────────────────────
+           .child(render_concurrency_row(max_concurrent_downloads,
+                                         max_concurrent_downloads_input,
+                                         colors))
            // ── Divider ───────────────────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
            // ── Create collections toggle ───────────────────────────────────
@@ -220,17 +220,29 @@ fn create_collections_note() -> String {
     t!("settings.create_collections_note").to_string()
 }
 
-/// Renders the "Max concurrent downloads" stepper row: a label/note pair and
-/// a minus/value/plus control, matching the icon-button style used for the
-/// "Change…"/reveal actions above.
-fn render_concurrency_stepper(max_concurrent_downloads: usize,
-                              entity: Entity<SettingsController>, colors: &ColorTokens)
-                              -> impl IntoElement + 'static + use<> {
+/// Renders the "Max concurrent downloads" row: a label/note pair and an
+/// editable [`NumberInput`] (bounded `MIN_CONCURRENT_DOWNLOADS`-
+/// `MAX_CONCURRENT_DOWNLOADS` via `InputState::min`/`max`, set when the field
+/// was created) with built-in +/- stepper buttons.
+///
+/// Falls back to a plain, non-editable value when `input` is `None` (before
+/// the root view attaches the shared input state), matching the pattern used
+/// for `recently_updated_window_input` in `settings_advanced_view`.
+fn render_concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<InputState>>,
+                          colors: &ColorTokens)
+                          -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
-    let border = colors.border;
-    let entity_dec = entity.clone();
-    let entity_inc = entity;
+
+    let field: AnyElement = if let Some(input_state) = input {
+        NumberInput::new(&input_state).into_any_element()
+    }
+    else {
+        div().text_sm()
+             .text_color(text_primary)
+             .child(max_concurrent_downloads.to_string())
+             .into_any_element()
+    };
 
     div().flex()
          .flex_col()
@@ -239,70 +251,7 @@ fn render_concurrency_stepper(max_concurrent_downloads: usize,
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(text_primary)
                      .child(t!("settings.max_concurrent_downloads_title")))
-         .child(div().flex()
-                     .items_center()
-                     .gap(px(8.0))
-                     .child(div().id("max-concurrent-downloads-decrement")
-                                 .flex_none()
-                                 .size(px(32.0))
-                                 .rounded(px(8.0))
-                                 .border_1()
-                                 .border_color(border)
-                                 .flex()
-                                 .items_center()
-                                 .justify_center()
-                                 .cursor_pointer()
-                                 .tooltip(|window, cx| {
-                                     Tooltip::new(
-                                t!("settings.max_concurrent_downloads_decrement_tooltip")
-                                    .to_string(),
-                            )
-                            .build(window, cx)
-                                 })
-                                 .on_click(move |_event, _window, cx| {
-                                     if max_concurrent_downloads > MIN_CONCURRENT_DOWNLOADS {
-                                         entity_dec.update(cx, |ctrl, cx| {
-                                                       ctrl.set_max_concurrent_downloads(
-                                        max_concurrent_downloads - 1,
-                                        cx,
-                                    );
-                                                   });
-                                     }
-                                 })
-                                 .child(div().text_sm().text_color(text_primary).child("−")))
-                     .child(div().w(px(32.0))
-                                 .text_sm()
-                                 .text_color(text_primary)
-                                 .text_align(gpui::TextAlign::Center)
-                                 .child(max_concurrent_downloads.to_string()))
-                     .child(div().id("max-concurrent-downloads-increment")
-                                 .flex_none()
-                                 .size(px(32.0))
-                                 .rounded(px(8.0))
-                                 .border_1()
-                                 .border_color(border)
-                                 .flex()
-                                 .items_center()
-                                 .justify_center()
-                                 .cursor_pointer()
-                                 .tooltip(|window, cx| {
-                                     Tooltip::new(
-                                t!("settings.max_concurrent_downloads_increment_tooltip")
-                                    .to_string(),
-                            )
-                            .build(window, cx)
-                                 })
-                                 .on_click(move |_event, _window, cx| {
-                                     if max_concurrent_downloads < MAX_CONCURRENT_DOWNLOADS {
-                                         entity_inc.update(cx, |ctrl, cx| {
-                                                       ctrl.set_max_concurrent_downloads(
-                                        max_concurrent_downloads + 1,
-                                        cx,
-                                    );
-                                                   });
-                                     }
-                                 })
-                                 .child(div().text_sm().text_color(text_primary).child("+"))))
+         .child(div().w(px(140.0)).child(field))
          .child(div().text_xs()
                      .text_color(text_secondary)
                      .child(t!("settings.max_concurrent_downloads_note")))

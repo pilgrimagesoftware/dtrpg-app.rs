@@ -6,9 +6,14 @@
 //! inline strings to ensure consistent namespacing and enable targeted
 //! deletion on uninstall.
 
-/// The threshold (in `added_order`) below which an item counts as recently
-/// added.
-pub const RECENTLY_ADDED_THRESHOLD: u32 = 90;
+/// Default number of days within which an item's `date_added` or
+/// `date_updated` counts as "recently updated", when no user preference has
+/// been saved.
+pub const RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS: u32 = 30;
+/// Lower bound for the "Recently Updated window" stepper, in days.
+pub const RECENTLY_UPDATED_WINDOW_MIN_DAYS: u32 = 7;
+/// Upper bound for the "Recently Updated window" stepper, in days.
+pub const RECENTLY_UPDATED_WINDOW_MAX_DAYS: u32 = 90;
 
 pub const MONTH_ABBRS: [&str; 12] =
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -32,6 +37,19 @@ pub const AVATAR_CACHE_FILE: &str = "avatar";
 
 /// 7 days in seconds — caches older than this are considered stale.
 pub const STALE_SECS: u64 = 7 * 24 * 60 * 60;
+
+/// Number of live catalog pages received before the accumulating page buffer
+/// is checkpointed to disk, whichever of this or
+/// [`CATALOG_CHECKPOINT_MIN_INTERVAL_SECS`] elapses first.
+///
+/// See `catalog-cache-checkpointing`: without a periodic checkpoint, an app
+/// quit or crash partway through a large live load leaves nothing on disk
+/// even though many pages may already have been fetched.
+pub const CATALOG_CHECKPOINT_PAGE_INTERVAL: u32 = 5;
+
+/// Minimum time between catalog cache checkpoints during a live load, in
+/// seconds — see [`CATALOG_CHECKPOINT_PAGE_INTERVAL`].
+pub const CATALOG_CHECKPOINT_MIN_INTERVAL_SECS: u64 = 10;
 
 /// Minimum interval between user-requested full catalog reloads ("Catalog >
 /// Reload"), keyed off `CacheMetadata::saved_at_secs`.

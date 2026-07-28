@@ -7,12 +7,13 @@
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
+    AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
     StatefulInteractiveElement, Styled, div, px,
 };
 use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::description_list::{DescriptionItem, DescriptionList};
+use gpui_component::input::{InputState, NumberInput};
 use gpui_component::tooltip::Tooltip;
 use rust_i18n::t;
 
@@ -214,12 +215,51 @@ fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens,
                          value_font_family))
 }
 
-/// Renders the Advanced settings section: cache visibility (counts and
-/// timing constants), an "Open cache folder" action, and a "Clear cache"
-/// action with a confirmation dialog.
+/// Renders the "Recently Updated window" row: a label/note pair and an
+/// editable [`NumberInput`] (bounded 7-90 via `InputState::min`/`max`, set
+/// when the field was created) with built-in +/- stepper buttons.
+///
+/// Falls back to a plain, non-editable value when `input` is `None` (before
+/// the root view attaches the shared input state), matching the pattern used
+/// for `storage_path_input` in `settings_storage_view`.
+fn render_recently_updated_window_row(recently_updated_window_days: u32,
+                                      input: Option<Entity<InputState>>, colors: &ColorTokens)
+                                      -> impl IntoElement + 'static + use<> {
+    let text_primary = colors.text_primary;
+    let text_secondary = colors.text_secondary;
+
+    let field: AnyElement = if let Some(input_state) = input {
+        NumberInput::new(&input_state).into_any_element()
+    }
+    else {
+        div().text_sm()
+             .text_color(text_primary)
+             .child(recently_updated_window_days.to_string())
+             .into_any_element()
+    };
+
+    div().flex()
+         .flex_col()
+         .gap(px(6.0))
+         .child(div().text_sm()
+                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .text_color(text_primary)
+                     .child(t!("settings.recently_updated_window_title")))
+         .child(div().w(px(140.0)).child(field))
+         .child(div().text_xs()
+                     .text_color(text_secondary)
+                     .child(t!("settings.recently_updated_window_note")))
+}
+
+/// Renders the Advanced settings section: the "Recently Updated window"
+/// number field, cache visibility (counts and timing constants), an "Open
+/// cache folder" action, and a "Clear cache" action with a confirmation
+/// dialog.
+#[allow(clippy::too_many_arguments)]
 pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts: CacheCounts,
                                colors: &ColorTokens, label_font_family: &str,
-                               value_font_family: &str)
+                               value_font_family: &str, recently_updated_window_days: u32,
+                               recently_updated_window_input: Option<Entity<InputState>>)
                                -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -238,6 +278,10 @@ pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts:
                 .text_color(text_primary)
                 .child(t!("settings.advanced_title")),
         )
+        .child(div().h(px(1.0)).bg(border))
+        .child(render_recently_updated_window_row(recently_updated_window_days,
+                                                  recently_updated_window_input,
+                                                  colors))
         .child(div().h(px(1.0)).bg(border))
         .child(render_cache_details(cache_counts, colors, label_font_family, value_font_family))
         .child(

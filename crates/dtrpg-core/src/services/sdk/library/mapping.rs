@@ -236,8 +236,24 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
     // `date_updated` rather than embedding the machine format as text — the
     // detail panel renders these as relative labels with a human-readable
     // absolute-date tooltip (see `render_relative_date_value`).
+    //
+    // `datePurchased` is documented as present "if available" — it's absent
+    // for some ordered products (observed for bundle members), which would
+    // otherwise leave `date_added` unset and make an item invisible to the
+    // "Recently Updated" filter regardless of how recently it actually
+    // appeared in the user's library. `attributes.order.dateCreated` (the
+    // embedded order's creation date, always present alongside the standard
+    // order_products response — no extra request needed) is a reliable
+    // fallback: every ordered product belongs to an order, and the order's
+    // creation date is at least as good a "when this entered the library"
+    // signal as the purchase date.
     let date_purchased_epoch = attributes.date_purchased
                                          .as_deref()
+                                         .or_else(|| {
+                                             attributes.order
+                                                       .as_ref()
+                                                       .and_then(|o| o.date_created.as_deref())
+                                         })
                                          .and_then(parse_rfc3339_to_epoch);
     let file_last_modified_epoch = attributes.file_last_modified
                                              .as_deref()
@@ -274,8 +290,8 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
 mod tests {
     use dtrpg_sdk::{
         FileChecksum, OrderProductAttributes, OrderProductFile, OrderProductItemResponse,
-        OrderProductListResponse, OrderProductRelationships, PaginationLinks, PaginationMeta,
-        RelationshipData, RelationshipRef,
+        OrderProductListResponse, OrderProductOrder, OrderProductRelationships, PaginationLinks,
+        PaginationMeta, RelationshipData, RelationshipRef,
     };
     use dtrpg_ui::services::{LibraryService, LibraryServiceError};
 
@@ -392,6 +408,50 @@ mod tests {
 
         // "2026-01-01T10:45:52-05:00" == 2026-01-01T15:45:52Z
         assert_eq!(mapped.date_added, Some(1_767_282_352));
+    }
+
+    #[test]
+    fn map_order_product_falls_back_to_order_date_created_when_date_purchased_absent() {
+        // `datePurchased` is documented as present "if available" — observed
+        // absent for bundle members. `attributes.order.dateCreated` is
+        // embedded on every standard order_products response and is a
+        // reliable fallback so the item isn't left with no `date_added` at
+        // all.
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.date_purchased = None;
+        item.attributes.order =
+            Some(OrderProductOrder { date_created: Some("2026-01-03T09:00:00Z".to_string()),
+                                     order_id:     900, });
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        // "2026-01-03T09:00:00Z"
+        assert_eq!(mapped.date_added, Some(1_767_430_800));
+    }
+
+    #[test]
+    fn map_order_product_prefers_date_purchased_over_order_date_created() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.order =
+            Some(OrderProductOrder { date_created: Some("2020-01-01T00:00:00Z".to_string()),
+                                     order_id:     900, });
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        // "2026-01-01T10:45:52-05:00" == 2026-01-01T15:45:52Z, unchanged from
+        // `date_purchased` despite an older `order.date_created` also being set.
+        assert_eq!(mapped.date_added, Some(1_767_282_352));
+    }
+
+    #[test]
+    fn map_order_product_date_added_is_none_when_both_date_purchased_and_order_absent() {
+        let mut item = order_product_item(515_276, "The Wellspring");
+        item.attributes.date_purchased = None;
+        item.attributes.order = None;
+
+        let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+        assert_eq!(mapped.date_added, None);
     }
 
     #[test]

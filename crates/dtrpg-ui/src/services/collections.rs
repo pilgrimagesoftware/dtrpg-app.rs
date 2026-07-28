@@ -14,22 +14,36 @@ pub enum CollectionsServiceErrorKind {
     /// Distinct from [`Self::Network`] so callers can treat it as a
     /// non-fatal, expected outcome rather than a genuine failure.
     Conflict,
+    /// Request failed due to an HTTP 429 (Too Many Requests) response.
+    RateLimited,
 }
 
 /// Error returned by collections service operations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CollectionsServiceError {
     /// The machine-classified failure kind.
-    pub kind:    CollectionsServiceErrorKind,
+    pub kind:        CollectionsServiceErrorKind,
     /// Human-readable baseline error message.
-    pub message: String,
+    pub message:     String,
+    /// The server-specified wait duration from a `Retry-After` header, when
+    /// the failure was a [`CollectionsServiceErrorKind::RateLimited`]
+    /// response that included one.
+    pub retry_after: Option<std::time::Duration>,
 }
 
 impl CollectionsServiceError {
     /// Creates a new service error.
     pub fn new(kind: CollectionsServiceErrorKind, message: impl Into<String>) -> Self {
         Self { kind,
-               message: message.into() }
+               message: message.into(),
+               retry_after: None }
+    }
+
+    /// Attaches a `Retry-After`-derived wait duration to this error.
+    #[must_use]
+    pub fn with_retry_after(mut self, retry_after: Option<std::time::Duration>) -> Self {
+        self.retry_after = retry_after;
+        self
     }
 }
 

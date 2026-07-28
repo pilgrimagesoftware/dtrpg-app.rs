@@ -224,6 +224,25 @@ pub struct CacheCleared;
 
 impl EventEmitter<CacheCleared> for SettingsController {}
 
+// ── LowDiskSpaceWarning
+// ────────────────────────────────────────────────────
+
+/// Emitted by `LibraryController` when a `request_*` gating wrapper finds
+/// free disk space insufficient for the download it was about to queue.
+///
+/// The receiver should show a confirmation dialog naming the shortfall,
+/// calling `confirm_pending_download`/`cancel_pending_download` on the
+/// controller from the dialog's ok/cancel handlers.
+pub struct LowDiskSpaceWarning {
+    /// Total size, in megabytes, of the files the pending action would
+    /// enqueue.
+    pub needed_mb: f64,
+    /// Free disk space, in megabytes, at the storage root.
+    pub free_mb:   f64,
+}
+
+impl EventEmitter<LowDiskSpaceWarning> for LibraryController {}
+
 // ── TabsChanged
 // ───────────────────────────────────────────────────────────────
 

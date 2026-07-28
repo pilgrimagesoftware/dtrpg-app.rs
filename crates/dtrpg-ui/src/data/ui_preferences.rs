@@ -35,6 +35,10 @@ pub struct UiPreferencesFile {
     /// Persisted sidebar Collections sort direction (`"ascending"` or
     /// `"descending"`).
     pub collection_sort_direction: Option<String>,
+    /// Persisted locale code (`"en"`, `"fr"`, `"de"`), read ahead of
+    /// OS-locale detection at startup. `None` before this preference existed,
+    /// or if never changed from the OS-detected default.
+    pub locale:                    Option<String>,
 }
 
 /// Persists and restores user-facing UI preferences.
@@ -164,6 +168,17 @@ impl UiPreferences {
                                                        SortDirection::Ascending => "ascending",
                                                        SortDirection::Descending => "descending",
                                                    }.to_string());
+        self.flush();
+    }
+
+    /// Persisted locale code, or `None` if never saved.
+    pub fn locale(&self) -> Option<&str> {
+        self.data.locale.as_deref()
+    }
+
+    /// Persist the active locale's code.
+    pub fn save_locale(&mut self, code: &str) {
+        self.data.locale = Some(code.to_string());
         self.flush();
     }
 

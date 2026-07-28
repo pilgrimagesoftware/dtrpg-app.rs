@@ -29,6 +29,7 @@ use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
 use crate::data::activity::{ActivitySnapshot, AlertHistorySnapshot};
 use crate::data::theme::{ColorTokens, ThemeKey};
+use crate::i18n::Locale;
 use crate::ui::views::activity_panel_view::render_activity_panel;
 use crate::ui::views::alert_history_view::render_alert_history_panel;
 use crate::util::pluralize::pluralize;
@@ -48,6 +49,8 @@ pub struct StatusBarSnapshot {
     pub active_tab_count: usize,
     /// Currently active theme.
     pub theme_key:        ThemeKey,
+    /// Currently active locale.
+    pub current_locale:   Locale,
 }
 
 /// Activity and alert history state needed to render the status bar's
@@ -98,6 +101,29 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
              .child(format!("{} \u{2022} {}",
                             snap.active_tab_label,
                             pluralize(snap.active_tab_count, "count.item", "count.items")));
+
+    let language_entity = entity.clone();
+    let language_picker =
+        Button::new("status-bar-language").ghost()
+                                          .compact()
+                                          .label(snap.current_locale.label())
+                                          .tooltip(t!("status_bar.language_tooltip",
+                                                      language = snap.current_locale.label())
+                                                       .to_string())
+                                          .dropdown_menu(move |menu, _, _| {
+                                              let mut m = menu;
+                                              for locale in Locale::ALL {
+                                                  let e = language_entity.clone();
+                                                  m = m.item(
+                    PopupMenuItem::new(locale.label())
+                        .checked(locale == snap.current_locale)
+                        .on_click(move |_, _, cx| {
+                            e.update(cx, |ctrl, cx| ctrl.set_locale(locale, cx));
+                        }),
+                );
+                                              }
+                                              m
+                                          });
 
     let theme_picker =
         Button::new("status-bar-theme").ghost()
@@ -228,6 +254,8 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
     StatusBar::new().left(library_summary)
                     .left(Separator::vertical().h_5())
                     .left(active_tab_summary)
+                    .right(language_picker)
+                    .right(Separator::vertical().h_5())
                     .right(theme_picker)
                     .right(Separator::vertical().h_5())
                     .right(activity_panel)

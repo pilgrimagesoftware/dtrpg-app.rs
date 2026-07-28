@@ -8,7 +8,7 @@ Every hardcoded user-facing string in `crates/dtrpg-ui/src/ui/views/` and the fi
 
 #### Scenario: Sidebar navigation labels
 - **WHEN** the sidebar renders
-- **THEN** the labels "All Titles", "Recently Added", "On This Device", "In the Cloud", "Publishers", and "Collections" are produced by `t!()` calls, not string literals
+- **THEN** the labels "All Titles", "Recently Updated", "On This Device", "In the Cloud", "Publishers", and "Collections" are produced by `t!()` calls, not string literals
 
 #### Scenario: Detail panel metadata labels
 - **WHEN** the detail panel renders for any item

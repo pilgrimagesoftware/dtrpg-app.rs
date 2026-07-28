@@ -116,6 +116,7 @@ pub fn fetch_avatar_bytes(email: String) -> Option<Vec<u8>> {
                                                 })
                                     },
                                     |e| matches!(e, AvatarFetchError::Transient(_)),
+                                    |_| None,
                                     Some(&mut on_retry));
 
     match result {

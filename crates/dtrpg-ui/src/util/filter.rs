@@ -10,7 +10,7 @@ use std::sync::Arc;
 pub enum SidebarFilter {
     #[default]
     AllTitles,
-    RecentlyAdded,
+    RecentlyUpdated,
     OnDevice,
     InCloud,
     Publisher(Arc<str>),
@@ -23,7 +23,7 @@ impl PartialEq for SidebarFilter {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::AllTitles, Self::AllTitles)
-            | (Self::RecentlyAdded, Self::RecentlyAdded)
+            | (Self::RecentlyUpdated, Self::RecentlyUpdated)
             | (Self::OnDevice, Self::OnDevice)
             | (Self::InCloud, Self::InCloud) => true,
             (Self::Publisher(a), Self::Publisher(b)) => a == b,

@@ -34,14 +34,14 @@ through `cmd-9`.
 - **WHEN** fewer than `n` detail tabs are open and the user presses `cmd-<n>`
 - **THEN** the active tab does not change and no error occurs
 
-### Requirement: Window menu exposes a Select Tab submenu with items for positions 0 through 9
-The Window menu SHALL contain a "Select Tab" submenu holding ten items, one per position
+### Requirement: View menu exposes a Select Tab submenu with items for positions 0 through 9
+The View menu SHALL contain a "Select Tab" submenu holding ten items, one per position
 `0` through `9`, each dispatching the same action as the corresponding `cmd-<n>` shortcut
 (position `0` is Catalog; positions `1` through `9` are the 1st through 9th open detail
 tab). Each item's label SHALL reflect the open tab's title when a tab occupies that
 position, and each item SHALL be disabled (not removed) when no tab occupies that
-position. The items are nested under this submenu, not listed directly in the Window
-menu, so the ten fixed slots don't lengthen the Window menu itself.
+position. The items are nested under this submenu, not listed directly in the View
+menu, so the ten fixed slots don't lengthen the View menu itself.
 
 #### Scenario: Menu item enabled and labeled for an open detail tab
 - **WHEN** a detail tab titled "Curse of Strahd" is the 2nd open detail tab

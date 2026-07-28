@@ -266,6 +266,17 @@ pub(crate) fn render_checking_indicator(is_checking: bool)
     Some(Spinner::new().with_size(Size::XSmall))
 }
 
+/// Applies a `TableEvent::ColumnWidthsChanged` payload to a delegate's
+/// `user_widths`, ignoring mismatched-length payloads (e.g. mid-resize
+/// column-count changes).
+fn apply_column_widths(user_widths: &mut [Option<Pixels>], widths: &[Pixels]) {
+    if widths.len() == user_widths.len() {
+        for (slot, &w) in user_widths.iter_mut().zip(widths.iter()) {
+            *slot = Some(w);
+        }
+    }
+}
+
 /// Renders a single data cell (column `col_ix`) for `item`. Shared between
 /// the ungrouped `CatalogListDelegate` and the grouped
 /// `GroupedCatalogListDelegate` so grouped and ungrouped list rows stay
@@ -583,7 +594,7 @@ impl TableDelegate for CatalogListDelegate {
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.enqueue_download(&id, title.clone(), cx));
+                    entity.update(cx, |ctrl, cx| ctrl.request_download(&id, title.clone(), cx));
                 }),
             ),
         };
@@ -702,7 +713,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                     PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
                         move |_, _, cx| {
                             entity.update(cx, |ctrl, cx| {
-                                ctrl.download_all_for_publisher(&publisher, cx);
+                                ctrl.request_download_all_for_publisher(&publisher, cx);
                             });
                         },
                     ),
@@ -780,7 +791,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
             }
             ItemStatus::Cloud => menu.item(
                 PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.enqueue_download(&id, title.clone(), cx));
+                    entity.update(cx, |ctrl, cx| ctrl.request_download(&id, title.clone(), cx));
                 }),
             ),
         };
@@ -979,15 +990,15 @@ impl CatalogView {
                          TableEvent::ColumnWidthsChanged(widths) => {
                              let widths = widths.clone();
                              table.update(cx, |state, _cx| {
-                                      let delegate = state.delegate_mut();
-                                      if widths.len() == delegate.user_widths.len() {
-                                          for (slot, &w) in
-                                              delegate.user_widths.iter_mut().zip(widths.iter())
-                                          {
-                                              *slot = Some(w);
-                                          }
-                                      }
+                                      apply_column_widths(&mut state.delegate_mut().user_widths,
+                                                          &widths);
                                   });
+                             this.catalog_grouped_list_table.update(cx, |state, _cx| {
+                                                                apply_column_widths(
+                                &mut state.delegate_mut().user_widths,
+                                &widths,
+                            );
+                                                            });
                          }
                          _ => {}
                      })
@@ -1034,15 +1045,15 @@ impl CatalogView {
                          TableEvent::ColumnWidthsChanged(widths) => {
                              let widths = widths.clone();
                              table.update(cx, |state, _cx| {
-                                      let delegate = state.delegate_mut();
-                                      if widths.len() == delegate.user_widths.len() {
-                                          for (slot, &w) in
-                                              delegate.user_widths.iter_mut().zip(widths.iter())
-                                          {
-                                              *slot = Some(w);
-                                          }
-                                      }
+                                      apply_column_widths(&mut state.delegate_mut().user_widths,
+                                                          &widths);
                                   });
+                             this.catalog_list_table.update(cx, |state, _cx| {
+                                                        apply_column_widths(
+                                &mut state.delegate_mut().user_widths,
+                                &widths,
+                            );
+                                                    });
                          }
                          _ => {}
                      })
@@ -1520,7 +1531,8 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
              let publisher = menu_publisher.clone();
              menu.item(PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
                  move |_, _, cx| {
-                     entity.update(cx, |ctrl, cx| ctrl.download_all_for_publisher(&publisher, cx));
+                     entity.update(cx,
+                                   |ctrl, cx| ctrl.request_download_all_for_publisher(&publisher, cx));
                  },
              ))
          })
@@ -1828,7 +1840,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                         move |_, _, cx| {
                             entity_dl.update(cx, |ctrl, cx| {
-                                ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                                ctrl.request_download(&dl_id, dl_title.clone(), cx)
                             });
                         },
                     ))
@@ -2129,7 +2141,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
                         move |_, _, cx| {
                             entity_dl.update(cx, |ctrl, cx| {
-                                ctrl.enqueue_download(&dl_id, dl_title.clone(), cx)
+                                ctrl.request_download(&dl_id, dl_title.clone(), cx)
                             });
                         },
                     ))

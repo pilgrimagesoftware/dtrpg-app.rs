@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use std::sync::Arc;
 
-use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString};
+use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString, Task};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -14,7 +14,10 @@ use crate::data::catalog_cache::{
 };
 use crate::data::collection::CollectionEntry;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
-use crate::data::constants::CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS;
+use crate::data::constants::{
+    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
+    CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS,
+};
 use crate::data::cover_cache::{load_cached_cover, save_cached_cover};
 use crate::data::enums::*;
 use crate::data::events::*;
@@ -28,6 +31,7 @@ use crate::services::collections::{CollectionsService, CollectionsServiceErrorKi
 use crate::services::network_monitor::NetworkMonitor;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
+use crate::util::datetime::now_secs;
 use crate::util::file_presence::{resolved_file_path, verify_item_downloads};
 use crate::util::filter::*;
 use crate::util::matching::*;
@@ -155,6 +159,34 @@ fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
          .filter(|(_, f)| !f.downloaded)
          .map(|(idx, _)| idx as u32)
          .collect()
+}
+
+/// Sums `size_mb` across every not-yet-downloaded file in `files`.
+///
+/// Used by the `request_*` gating wrappers to compute the aggregate size a
+/// queuing action would enqueue, for comparison against
+/// [`crate::data::storage::available_space_mb`].
+fn missing_files_size_mb(files: &[LibraryItemFile]) -> f64 {
+    files.iter()
+         .filter(|f| !f.downloaded)
+         .map(|f| f.size_mb)
+         .sum()
+}
+
+/// Sums [`missing_files_size_mb`] across every item in `catalog` whose id is
+/// in `ids`.
+///
+/// Used by the collection/publisher `request_download_all_for_*` wrappers to
+/// compute one aggregate size across every matching item's missing files,
+/// rather than checking each item individually.
+fn missing_files_size_mb_for_items<'a>(catalog: &[LibraryItem],
+                                       ids: impl Iterator<Item = &'a str>)
+                                       -> f64 {
+    let ids: HashSet<&str> = ids.collect();
+    catalog.iter()
+           .filter(|item| ids.contains(item.id.as_ref()))
+           .map(|item| missing_files_size_mb(&item.files))
+           .sum()
 }
 
 /// Returns `(id, title)` for every `catalog` item that is a member of
@@ -461,6 +493,23 @@ struct ZipPreviewState {
     pinned:     bool,
 }
 
+/// Error from a cover/avatar thumbnail fetch, carrying the `Retry-After`
+/// duration when the failure was an HTTP 429 response so the fetch's
+/// `retry_with_backoff` call can honor it instead of the default backoff.
+struct ThumbnailFetchError {
+    /// Human-readable description of the failure, logged as-is.
+    message:     String,
+    /// The server-specified wait duration from a `Retry-After` header, when
+    /// the failure was an HTTP 429 response that included one.
+    retry_after: Option<std::time::Duration>,
+}
+
+impl std::fmt::Display for ThumbnailFetchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
@@ -561,6 +610,16 @@ pub struct LibraryController {
     ///
     /// [`start_load_inner`]: Self::start_load_inner
     catalog_sync_in_flight:        bool,
+    /// True if a load was requested (via [`start_load_inner`]) while
+    /// `catalog_sync_in_flight` was already set, so it couldn't start
+    /// immediately. Consumed by [`Self::finish_catalog_sync`], which starts
+    /// a follow-up load once the in-flight one completes rather than
+    /// silently dropping the request — critical for callers like
+    /// [`Self::replace_service`] that clear the catalog and depend on their
+    /// reload actually happening.
+    ///
+    /// [`start_load_inner`]: Self::start_load_inner
+    pending_reload:                bool,
     /// Shared connectivity monitor consulted before catalog-sync and
     /// cover-thumbnail network requests. Held as an `Arc` so background
     /// tasks spawned on gpui's executor can query it without borrowing
@@ -668,6 +727,56 @@ pub struct LibraryController {
     /// [`crate::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].
     max_concurrent_downloads:      usize,
+    /// User-configured "Recently Updated" sidebar window, in days.
+    /// Initialized from [`crate::data::storage::StorageConfig`] and kept in
+    /// sync with the Storage settings page via
+    /// [`Self::set_recently_updated_window_days`].
+    recently_updated_window_days:  u32,
+    /// A queuing action stashed by a `request_*` gating wrapper after it
+    /// found free disk space insufficient, awaiting the user's response to
+    /// the resulting [`LowDiskSpaceWarning`]. Consumed by
+    /// [`Self::confirm_pending_download`] or cleared by
+    /// [`Self::cancel_pending_download`].
+    pending_download:              Option<PendingDownloadRequest>,
+}
+
+/// A user-initiated download-queuing action stashed while a
+/// [`LowDiskSpaceWarning`] confirmation is pending.
+///
+/// One variant per `request_*` gating wrapper — see `LibraryController`'s
+/// `request_download`, `request_item_download`,
+/// `request_download_all_for_collection`, and
+/// `request_download_all_for_publisher`.
+enum PendingDownloadRequest {
+    /// Stashed by [`LibraryController::request_download`].
+    Item {
+        /// Entry id to pass to [`LibraryController::enqueue_download`].
+        id:    Arc<str>,
+        /// Display title to pass to [`LibraryController::enqueue_download`].
+        title: String,
+    },
+    /// Stashed by [`LibraryController::request_item_download`].
+    ItemFile {
+        /// Entry id to pass to [`LibraryController::enqueue_item_download`].
+        id:    Arc<str>,
+        /// File index to pass to [`LibraryController::enqueue_item_download`].
+        index: u32,
+        /// Display title to pass to
+        /// [`LibraryController::enqueue_item_download`].
+        title: String,
+    },
+    /// Stashed by [`LibraryController::request_download_all_for_collection`].
+    Collection {
+        /// Collection id to pass to
+        /// [`LibraryController::download_all_for_collection`].
+        collection_id: u64,
+    },
+    /// Stashed by [`LibraryController::request_download_all_for_publisher`].
+    Publisher {
+        /// Publisher name to pass to
+        /// [`LibraryController::download_all_for_publisher`].
+        publisher: Arc<str>,
+    },
 }
 
 impl LibraryController {
@@ -687,19 +796,21 @@ impl LibraryController {
                -> Self {
         let vm = LibraryViewModel::new(service);
         let prefs = crate::data::ui_preferences::UiPreferences::load();
+        let view_prefs = crate::data::file_openers::CatalogViewPrefs::load();
+        let storage = StorageConfig::load();
 
         let mut ctrl =
             Self { vm,
                    activity,
                    catalog: Vec::new(),
-                   filter: SidebarFilter::default(),
+                   filter: view_prefs.to_filter(),
                    search_query: String::new(),
-                   sort: SortMethod::default(),
+                   sort: view_prefs.to_sort(),
                    sort_direction: SortDirection::default(),
                    collection_sort: prefs.collection_sort(),
                    collection_sort_direction: prefs.collection_sort_direction(),
-                   grouped: false,
-                   presentation: CatalogPresentation::default(),
+                   grouped: view_prefs.grouped.unwrap_or(false),
+                   presentation: view_prefs.to_presentation(),
                    selection: Selection::default(),
                    section_counts: SectionCounts::default(),
                    publishers: Vec::new(),
@@ -718,6 +829,7 @@ impl LibraryController {
                    catalog_loading: true,
                    load_generation: 0,
                    catalog_sync_in_flight: false,
+                   pending_reload: false,
                    network_monitor: Arc::new(NetworkMonitor::new()),
                    items_cache: None,
                    publisher_search_open: false,
@@ -738,7 +850,9 @@ impl LibraryController {
                    active_downloads: 0,
                    download_cancel_flags: HashMap::new(),
                    download_activity_ids: HashMap::new(),
-                   max_concurrent_downloads: StorageConfig::load().max_concurrent_downloads() };
+                   max_concurrent_downloads: storage.max_concurrent_downloads(),
+                   recently_updated_window_days: storage.recently_updated_window_days(),
+                   pending_download: None };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
@@ -859,7 +973,9 @@ impl LibraryController {
                       }
                       if changed {
                           ctrl.catalog = catalog;
-                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                               now_secs(),
+                                                               ctrl.recently_updated_window_days);
                           ctrl.invalidate_cache();
                       }
                       cx.emit(LibraryChanged);
@@ -869,6 +985,21 @@ impl LibraryController {
           .detach();
     }
 
+    /// Clears `catalog_sync_in_flight` and, if a load was requested while
+    /// this sync was running (see `start_load_inner`'s single-flight guard),
+    /// immediately starts a fresh one instead of leaving it dropped.
+    ///
+    /// Every exit path of `start_load_inner`'s background task must call
+    /// this exactly once instead of setting `catalog_sync_in_flight = false`
+    /// directly, so a queued follow-up (e.g. from `replace_service`) is
+    /// never silently lost.
+    fn finish_catalog_sync(&mut self, cx: &mut Context<Self>) {
+        self.catalog_sync_in_flight = false;
+        if std::mem::take(&mut self.pending_reload) {
+            self.start_load(cx);
+        }
+    }
+
     fn start_load_inner(&mut self, cx: &mut Context<Self>, force_reload: bool) {
         // Serial catalog-sync dispatch: never let a second catalog-sync task
         // start while one is already in flight, per
@@ -876,8 +1007,17 @@ impl LibraryController {
         // (which discards a superseded load's *results*), this stops a
         // redundant load from starting — and therefore from making a
         // redundant remote request — at all.
+        //
+        // A caller that arrives here while a sync is already running (e.g.
+        // `replace_service` clearing the catalog for a newly authenticated
+        // session while the prior unauthenticated attempt is still failing
+        // out) still needs its load to happen eventually — dropping it
+        // silently would leave a just-cleared catalog empty forever. Record
+        // it as pending instead; [`Self::finish_catalog_sync`] starts a
+        // follow-up load once the in-flight one completes.
         if self.catalog_sync_in_flight {
-            tracing::debug!("catalog sync already in flight, skipping redundant load request");
+            tracing::debug!("catalog sync already in flight; queuing a follow-up reload once it completes");
+            self.pending_reload = true;
             return;
         }
         self.catalog_sync_in_flight = true;
@@ -1033,11 +1173,17 @@ impl LibraryController {
                                     .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                     .ok();
                                 this.update(async_cx, |ctrl, cx| {
-                                    ctrl.catalog_sync_in_flight = false;
+                                    ctrl.finish_catalog_sync(cx);
                                     if ctrl.load_generation != generation {
                                         return; // superseded by a newer load
                                     }
                                     ctrl.catalog_loading = false;
+                                    // This branch completes the load without ever calling
+                                    // `set_catalog` — a restored `Publisher` filter that no
+                                    // longer matches must be corrected here too, or it stays
+                                    // applied (filtering the catalog to nothing) until a
+                                    // forced reload happens to reach `set_catalog` instead.
+                                    ctrl.revalidate_publisher_filter();
                                     cx.emit(LibraryChanged);
                                     // The skip-fetch path is exactly the case most likely to be
                                     // showing stale `downloaded` state indefinitely — that's the
@@ -1107,8 +1253,8 @@ impl LibraryController {
                                         weak_activity
                                             .update(async_cx, |a, cx| a.complete(activity_id, cx))
                                             .ok();
-                                        this.update(async_cx, |ctrl, _cx| {
-                                            ctrl.catalog_sync_in_flight = false;
+                                        this.update(async_cx, |ctrl, cx| {
+                                            ctrl.finish_catalog_sync(cx);
                                         })
                                         .ok();
                                         return;
@@ -1199,7 +1345,9 @@ impl LibraryController {
                                 },
                                 |e: &LibraryServiceError| {
                                     e.kind == LibraryServiceErrorKind::Network
+                                        || e.kind == LibraryServiceErrorKind::RateLimited
                                 },
+                                |e: &LibraryServiceError| e.retry_after,
                                 Some(&mut on_retry),
                             )
                         })
@@ -1261,7 +1409,7 @@ impl LibraryController {
                         ctrl.catalog_loading = false;
                         cx.emit(LibraryChanged);
                     }
-                    ctrl.catalog_sync_in_flight = false;
+                    ctrl.finish_catalog_sync(cx);
                 })
                 .ok();
                 return;
@@ -1346,6 +1494,16 @@ impl LibraryController {
             let mut total_rx = Some(total_rx);
             let mut live_items: Vec<LibraryItem> = Vec::new();
             let mut page_num: u32 = 0;
+            // Checkpointing state for `catalog-cache-checkpointing`: the accumulating
+            // `live_items` buffer (not `self.catalog`, which isn't swapped in until the
+            // full fetch completes) is periodically saved to disk so an interrupted load
+            // still leaves a recent cache for the next startup. `checkpoint_task` is
+            // awaited — never dropped while pending — before starting the next checkpoint
+            // or the final post-fetch save, so writes never race each other or the final
+            // save over the same `.tmp` file.
+            let mut checkpoint_task: Option<Task<()>> = None;
+            let mut last_checkpoint_page: u32 = 0;
+            let mut last_checkpoint_at = std::time::Instant::now();
             loop {
                 let Some(receiver) = rx.take() else { break; };
 
@@ -1389,6 +1547,37 @@ impl LibraryController {
                         }
                         live_items.extend(items);
                         page_num += 1;
+
+                        // Checkpoint the accumulating buffer every N pages, or after a
+                        // minimum interval, whichever fires first — see
+                        // `catalog-cache-checkpointing`.
+                        let pages_since_checkpoint = page_num - last_checkpoint_page;
+                        if pages_since_checkpoint >= CATALOG_CHECKPOINT_PAGE_INTERVAL
+                           || last_checkpoint_at.elapsed()
+                              >= std::time::Duration::from_secs(
+                                  CATALOG_CHECKPOINT_MIN_INTERVAL_SECS,
+                              )
+                        {
+                            if let Some(prev) = checkpoint_task.take() {
+                                prev.await;
+                            }
+                            let snapshot = live_items.clone();
+                            let checkpoint_root = save_root.clone();
+                            checkpoint_task = Some(async_cx.background_executor().spawn(
+                                async move {
+                                    if let Err(e) = save_catalog_cache(&checkpoint_root, &snapshot)
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            "failed to checkpoint catalog cache"
+                                        );
+                                    }
+                                },
+                            ));
+                            last_checkpoint_page = page_num;
+                            last_checkpoint_at = std::time::Instant::now();
+                        }
+
                         // Always advance the label to the current page — the
                         // real DriveThruRPG API never reports `links.last`, so a
                         // percentage is usually unavailable; the page number is
@@ -1432,8 +1621,8 @@ impl LibraryController {
                         // A newer load (e.g. triggered by a cache clear) has already
                         // taken over; discard this stale result instead of clobbering it.
                         weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
-                        this.update(async_cx, |ctrl, _cx| {
-                            ctrl.catalog_sync_in_flight = false;
+                        this.update(async_cx, |ctrl, cx| {
+                            ctrl.finish_catalog_sync(cx);
                         })
                         .ok();
                         return;
@@ -1442,6 +1631,12 @@ impl LibraryController {
                         ctrl.set_catalog(live_items, !catalog_was_empty, cx);
                         ctrl.verify_catalog_downloads(cx);
                     }).ok();
+                    // Wait for any in-flight checkpoint write to finish before writing the
+                    // final cache — both write `save_root`'s `.tmp` file, so they must never
+                    // run concurrently.
+                    if let Some(prev) = checkpoint_task.take() {
+                        prev.await;
+                    }
                     let items_to_save = this
                         .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
                         .unwrap_or_default();
@@ -1479,8 +1674,8 @@ impl LibraryController {
                     .ok();
                 }
             }
-            this.update(async_cx, |ctrl, _cx| {
-                ctrl.catalog_sync_in_flight = false;
+            this.update(async_cx, |ctrl, cx| {
+                ctrl.finish_catalog_sync(cx);
             })
             .ok();
         })
@@ -1507,10 +1702,47 @@ impl LibraryController {
             items
         };
         self.catalog_loading = false;
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
+        self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
+    }
+
+    /// Resets `self.filter` to [`SidebarFilter::AllTitles`] if it is a
+    /// `Publisher` filter whose publisher is not present in
+    /// `known_publishers`.
+    ///
+    /// Called once the catalog-load's item list is available, since a
+    /// `Publisher` filter restored from disk at [`Self::new`] (before any
+    /// items have loaded) can't be validated synchronously. Does not save
+    /// the reset — the persisted preference is left untouched, so a launch
+    /// where the publisher reappears restores it.
+    pub fn validate_publisher_filter(&mut self, known_publishers: &[Arc<str>]) {
+        if let SidebarFilter::Publisher(name) = &self.filter
+           && !known_publishers.contains(name)
+        {
+            self.filter = SidebarFilter::AllTitles;
+        }
+    }
+
+    /// Convenience wrapper around [`Self::validate_publisher_filter`] using
+    /// the just-recomputed `self.publishers` as the known set.
+    ///
+    /// Every catalog-load completion path that (re)computes `self.publishers`
+    /// must call this — not just the full live-fetch path
+    /// ([`Self::set_catalog`]) — since the cache-fresh skip-fetch branch in
+    /// [`Self::start_load_inner`] and [`Self::apply_partial_fetch`] both also
+    /// complete a load without ever calling `set_catalog`. Missing one of
+    /// these left a restored `Publisher` filter that no longer matched
+    /// permanently un-validated on an ordinary cache-hit cold start.
+    fn revalidate_publisher_filter(&mut self) {
+        let known_publishers: Vec<Arc<str>> = self.publishers
+                                                  .iter()
+                                                  .map(|p| Arc::clone(&p.name))
+                                                  .collect();
+        self.validate_publisher_filter(&known_publishers);
     }
 
     /// Merges a partial date-filtered fetch's `partial` results into the
@@ -1524,8 +1756,10 @@ impl LibraryController {
         self.enqueue_thumbnails(&partial, cx);
         self.catalog = merge_partial_fetch(std::mem::take(&mut self.catalog), partial);
         self.catalog_loading = false;
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
+        self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -1538,7 +1772,8 @@ impl LibraryController {
     fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog.extend(items);
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -1649,7 +1884,8 @@ impl LibraryController {
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
         self.catalog.clear();
-        self.section_counts = section_counts(&self.catalog);
+        self.section_counts =
+            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
         self.publishers = publisher_entries(&self.catalog);
         self.collections.clear();
         self.collections_loaded = false;
@@ -1753,7 +1989,8 @@ impl LibraryController {
           .detach();
     }
 
-    /// Forces a full live catalog fetch, bypassing the auto-load policy.
+    /// Invokes the catalog auto-load freshness policy, running a full live
+    /// fetch only when the policy determines one is needed.
     ///
     /// Used by the "Catalog > Reload" menu action. Gated by
     /// [`reload_cooldown_active`]: if the on-disk cache was written more
@@ -1769,7 +2006,7 @@ impl LibraryController {
         }
         self.catalog_loading = true;
         cx.emit(LibraryChanged);
-        self.start_load_inner(cx, true);
+        self.start_load_inner(cx, false);
     }
 
     /// Drops the in-memory catalog and collections, then forces a full live
@@ -2062,6 +2299,23 @@ impl LibraryController {
         self.drain_download_queue(cx);
     }
 
+    /// Updates the "Recently Updated" sidebar window and recomputes the
+    /// section counts and cached filtered items so the change is reflected
+    /// immediately.
+    ///
+    /// Called when [`crate::controllers::settings::SettingsController`]
+    /// reports a `SettingsChanged` event, so a change made on the Storage
+    /// settings page takes effect immediately.
+    pub fn set_recently_updated_window_days(&mut self, days: u32, cx: &mut Context<Self>) {
+        if self.recently_updated_window_days == days {
+            return;
+        }
+        self.recently_updated_window_days = days;
+        self.section_counts = section_counts(&self.catalog, now_secs(), days);
+        self.invalidate_cache();
+        cx.emit(LibraryChanged);
+    }
+
     // ── Thumbnail loading ──────────────────────────────────────────────────────
 
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
@@ -2154,7 +2408,7 @@ impl LibraryController {
               let disk_key = Arc::clone(&item_id);
               let cancel = std::sync::atomic::AtomicBool::new(false);
               let retry_url = fetch_url.clone();
-              let result: Result<Vec<u8>, String> =
+              let result: Result<Vec<u8>, ThumbnailFetchError> =
                   async_cx.background_executor()
                           .spawn(async move {
                               let covers_root = covers_dir();
@@ -2166,34 +2420,59 @@ impl LibraryController {
                               if !network_monitor.check_endpoint(
                                   crate::data::constants::DTRPG_API_HOST,
                               ) {
-                                  return Err(
-                                      "DriveThruRPG API endpoint unreachable".to_string(),
-                                  );
+                                  return Err(ThumbnailFetchError {
+                                      message:     "DriveThruRPG API endpoint unreachable"
+                                          .to_string(),
+                                      retry_after: None,
+                                  });
                               }
                               let config = retry::RetryConfig {
                                   max_attempts: crate::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
                                   base_secs: crate::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
                                   max_secs: crate::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
                               };
-                              let mut on_retry =
-                                  |attempt: u32, delay: std::time::Duration, reason: &String| {
-                                      tracing::debug!(
-                                          url = %retry_url,
-                                          attempt,
-                                          delay_secs = delay.as_secs(),
-                                          reason = %reason,
-                                          "cover thumbnail fetch retrying"
-                                      );
-                                  };
+                              let mut on_retry = |attempt: u32, delay: std::time::Duration,
+                                                   reason: &ThumbnailFetchError| {
+                                  tracing::debug!(
+                                      url = %retry_url,
+                                      attempt,
+                                      delay_secs = delay.as_secs(),
+                                      reason = %reason,
+                                      "cover thumbnail fetch retrying"
+                                  );
+                              };
                               let bytes = retry::retry_with_backoff(
                                   config,
                                   &cancel,
-                                  || -> Result<Vec<u8>, String> {
-                                      let resp = reqwest::blocking::get(&fetch_url)
-                                          .map_err(|e| e.to_string())?;
-                                      Ok(resp.bytes().map_err(|e| e.to_string())?.to_vec())
+                                  || -> Result<Vec<u8>, ThumbnailFetchError> {
+                                      let resp = reqwest::blocking::get(&fetch_url).map_err(
+                                          |e| ThumbnailFetchError {
+                                              message:     e.to_string(),
+                                              retry_after: None,
+                                          },
+                                      )?;
+                                      if resp.status().as_u16() == 429 {
+                                          let retry_after = resp
+                                              .headers()
+                                              .get(reqwest::header::RETRY_AFTER)
+                                              .and_then(|v| v.to_str().ok())
+                                              .and_then(|v| v.trim().parse::<u64>().ok())
+                                              .map(std::time::Duration::from_secs);
+                                          return Err(ThumbnailFetchError {
+                                              message: "rate limited (HTTP 429)".to_string(),
+                                              retry_after,
+                                          });
+                                      }
+                                      Ok(resp
+                                          .bytes()
+                                          .map_err(|e| ThumbnailFetchError {
+                                              message:     e.to_string(),
+                                              retry_after: None,
+                                          })?
+                                          .to_vec())
                                   },
                                   |_| true,
+                                  |e: &ThumbnailFetchError| e.retry_after,
                                   Some(&mut on_retry),
                               )?;
                               save_cached_cover(&covers_root, &disk_key, &bytes);
@@ -2435,11 +2714,18 @@ impl LibraryController {
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
-        let filter_count =
-            self.catalog
-                .iter()
-                .filter(|i| item_matches_filter(i, &self.filter, &self.collection_members))
-                .count();
+        let now_secs = now_secs();
+        let window_days = self.recently_updated_window_days;
+        let filter_count = self.catalog
+                               .iter()
+                               .filter(|i| {
+                                   item_matches_filter(i,
+                                                       &self.filter,
+                                                       &self.collection_members,
+                                                       now_secs,
+                                                       window_days)
+                               })
+                               .count();
         let items = self.visible_items();
         let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
@@ -2507,15 +2793,20 @@ impl LibraryController {
     /// Called eagerly at every mutation site that changes any of those inputs
     /// so render-path accessors never re-scan the catalog.
     fn invalidate_cache(&mut self) {
-        let mut items: Vec<LibraryItem> =
-            self.catalog
-                .iter()
-                .filter(|i| {
-                    item_matches_filter(i, &self.filter, &self.collection_members)
-                    && item_matches_query(i, &self.search_query)
-                })
-                .cloned()
-                .collect();
+        let now_secs = now_secs();
+        let window_days = self.recently_updated_window_days;
+        let mut items: Vec<LibraryItem> = self.catalog
+                                              .iter()
+                                              .filter(|i| {
+                                                  item_matches_filter(i,
+                                                                      &self.filter,
+                                                                      &self.collection_members,
+                                                                      now_secs,
+                                                                      window_days)
+                                                  && item_matches_query(i, &self.search_query)
+                                              })
+                                              .cloned()
+                                              .collect();
         sort_items(&mut items, self.sort, self.sort_direction);
         self.items_cache = Some(items);
     }
@@ -2567,6 +2858,7 @@ impl LibraryController {
         self.filter = filter;
         self.selection = Selection::None;
         self.invalidate_cache();
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
@@ -2630,6 +2922,7 @@ impl LibraryController {
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
         self.sort = sort;
         self.invalidate_cache();
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
@@ -2674,13 +2967,25 @@ impl LibraryController {
     /// Toggles publisher grouping on or off.
     pub fn set_grouped(&mut self, grouped: bool, cx: &mut Context<Self>) {
         self.grouped = grouped;
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
     }
 
     /// Switches the catalog presentation mode.
     pub fn set_presentation(&mut self, mode: CatalogPresentation, cx: &mut Context<Self>) {
         self.presentation = mode;
+        self.save_view_prefs();
         cx.emit(LibraryChanged);
+    }
+
+    /// Persists the current sidebar filter, sort, grouped, and presentation
+    /// state to disk. Best-effort — I/O failures are logged and ignored (see
+    /// [`crate::data::file_openers::CatalogViewPrefs::save`]).
+    fn save_view_prefs(&self) {
+        crate::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
+                                                                self.sort,
+                                                                self.grouped,
+                                                                self.presentation).save();
     }
 
     // ── Selection mutations ───────────────────────────────────────────────────
@@ -2729,7 +3034,9 @@ impl LibraryController {
                          && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
                       {
                           *existing = item;
-                          ctrl.section_counts = section_counts(&ctrl.catalog);
+                          ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                               now_secs(),
+                                                               ctrl.recently_updated_window_days);
                           ctrl.invalidate_cache();
                       }
                       cx.emit(LibraryChanged);
@@ -2824,7 +3131,9 @@ impl LibraryController {
             this.update(async_cx, |ctrl, cx| {
                     if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
                         apply_check_result(existing, result, std::time::SystemTime::now());
-                        ctrl.section_counts = section_counts(&ctrl.catalog);
+                        ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                             now_secs(),
+                                                             ctrl.recently_updated_window_days);
                         ctrl.invalidate_cache();
                     }
                     ctrl.checking_items.remove(&id);
@@ -3183,7 +3492,8 @@ impl LibraryController {
                 file.downloaded = false;
             }
             item.recompute_status();
-            self.section_counts = section_counts(&self.catalog);
+            self.section_counts =
+                section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
             self.invalidate_cache();
             self.file_info_cache
                 .retain(|(entry_id, _), _| entry_id.as_ref() != id);
@@ -3273,6 +3583,133 @@ impl LibraryController {
         self.download_queue
             .push_back((item_id, index, title.into()));
         self.drain_download_queue(cx);
+    }
+
+    /// Gates [`Self::enqueue_download`] behind a free-disk-space check.
+    ///
+    /// Computes the entry's aggregate missing-file size and compares it to
+    /// [`crate::data::storage::available_space_mb`]. If space is sufficient
+    /// or can't be determined, queues immediately; otherwise stashes the
+    /// request and emits [`LowDiskSpaceWarning`] instead of queuing anything.
+    pub fn request_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
+        let title = title.into();
+        let Some(needed_mb) = self.catalog
+                                  .iter()
+                                  .find(|i| i.id.as_ref() == id)
+                                  .map(|item| missing_files_size_mb(&item.files))
+        else {
+            return;
+        };
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::Item { id: Arc::from(id),
+                                                                        title });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.enqueue_download(id, title, cx);
+    }
+
+    /// Gates [`Self::enqueue_item_download`] behind a free-disk-space check.
+    ///
+    /// Same pattern as [`Self::request_download`], but for a single file.
+    pub fn request_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
+                                 cx: &mut Context<Self>) {
+        let title = title.into();
+        let Some(needed_mb) = self.catalog
+                                  .iter()
+                                  .find(|i| i.id.as_ref() == id)
+                                  .and_then(|item| item.files.get(index as usize))
+                                  .filter(|f| !f.downloaded)
+                                  .map(|f| f.size_mb)
+        else {
+            return;
+        };
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::ItemFile { id: Arc::from(id),
+                                                                            index,
+                                                                            title });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.enqueue_item_download(id, index, title, cx);
+    }
+
+    /// Gates [`Self::download_all_for_collection`] behind a free-disk-space
+    /// check.
+    ///
+    /// The check is evaluated once as an aggregate across every matching
+    /// item's missing files, not per item — see [`Self::request_download`].
+    pub fn request_download_all_for_collection(&mut self, collection_id: u64,
+                                               cx: &mut Context<Self>) {
+        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        else {
+            return;
+        };
+        let member_ids = Arc::clone(&collection.member_ids);
+        let targets = collection_download_targets(&self.catalog, &member_ids);
+        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
+                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::Collection { collection_id });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.download_all_for_collection(collection_id, cx);
+    }
+
+    /// Gates [`Self::download_all_for_publisher`] behind a free-disk-space
+    /// check.
+    ///
+    /// The check is evaluated once as an aggregate across every matching
+    /// item's missing files, not per item — see [`Self::request_download`].
+    pub fn request_download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
+        let targets = publisher_download_targets(&self.catalog, publisher);
+        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
+                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download =
+                Some(PendingDownloadRequest::Publisher { publisher: Arc::from(publisher), });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.download_all_for_publisher(publisher, cx);
+    }
+
+    /// Returns `Some(free_mb)` if `needed_mb` exceeds the free space at the
+    /// storage root; `None` if space is sufficient or can't be determined
+    /// (fail open — see `download-disk-space-check`).
+    fn warn_if_insufficient_space(needed_mb: f64) -> Option<f64> {
+        let free_mb = crate::data::storage::available_space_mb()?;
+        (needed_mb > free_mb).then_some(free_mb)
+    }
+
+    /// Queues the download stashed in `pending_download` (if any) via the
+    /// corresponding unconditional method, then clears it.
+    ///
+    /// Calls the unconditional method directly — never a `request_*`
+    /// wrapper — so confirming can't re-trigger the same space check and
+    /// loop back into another warning.
+    pub fn confirm_pending_download(&mut self, cx: &mut Context<Self>) {
+        match self.pending_download.take() {
+            Some(PendingDownloadRequest::Item { id, title }) => {
+                self.enqueue_download(&id, title, cx);
+            }
+            Some(PendingDownloadRequest::ItemFile { id, index, title }) => {
+                self.enqueue_item_download(&id, index, title, cx);
+            }
+            Some(PendingDownloadRequest::Collection { collection_id }) => {
+                self.download_all_for_collection(collection_id, cx);
+            }
+            Some(PendingDownloadRequest::Publisher { publisher }) => {
+                self.download_all_for_publisher(&publisher, cx);
+            }
+            None => {}
+        }
+    }
+
+    /// Clears a stashed `pending_download` without queuing anything.
+    pub fn cancel_pending_download(&mut self, _cx: &mut Context<Self>) {
+        self.pending_download = None;
     }
 
     /// Cancels a single file's download that has not yet completed.
@@ -3465,7 +3902,10 @@ impl LibraryController {
                                   }
                                   item.recompute_status();
                               }
-                              ctrl.section_counts = section_counts(&ctrl.catalog);
+                              ctrl.section_counts =
+                                  section_counts(&ctrl.catalog,
+                                                 now_secs(),
+                                                 ctrl.recently_updated_window_days);
                               ctrl.invalidate_cache();
                               cx.emit(LibraryChanged);
                           }
@@ -3550,6 +3990,15 @@ impl LibraryController {
         let current = cx.global::<LibriTheme>();
         let new_theme = LibriTheme::new(current.key, density, current.fonts.clone());
         cx.set_global(new_theme);
+        cx.notify();
+    }
+
+    /// Switches the active locale (updates `rust_i18n`'s global state) and
+    /// persists it via [`crate::data::ui_preferences::UiPreferences`] so it
+    /// takes precedence over OS-locale detection on the next launch.
+    pub fn set_locale(&self, locale: crate::i18n::Locale, cx: &mut Context<Self>) {
+        rust_i18n::set_locale(locale.code());
+        crate::data::ui_preferences::UiPreferences::load().save_locale(locale.code());
         cx.notify();
     }
 
@@ -4564,6 +5013,75 @@ mod download_queue_tests {
 
         assert!(!removed);
         assert_eq!(queue.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod disk_space_check_tests {
+    use super::{missing_files_size_mb, missing_files_size_mb_for_items};
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::{LibraryItem, LibraryItemFile};
+
+    fn file(size_mb: f64, downloaded: bool) -> LibraryItemFile {
+        LibraryItemFile { id: "f".into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb,
+                          downloaded }
+    }
+
+    fn item(id: &str, files: Vec<LibraryItemFile>) -> LibraryItem {
+        let mut item = LibraryItem::new(id,
+                                        "Title",
+                                        "Pub",
+                                        "Line",
+                                        "Core",
+                                        "PDF",
+                                        0,
+                                        0.0,
+                                        2020,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
+        item.files = files;
+        item
+    }
+
+    #[test]
+    fn missing_files_size_mb_sums_only_not_yet_downloaded_files() {
+        let files = vec![file(10.0, false), file(5.0, true), file(2.5, false)];
+
+        assert_eq!(missing_files_size_mb(&files), 12.5);
+    }
+
+    #[test]
+    fn missing_files_size_mb_is_zero_when_all_downloaded() {
+        let files = vec![file(10.0, true), file(5.0, true)];
+
+        assert_eq!(missing_files_size_mb(&files), 0.0);
+    }
+
+    #[test]
+    fn missing_files_size_mb_for_items_sums_across_matching_items_only() {
+        let catalog = vec![item("a", vec![file(10.0, false), file(5.0, true)]),
+                           item("b", vec![file(3.0, false)]),
+                           item("c", vec![file(100.0, false)])];
+
+        let total = missing_files_size_mb_for_items(&catalog, ["a", "b"].into_iter());
+
+        assert_eq!(total, 13.0);
+    }
+
+    #[test]
+    fn missing_files_size_mb_for_items_ignores_unknown_ids() {
+        let catalog = vec![item("a", vec![file(10.0, false)])];
+
+        let total = missing_files_size_mb_for_items(&catalog, ["nonexistent"].into_iter());
+
+        assert_eq!(total, 0.0);
     }
 }
 

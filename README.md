@@ -16,6 +16,9 @@ cargo run -p dtrpg-core
 
 ### macOS
 
+**Apple Silicon only.** Intel Macs are not a supported build or runtime target; packaged releases
+ship an `aarch64-apple-darwin` binary only.
+
 No additional setup required. The app links `Security.framework` automatically via the `keyring` crate.
 
 Install Xcode components to get Metal support:
