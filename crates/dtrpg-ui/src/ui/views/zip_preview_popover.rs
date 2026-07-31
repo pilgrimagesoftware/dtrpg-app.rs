@@ -95,13 +95,20 @@ fn render_entry_list(entries: &[ZipEntry], text_primary: Hsla, text_secondary: H
                     .into_any_element();
     }
 
+    // `overflow_y_scrollbar()` wraps its element in `Scrollable`, whose
+    // `render` only copies the `size` style field onto its own outer
+    // wrapper — `max_h` sets `max_size` and would be silently dropped if
+    // placed on the scrollable div itself. The height cap lives on this
+    // plain outer div instead; the inner div just fills it via
+    // `size_full()`, which `Scrollable` already applies on its own.
     div().max_h(px(POPOVER_LIST_MAX_HEIGHT))
-         .overflow_y_scrollbar()
-         .flex()
-         .flex_col()
-         .gap(px(4.0))
-         .children(entries.iter().map(|entry| {
-                                     div().flex()
+         .child(div().flex()
+                     .flex_col()
+                     .size_full()
+                     .overflow_y_scrollbar()
+                     .gap(px(4.0))
+                     .children(entries.iter().map(|entry| {
+                                                 div().flex()
                                           .items_center()
                                           .justify_between()
                                           .gap(px(8.0))
@@ -115,6 +122,6 @@ fn render_entry_list(entries: &[ZipEntry], text_primary: Hsla, text_secondary: H
                                                       .text_xs()
                                                       .text_color(text_secondary)
                                                       .child(format_bytes(entry.size_bytes)))
-                                 }))
+                                             })))
          .into_any_element()
 }
