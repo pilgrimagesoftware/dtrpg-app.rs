@@ -252,6 +252,11 @@ activity:
   refreshing_thumbnails: "Miniaturansichten werden aktualisiert…"
   refreshing_thumbnails_remaining: "Miniaturansichten werden aktualisiert… (%{remaining} verbleibend)"
   downloading_retry: "%{title} — Versuch %{attempt} in %{delay_secs}s…"
+  creating_collection: "Sammlung „%{name}“ wird erstellt…"
+  deleting_collection: "Sammlung wird gelöscht…"
+  downloading_file: "%{title} wird heruntergeladen…"
+  downloading_file_entry: "%{title} — %{file_name} wird heruntergeladen…"
+  session_setup_failed: "Sitzungseinrichtung nach der Anmeldung fehlgeschlagen"
 
 alert_history:
   title: "Warnungsverlauf"
