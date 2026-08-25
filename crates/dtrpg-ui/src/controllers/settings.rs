@@ -6,6 +6,7 @@ use std::sync::Arc;
 use gpui::{Context, Entity, EventEmitter};
 use gpui_component::input::InputState;
 use gpui_component::select::SelectState;
+use rust_i18n::t;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
 use crate::data::avatar::{avatar_cached, fetch_avatar_bytes};
@@ -752,7 +753,8 @@ impl SettingsController {
                           }
                           Err(e) => {
                               ctrl.sign_in_error =
-                                  Some(format!("Session setup failed after sign-in: {}", e.0));
+                                  Some(format!("{}: {}", t!("activity.session_setup_failed"),
+                                               e.0));
                               cx.emit(SettingsChanged);
                           }
                       }

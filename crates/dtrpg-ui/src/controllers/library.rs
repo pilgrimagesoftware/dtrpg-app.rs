@@ -1906,7 +1906,7 @@ impl LibraryController {
     /// [`CollectionCreateFailed`] is emitted so the window can push an
     /// error notification.
     pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
-        let label = format!("Creating collection '{name}'...");
+        let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
@@ -1953,7 +1953,7 @@ impl LibraryController {
     /// [`CollectionCreateFailed`] is emitted — no add is attempted.
     pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
                                             product_id: u64, cx: &mut Context<Self>) {
-        let label = format!("Creating collection '{name}'...");
+        let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
@@ -2064,7 +2064,7 @@ impl LibraryController {
     /// Logs failures to the activity panel and leaves the collection in place
     /// on error.
     pub fn delete_collection(&mut self, id: u64, cx: &mut Context<Self>) {
-        let label = "Deleting collection\u{2026}".to_string();
+        let label = t!("activity.deleting_collection").to_string();
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
@@ -3801,8 +3801,9 @@ impl LibraryController {
                         });
 
         let label = match &found {
-            Some((_, file_name, _)) => format!("Downloading {title} — {file_name}..."),
-            None => format!("Downloading {title}..."),
+            Some((_, file_name, _)) => t!("activity.downloading_file_entry", title = title,
+                                          file_name = file_name).to_string(),
+            None => t!("activity.downloading_file", title = title).to_string(),
         };
         let activity_id = self.activity
                               .update(cx, |a, cx| a.start(&label, Some(cancel_fn), cx));
