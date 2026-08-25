@@ -3801,7 +3801,8 @@ impl LibraryController {
                         });
 
         let label = match &found {
-            Some((_, file_name, _)) => t!("activity.downloading_file_entry", title = title,
+            Some((_, file_name, _)) => t!("activity.downloading_file_entry",
+                                          title = title,
                                           file_name = file_name).to_string(),
             None => t!("activity.downloading_file", title = title).to_string(),
         };

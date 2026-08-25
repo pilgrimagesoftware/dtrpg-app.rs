@@ -753,8 +753,7 @@ impl SettingsController {
                           }
                           Err(e) => {
                               ctrl.sign_in_error =
-                                  Some(format!("{}: {}", t!("activity.session_setup_failed"),
-                                               e.0));
+                                  Some(format!("{}: {}", t!("activity.session_setup_failed"), e.0));
                               cx.emit(SettingsChanged);
                           }
                       }
