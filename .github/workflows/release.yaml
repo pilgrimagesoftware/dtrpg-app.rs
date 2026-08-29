@@ -69,3 +69,43 @@ jobs:
       ref: master
       release_notes: ${{ needs.version.outputs.release_notes }}
     secrets: inherit
+
+  update-site-links:
+    name: Update download links on pilgrimagesoftware/site
+    needs: [version, package]
+    if: needs.version.outputs.new_tag
+    runs-on: ubuntu-latest
+
+    steps:
+      # SITE_REPO_TOKEN must be a PAT (classic "repo" scope, or fine-grained
+      # with contents:read/write on pilgrimagesoftware/site) - the default
+      # GITHUB_TOKEN is scoped to this repo only and can't push elsewhere.
+      - name: Checkout pilgrimagesoftware/site
+        uses: actions/checkout@v7
+        with:
+          repository: pilgrimagesoftware/site
+          token: ${{ secrets.SITE_REPO_TOKEN }}
+
+      - name: Update Libri download links
+        env:
+          TAG: ${{ needs.version.outputs.new_tag }}
+        run: |
+          FILE=public/apps/libri/index.html
+          # Asset filenames follow Libri_<tag>_<arch>.<ext> (see package.yaml);
+          # this repoints the macOS/Linux download links at the new tag
+          # regardless of what version they previously pointed to.
+          sed -i -E "s#/releases/download/[^/]+/Libri_[^_]+_#/releases/download/${TAG}/Libri_${TAG}_#g" "$FILE"
+
+      - name: Commit and push
+        env:
+          TAG: ${{ needs.version.outputs.new_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/apps/libri/index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update Libri download links to ${TAG}"
+            git push
+          fi
