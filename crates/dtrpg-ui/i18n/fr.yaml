@@ -252,6 +252,11 @@ activity:
   refreshing_thumbnails: "Actualisation des miniatures…"
   refreshing_thumbnails_remaining: "Actualisation des miniatures… (%{remaining} restantes)"
   downloading_retry: "%{title} — nouvelle tentative %{attempt} dans %{delay_secs}s…"
+  creating_collection: "Création de la collection « %{name} »…"
+  deleting_collection: "Suppression de la collection…"
+  downloading_file: "Téléchargement de %{title}…"
+  downloading_file_entry: "Téléchargement de %{title} — %{file_name}…"
+  session_setup_failed: "Échec de la configuration de la session après la connexion"
 
 alert_history:
   title: "Historique des alertes"

@@ -253,6 +253,11 @@ activity:
   refreshing_thumbnails: "Refreshing thumbnails…"
   refreshing_thumbnails_remaining: "Refreshing thumbnails… (%{remaining} remaining)"
   downloading_retry: "%{title} — retrying (attempt %{attempt}) in %{delay_secs}s…"
+  creating_collection: "Creating collection '%{name}'…"
+  deleting_collection: "Deleting collection…"
+  downloading_file: "Downloading %{title}…"
+  downloading_file_entry: "Downloading %{title} — %{file_name}…"
+  session_setup_failed: "Session setup failed after sign-in"
 
 alert_history:
   title: "Alert History"
