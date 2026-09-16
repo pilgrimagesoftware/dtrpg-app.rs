@@ -1780,7 +1780,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
 name = "dtrpg-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dirs",
  "dtrpg-sdk",
@@ -1816,7 +1816,7 @@ dependencies = [
 
 [[package]]
 name = "dtrpg-ui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "block",
  "chrono",
@@ -4989,9 +4989,9 @@ dependencies = [
 
 [[package]]
 name = "open"
-version = "5.4.0"
+version = "5.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0b3d059e795d52b8a72fef45658620edd4d9c359b338564aa14391ffa511ed5"
+checksum = "ade3be4664bc1ef537ce133015f04c176b737815c2ba9fd60edf212d6e90dd55"
 dependencies = [
  "is-wsl",
  "libc",
