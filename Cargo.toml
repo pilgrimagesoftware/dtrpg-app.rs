@@ -40,7 +40,7 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe", features = ["font-kit", "wayland", "x11"] }
 gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
-cocoa = "=0.26.0"
+cocoa = "=0.27.0"
 cocoa-foundation = "=0.2.0"
 const_format = "0.2"
 convert_case = "0.8.0"
