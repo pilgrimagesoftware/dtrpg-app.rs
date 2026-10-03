@@ -261,11 +261,16 @@ impl LibraryRootView {
                                     }
                                 }
                                 InputEvent::Blur => {
-                                    // `NumberInput`'s own min/max clamp only corrects the
-                                    // displayed text in some focus-loss paths; explicitly
-                                    // re-syncing the field to the persisted (already-clamped)
-                                    // value on every blur guarantees the display never shows an
-                                    // out-of-range number regardless of that widget-internal
+                                    // `NumberInput`'s own min/max clamp only
+                                    // corrects the
+                                    // displayed text in some focus-loss paths;
+                                    // explicitly
+                                    // re-syncing the field to the persisted
+                                    // (already-clamped)
+                                    // value on every blur guarantees the
+                                    // display never shows an
+                                    // out-of-range number regardless of that
+                                    // widget-internal
                                     // timing.
                                     let clamped = settings_for_window.read(cx)
                                                                      .snapshot()
@@ -497,9 +502,10 @@ impl LibraryRootView {
                      })
           .detach();
 
-        // Commit the pending "add file opener" row on Enter; on blur, commit if the
-        // user typed something, otherwise discard the pending row (matches clicking
-        // elsewhere in most inline-add UIs — no separate confirm step needed).
+        // Commit the pending "add file opener" row on Enter; on blur, commit if
+        // the user typed something, otherwise discard the pending row
+        // (matches clicking elsewhere in most inline-add UIs — no
+        // separate confirm step needed).
         let settings_for_ext = settings.clone();
         cx.subscribe(&file_opener_extension_input,
                      move |_this, input_entity, event: &InputEvent, cx| match event {
@@ -624,13 +630,15 @@ impl LibraryRootView {
           .detach();
 
         cx.subscribe(&controller, |this, ctrl, _event: &LibraryChanged, cx| {
-              // Keep the native View menu's checkmarks (presentation, sort, grouping)
-              // in sync with the toolbar/keyboard-driven selection. `LibraryChanged`
+              // Keep the native View menu's checkmarks (presentation, sort,
+              // grouping) in sync with the
+              // toolbar/keyboard-driven selection. `LibraryChanged`
               // fires far more often than the checkmark-relevant state actually
               // changes (e.g. once per thumbnail during a catalog load), and
-              // `cx.set_menus` replaces the whole native menu bar — on macOS that
-              // tears down any menu currently tracking a click, which read as the
-              // app menu flickering or closing itself right after opening. Only
+              // `cx.set_menus` replaces the whole native menu bar — on macOS
+              // that tears down any menu currently tracking a
+              // click, which read as the app menu flickering or
+              // closing itself right after opening. Only
               // rebuild when the state that drives the checkmarks has changed.
               let ctrl = ctrl.read(cx);
               let menu_state = ViewMenuState { presentation:   ctrl.presentation,
@@ -738,8 +746,8 @@ impl LibraryRootView {
                      })
           .detach();
 
-        // Handle sign-in: replace both services, mark authenticated, dismiss any auth
-        // toast.
+        // Handle sign-in: replace both services, mark authenticated, dismiss
+        // any auth toast.
         let auth_state_for_signin = auth_state.clone();
         let controller_for_signin = controller.clone();
         cx.subscribe_in(&settings,
@@ -762,8 +770,8 @@ impl LibraryRootView {
                         })
           .detach();
 
-        // Handle startup auth beginning: suppress the "Not signed in" banner and show a
-        // toast.
+        // Handle startup auth beginning: suppress the "Not signed in" banner
+        // and show a toast.
         let auth_state_for_begun = auth_state.clone();
         cx.subscribe_in(
                         &settings,
@@ -783,7 +791,8 @@ impl LibraryRootView {
         )
           .detach();
 
-        // Handle startup auth failure: clear pending state and dismiss the toast.
+        // Handle startup auth failure: clear pending state and dismiss the
+        // toast.
         let auth_state_for_failed = auth_state.clone();
         cx.subscribe_in(&settings,
                         window,
@@ -795,8 +804,9 @@ impl LibraryRootView {
                         })
           .detach();
 
-        // Handle cache clear: drop the in-memory catalog/collections and force a live
-        // re-fetch, so cleared content disappears immediately instead of lingering.
+        // Handle cache clear: drop the in-memory catalog/collections and force
+        // a live re-fetch, so cleared content disappears immediately
+        // instead of lingering.
         let controller_for_cache_cleared = controller.clone();
         cx.subscribe(&settings,
                      move |_this, _settings, _event: &CacheCleared, cx| {
@@ -966,9 +976,10 @@ impl Focusable for LibraryRootView {
 
 impl Render for LibraryRootView {
     fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // `Root` (gpui-component) tracks open dialogs/sheets/notifications as state but
-        // does not render them itself — the top-level app view must compose these
-        // layers explicitly, or `window.open_dialog()` / `open_alert_dialog()`
+        // `Root` (gpui-component) tracks open dialogs/sheets/notifications as
+        // state but does not render them itself — the top-level app
+        // view must compose these layers explicitly, or
+        // `window.open_dialog()` / `open_alert_dialog()`
         // / `push_notification()` calls silently have no visible effect. See
         // gpui-component's `StoryRoot` example.
         let sheet_layer = Root::render_sheet_layer(window, cx);
@@ -1138,9 +1149,9 @@ impl Render for LibraryRootView {
         let surface = colors.surface;
         let text_primary = colors.text_primary;
 
-        // Settings renders in its own window (see `settings_window_view`), not as
-        // an overlay here, so the main content area no longer branches on
-        // `settings_snap.is_open`.
+        // Settings renders in its own window (see `settings_window_view`), not
+        // as an overlay here, so the main content area no longer
+        // branches on `settings_snap.is_open`.
         let main_content = div().flex_1()
                                 .min_w_0()
                                 .flex()

@@ -418,7 +418,8 @@ impl SettingsController {
 }
 
 impl SettingsController {
-    // ── Auth state ────────────────────────────────────────────────────────────
+    // ── Auth state
+    // ────────────────────────────────────────────────────────────
 
     /// Marks the user as signed in.
     ///
@@ -467,7 +468,8 @@ impl SettingsController {
         cx.emit(LogoutRequested);
     }
 
-    // ── Storage ───────────────────────────────────────────────────────────────
+    // ── Storage
+    // ───────────────────────────────────────────────────────────────
 
     /// Returns the resolved storage root path.
     pub fn storage_root_path(&self) -> PathBuf {
@@ -610,14 +612,16 @@ impl SettingsController {
         }
     }
 
-    // ── Panel visibility ──────────────────────────────────────────────────────
+    // ── Panel visibility
+    // ──────────────────────────────────────────────────────
 
     /// Returns `true` when the settings panel is visible.
     pub fn is_open(&self) -> bool {
         self.is_open
     }
 
-    // ── Sign-in ───────────────────────────────────────────────────────────────
+    // ── Sign-in
+    // ───────────────────────────────────────────────────────────────
 
     /// Returns the current email draft value.
     pub fn email_draft(&self) -> &str {
@@ -763,7 +767,8 @@ impl SettingsController {
           .detach();
     }
 
-    // ── Panel visibility ──────────────────────────────────────────────────────
+    // ── Panel visibility
+    // ──────────────────────────────────────────────────────
 
     /// Opens the settings panel.
     pub fn open(&mut self, cx: &mut Context<Self>) {
@@ -787,7 +792,8 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
-    // ── File-opener overrides ─────────────────────────────────────────────────
+    // ── File-opener overrides
+    // ─────────────────────────────────────────────────
 
     /// Returns a shared reference to the file-opener config.
     pub fn file_openers(&self) -> &FileOpenerConfig {
@@ -849,7 +855,8 @@ impl SettingsController {
                              cx);
     }
 
-    // ── Snapshot ──────────────────────────────────────────────────────────────
+    // ── Snapshot
+    // ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the views for one render pass.
     pub fn snapshot(&self) -> SettingsSnapshot {

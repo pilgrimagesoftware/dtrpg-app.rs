@@ -291,22 +291,24 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
                       checked_at: std::time::SystemTime) {
     match result {
         Ok(fresh) => {
-            // Preserve identity/collection-membership fields from the existing item
-            // rather than trusting the single-item response for them: a per-item
-            // availability re-check should only refresh display data, and blindly
-            // overwriting `order_product_id`/`product_id` here has been observed to
-            // silently corrupt `collection_member_id` lookups for the checked item
-            // (its collection membership stops resolving) when the single-item
-            // endpoint's response doesn't carry the exact same id values the list
-            // fetch populated.
+            // Preserve identity/collection-membership fields from the existing
+            // item rather than trusting the single-item response
+            // for them: a per-item availability re-check should
+            // only refresh display data, and blindly overwriting
+            // `order_product_id`/`product_id` here has been observed to
+            // silently corrupt `collection_member_id` lookups for the checked
+            // item (its collection membership stops resolving) when
+            // the single-item endpoint's response doesn't carry the
+            // exact same id values the list fetch populated.
             let id = Arc::clone(&item.id);
             let numeric_id = item.numeric_id;
             let order_product_id = item.order_product_id;
             let product_id = item.product_id;
-            // `downloaded` is a local-only fact the server response knows nothing
-            // about - the single-item endpoint always reports it `false`.
-            // Preserve each file's existing flag by id so a re-check (or the
-            // disk-presence verification racing it, see
+            // `downloaded` is a local-only fact the server response knows
+            // nothing about - the single-item endpoint always
+            // reports it `false`. Preserve each file's existing
+            // flag by id so a re-check (or the disk-presence
+            // verification racing it, see
             // `verify-downloaded-status-against-disk`) doesn't get its
             // correction wiped the moment this slower network check resolves.
             let downloaded_by_id: HashMap<Arc<str>, bool> =
@@ -1816,9 +1818,11 @@ impl LibraryController {
                                    .ok();
                   }
                   Err(e) => {
-                      // Session errors are expected when starting before auth completes
-                      // (see `start_load_inner`'s matching treatment for the catalog
-                      // fetch); quietly complete rather than surfacing a user-facing error.
+                      // Session errors are expected when starting before auth
+                      // completes
+                      // (see `start_load_inner`'s matching treatment for the
+                      // catalog fetch); quietly complete
+                      // rather than surfacing a user-facing error.
                       if e.kind == CollectionsServiceErrorKind::Session {
                           tracing::warn!(error = %e,
                                       "collections load skipped: no authenticated session");
@@ -1847,8 +1851,9 @@ impl LibraryController {
                          &catalog_ids);
         self.collections = collections;
         self.collections_loaded = true;
-        // Refresh collection_members if the current filter is a Collection filter,
-        // in case the filter was set before the collections loaded.
+        // Refresh collection_members if the current filter is a Collection
+        // filter, in case the filter was set before the collections
+        // loaded.
         if let SidebarFilter::Collection(id, _) = &self.filter {
             let id = *id;
             self.collection_members = self.collections
@@ -2030,16 +2035,17 @@ impl LibraryController {
         self.section_counts = SectionCounts::default();
         self.publishers.clear();
         self.invalidate_cache();
-        // Queued availability checks reference items that no longer exist in the
-        // now-cleared catalog; an in-flight check (if any) still completes normally
-        // and harmlessly finds nothing to update.
+        // Queued availability checks reference items that no longer exist in
+        // the now-cleared catalog; an in-flight check (if any) still
+        // completes normally and harmlessly finds nothing to update.
         self.check_queue.clear();
         for (id, _url, _force) in self.thumbnail_queue.drain(..) {
             cx.global_mut::<CoverCache>().in_flight.remove(&id);
         }
-        // If nothing is currently in flight, no pending fetch completion will ever run
-        // `drain_thumbnail_queue`'s empty-queue completion branch — without this, the
-        // aggregated activity item would be left showing "in progress" indefinitely.
+        // If nothing is currently in flight, no pending fetch completion will
+        // ever run `drain_thumbnail_queue`'s empty-queue completion
+        // branch — without this, the aggregated activity item would be
+        // left showing "in progress" indefinitely.
         if self.active_thumbnail_fetches == 0
            && let Some(id) = self.thumbnail_activity_id.take()
         {
@@ -2316,7 +2322,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Thumbnail loading ──────────────────────────────────────────────────────
+    // ── Thumbnail loading
+    // ──────────────────────────────────────────────────────
 
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
     /// cached or in flight.  Must be called before items are added to `catalog`
@@ -2662,9 +2669,10 @@ impl LibraryController {
         }
 
         self.thumbnail_queue.clear();
-        // This forces a fresh full re-fetch batch — reset the processed counter so the
-        // progress bar denominator isn't skewed by whatever fraction of a prior batch
-        // had already completed before this action was invoked.
+        // This forces a fresh full re-fetch batch — reset the processed counter
+        // so the progress bar denominator isn't skewed by whatever
+        // fraction of a prior batch had already completed before this
+        // action was invoked.
         self.thumbnail_processed = 0;
         self.thumbnail_refresh_active = true;
         self.thumbnail_refresh_pending =
@@ -2710,7 +2718,8 @@ impl LibraryController {
         }
     }
 
-    // ── Snapshot ──────────────────────────────────────────────────────────────
+    // ── Snapshot
+    // ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
@@ -2785,7 +2794,8 @@ impl LibraryController {
             .collect()
     }
 
-    // ── Filtered result set ───────────────────────────────────────────────────
+    // ── Filtered result set
+    // ───────────────────────────────────────────────────
 
     /// Recomputes the filtered, sorted item cache from the current catalog,
     /// filter, search query, and sort settings.
@@ -2837,7 +2847,8 @@ impl LibraryController {
              .unwrap_or_default()
     }
 
-    // ── Sidebar filter mutations ──────────────────────────────────────────────
+    // ── Sidebar filter mutations
+    // ──────────────────────────────────────────────
 
     /// Sets the active sidebar filter.
     ///
@@ -2862,7 +2873,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Search mutations ──────────────────────────────────────────────────────
+    // ── Search mutations
+    // ──────────────────────────────────────────────────────
 
     /// Updates the text search query.
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
@@ -2878,11 +2890,13 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Sidebar section search mutations ──────────────────────────────────────
+    // ── Sidebar section search mutations
+    // ──────────────────────────────────────
     //
     // These filter the publishers/collections sidebar lists only. They never
     // touch the catalog cache and are intentionally session-only: closing a
-    // section's search bar clears its query so reopening it always starts fresh.
+    // section's search bar clears its query so reopening it always starts
+    // fresh.
 
     /// Toggles the publishers section's inline search bar, clearing its query
     /// on close.
@@ -2916,7 +2930,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Sort mutations ────────────────────────────────────────────────────────
+    // ── Sort mutations
+    // ────────────────────────────────────────────────────────
 
     /// Sets the sort method.
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
@@ -2988,7 +3003,8 @@ impl LibraryController {
                                                                 self.presentation).save();
     }
 
-    // ── Selection mutations ───────────────────────────────────────────────────
+    // ── Selection mutations
+    // ───────────────────────────────────────────────────
 
     /// Opens the single-click item popover for `id` (see `main-window-tabs`).
     ///
@@ -3062,7 +3078,8 @@ impl LibraryController {
         self.verifying_downloads.clone()
     }
 
-    // ── Item-level availability checks ────────────────────────────────────────
+    // ── Item-level availability checks
+    // ────────────────────────────────────────
 
     /// Returns `true` if an availability check is currently in flight for
     /// catalog item `id` (on-demand or from the periodic queue).
@@ -3124,8 +3141,8 @@ impl LibraryController {
             if let Err(e) = &result
                && e.kind != LibraryServiceErrorKind::NotFound
             {
-                // Transient failure: not evidence of removal, leave the item and
-                // its flag entirely unchanged.
+                // Transient failure: not evidence of removal, leave the item
+                // and its flag entirely unchanged.
                 tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
             }
             this.update(async_cx, |ctrl, cx| {
@@ -3456,7 +3473,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Detail panel width ────────────────────────────────────────────────────
+    // ── Detail panel width
+    // ────────────────────────────────────────────────────
 
     /// Returns the current detail panel width, in pixels.
     #[must_use]
@@ -3474,7 +3492,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Download queue ────────────────────────────────────────────────────────
+    // ── Download queue
+    // ────────────────────────────────────────────────────────
 
     /// Reverts a `Downloaded` entry to `Cloud` status.
     ///
@@ -3964,7 +3983,8 @@ impl LibraryController {
           .detach();
     }
 
-    // ── Theme / density mutations (dispatched via callbacks) ──────────────────
+    // ── Theme / density mutations (dispatched via callbacks)
+    // ──────────────────
 
     /// Applies a new theme key (updates the GPUI global) and persists it via
     /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart
@@ -4081,7 +4101,8 @@ impl LibraryController {
         cx.notify();
     }
 
-    // ── Helper accessors ──────────────────────────────────────────────────────
+    // ── Helper accessors
+    // ──────────────────────────────────────────────────────
 
     /// Returns the selected `LibraryItem`, if any.
     #[must_use]
@@ -5767,7 +5788,8 @@ mod check_batch_tests {
         let batch = select_check_batch(&catalog, 10);
 
         // The recently-checked item is within its cooldown and not due, so it's
-        // excluded; the never-checked item sorts before the long-ago-checked one.
+        // excluded; the never-checked item sorts before the long-ago-checked
+        // one.
         assert_eq!(batch,
                    vec![Arc::clone(&never_checked.id),
                         Arc::clone(&checked_long_ago.id)]);
@@ -5853,7 +5875,8 @@ mod partial_fetch_tests {
 
         let merged = merge_partial_fetch(vec![existing], vec![]);
 
-        // Absence from a partial response proves nothing — the flag must not change.
+        // Absence from a partial response proves nothing — the flag must not
+        // change.
         assert!(!merged[0].is_available);
     }
 
