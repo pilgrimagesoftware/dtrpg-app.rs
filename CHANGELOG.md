@@ -1,4 +1,11 @@
 
+## 0.2.0 - 2026-10-04
+
+### Added
+- Add Report a Feature/Bug menu item and dialog (#243)
+
+
+
 ## 0.1.3 - 2026-10-04
 
 ### Fixed
