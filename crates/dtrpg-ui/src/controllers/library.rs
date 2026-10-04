@@ -117,10 +117,36 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
             .map(|item| (Arc::clone(&item.id), item))
             .collect();
 
+    // The API mints a new `orderProductId` (and thus a new `id`) when a
+    // title's files are republished, so `id` alone isn't stable across a
+    // republish. `product_id` is the catalog SKU and stays constant across
+    // republishes, so it's used as a fallback match for an existing item
+    // whose `id` no longer appears live — without this, a republished title
+    // reconciles as "old id gone" (flagged unavailable) plus "new id new"
+    // (appended), duplicating the entry instead of recognizing it as the
+    // same book.
+    let mut live_id_by_product_id: HashMap<u64, Arc<str>> = HashMap::new();
+    for item in live_by_id.values() {
+        if item.product_id != 0 {
+            live_id_by_product_id.entry(item.product_id)
+                                 .or_insert_with(|| Arc::clone(&item.id));
+        }
+    }
+
     let mut reconciled: Vec<LibraryItem> =
         existing.into_iter()
                 .map(|mut item| {
-                    if let Some(mut live_item) = live_by_id.remove(&item.id) {
+                    let matched_id = if live_by_id.contains_key(&item.id) {
+                        Some(Arc::clone(&item.id))
+                    }
+                    else if item.product_id != 0 {
+                        live_id_by_product_id.get(&item.product_id).cloned()
+                    }
+                    else {
+                        None
+                    };
+
+                    if let Some(mut live_item) = matched_id.and_then(|id| live_by_id.remove(&id)) {
                         let downloaded_by_id: HashMap<Arc<str>, bool> =
                             item.files
                                 .iter()
@@ -144,6 +170,41 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
 
     reconciled.extend(live_by_id.into_values());
     reconciled
+}
+
+/// Collapses catalog entries that share a `product_id` (the catalog SKU)
+/// down to one, keeping the available entry if exactly one of the pair is
+/// available, otherwise the entry with the greater `numeric_id`.
+///
+/// Needed for on-disk caches saved before `reconcile_catalog` learned the
+/// `product_id` fallback match (see its comment): those caches can already
+/// contain a stale-unavailable/new-duplicate pair for a republished title,
+/// which this collapses on load rather than requiring a manual cache clear.
+/// Items with `product_id == 0` (no known SKU) are never deduped against one
+/// another — `0` is used elsewhere in this file as a "SKU unknown" sentinel,
+/// not a real shared identity.
+fn dedupe_by_product_id(items: Vec<LibraryItem>) -> Vec<LibraryItem> {
+    let mut index_by_product_id: HashMap<u64, usize> = HashMap::new();
+    let mut deduped: Vec<LibraryItem> = Vec::with_capacity(items.len());
+    for item in items {
+        if item.product_id == 0 {
+            deduped.push(item);
+            continue;
+        }
+        match index_by_product_id.get(&item.product_id) {
+            Some(&ix) => {
+                let current = (deduped[ix].is_available, deduped[ix].numeric_id);
+                if (item.is_available, item.numeric_id) > current {
+                    deduped[ix] = item;
+                }
+            }
+            None => {
+                index_by_product_id.insert(item.product_id, deduped.len());
+                deduped.push(item);
+            }
+        }
+    }
+    deduped
 }
 
 /// Returns the positions of every not-yet-downloaded file in `files`, in
@@ -396,7 +457,15 @@ fn merge_partial_fetch(mut existing: Vec<LibraryItem>, partial: Vec<LibraryItem>
                        -> Vec<LibraryItem> {
     for mut item in partial {
         item.is_available = true;
-        if let Some(existing_item) = existing.iter_mut().find(|e| e.id == item.id) {
+        // Same `product_id` fallback as `reconcile_catalog`: a republished
+        // title's `id` can change between fetches, so matching on `id` alone
+        // would append a duplicate instead of refreshing the existing entry.
+        let existing_match =
+            existing.iter_mut()
+                    .find(|e| {
+                        e.id == item.id || (item.product_id != 0 && e.product_id == item.product_id)
+                    });
+        if let Some(existing_item) = existing_match {
             *existing_item = item;
         }
         else {
@@ -1055,7 +1124,7 @@ impl LibraryController {
 
             let cached = async_cx
                 .background_executor()
-                .spawn(async move { load_catalog_cache(&cache_root) })
+                .spawn(async move { load_catalog_cache(&cache_root).map(dedupe_by_product_id) })
                 .await;
             if let Some(items) = cached.as_ref() {
                 this.update(async_cx, |ctrl, cx| {
