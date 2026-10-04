@@ -20,15 +20,16 @@ use rust_i18n::t;
 
 use crate::ui::actions::{
     About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
-    SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6, SelectTab7,
-    SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending,
-    SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
+    ReportFeatureBug, SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5,
+    SelectTab6, SelectTab7, SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings,
+    SortAscending, SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
     ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
     open_settings_window, save_library_window_bounds,
 };
+use crate::ui::views::report_feature_bug_dialog::open_report_feature_bug_dialog;
 use crate::ui::views::{
     catalog_view::CatalogView,
     detail_panel_view::render_detail_tab_content,
@@ -1240,6 +1241,9 @@ impl Render for LibraryRootView {
                                 )),
                         )
                 });
+            })
+            .on_action(move |_: &ReportFeatureBug, window, cx| {
+                open_report_feature_bug_dialog(window, cx);
             })
             .on_action(move |_: &ReloadCatalog, _, cx| {
                 controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));

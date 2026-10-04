@@ -290,6 +290,9 @@ pub fn setup(cx: &mut App) {
     // This is a harmless fallback in case the action fires before any
     // window has focus.
     cx.on_action::<About>(|_, _cx| {});
+    // Same fallback shape, for the "Report a Feature/Bug" dialog — see
+    // `LibraryRootView`'s `ReportFeatureBug` handler.
+    cx.on_action::<ReportFeatureBug>(|_, _cx| {});
     cx.on_action::<Minimize>(|_, cx| {
           if let Some(win) = cx.active_window() {
               win.update(cx, |_, window, _| window.minimize_window()).ok();
@@ -569,7 +572,10 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                 ShowAlertHistory,
             ),
         ]),
-        Menu::new(t!("menu.help_title").to_string())
-            .items([MenuItem::action(t!("menu.app_about").to_string(), About)]),
+        Menu::new(t!("menu.help_title").to_string()).items([
+            MenuItem::action(t!("menu.app_about").to_string(), About),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.help_report").to_string(), ReportFeatureBug),
+        ]),
     ]
 }
