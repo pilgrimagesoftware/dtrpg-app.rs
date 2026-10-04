@@ -65,11 +65,13 @@ publisher = "Pilgrimage Software"
 license_file = "../../LICENSE.md"
 copyright = "Copyright (c) 2026 Pilgrimage Software"
 category = "Utility"
+before-packaging-command = "cargo build --release --package dtrpg-core --features sentry"
+icons = ["../../assets/icon/icon.png", "../../assets/icon/icon.icns", "../../assets/icon/icon.ico"]
+
+[package.metadata.packager.macos]
 # Ad-hoc by default; package.yml's Package step substitutes a Developer ID
 # identity here at build time when APPLE_SIGNING_IDENTITY is set.
 signing-identity = "-"
-before-packaging-command = "cargo build --release --package dtrpg-core --features sentry"
-icons = ["../../assets/icon/icon.png", "../../assets/icon/icon.icns", "../../assets/icon/icon.ico"]
 
 [package.metadata.packager.deb]
 depends = ["libsecret-1-0"]
