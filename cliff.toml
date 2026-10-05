@@ -32,8 +32,13 @@ commit_parsers = [
   { message = "^\\w+\\(ci\\)", skip = true },
   { message = "^\\w+\\(internal\\)", skip = true },
   { message = "^\\w+\\(dev\\)", skip = true },
-  { message = "^\\w+\\(release\\)", skip = true },
   { message = "^\\w+\\(openspec\\)", skip = true },
+  # No "(release)" scope-skip here (unlike the Knot/Fernrohr-App template this
+  # was copied from): a `fix(release): ...` can be a genuine user-facing bug
+  # fix in release-relevant application code (e.g. the Sentry client init
+  # path), not just release-tooling/CI maintenance -- blanket-skipping the
+  # scope silently dropped exactly that kind of commit from both the
+  # changelog and the version bump.
   { message = "^chore", skip = true },
   { message = "^ci", skip = true },
   { message = "^test", skip = true },
