@@ -162,17 +162,20 @@ jobs:
             --formats ${{ matrix.formats }} \
             --verbose
 
-      # Fails the job on a missing or broken signature, on the .app itself and
-      # on the copy a user actually installs from the dmg. `--deep` here only
-      # verifies nested code; signing never uses it.
+      # Fails the job on a missing or broken signature, on the dmg itself and
+      # on the copy a user actually installs from it. `--deep` here only
+      # verifies nested code; signing never uses it. No separate check against
+      # the unpacked target/<triple>/release/Libri.app: cargo-packager cleans
+      # that intermediate bundle up once it's been copied into the dmg (see
+      # its "Cleaning ... Libri.app" log line), so by this point the dmg's
+      # own copy is the only one that still exists, and is also the one that
+      # actually matters (it's what ships).
       - name: Verify macOS signatures
         if: matrix.name == 'macOS'
         run: |
           set -euo pipefail
           out=target/${{ matrix.target }}/release
-          app="$out/Libri.app"
           dmg=$(ls "$out"/*.dmg)
-          codesign --verify --deep --strict --verbose=2 "$app"
           codesign --verify --strict --verbose=2 "$dmg"
           mnt=$(mktemp -d)
           # The dmg carries LICENSE.md as a license agreement, which hdiutil
