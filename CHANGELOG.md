@@ -1,4 +1,12 @@
 
+## 0.2.1 - 2026-10-05
+
+### Fixed
+- Use the ClientOptions builder, not a non-exhaustive struct literal
+- Stop git-cliff from skipping fix:/feat: commits scoped "(release)"
+
+
+
 ## 0.2.0 - 2026-10-04
 
 ### Added
