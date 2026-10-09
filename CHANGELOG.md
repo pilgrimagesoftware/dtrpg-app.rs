@@ -1,4 +1,11 @@
 
+## 0.2.2 - 2026-10-09
+
+### Fixed
+- Stop verifying a macOS .app bundle cargo-packager already deleted
+
+
+
 ## 0.2.1 - 2026-10-05
 
 ### Fixed
