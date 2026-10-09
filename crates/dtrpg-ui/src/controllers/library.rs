@@ -1134,7 +1134,15 @@ impl LibraryController {
                     if force_reload {
                         ctrl.catalog.clear();
                     }
-                    ctrl.append_catalog_page(items.clone(), cx);
+                    // Only pre-populate when there's nothing in memory yet (fresh
+                    // controller, or just cleared above) — `append_catalog_page`
+                    // does a plain `extend` with no dedup, so calling it again on an
+                    // already-populated catalog (e.g. a periodic refresh tick after
+                    // the initial load completed, or any later call to
+                    // `start_load`/`start_load_inner`) would duplicate every item.
+                    if ctrl.catalog.is_empty() {
+                        ctrl.append_catalog_page(items.clone(), cx);
+                    }
                 })
                 .ok();
             }
