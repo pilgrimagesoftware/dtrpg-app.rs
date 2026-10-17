@@ -7,8 +7,8 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use dtrpg_ui::credentials::{Credential, CredentialStore, KeyringCredentialStore};
-//! use dtrpg_ui::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
+//! use dtrpg_core::credentials::{Credential, CredentialStore, KeyringCredentialStore};
+//! use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 //! let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
 //! let credential = Credential { service: KEYRING_SERVICE.into(),
 //!                               account: KEYRING_API_KEY.into(),

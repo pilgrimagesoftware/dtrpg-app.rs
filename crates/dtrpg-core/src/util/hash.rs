@@ -10,7 +10,7 @@
 /// # Examples
 ///
 /// ```
-/// use dtrpg_ui::util::hash::fnv1a_32;
+/// use dtrpg_core::util::hash::fnv1a_32;
 ///
 /// assert_eq!(fnv1a_32("same input"), fnv1a_32("same input"));
 /// assert_ne!(fnv1a_32("a"), fnv1a_32("b"));

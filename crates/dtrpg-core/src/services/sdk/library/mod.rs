@@ -6,14 +6,14 @@ mod gateway;
 mod mapping;
 
 use dtrpg_sdk::{IncludedItem, LibraryItemsParams};
-use dtrpg_ui::{
-    data::{library::LibraryItem, token_status::TokenStatusHandle},
-    services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
-};
 
 pub use self::gateway::SdkLibraryGateway;
 use self::gateway::{HttpSdkLibraryGateway, UnavailableSdkGateway};
 use self::mapping::{last_page_from_links, map_order_product, product_lookup, publisher_lookup};
+use crate::{
+    data::{library::LibraryItem, token_status::TokenStatusHandle},
+    services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
+};
 
 /// Library service adapter backed by the Rust SDK.
 pub struct RustSdkLibraryService {
@@ -55,7 +55,7 @@ impl RustSdkLibraryService {
     /// Reads only the API key from the platform keyring; tokens are never
     /// persisted to the keychain. Falls back to [`UnavailableSdkGateway`]
     /// when the API key cannot be found.
-    pub fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens,
+    pub fn from_keyring_with_tokens(tokens: crate::services::LoginTokens,
                                     token_status: TokenStatusHandle)
                                     -> Self {
         match HttpSdkLibraryGateway::from_keyring_with_tokens(tokens, token_status) {

@@ -17,7 +17,13 @@ use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
     SdkError, auth::key_exchange,
 };
-use dtrpg_ui::{
+use tokio::runtime::{Builder, Runtime};
+
+use crate::constants::{
+    ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, REFRESH_TOKEN_ENV,
+    REFRESH_TOKEN_TTL_ENV,
+};
+use crate::{
     credentials::{CredentialStore, KeyringCredentialStore},
     data::{
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
@@ -25,12 +31,6 @@ use dtrpg_ui::{
     },
     services::LoginTokens,
     util::datetime::now_secs,
-};
-use tokio::runtime::{Builder, Runtime};
-
-use crate::constants::{
-    ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, REFRESH_TOKEN_ENV,
-    REFRESH_TOKEN_TTL_ENV,
 };
 
 /// An SDK session plus the runtime that drives it.

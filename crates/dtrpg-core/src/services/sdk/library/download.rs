@@ -10,20 +10,19 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use dtrpg_ui::services::retry::{RetryConfig, retry_with_backoff};
-use dtrpg_ui::services::{LibraryServiceError, LibraryServiceErrorKind};
-
 use super::gateway::SdkLibraryGateway;
 use crate::constants::{
     DOWNLOAD_RETRY_BASE_DELAY_SECS, DOWNLOAD_RETRY_MAX_DELAY_SECS, MAX_DOWNLOAD_ATTEMPTS,
 };
+use crate::services::retry::{RetryConfig, retry_with_backoff};
+use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
 const CHUNK_SIZE: usize = 64 * 1024;
 
 /// Downloads the file identified by `(order_product_id, index)` to `dest`,
 /// via `gateway.prepare_download`, retrying a retryable transfer failure with
 /// exponential backoff. See
-/// [`LibraryService::download_item`](dtrpg_ui::services::LibraryService::download_item)
+/// [`LibraryService::download_item`](crate::services::LibraryService::download_item)
 /// for the cancellation, temp-file, and retry-progress contract.
 pub(super) fn download_item(gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32,
                             dest: &Path, cancel: &AtomicBool,

@@ -2,10 +2,10 @@
 
 use dtrpg_sdk::auth::{credential_login, key_exchange};
 use dtrpg_sdk::{ClientError, config::Config};
-use dtrpg_ui::services::{LoginError, LoginService, LoginTokens};
 use tokio::runtime::{Builder, Runtime};
 
 use crate::constants::API_BASE_URL_ENV;
+use crate::services::{LoginError, LoginService, LoginTokens};
 
 /// [`LoginService`] implementation backed by the DriveThruRPG SDK auth
 /// endpoint.

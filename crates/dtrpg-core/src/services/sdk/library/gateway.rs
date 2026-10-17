@@ -2,10 +2,10 @@
 //! HTTP-backed gateway and a stub used when no credentials are available.
 
 use dtrpg_sdk::{LibraryItemsParams, OrderProductItemResponse, OrderProductListResponse};
-use dtrpg_ui::{data::token_status::TokenStatusHandle, services::LibraryServiceError};
 
 use super::super::connection::{self, SdkConnection};
 use super::errors::{map_client_error, map_connection_error};
+use crate::{data::token_status::TokenStatusHandle, services::LibraryServiceError};
 
 /// SDK operation boundary used by the Rust library service adapter.
 pub trait SdkLibraryGateway: Send + Sync {
@@ -42,7 +42,7 @@ pub(super) struct HttpSdkLibraryGateway {
 impl HttpSdkLibraryGateway {
     /// Reads only the API key from the keyring and uses the provided in-memory
     /// tokens.
-    pub(super) fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens,
+    pub(super) fn from_keyring_with_tokens(tokens: crate::services::LoginTokens,
                                            token_status: TokenStatusHandle)
                                            -> Result<Self, LibraryServiceError> {
         let connection = connection::connect_from_keyring_with_tokens(tokens, token_status)

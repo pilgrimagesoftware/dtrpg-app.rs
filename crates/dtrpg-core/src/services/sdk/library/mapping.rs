@@ -7,13 +7,13 @@ use dtrpg_sdk::{
     IncludedItem, OrderProductAttributes, OrderProductFile, OrderProductInfo, OrderProductItem,
     PaginationLinks,
 };
-use dtrpg_ui::data::{
+
+use crate::constants::{BYTES_PER_MB, DEFAULT_COLOR, DTRPG_IMAGES_BASE_URL};
+use crate::data::{
     enums::ItemStatus,
     library::{LibraryItem, LibraryItemFile},
 };
-use dtrpg_ui::util::datetime::parse_rfc3339_to_epoch;
-
-use crate::constants::{BYTES_PER_MB, DEFAULT_COLOR, DTRPG_IMAGES_BASE_URL};
+use crate::util::datetime::parse_rfc3339_to_epoch;
 
 /// Extracts the last page number from a [`PaginationLinks`] `last` URL.
 ///
@@ -294,11 +294,11 @@ mod tests {
         OrderProductListResponse, OrderProductOrder, OrderProductRelationships, PaginationLinks,
         PaginationMeta, RelationshipData, RelationshipRef,
     };
-    use dtrpg_ui::services::{LibraryService, LibraryServiceError};
 
     use super::super::RustSdkLibraryService;
     use super::super::gateway::SdkLibraryGateway;
     use super::*;
+    use crate::services::{LibraryService, LibraryServiceError};
 
     struct FakeSdkGateway {
         list_result:   Result<OrderProductListResponse, LibraryServiceError>,
@@ -339,7 +339,7 @@ mod tests {
 
         fn prepare_download(&self, _order_product_id: u64, _index: u32)
                             -> Result<serde_json::Value, LibraryServiceError> {
-            Err(LibraryServiceError::new(dtrpg_ui::services::LibraryServiceErrorKind::NotFound,
+            Err(LibraryServiceError::new(crate::services::LibraryServiceErrorKind::NotFound,
                                          "not used"))
         }
     }

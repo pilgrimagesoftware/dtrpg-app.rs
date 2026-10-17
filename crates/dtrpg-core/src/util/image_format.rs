@@ -1,6 +1,6 @@
 //! UI-independent image format sniffing shared by the data-layer disk cache
-//! ([`crate::data::cover_cache`]) and the UI-layer decoded-image cache
-//! ([`crate::ui::library::cover::CoverCache`]).
+//! (`crate::data::cover_cache`) and the UI-layer decoded-image cache
+//! (`dtrpg_ui::ui::library::cover::CoverCache`).
 //!
 //! Neither this module nor its callers in `data/` depend on `gpui` — the UI
 //! layer maps [`ImageKind`] to `gpui::ImageFormat` locally.
@@ -21,7 +21,7 @@ impl ImageKind {
     /// # Examples
     ///
     /// ```
-    /// use dtrpg_ui::util::image_format::ImageKind;
+    /// use dtrpg_core::util::image_format::ImageKind;
     ///
     /// assert_eq!(ImageKind::Png.extension(), "png");
     /// ```
@@ -42,7 +42,7 @@ impl ImageKind {
 /// # Examples
 ///
 /// ```
-/// use dtrpg_ui::util::image_format::{ImageKind, sniff};
+/// use dtrpg_core::util::image_format::{ImageKind, sniff};
 ///
 /// let png_bytes = [0x89, b'P', b'N', b'G', 0x0D, 0x0A];
 /// assert_eq!(sniff(&png_bytes), ImageKind::Png);

@@ -155,8 +155,11 @@ impl StorageConfig {
     /// developer's actual settings the moment `cargo test` runs; this
     /// constructor exists so tests can exercise path-derivation logic without
     /// that side effect.
-    #[cfg(test)]
-    pub(crate) fn for_test(root: PathBuf) -> Self {
+    ///
+    /// Not `#[cfg(test)]`-gated: dtrpg-ui's own tests construct a
+    /// `StorageConfig` across the crate boundary, and `cfg(test)` only
+    /// applies when the crate it's written in is itself under test.
+    pub fn for_test(root: PathBuf) -> Self {
         Self { override_path:                Some(root),
                max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                create_collections:           false,

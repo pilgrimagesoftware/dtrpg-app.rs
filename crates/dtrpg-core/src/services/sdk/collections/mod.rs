@@ -5,7 +5,9 @@ mod gateway;
 
 use std::sync::Arc;
 
-use dtrpg_ui::{
+pub use self::gateway::SdkCollectionsGateway;
+use self::gateway::{HttpSdkCollectionsGateway, UnavailableCollectionsGateway};
+use crate::{
     data::{collection::CollectionEntry, token_status::TokenStatusHandle},
     services::{
         LoginTokens,
@@ -13,9 +15,6 @@ use dtrpg_ui::{
     },
     util::datetime::parse_rfc3339_to_epoch,
 };
-
-pub use self::gateway::SdkCollectionsGateway;
-use self::gateway::{HttpSdkCollectionsGateway, UnavailableCollectionsGateway};
 
 /// Collections service adapter backed by the Rust SDK.
 pub struct RustSdkCollectionsService {

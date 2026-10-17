@@ -8,7 +8,6 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use gpui::Global;
 use serde::Deserialize;
 
 /// When the current access token was acquired and when it expires, as Unix
@@ -55,8 +54,6 @@ fn decode_claims(jwt: &str) -> Option<TokenClaims> {
 /// tokens and the Settings window that displays them see the same value.
 #[derive(Clone, Default)]
 pub struct TokenStatusHandle(Arc<Mutex<Option<TokenStatus>>>);
-
-impl Global for TokenStatusHandle {}
 
 impl TokenStatusHandle {
     /// Records `status` as the current token's.

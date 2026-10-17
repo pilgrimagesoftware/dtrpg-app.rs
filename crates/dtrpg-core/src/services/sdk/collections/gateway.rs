@@ -4,17 +4,17 @@
 use dtrpg_sdk::{
     PageParams, ProductListCollectionResponse, ProductListItem, ProductListItemsResponse,
 };
-use dtrpg_ui::{
+
+use super::super::connection::{self, SdkConnection};
+use super::errors::{map_client_error, map_connection_error};
+use super::{extract_member_id, extract_product_list_item_id};
+use crate::{
     data::token_status::TokenStatusHandle,
     services::{
         LoginTokens,
         collections::{CollectionsServiceError, CollectionsServiceErrorKind},
     },
 };
-
-use super::super::connection::{self, SdkConnection};
-use super::errors::{map_client_error, map_connection_error};
-use super::{extract_member_id, extract_product_list_item_id};
 
 /// SDK operation boundary used by the Rust collections service adapter.
 pub trait SdkCollectionsGateway: Send + Sync {
