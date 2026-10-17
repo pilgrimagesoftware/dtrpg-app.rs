@@ -34,3 +34,14 @@ rusqlite = { version = "0.40.0", default-features = false, features = ["bundled"
 # artifacts; source builds (`cargo build`/`cargo test`/`cargo run` with no
 # explicit feature flags) never pull in the Sentry dependency.
 sentry = ["dep:sentry", "dep:sentry-tracing"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Used by `platform::macos` for iCloud offloaded-file detection
+# (`NSURLUbiquitousItemDownloadingStatusKey`) via `NSURL`'s resource values.
+objc2 = "0.6"
+objc2-foundation = "0.3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Used by `platform::windows` for cloud-placeholder file-attribute detection
+# (`FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`) via `GetFileAttributesW`.
+windows = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }

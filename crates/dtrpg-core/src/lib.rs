@@ -12,5 +12,6 @@ pub mod credentials;
 pub mod data;
 pub mod logging;
 pub mod models;
+pub mod platform;
 pub mod services;
 pub mod util;
