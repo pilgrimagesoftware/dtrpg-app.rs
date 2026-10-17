@@ -63,6 +63,13 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # Non-blocking for now: the 500-line file limit (AGENTS.md) has known
+      # violations awaiting the crate-inversion move and in-flight PRs. The
+      # gate flips to failing once those land -- see docs/adr/0002.
+      - name: Size check (warn only)
+        continue-on-error: true
+        run: make size-check
+
       - name: Test
         run: cargo test --workspace
 
