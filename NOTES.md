@@ -211,11 +211,36 @@ hand-picked single-word titles like my earlier tests used). Fixed with
 `sanitize_fts_query`, tested in isolation. `cargo test --workspace`: 226 in
 dtrpg-core (up from 219), 208 in dtrpg-ui unchanged, clippy and fmt clean.
 
-## Stopped before gap 2 (moving catalog ownership into dtrpg-core)
+## Gap 2 withdrawn, not deferred (resolved 2026-10-17)
+
+The finding below was correct and changed the plan: MBCC confirmed the
+premise behind gap 2 ("the render path should query the index") was wrong,
+not something to work around. This codebase already has an explicit rule
+against it (`AGENTS.md`: "No I/O on the render path -- GPUI re-renders per
+keystroke") -- a local SQLite query is still I/O, and routing live
+search/filter/sort through it on every keystroke would violate that rule
+rather than satisfy the task.
+
+Final architecture, as decided: `self.catalog` stays the synchronous
+in-memory source for the interactive render path, unchanged -- it was
+never broken and does not need touching. The index is a write-mostly
+backing store from the UI's perspective, fed by the same background-
+executor save path that already existed for the JSON cache (exactly what
+the finding below describes already happening). It serves consumers that
+can tolerate an async boundary -- durable persistence, the MCP server, and
+later analytics/tags/smart-collections, each reaching it through
+`LibraryApi` directly, not through a `LibraryController` decomposition.
+
+Gap 1 (this branch's `LibraryApi` extension) is the complete deliverable
+of this task at its corrected scope. Gap 2 is withdrawn outright, not left
+as a TODO -- there is nothing to continue here. The original finding is
+kept below for the record of why the premise was wrong.
+
+### Original finding (what triggered the correction)
 
 Found a concrete timing conflict between "query/filter/sort through the
 index" and the catalog-sync pipeline's existing write pattern, before
-writing any controller code, and I'm not guessing past it.
+writing any controller code, and did not guess past it.
 
 **The finding.** `controllers/library/catalog_sync.rs`'s live-fetch
 completion (around line 648) calls `ctrl.set_catalog(live_items, ...)`
@@ -267,22 +292,19 @@ its behavior":
 
 Any of these is defensible; none is obviously correct without a decision
 from whoever is tracking the regression bar and the "no I/O on render
-path" rule's priority against each other. I did not pick one and proceed,
+path" rule's priority against each other. Not picked one and proceeded,
 per the standing instruction to stop and write a note on a real ambiguity
 rather than guess on a change this size with no one reviewing in real
-time.
+time. See the resolution above: the answer was "none of these -- the
+premise was wrong," not a pick among them.
 
 ## Not touched
 
-Per the brief, explicitly out of scope and untouched: the three
-hand-rolled work queues (thumbnails/downloads/checks) and the shared-Tokio-
-runtime work. Also untouched: every other `controllers/library/` file that
-reads `self.catalog` (`checks.rs`, `thumbnails.rs`, `downloads.rs`,
-`download_dispatch.rs`, `selection.rs`, `bulk_selection.rs`,
-`collections.rs`, `helpers.rs`) -- the brief named the search/filter/sort
-path and the sidebar facet counts specifically, not every catalog reader,
-and the timing conflict above applies to all of them equally if catalog
-ownership genuinely moves.
+The three hand-rolled work queues (thumbnails/downloads/checks) and the
+shared-Tokio-runtime work remain genuinely separate, independent future
+work -- not blocking anything, not part of this task. `LibraryController`
+and every file under `controllers/library/` are unchanged; `self.catalog`
+stays exactly as it was.
 
 ## Verify before continuing
 
