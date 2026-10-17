@@ -189,3 +189,108 @@ cargo test --workspace
 ```
 
 All four are clean as of commit 6fe8509.
+
+---
+
+# library-controller-decomposition implementation status
+
+Branch: `feature/libri-v2-controller-decomposition`, off
+`feature/libri-v2-library-index`. Pushed: commit 2bc0fbc.
+
+## Done
+
+Gap 1 of the brief (`LibraryApi` doesn't call `LibraryIndex` yet): fixed.
+`LibraryApi` now has `index_list_items`, `index_get_item`, `search`,
+`index_count_all`, `index_count_by_status`, `index_count_recently_updated`,
+each opening a `LibraryIndex` over a new `index_root` field and delegating.
+Found and fixed a real pre-existing bug along the way: `LibraryIndex::search`
+passed the raw query string straight into FTS5's `MATCH`, which breaks on
+any title containing an apostrophe, colon, hyphen, or other FTS5 syntax
+character (surfaced by testing against the actual stub catalog instead of
+hand-picked single-word titles like my earlier tests used). Fixed with
+`sanitize_fts_query`, tested in isolation. `cargo test --workspace`: 226 in
+dtrpg-core (up from 219), 208 in dtrpg-ui unchanged, clippy and fmt clean.
+
+## Stopped before gap 2 (moving catalog ownership into dtrpg-core)
+
+Found a concrete timing conflict between "query/filter/sort through the
+index" and the catalog-sync pipeline's existing write pattern, before
+writing any controller code, and I'm not guessing past it.
+
+**The finding.** `controllers/library/catalog_sync.rs`'s live-fetch
+completion (around line 648) calls `ctrl.set_catalog(live_items, ...)`
+synchronously inside a `this.update(cx, ...)` callback -- this updates
+`self.catalog` in memory and emits `LibraryChanged` immediately, which
+triggers a re-render. `save_catalog_cache` (the function that, as of the
+index work, persists to `LibraryIndex`) is called *afterward*, awaited on
+a background executor (lines 658-668) -- there is a real, variable-length
+window between "UI has already re-rendered with the new catalog" and
+"the index actually has that data." The same pattern holds for
+`apply_partial_fetch` (checkpoint saves) and `append_catalog_page`.
+
+**Why this blocks gap 2 as literally stated.** If `invalidate_cache` (or
+the sidebar facet counts) queries the index instead of scanning
+`self.catalog`, a search typed or a facet clicked during that window
+returns stale results -- data the UI already shows as loaded, that the
+index hasn't caught up to persisting yet. On a large catalog or a slow
+disk this window is not hypothetical; it is however long the background
+`save_catalog_cache` write takes. That is a real, user-visible regression
+against this task's own regression bar ("same filter/search/sort results
+for the same inputs must not change"), not a style concern.
+
+**Why I'm not fixing it myself.** Closing the gap means one of several
+real design decisions, none of which are "move this code, don't change
+its behavior":
+
+1. Make the index write synchronous with the in-memory update (inside the
+   same `this.update` callback that calls `set_catalog`). This reintroduces
+   exactly the inline-I/O-on-a-GPUI-callback pattern the background-executor
+   split was written to avoid, for however long an SQLite write of a full
+   catalog replace takes.
+2. Keep `self.catalog` as the fast in-memory source for
+   search/filter/sort/facets (today's behavior, unchanged) and treat the
+   index purely as a persistence/migration/future-query layer the
+   controller doesn't read from for its own render path. This is simplest
+   and risk-free, but it means gap 2 as stated -- "catalog ownership moves
+   into dtrpg-core," "make the query/filter/sort path call LibraryApi" --
+   doesn't actually happen; the index exists and is correct but stays a
+   write-mostly store from the UI's perspective until something else reads
+   it.
+3. Have the controller hold a `LibraryApi`-backed read cache that it
+   refreshes from the index right after each background save completes
+   (so the brief window of staleness is explicit and bounded, not silent),
+   rather than querying the index on every keystroke/filter change. This
+   keeps the "no I/O on the render path" property but is a different
+   design than "call LibraryApi instead of scanning its own Vec" -- it's
+   "call LibraryApi to refresh a Vec, then scan the Vec," which only
+   half-delivers the stated goal.
+
+Any of these is defensible; none is obviously correct without a decision
+from whoever is tracking the regression bar and the "no I/O on render
+path" rule's priority against each other. I did not pick one and proceed,
+per the standing instruction to stop and write a note on a real ambiguity
+rather than guess on a change this size with no one reviewing in real
+time.
+
+## Not touched
+
+Per the brief, explicitly out of scope and untouched: the three
+hand-rolled work queues (thumbnails/downloads/checks) and the shared-Tokio-
+runtime work. Also untouched: every other `controllers/library/` file that
+reads `self.catalog` (`checks.rs`, `thumbnails.rs`, `downloads.rs`,
+`download_dispatch.rs`, `selection.rs`, `bulk_selection.rs`,
+`collections.rs`, `helpers.rs`) -- the brief named the search/filter/sort
+path and the sidebar facet counts specifically, not every catalog reader,
+and the timing conflict above applies to all of them equally if catalog
+ownership genuinely moves.
+
+## Verify before continuing
+
+```sh
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+/Users/paulyhedral/.rustup/toolchains/nightly-aarch64-apple-darwin/bin/cargo-fmt --all -- --check
+```
+
+All four are clean as of commit 2bc0fbc.
