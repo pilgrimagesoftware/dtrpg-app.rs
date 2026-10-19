@@ -51,7 +51,12 @@ impl LibraryController {
         let cache_root = self.cache_root.clone();
         cx.spawn(async move |this, async_cx| {
               let loaded = async_cx.background_executor()
-                                   .spawn(async move { read_tag_library(&cache_root) })
+                                   .spawn(async move {
+                                       eprintln!("DIAG tags: reading");
+                                       let r = read_tag_library(&cache_root);
+                                       eprintln!("DIAG tags: read");
+                                       r
+                                   })
                                    .await;
               this.update(async_cx, |ctrl, cx| match loaded {
                       Ok(library) => ctrl.show_tags(library, generation, cx),

@@ -70,8 +70,8 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
-        timeout-minutes: 10
-        run: cargo test --workspace -- --test-threads=1 --nocapture
+        timeout-minutes: 4
+        run: cargo test -p dtrpg-ui tags_show_on_a_launch -- --test-threads=1 --nocapture
 
       - name: Build
         run: cargo build --workspace

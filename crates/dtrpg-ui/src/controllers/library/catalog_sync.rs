@@ -55,10 +55,12 @@ impl LibraryController {
             let cache_root = storage_root.clone();
             let meta_root = cache_root.clone();
 
+            eprintln!("DIAG load: reading cached catalog");
             let cached = async_cx
                 .background_executor()
                 .spawn(async move { load_catalog_cache(&cache_root).map(dedupe_by_product_id) })
                 .await;
+            eprintln!("DIAG load: cached catalog read");
             if let Some(items) = cached.as_ref() {
                 this.update(async_cx, |ctrl, cx| {
                     if ctrl.load_generation != generation {
@@ -73,15 +75,18 @@ impl LibraryController {
                     // already-populated catalog (e.g. a periodic refresh tick after
                     // the initial load completed, or any later call to
                     // `start_load`/`start_load_inner`) would duplicate every item.
+                    eprintln!("DIAG load: applying cached catalog");
                     if ctrl.catalog.is_empty() {
                         ctrl.append_catalog_page(items.clone(), cx);
                     }
                     // Whatever the network does next, the tags are on disk.
+                    eprintln!("DIAG load: catalog applied, starting tag sync");
                     ctrl.begin_tag_sync(force_reload, cx);
                 })
                 .ok();
             }
 
+            eprintln!("DIAG load: collections stage");
             // ── Stage: collections ──────────────────────────────────────────────
             weak_activity
                 .update(async_cx, |a, cx| {
@@ -104,11 +109,13 @@ impl LibraryController {
                 .ok();
             }
 
+            eprintln!("DIAG load: collections cache done");
             let col_save_root = storage_root.clone();
             let live_collections = async_cx
                 .background_executor()
                 .spawn(async move { collections_service.list_collections() })
                 .await;
+            eprintln!("DIAG load: live collections done");
             match live_collections {
                 Ok(entries) => {
                     let to_save = entries.clone();
@@ -414,6 +421,7 @@ impl LibraryController {
             // Query the network monitor before committing to the paginated fetch —
             // per `rust-resource-network-monitor`, a process needing a specific
             // endpoint stops rather than requesting when it's reported unreachable.
+            eprintln!("DIAG load: before fetch probe");
             let monitor_for_fetch = network_monitor.clone();
             let endpoint_reachable = async_cx
                 .background_executor()
@@ -421,6 +429,7 @@ impl LibraryController {
                     monitor_for_fetch.check_endpoint(dtrpg_core::data::constants::DTRPG_API_HOST)
                 })
                 .await;
+            eprintln!("DIAG load: probe done {endpoint_reachable}");
             if !endpoint_reachable {
                 tracing::debug!("catalog fetch skipped: DriveThruRPG API unreachable");
                 weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx)).ok();
