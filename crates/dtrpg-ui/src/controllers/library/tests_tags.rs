@@ -249,11 +249,18 @@ fn tags_show_on_a_launch_that_is_signed_out(cx: &mut TestAppContext) {
                                ScriptedLibrary::signed_out(),
                                3,
                                Vec::new());
+    eprintln!("DIAG fixture built");
     saved_catalog_with_a_tag(&fixture, &["a", "b"]);
+    eprintln!("DIAG catalog saved");
 
     fixture.controller
            .update(cx, |ctrl, cx| ctrl.start_load(cx));
-    wait_for(cx, |cx| !names_of(&fixture, cx, "a").is_empty());
+    eprintln!("DIAG load started");
+    wait_for(cx, |cx| {
+        eprintln!("DIAG polling");
+        !names_of(&fixture, cx, "a").is_empty()
+    });
+    eprintln!("DIAG tags shown");
 
     assert_eq!(names_of(&fixture, cx, "a"), ["solo"]);
 }
