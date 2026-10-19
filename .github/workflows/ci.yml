@@ -70,7 +70,8 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        timeout-minutes: 10
+        run: cargo test --workspace -- --test-threads=1 --nocapture
 
       - name: Build
         run: cargo build --workspace
