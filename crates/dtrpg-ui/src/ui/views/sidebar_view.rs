@@ -85,12 +85,15 @@ impl SidebarItem for SidebarContent {
             Self::Collections(c) => c.render(id, window, cx).into_any_element(),
             Self::Separator => div().h(px(1.))
                                     .w_full()
-                                    .my_1()
                                     .bg(cx.theme().sidebar_border)
                                     .into_any_element(),
         }
     }
 }
+
+/// The space between the rows of a sidebar list. The sidebar widget's own
+/// default is 8px, which left the lists loose.
+pub(super) const SIDEBAR_ROW_GAP: gpui::Pixels = px(2.);
 
 // ── Collections section (hand-rolled drop target)
 // ──────────────────────────

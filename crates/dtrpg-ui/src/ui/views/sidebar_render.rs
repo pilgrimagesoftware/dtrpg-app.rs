@@ -21,7 +21,8 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
 
     // ── Library smart-filter menu
     // ─────────────────────────────────────────────
-    let lib_menu = SidebarMenu::new().child(nav_item(&t!("sidebar.all_titles"),
+    let lib_menu = SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
+                                     .child(nav_item(&t!("sidebar.all_titles"),
                                                      counts.all,
                                                      active == SidebarFilter::AllTitles,
                                                      SidebarFilter::AllTitles,
@@ -75,7 +76,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     else {
         t!("sidebar.publishers").into()
     };
-    let pub_menu = SidebarMenu::new().child(
+    let pub_menu = SidebarMenu::new().gap(SIDEBAR_ROW_GAP).child(
         SidebarMenuItem::new(pub_title)
             .default_open(publishers_open)
             .click_to_toggle(true)

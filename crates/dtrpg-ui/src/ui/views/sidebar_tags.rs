@@ -11,6 +11,7 @@ use rust_i18n::t;
 use crate::controllers::library::{LibraryController, SidebarSection};
 use crate::data::theme::LibriTheme;
 use crate::ui::library::tag::{color_menu, tag_dot};
+use crate::ui::views::sidebar_view::SIDEBAR_ROW_GAP;
 
 /// Builds the Tags menu: a collapsible header over a row for each tag in
 /// `tags`. `active` is the filter now applied, so its tag is marked.
@@ -22,7 +23,8 @@ pub fn tags_menu(tags: Vec<TagEntry>, open: bool, active: &SidebarFilter,
                                          .map(|tag| tag_row(tag, active, &entity))
                                          .collect();
     let toggle_entity = entity;
-    SidebarMenu::new().child(SidebarMenuItem::new(t!("sidebar.tags").to_string())
+    SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
+                      .child(SidebarMenuItem::new(t!("sidebar.tags").to_string())
         .default_open(open)
         .click_to_toggle(true)
         .on_click(move |_, _, cx| {
