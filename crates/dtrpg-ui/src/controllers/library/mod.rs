@@ -12,6 +12,7 @@ use dtrpg_core::data::enums::*;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
+use dtrpg_core::data::smart_collection::SmartCollectionStore;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::library::{
@@ -61,6 +62,7 @@ mod inspector_actions;
 mod lifecycle;
 mod preferences;
 mod selection;
+mod smart_collections;
 mod tags;
 mod theme_files;
 mod thumbnails;
@@ -77,6 +79,8 @@ mod tests_downloads;
 mod tests_file_tags;
 #[cfg(test)]
 mod tests_inspector;
+#[cfg(test)]
+mod tests_smart_collections;
 #[cfg(test)]
 mod tests_support;
 #[cfg(test)]
@@ -220,6 +224,12 @@ pub struct LibraryController {
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
     pub collection_members:        HashSet<u64>,
+    /// The user's smart collections, kept in a file in the preferences
+    /// directory.
+    smart_collections:             SmartCollectionStore,
+    /// How many items each smart collection holds, by collection id, as of
+    /// the last change to the catalog or the collections.
+    smart_counts:                  HashMap<u64, usize>,
     /// Headless library session: owns the index, work queue, cover fetcher,
     /// network monitor, and (since Slice 2) the catalog-sync state machine.
     /// `Arc` since catalog-sync runs on a background thread while the

@@ -393,6 +393,7 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
             Box::new(UnusedCollections),
             activity.clone(),
             cache_path.clone(),
+            SmartCollectionStore::load_or_set_aside(cache_path.join("smart_collections.toml")),
         );
               // `ctrl.library` was just constructed above and not yet shared
               // with anything else, so this is the one unique reference —

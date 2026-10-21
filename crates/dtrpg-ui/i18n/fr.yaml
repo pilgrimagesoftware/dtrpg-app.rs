@@ -1,4 +1,5 @@
 sidebar:
+  smart_collections: "Collections intelligentes"
   all_titles: "Tous les titres"
   recently_updated: "Mises à jour récentes"
   on_this_device: "Sur cet appareil"
@@ -506,3 +507,8 @@ filters:
   tags: "Étiquettes"
   downloaded: "Sur cet appareil"
   cloud: "Dans le cloud"
+
+smart_collections:
+  delete: "Supprimer la collection intelligente"
+  delete_confirm_title: "Supprimer « {name} » ?"
+  delete_confirm_description: "La collection est supprimée. Les titres qu’elle contient restent dans votre bibliothèque."

@@ -51,7 +51,7 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
         SidebarFilter::OnDevice => item.status == ItemStatus::Downloaded,
         SidebarFilter::InCloud => item.status == ItemStatus::Cloud,
         SidebarFilter::Publisher(name) => item.publisher.as_ref() == name.as_ref(),
-        SidebarFilter::Collection(_, _) => {
+        SidebarFilter::Collection(..) | SidebarFilter::SmartCollection(..) => {
             (item.order_product_id > 0 && collection_members.contains(&item.order_product_id))
             || (item.product_id > 0 && collection_members.contains(&item.product_id))
         }

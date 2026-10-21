@@ -23,6 +23,7 @@ pub mod settings_storage_view;
 pub mod settings_theme_gallery;
 pub mod settings_view;
 pub mod settings_window_view;
+pub mod sidebar_smart;
 pub mod sidebar_tags;
 pub mod sidebar_view;
 pub mod status_bar_view;

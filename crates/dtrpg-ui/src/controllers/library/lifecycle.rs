@@ -39,7 +39,11 @@ impl LibraryController {
                         collections_service: Box<dyn CollectionsService>,
                         activity: Entity<ActivityController>)
                         -> (Self, JobEvents, LibraryEvents) {
-        Self::build_with_cache_root(service, collections_service, activity, cache_dir())
+        Self::build_with_cache_root(service,
+                                    collections_service,
+                                    activity,
+                                    cache_dir(),
+                                    SmartCollectionStore::load())
     }
 
     /// Builds the controller against `cache_root` instead of the real cache
@@ -48,7 +52,8 @@ impl LibraryController {
     pub(super) fn build_with_cache_root(service: Box<dyn LibraryService>,
                                         collections_service: Box<dyn CollectionsService>,
                                         activity: Entity<ActivityController>,
-                                        cache_root: PathBuf)
+                                        cache_root: PathBuf,
+                                        smart_collections: SmartCollectionStore)
                                         -> (Self, JobEvents, LibraryEvents) {
         let vm = LibraryViewModel::new(service);
         let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
@@ -77,6 +82,8 @@ impl LibraryController {
                           selection: Selection::default(),
                           collections_service: Arc::from(collections_service),
                           collection_members: HashSet::new(),
+                          smart_collections,
+                          smart_counts: HashMap::new(),
                           library,
                           thumbnail_activity_id: None,
                           thumbnail_processed: 0,

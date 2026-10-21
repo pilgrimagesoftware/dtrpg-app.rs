@@ -36,9 +36,10 @@ impl Library {
             }
             SidebarFilter::Publisher(name) => ItemFilter { publisher: Some(name),
                                                            ..Default::default() },
-            SidebarFilter::Collection(..) => ItemFilter { collection_member_ids:
-                                                              Some(&view.collection_members),
-                                                          ..Default::default() },
+            SidebarFilter::Collection(..) | SidebarFilter::SmartCollection(..) => {
+                ItemFilter { collection_member_ids: Some(&view.collection_members),
+                             ..Default::default() }
+            }
         }
     }
 
