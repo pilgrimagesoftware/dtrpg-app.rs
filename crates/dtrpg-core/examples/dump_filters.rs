@@ -45,7 +45,9 @@ fn run_step<T, E>(runtime: &tokio::runtime::Handle, name: &str,
                   -> Result<T, Box<dyn Error>>
     where E: Error + 'static {
     eprintln!("{name}...");
-    match runtime.block_on(tokio::time::timeout(STEP_TIMEOUT, step)) {
+    // The timeout is created inside the async block because it needs the
+    // runtime's timer, which exists only while the runtime is running.
+    match runtime.block_on(async { tokio::time::timeout(STEP_TIMEOUT, step).await }) {
         Ok(result) => Ok(result?),
         Err(_) => Err(format!("{name}: no answer after {} seconds; the DriveThruRPG site may \
                                be down",
