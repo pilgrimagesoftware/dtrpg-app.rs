@@ -33,11 +33,16 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
         None
     };
 
-    // Update items_per_row estimate for grid layout using the viewport
-    // width. Subtract a rough sidebar width (220px) and both side
-    // pads.
-    let viewport_w = window.viewport_size().width.as_f32();
-    let usable_w = (viewport_w - 220.0 - pad_side.as_f32() * 2.0).max(0.0);
+    // Update items_per_row for the grid layout from the width the area was
+    // last drawn at, so it shrinks and reflows beside the filters column and
+    // the inspector. Before the first draw, estimate from the window: less a
+    // rough sidebar width (220px).
+    let area_w =
+        view.drawn_width
+            .get()
+            .map_or_else(|| window.viewport_size().width.as_f32() - 220.0,
+                         Pixels::as_f32);
+    let usable_w = (area_w - pad_side.as_f32() * 2.0).max(0.0);
     let card_pitch = density.card_min_width + density.card_gap_x.as_f32();
     view.items_per_row = ((usable_w / card_pitch) as usize).max(1);
 
@@ -46,7 +51,19 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
     let ctrl = view.controller.clone();
     let inspector_entity = view.inspector.clone();
 
-    let outer = div().flex_1().min_h_0().flex().flex_col();
+    let drawn_width = Rc::clone(&view.drawn_width);
+    let view_id = cx.entity_id();
+    let outer = div().flex_1()
+                     .min_h_0()
+                     .flex()
+                     .flex_col()
+                     .on_prepaint(move |bounds, _window, cx| {
+                         if drawn_width.get() != Some(bounds.size.width) {
+                             drawn_width.set(Some(bounds.size.width));
+                             // Lay the cards out again for the new width.
+                             cx.notify(view_id);
+                         }
+                     });
 
     // Non-virtualized branches (grouped Thumbs/Grid, empty/loading states)
     // size their content to its natural height and need `root`

@@ -1,7 +1,9 @@
 //! Catalog view: list, thumbs, and grid layouts with grouping and empty state.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use dtrpg_core::data::enums::*;
@@ -71,6 +73,10 @@ pub struct CatalogView {
     /// Cached items-per-row for the grid layout; updated each render from
     /// the window viewport width. Initialized to 4 as a safe default.
     items_per_row:              usize,
+    /// The width the catalog area was last drawn at, which is what is left
+    /// beside the sidebar, the filters column and the inspector. Written as
+    /// the area is laid out and read by the next render.
+    drawn_width:                Rc<Cell<Option<Pixels>>>,
     /// Cached reference to the controller's grouped items. Compared by Arc
     /// pointer so the grouped list only rebuilds its flattened rows when the
     /// controller cache actually changes, not on every hover-triggered
@@ -236,6 +242,7 @@ impl CatalogView {
                catalog_list_table,
                catalog_grouped_list_table,
                items_per_row: 4,
+               drawn_width: Rc::new(Cell::new(None)),
                grouped_cache: None,
                fitted_items: None }
     }
