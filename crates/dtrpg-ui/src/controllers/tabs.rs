@@ -12,7 +12,7 @@ use gpui::{App, AppContext as _, Context, Entity, Window};
 use gpui_kit::component::table::{TableEvent, TableState};
 
 use crate::controllers::library::LibraryController;
-use crate::data::events::TabsChanged;
+use crate::data::events::{InspectorPopOutRequested, TabsChanged};
 use crate::ui::views::detail_panel_view::{ItemListDelegate, item_list_columns};
 
 /// Identifies a tab in the main window's tab strip.
@@ -46,6 +46,9 @@ pub struct TabsController {
     /// `detail-item-list-column-resize`. Evicted in `close_detail_tab` so
     /// the cache doesn't grow unbounded across a session.
     item_list_tables: HashMap<Arc<str>, Entity<TableState<ItemListDelegate>>>,
+    /// Whether inspectors shown through this controller offer the "open in
+    /// its own window" control. Off for a window that is already popped out.
+    allows_pop_out:   bool,
 }
 
 impl TabsController {
@@ -55,7 +58,30 @@ impl TabsController {
         Self { open_tabs:        vec![TabTarget::Catalog],
                active:           TabTarget::Catalog,
                titles:           HashMap::new(),
-               item_list_tables: HashMap::new(), }
+               item_list_tables: HashMap::new(),
+               allows_pop_out:   true, }
+    }
+
+    /// Creates the controller for a popped-out inspector window. It only
+    /// holds the window's item list state, and its inspector has no pop-out
+    /// control because it is already in its own window.
+    #[must_use]
+    pub fn new_for_pop_out_window() -> Self {
+        Self { allows_pop_out: false,
+               ..Self::new() }
+    }
+
+    /// Whether inspectors shown through this controller offer the pop-out
+    /// control.
+    #[must_use]
+    pub fn allows_pop_out(&self) -> bool {
+        self.allows_pop_out
+    }
+
+    /// Asks the main window to move the inspector for `item_id` into its own
+    /// window.
+    pub fn request_pop_out(&mut self, item_id: Arc<str>, cx: &mut Context<Self>) {
+        cx.emit(InspectorPopOutRequested { item_id });
     }
 
     /// Returns a snapshot of the current tab state.
@@ -167,6 +193,9 @@ impl Default for TabsController {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use super::*;
 
     #[test]
@@ -175,5 +204,29 @@ mod tests {
         let snap = ctrl.snapshot();
         assert_eq!(snap.open_tabs, vec![TabTarget::Catalog]);
         assert!(matches!(snap.active, TabTarget::Catalog));
+    }
+
+    #[test]
+    fn only_the_main_window_offers_pop_out() {
+        assert!(TabsController::new().allows_pop_out());
+        assert!(!TabsController::new_for_pop_out_window().allows_pop_out());
+    }
+
+    #[gpui::test]
+    fn requesting_pop_out_announces_the_item(cx: &mut gpui::TestAppContext) {
+        let requested: Rc<RefCell<Vec<Arc<str>>>> = Rc::default();
+        let tabs = cx.new(|_| TabsController::new());
+        let log = Rc::clone(&requested);
+        cx.update(|cx| {
+              cx.subscribe(&tabs,
+                           move |_tabs, event: &InspectorPopOutRequested, _cx| {
+                               log.borrow_mut().push(Arc::clone(&event.item_id));
+                           })
+                .detach();
+          });
+
+        tabs.update(cx, |tabs, cx| tabs.request_pop_out(Arc::from("item-1"), cx));
+
+        assert_eq!(requested.borrow().as_slice(), [Arc::from("item-1")]);
     }
 }

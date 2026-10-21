@@ -81,6 +81,22 @@ shows a dashed cloud) gets a **Materialize** button next to Download. It asks
 the system for the local copy and waits for it, then checks the file against
 the disk. Opening the file with **Read** does the same automatically.
 
+### Opening an item in its own window
+
+The arrow-out button at the right end of the detail tab's tab row (hover it for
+"Open in its own window") moves the item into a separate window, so you can
+keep it beside the catalog or beside another item. The detail tab closes when
+the window opens. The window shows the same details and actions as the tab.
+
+- Pressing the button again for an item that already has a window brings that
+  window to the front instead of opening a second one.
+- Libri remembers these windows. Where you leave one, and which items have one,
+  carry over to the next launch: quit with a window open and it reopens in the
+  same place. Closing a window yourself means Libri forgets it.
+- If an item leaves your library, its window closes.
+  Libri waits for the catalog to finish loading first, so a window is not
+  closed just because its item has not arrived yet.
+
 ## Bulk selection
 
 Enter bulk-selection mode from the toolbar to check multiple items at once.

@@ -7,7 +7,9 @@
 //! imports, and helpers.
 
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::{
@@ -16,7 +18,7 @@ use dtrpg_core::{
         auth_state::AuthState,
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
         enums::{CatalogPresentation, GroupBy, SelectionField},
-        ui_state::UiState,
+        ui_state::{InspectorWindowPref, UiState},
     },
     services::{LibraryService, collections::CollectionsService},
     util::sort::{SortDirection, SortMethod},
@@ -52,7 +54,8 @@ use crate::ui::actions::{
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
-    install_menus, open_about_window, open_settings_window, save_library_window_bounds,
+    install_menus, open_about_window, open_inspector_window, open_settings_window,
+    save_library_window_bounds,
 };
 use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::{
@@ -78,10 +81,10 @@ use crate::{
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
-            CollectionMemberRemoveFailed, DownloadComplete, DownloadError, LibraryChanged,
-            LogoutRequested, LowDiskSpaceWarning, SettingsChanged, SignInSucceeded,
-            StartupAuthBegun, StartupAuthFailed, TabsChanged, ThumbnailRefreshCompleted,
-            ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
+            CollectionMemberRemoveFailed, DownloadComplete, DownloadError,
+            InspectorPopOutRequested, LibraryChanged, LogoutRequested, LowDiskSpaceWarning,
+            SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed, TabsChanged,
+            ThumbnailRefreshCompleted, ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
     },
@@ -159,6 +162,14 @@ pub struct LibraryRootView {
     /// `About` action to bring an already-open window to front instead of
     /// opening a duplicate; `None` when no About window is open.
     about_window:                Option<WindowHandle<Root>>,
+    /// Handles to the open popped-out inspector windows, by item id. Used to
+    /// bring an item's existing window to front instead of opening a second
+    /// one.
+    inspector_windows:           HashMap<Arc<str>, WindowHandle<Root>>,
+    /// Popped-out inspectors remembered from the last session whose item has
+    /// not reached the catalog yet. Each reopens as soon as its item
+    /// arrives.
+    pending_inspector_restores:  Vec<InspectorWindowPref>,
     /// Editable search input wired to the library controller's search query.
     search_input:                Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
@@ -271,6 +282,8 @@ impl LibraryRootView {
                settings_window: None,
                report_feature_bug_window: None,
                about_window: None,
+               inspector_windows: HashMap::new(),
+               pending_inspector_restores: UiState::load().inspector_windows(),
                search_input: misc.search_input,
                collection_name_input: misc.collection_name_input,
                file_opener_extension_input: misc.file_opener_extension_input,
@@ -296,6 +309,7 @@ impl Render for LibraryRootView {
 }
 
 mod actions;
+mod inspector_windows;
 mod render;
 mod wiring_inputs;
 mod wiring_subscriptions;

@@ -1,7 +1,6 @@
 use dtrpg_core::credentials::{CredentialStore, KeyringCredentialStore};
 use dtrpg_core::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
-use dtrpg_core::data::ui_state::{UiState, WindowBoundsPref};
 use dtrpg_core::services::{
     LibraryService, LoginService, LoginTokens, collections::CollectionsService,
 };
@@ -148,46 +147,6 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     cx.set_global(LibraryWindowHandle { view, window });
 }
 
-/// Resolves the library window's persisted position/size into a
-/// `WindowBounds`, or `None` (falling back to the OS default placement) if
-/// nothing was ever saved, or the saved bounds no longer intersect any
-/// currently connected display.
-fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
-    let saved = UiState::load().library_window_bounds()?;
-    let bounds = Bounds { origin: Point { x: px(saved.x),
-                                          y: px(saved.y), },
-                          size:   Size { width:  px(saved.width),
-                                         height: px(saved.height), }, };
-    let display_bounds: Vec<_> = cx.displays().iter().map(|d| d.bounds()).collect();
-    let fits_a_display = display_bounds.iter().any(|db| bounds.intersects(db));
-    debug!(?saved,
-           ?bounds,
-           ?display_bounds,
-           fits_a_display,
-           "restoring library window bounds");
-    fits_a_display.then_some(WindowBounds::Windowed(bounds))
-}
-
-/// Saves the library window's current position/size to `UiState`.
-///
-/// Called both on every live resize/move (via `LibraryRootView`'s
-/// `observe_window_bounds` subscription) and once more just before the
-/// window closes (mirroring `open_settings_window`'s existing
-/// `on_window_should_close` pattern), so the saved bounds stay current even
-/// if the close hook doesn't fire for a given quit path.
-pub fn save_library_window_bounds(window: &Window) {
-    let bounds = window.bounds();
-    debug!(?bounds, "saving library window bounds");
-    UiState::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
-                                                                  y:      bounds.origin.y.as_f32(),
-                                                                  width:  bounds.size
-                                                                                .width
-                                                                                .as_f32(),
-                                                                  height: bounds.size
-                                                                                .height
-                                                                                .as_f32(), });
-}
-
 /// The smallest the settings window can be resized to: wide enough for its
 /// page list beside a page's content, and tall enough for a page's first
 /// rows.
@@ -275,8 +234,15 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
 #[allow(clippy::expect_used)]
 #[path = "about.rs"]
 mod about;
+#[path = "inspector_window.rs"]
+mod inspector_window;
+#[path = "window_bounds.rs"]
+mod window_bounds;
 
 pub use about::open_about_window;
+pub use inspector_window::{ShuttingDown, open_inspector_window, remember_window};
+use window_bounds::restore_library_window_bounds;
+pub use window_bounds::save_library_window_bounds;
 
 /// Initializes the GPUI application and routes to the login or library window.
 ///
@@ -319,7 +285,12 @@ pub fn setup(cx: &mut App) {
                   KeyBinding::new("cmd-9", SelectTab9, None)]);
 
     // App-level action handlers
-    cx.on_action::<Quit>(|_, cx| cx.quit());
+    cx.on_action::<Quit>(|_, cx| {
+          // Popped-out inspector windows close as the app quits; this marker
+          // tells them to stay remembered for the next launch.
+          cx.set_global(ShuttingDown);
+          cx.quit();
+      });
     cx.on_action::<HideApplication>(|_, cx| cx.hide());
     cx.on_action::<HideOthers>(|_, cx| cx.hide_other_apps());
     // The real handler lives on `LibraryRootView` (opens the About dialog).

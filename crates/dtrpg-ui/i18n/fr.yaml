@@ -104,6 +104,7 @@ detail:
   tooltip_offloaded_download: "Téléchargé, mais les données locales ont été déchargées vers iCloud"
   tooltip_verifying_download: "Vérification du statut de téléchargement…"
   refresh_thumbnail_tooltip: "Actualiser la vignette"
+  pop_out_tooltip: "Ouvrir dans sa propre fenêtre"
   field_system: "Système"
   field_category: "Type"
   field_format: "Format"
