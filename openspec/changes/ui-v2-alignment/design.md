@@ -116,13 +116,14 @@ more: the docked pane and the pop-out window replace the detail tab.
 - **Single-click** selects an item, and the pane shows it. The old popover is
   gone.
 - **Double-click** pops the item out into its own window. The pop-out window
-  uses the same layout as the pane, without the pane's pop-out and close
-  buttons.
+  uses the same layout as the pane, with a pop back button in place of the
+  pane's pop-out and close buttons.
 - **Read** on an item with several files shows its Files tab, where the file is
   chosen.
-- The pane opens and closes from **View > Show Inspector** (Alt+Cmd+I) and its
-  close button. Its width is dragged at its left edge. Both are remembered.
-- With nothing selected the pane asks for a selection.
+- The pane is shown while an item is selected and closes when nothing is. Its
+  close button clears the selection. Its width is dragged at its left edge and
+  remembered.
+- A popped-out window has a button that puts the item back in the pane.
 - The tab strip, the Window menu's tab items and Cmd+0 to Cmd+9 are removed.
   The Collections tab folds into Info, which now lists the description, tags,
   collections, details, Opens With and the collapsed other details.

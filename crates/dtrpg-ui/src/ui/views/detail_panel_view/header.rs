@@ -3,11 +3,11 @@ use dtrpg_core::data::constants::INSPECTOR_THUMBNAIL_WIDTH;
 use super::*;
 
 /// Renders the inspector's header: the cover thumbnail beside the title,
-/// publisher and "System · Type" line. In the docked pane, `pane_controls`
-/// adds the buttons that pop the item out into its own window and close the
-/// pane.
+/// publisher and "System · Type" line, and the buttons at the top right. The
+/// docked pane offers popping the item out into its own window and closing the
+/// pane; a popped-out window offers putting the item back in the pane.
 pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Arc<Image>>,
-                                      pane_controls: Option<&Entity<InspectorController>>,
+                                      inspector: &Entity<InspectorController>,
                                       controller: Entity<LibraryController>,
                                       colors: &ColorTokens, cx: &App)
                                       -> AnyElement {
@@ -30,23 +30,29 @@ pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Ar
                                             true).into_any_element(),
         };
 
+    // The title takes the room the status glyphs leave and wraps within it, so
+    // a long title never runs under the buttons.
     let title_block =
         div().flex_1()
              .min_w_0()
+             .overflow_hidden()
              .flex()
              .flex_col()
              .gap(px(2.0))
              .child(div().flex()
-                         .items_center()
+                         .items_start()
                          .gap(px(6.0))
                          .child(selectable_text("inspector-title", snapshot.title.to_string())
+                                    .flex_1()
+                                    .min_w_0()
                                     .text_lg()
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
                                     .text_color(colors.text_primary))
-                         .child(render_status_icon(is_downloaded,
-                                                   item.is_offloaded(),
-                                                   is_verifying,
-                                                   colors.text_secondary))
+                         .child(div().flex_none()
+                                     .child(render_status_icon(is_downloaded,
+                                                               item.is_offloaded(),
+                                                               is_verifying,
+                                                               colors.text_secondary)))
                          .children(render_checking_indicator(is_checking)))
              .child(selectable_text("inspector-publisher", snapshot.publisher.to_string())
                         .text_sm()
@@ -65,36 +71,53 @@ pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Ar
                                        thumbnail_height,
                                        controller.clone()))
          .child(title_block)
-         .children(pane_controls.map(|inspector| render_pane_controls(&item.id, inspector)))
+         .child(render_header_buttons(&item.id, inspector, cx))
          .into_any_element()
 }
 
-/// The two buttons at the top right of the docked pane: pop the item out into
-/// its own window, and close the pane.
-fn render_pane_controls(item_id: &Arc<str>, inspector: &Entity<InspectorController>) -> AnyElement {
-    let pop_out_id = Arc::clone(item_id);
-    let pop_out_inspector = inspector.clone();
-    let close_inspector = inspector.clone();
-    div().flex_none()
-         .flex()
-         .gap(px(2.0))
-         .child(Button::new("inspector-pop-out").ghost()
-                                                .compact()
-                                                .icon(IconName::ExternalLink)
-                                                .tooltip(t!("detail.pop_out_tooltip"))
-                                                .on_click(move |_, _, cx| {
-                                                    pop_out_inspector.update(cx, |inspector, cx| {
-                                                        inspector.request_pop_out(Arc::clone(&pop_out_id), cx)
+/// The buttons at the top right of the header, which depend on where the
+/// inspector is shown.
+fn render_header_buttons(item_id: &Arc<str>, inspector: &Entity<InspectorController>, cx: &App)
+                         -> AnyElement {
+    let buttons = div().flex_none().flex().gap(px(2.0));
+    match inspector.read(cx).placement() {
+        InspectorPlacement::Docked => {
+            let pop_out_id = Arc::clone(item_id);
+            let pop_out_inspector = inspector.clone();
+            let close_inspector = inspector.clone();
+            buttons.child(Button::new("inspector-pop-out")
+                              .ghost()
+                              .compact()
+                              .icon(IconName::ExternalLink)
+                              .tooltip(t!("detail.pop_out_tooltip"))
+                              .on_click(move |_, _, cx| {
+                                  pop_out_inspector.update(cx, |inspector, cx| {
+                                      inspector.request_pop_out(Arc::clone(&pop_out_id), cx)
+                                  });
+                              }))
+                   .child(Button::new("inspector-close")
+                              .ghost()
+                              .compact()
+                              .icon(IconName::Close)
+                              .tooltip(t!("detail.close_inspector_tooltip"))
+                              .on_click(move |_, _, cx| {
+                                  close_inspector.update(cx, |inspector, cx| {
+                                                     inspector.request_close(cx)
+                                                 });
+                              }))
+        }
+        InspectorPlacement::Window => {
+            let pop_back_inspector = inspector.clone();
+            buttons.child(Button::new("inspector-pop-back")
+                              .ghost()
+                              .compact()
+                              .icon(IconName::PanelRightOpen)
+                              .tooltip(t!("detail.pop_back_tooltip"))
+                              .on_click(move |_, _, cx| {
+                                  pop_back_inspector.update(cx, |inspector, cx| {
+                                                        inspector.request_pop_back(cx)
                                                     });
-                                                }))
-         .child(Button::new("inspector-close").ghost()
-                                              .compact()
-                                              .icon(IconName::Close)
-                                              .tooltip(t!("detail.close_inspector_tooltip"))
-                                              .on_click(move |_, _, cx| {
-                                                  close_inspector.update(cx, |inspector, cx| {
-                                                                     inspector.request_close(cx)
-                                                                 });
-                                              }))
-         .into_any_element()
+                              }))
+        }
+    }.into_any_element()
 }

@@ -256,6 +256,12 @@ pub struct InspectorPopOutRequested {
 
 impl EventEmitter<InspectorPopOutRequested> for InspectorController {}
 
+/// Emitted by a popped-out inspector window when the user asks to put its item
+/// back in the docked pane.
+pub struct InspectorPopBackRequested;
+
+impl EventEmitter<InspectorPopBackRequested> for InspectorController {}
+
 /// Emitted when something asks for an item to be shown in the docked pane, on
 /// a given tab, opening the pane if it is closed.
 pub struct InspectorShowRequested {

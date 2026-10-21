@@ -156,8 +156,6 @@ pub fn build_menus_for(kind: PlatformKind, state: &ViewMenuState) -> Vec<Menu> {
             ),
             MenuItem::separator(),
             MenuItem::action(t!("menu.focus_search").to_string(), FocusSearch),
-            MenuItem::action(t!("menu.view_show_inspector").to_string(), ToggleInspector)
-                .checked(state.inspector_open),
         ]),
         Menu::new(t!("menu.window_title").to_string()).items([
             MenuItem::action(t!("menu.window_minimize").to_string(), Minimize),
@@ -225,29 +223,5 @@ mod tests {
         assert!(file.items
                     .iter()
                     .all(|item| !matches!(item, MenuItem::SystemMenu(_))));
-    }
-
-    /// Whether the View menu's Show Inspector item is ticked, given whether the
-    /// inspector is open; `None` if the menu has no such item.
-    fn show_inspector_is_ticked(inspector_open: bool) -> Option<bool> {
-        let state = ViewMenuState { inspector_open,
-                                    ..ViewMenuState::default() };
-        let menus = build_menus_for(PlatformKind::MacOs, &state);
-        let view = menus.iter()
-                        .find(|menu| menu.name.as_ref() == t!("menu.view_title"))?;
-        view.items.iter().find_map(|item| match item {
-                             MenuItem::Action { name, checked, .. }
-                                 if name.as_ref() == t!("menu.view_show_inspector") =>
-                             {
-                                 Some(*checked)
-                             }
-                             _ => None,
-                         })
-    }
-
-    #[test]
-    fn the_view_menu_ticks_show_inspector_while_the_inspector_is_open() {
-        assert_eq!(show_inspector_is_ticked(true), Some(true));
-        assert_eq!(show_inspector_is_ticked(false), Some(false));
     }
 }

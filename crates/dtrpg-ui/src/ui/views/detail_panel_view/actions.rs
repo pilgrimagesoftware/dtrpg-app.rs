@@ -30,7 +30,7 @@ fn read_button(item: &LibraryItem, is_downloaded: bool, controller: Entity<Libra
     let read_item = item.clone();
     Button::new("inspector-read").primary()
                                  .icon(IconName::BookOpen)
-                                 .label(t!("detail.read_button").to_string())
+                                 .tooltip(t!("detail.read_button"))
                                  .disabled(!is_downloaded)
                                  .when(!is_downloaded, |button| {
                                      button.tooltip(format!("{}\n{}",
@@ -69,14 +69,24 @@ fn open_item_for_reading(entry_dir: &Path, item: &LibraryItem,
     }
 }
 
-/// Downloads the item, through the download sheet where one applies, or asks
-/// to remove the download if it is already there.
+/// Downloads the item, through the download sheet where one applies. Once the
+/// item is downloaded the button only shows that; holding Shift while clicking
+/// it asks to remove the download.
 fn download_button(item: &LibraryItem, is_downloaded: bool,
                    controller: Entity<LibraryController>, cx: &App)
                    -> Button {
     let is_verifying = controller.read(cx).is_verifying_downloads(&item.id);
     let item_id = Arc::clone(&item.id);
     let title = item.title.to_string();
+    let tooltip = if is_verifying {
+        t!("detail.tooltip_verifying_download")
+    }
+    else if is_downloaded {
+        t!("detail.downloaded_tooltip")
+    }
+    else {
+        t!("detail.download_sheet_button")
+    };
     Button::new("inspector-download").ghost()
                                      .outline()
                                      .disabled(is_verifying)
@@ -87,22 +97,16 @@ fn download_button(item: &LibraryItem, is_downloaded: bool,
                                            else {
                                                IconName::ArrowDown
                                            })
-                                     .label(if is_downloaded {
-                                                t!("detail.downloaded_button").to_string()
-                                            }
-                                            else {
-                                                t!("detail.download_sheet_button").to_string()
-                                            })
-                                     .when(is_verifying, |button| {
-                                         button.tooltip(t!("detail.tooltip_verifying_download"))
-                                     })
-                                     .on_click(move |_, window, cx| {
+                                     .tooltip(tooltip)
+                                     .on_click(move |event, window, cx| {
                                          if is_downloaded {
-                                             confirm_remove_download(window,
-                                                                     cx,
-                                                                     controller.clone(),
-                                                                     Arc::clone(&item_id),
-                                                                     title.clone());
+                                             if event.modifiers().shift {
+                                                 confirm_remove_download(window,
+                                                                         cx,
+                                                                         controller.clone(),
+                                                                         Arc::clone(&item_id),
+                                                                         title.clone());
+                                             }
                                          }
                                          else if let Some(sheet) =
                                              controller.read(cx).download_sheet_for(&item_id)
@@ -156,14 +160,15 @@ fn materialize_button(item: &LibraryItem, controller: Entity<LibraryController>)
                                         })
 }
 
-/// The menu at the end of the row: show the files in the file manager, and
-/// fetch the cover again.
+/// The menu at the end of the row: show the files in the file manager, remove
+/// the download, and fetch the cover again.
 fn more_menu(item: &LibraryItem, storage_root_path: &Path, is_downloaded: bool,
              controller: Entity<LibraryController>)
              -> impl IntoElement {
     let item_path = dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
     let has_cover = item.detail_cover_url.is_some() || item.cover_url.is_some();
     let item_id = Arc::clone(&item.id);
+    let title = item.title.to_string();
     Button::new("inspector-more").ghost()
                                  .outline()
                                  .icon(IconName::EllipsisVertical)
@@ -172,9 +177,21 @@ fn more_menu(item: &LibraryItem, storage_root_path: &Path, is_downloaded: bool,
                                      let reveal_path = item_path.clone();
                                      let refresh_controller = controller.clone();
                                      let refresh_id = Arc::clone(&item_id);
+                                     let remove_controller = controller.clone();
+                                     let remove_id = Arc::clone(&item_id);
+                                     let remove_title = title.clone();
                                      menu.item(PopupMenuItem::new(platform_reveal_label())
                                                .disabled(!is_downloaded)
                                                .on_click(move |_, _, _| reveal(&reveal_path)))
+                                         .item(PopupMenuItem::new(t!("catalog.action_remove_download"))
+                                               .disabled(!is_downloaded)
+                                               .on_click(move |_, window, cx| {
+                                                   confirm_remove_download(window,
+                                                                           cx,
+                                                                           remove_controller.clone(),
+                                                                           Arc::clone(&remove_id),
+                                                                           remove_title.clone());
+                                               }))
                                          .item(PopupMenuItem::new(t!("detail.refresh_thumbnail_tooltip"))
                                                .disabled(!has_cover)
                                                .on_click(move |_, _, cx| {

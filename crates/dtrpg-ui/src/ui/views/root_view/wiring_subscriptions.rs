@@ -144,7 +144,7 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
 
     cx.subscribe(inspector,
                  |this, _inspector, _event: &InspectorCloseRequested, cx| {
-                     this.set_inspector_open(false, cx);
+                     this.close_inspector_pane(cx);
                  })
       .detach();
 

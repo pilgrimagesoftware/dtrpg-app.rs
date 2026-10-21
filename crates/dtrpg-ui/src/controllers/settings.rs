@@ -33,6 +33,10 @@ use crate::data::events::{
 };
 use crate::data::token_status_global::TokenStatusGlobal;
 
+/// Index of the File Openers page of the settings window, for opening the
+/// settings on it.
+pub const FILE_OPENERS_PAGE_IX: usize = 3;
+
 /// State for one Appearance-page font picker: a searchable list of every
 /// font name installed on the user's system (see
 /// `cx.text_system().all_font_names()`), not a curated list.

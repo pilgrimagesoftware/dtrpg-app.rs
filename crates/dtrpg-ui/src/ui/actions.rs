@@ -56,5 +56,4 @@ actions!(libri,
           SortDescending,
           ToggleGroupByPublisher,
           ToggleGroupByTag,
-          ToggleInspector,
           FocusSearch,]);

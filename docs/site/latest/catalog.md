@@ -83,30 +83,32 @@ empty library says so instead.
 
 ## Viewing an item
 
-The inspector sits beside the catalog and shows the item you have selected.
+The inspector sits beside the catalog and shows the item you have selected. It
+opens when you select an item and closes when nothing is selected.
 
 - **Single-click** a catalog entry to select it and see it in the inspector.
 - **Double-click** to open it in a window of its own (see
   [Opening an item in its own window](#opening-an-item-in-its-own-window)).
-- **View > Show Inspector** (or the close button at the top right of the
-  inspector) shows and hides it. Libri remembers whether it was open.
+- The close button at the top right of the inspector clears the selection and
+  closes it.
 - Drag the inspector's left edge to make it wider or narrower. Libri remembers
-  the width too.
-
-With nothing selected, the inspector asks you to select an item.
+  the width.
 
 ### The inspector
 
 At the top are the cover, the title, the publisher and the item's game system
 and type (for example "D&D 5E · Adventure"), when the catalog has them. Under
-that are the buttons: **Read**, **Download…** (or **Downloaded**), and a **⋮**
-menu with Show in Finder (Explorer, Files) and Refresh thumbnail. Its tabs are:
+that are the buttons: **Read** and **Download…**, which show icons (hover for
+their names), and a **⋮** menu with Show in Finder (Explorer, Files), Remove
+download and Refresh thumbnail. Once an item is downloaded, its button shows a
+check mark and only reports that; hold Shift while clicking it, or use the ⋮
+menu, to remove the download. Its tabs are:
 
 - **Info** - the description, the item's tags, the collections it belongs to,
   a table of its details (the Type row is the content category DriveThruRPG
   files it under), and which application opens the item's file type. That
   application is the system default unless you set one in Settings > File
-  Openers. A collapsed "Other details" section holds the ids.
+  Openers, which the hint under it links to. A collapsed "Other details" section holds the ids.
 - **Files** - each file with its size and download state, with a count beside
   the tab's name. For an item with several files this is the list you pick
   from. **Verify on disk** checks the files against the disk right away and
@@ -137,9 +139,10 @@ the disk. Opening the file with **Read** does the same automatically.
 Double-click an item, or press the arrow-out button at the top right of the
 inspector (hover it for "Open in its own window"), to move the item into a
 separate window, so you can keep it beside the catalog or beside another item.
-The window has the same layout, details and actions as the inspector, without
-the inspector's own buttons. If the inspector was showing that item, it goes
-back to asking you to select one.
+The window has the same layout, details and actions as the inspector. Its
+button at the top right puts the item back: the window closes and the item is
+selected in the main window, which shows it in the inspector. If the inspector
+was showing that item when you opened the window, it closes.
 
 - Opening an item that already has a window brings that window to the front
   instead of opening a second one.
