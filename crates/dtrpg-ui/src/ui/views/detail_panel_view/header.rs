@@ -14,8 +14,6 @@ pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Ar
     let view_model = InspectorViewModel::new(item);
     let snapshot = view_model.snapshot();
     let is_checking = controller.read(cx).is_checking(&item.id);
-    let is_verifying = controller.read(cx).is_verifying_downloads(&item.id);
-    let is_downloaded = item.status == ItemStatus::Downloaded;
 
     let thumbnail_height = INSPECTOR_THUMBNAIL_WIDTH * 10.0 / 7.0;
     let thumbnail: AnyElement =
@@ -30,8 +28,8 @@ pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Ar
                                             true).into_any_element(),
         };
 
-    // The title takes the room the status glyphs leave and wraps within it, so
-    // a long title never runs under the buttons.
+    // The title takes the room the checking indicator leaves and wraps within
+    // it, so a long title never runs under the buttons.
     let title_block =
         div().flex_1()
              .min_w_0()
@@ -48,11 +46,6 @@ pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Ar
                                     .text_lg()
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
                                     .text_color(colors.text_primary))
-                         .child(div().flex_none()
-                                     .child(render_status_icon(is_downloaded,
-                                                               item.is_offloaded(),
-                                                               is_verifying,
-                                                               colors.text_secondary)))
                          .children(render_checking_indicator(is_checking)))
              .child(selectable_text("inspector-publisher", snapshot.publisher.to_string())
                         .text_sm()
