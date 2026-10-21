@@ -116,6 +116,13 @@ menu with Show in Finder (Explorer, Files) and Refresh thumbnail. Its tabs are:
   when, and its length in tokens. Items without a summary say so. The tab only
   shows summaries; they are written elsewhere for now, for example by an agent
   through the MCP server.
+- **Cover** - the cover as wide as the inspector. An item with no image shows
+  its generated cover.
+
+Double-click the small cover at the top of the inspector, or the cover on the
+Cover tab, to open it in a window of its own at the largest size the window
+allows. Resize the window to suit; press Escape to close it. The full-size image
+is fetched the first time you ask for it, so it can take a moment to appear.
 
 Reading an item that has several files shows its Files tab, so you can choose
 which file to open.

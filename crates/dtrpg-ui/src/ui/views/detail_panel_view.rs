@@ -164,6 +164,7 @@ pub fn render_inspector(context: InspectorContext<'_>, window: &mut Window, cx: 
 }
 
 mod actions;
+mod cover;
 mod header;
 mod info_tab;
 
@@ -175,6 +176,7 @@ mod other_details;
 mod sections;
 
 use actions::*;
+use cover::*;
 use header::*;
 use info_tab::*;
 use inspector::*;

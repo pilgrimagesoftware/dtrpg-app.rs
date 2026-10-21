@@ -59,12 +59,11 @@ pub(super) fn render_inspector_header(item: &LibraryItem, cover_image: Option<Ar
          .items_start()
          .gap(px(12.0))
          .p(px(16.0))
-         .child(div().flex_none()
-                     .w(px(INSPECTOR_THUMBNAIL_WIDTH))
-                     .h(px(thumbnail_height))
-                     .rounded(px(4.0))
-                     .overflow_hidden()
-                     .child(thumbnail))
+         .child(render_clickable_cover(item,
+                                       thumbnail,
+                                       INSPECTOR_THUMBNAIL_WIDTH,
+                                       thumbnail_height,
+                                       controller.clone()))
          .child(title_block)
          .children(pane_controls.map(|inspector| render_pane_controls(&item.id, inspector)))
          .into_any_element()

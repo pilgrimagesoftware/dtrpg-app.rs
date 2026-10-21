@@ -16,6 +16,7 @@ pub enum InspectorTab {
     Files,
     Contents,
     Summary,
+    Cover,
 }
 
 /// State of the lazily loaded archive contents tab.

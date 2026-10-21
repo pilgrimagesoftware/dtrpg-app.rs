@@ -128,7 +128,9 @@ more: the docked pane and the pop-out window replace the detail tab.
   collections, details, Opens With and the collapsed other details.
 - Left for later: a toolbar button for the pane, choosing the opener from
   Opens With (it only shows the current one), the Location row (needs slice 1),
-  and the Cover tab and full-size cover viewer.
+  and the Cover tab and full-size cover viewer. The last of these followed in
+  the next change: the Cover tab, and a viewer window opened by double-clicking
+  the thumbnail or the cover.
 
 ## Open questions
 

@@ -3,6 +3,7 @@ pub mod activity_panel_view;
 pub mod alert_history_view;
 pub mod bulk_action_bar_view;
 pub mod catalog_view;
+pub mod cover_viewer_view;
 pub mod detail_panel_view;
 pub mod download_sheet_dialog;
 pub mod inspector_window_view;
