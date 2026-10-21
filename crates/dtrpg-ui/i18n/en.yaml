@@ -82,10 +82,12 @@ search:
   collections_placeholder: "Search collections…"
 
 catalog:
-  no_titles_match: "No titles match."
+  no_titles_match: "No titles match these filters."
   library_empty: "Your library is empty."
-  try_clear_search: "Try clearing your search."
-  try_different_section: "Try selecting a different section."
+  try_clear_search: "Clear the search to see more titles."
+  try_clear_search_and_section: "Clear the search, or go back to all titles."
+  show_all_titles: "Show all titles"
+  try_different_section: "Choose a different section, or go back to all titles."
   col_title: "Title"
   col_publisher: "Publisher"
   col_system: "System"

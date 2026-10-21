@@ -307,6 +307,7 @@ mod grid;
 mod grouped_delegate;
 mod list_cell;
 mod list_delegate;
+mod loading_skeleton;
 mod render;
 mod thumb_row;
 
@@ -315,4 +316,5 @@ use grid::*;
 use grouped_delegate::*;
 pub(crate) use list_cell::*;
 use list_delegate::*;
+use loading_skeleton::render_loading_skeleton;
 use thumb_row::*;
