@@ -5,6 +5,7 @@
 //! the search text, so the search box, the chips and the column always agree,
 //! and a search typed by hand shows up as checked boxes.
 
+use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::data::index::FacetCount;
 use dtrpg_core::library::Facets;
 use dtrpg_core::util::search::{Field, SearchQuery};
@@ -66,6 +67,28 @@ fn counts_for(facets: &Facets, field: Field) -> &[FacetCount] {
         Field::Tag => &facets.tags,
         Field::Publisher => &[],
     }
+}
+
+/// The facets without the values the user hides. A hidden value still works
+/// in a search and still shows as a chip when it is applied; it is only left
+/// out of the column.
+#[must_use]
+pub fn without_hidden_values(facets: &Facets, choices: &FilterValueChoices) -> Facets {
+    let kept = |field: Field, counts: &[FacetCount]| -> Vec<FacetCount> {
+        counts.iter()
+              .filter(|count| {
+                  field.category()
+                       .is_none_or(|category| choices.is_shown(category, &count.value))
+              })
+              .cloned()
+              .collect()
+    };
+    Facets { availability: facets.availability.clone(),
+             systems:      kept(Field::System, &facets.systems),
+             types:        kept(Field::Type, &facets.types),
+             formats:      kept(Field::Format, &facets.formats),
+             genres:       kept(Field::Genre, &facets.genres),
+             tags:         facets.tags.clone(), }
 }
 
 /// Renders one facet: a heading and a checkbox with a count for each value.
@@ -205,6 +228,30 @@ mod tests {
         {
             assert_ne!(t!(key).to_string(), key, "{key} has no text");
         }
+    }
+
+    #[test]
+    fn hidden_values_are_left_out_of_the_column() {
+        let counts = |names: &[&str]| -> Vec<FacetCount> {
+            names.iter()
+                 .map(|name| FacetCount { value: (*name).to_owned(),
+                                          count: 1, })
+                 .collect()
+        };
+        let facets = Facets { formats: counts(&["PDF", "Creation Method"]),
+                              genres: counts(&["Horror"]),
+                              ..Facets::default() };
+        let mut choices = FilterValueChoices::default();
+        choices.set_shown("Genre", "Horror", false);
+
+        let shown = without_hidden_values(&facets, &choices);
+
+        assert_eq!(shown.formats,
+                   counts(&["PDF"]),
+                   "the app hides Creation Method by default");
+        assert!(shown.genres.is_empty());
+        choices.set_shown("Format", "Creation Method", true);
+        assert_eq!(without_hidden_values(&facets, &choices).formats.len(), 2);
     }
 
     #[test]

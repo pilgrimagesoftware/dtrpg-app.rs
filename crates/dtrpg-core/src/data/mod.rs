@@ -9,6 +9,7 @@ pub mod constants;
 pub mod cover_cache;
 pub mod enums;
 pub mod file_openers;
+pub mod filter_value_choices;
 pub mod index;
 pub mod library;
 pub mod native_preferences;

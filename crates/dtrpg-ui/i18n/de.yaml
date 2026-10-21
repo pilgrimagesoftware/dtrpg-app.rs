@@ -189,6 +189,13 @@ detail:
   materialize_tooltip: "Die lokale Kopie der nach iCloud ausgelagerten Dateien herunterladen"
 
 settings:
+  filter_values_title: "Filterwerte"
+  filter_values_description: "Legen Sie fest, welche Werte die Filterspalte auflistet. Hervorgehobene Werte werden aufgelistet, ausgegraute sind verborgen. Klicken Sie auf einen Wert, um ihn zu verschieben. Ein verborgener Wert funktioniert weiterhin in der Suche."
+  filter_values_format: "Format"
+  filter_values_genre: "Genre"
+  filter_values_type: "Produkttyp"
+  filter_values_hide_tooltip: "{name} in den Filtern verbergen"
+  filter_values_show_tooltip: "{name} in den Filtern anzeigen"
   title: "Einstellungen"
   account_title: "Konto"
   not_signed_in: "Nicht bei DriveThruRPG angemeldet"

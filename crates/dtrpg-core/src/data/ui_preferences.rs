@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::data::filter_value_choices::FilterValueChoices;
 use crate::data::paths::app_preferences_dir;
 use crate::util::sort::{CollectionSortMethod, SortDirection};
 
@@ -39,6 +40,10 @@ pub struct UiPreferencesFile {
     /// OS-locale detection at startup. `None` before this preference existed,
     /// or if never changed from the OS-detected default.
     pub locale:                    Option<String>,
+    /// Which filter values (formats, genres and so on) the user shows or
+    /// hides, as changes from the app's defaults.
+    #[serde(default)]
+    pub filter_value_choices:      FilterValueChoices,
 }
 
 /// Persists and restores user-facing UI preferences.
@@ -168,6 +173,17 @@ impl UiPreferences {
                                                        SortDirection::Ascending => "ascending",
                                                        SortDirection::Descending => "descending",
                                                    }.to_string());
+        self.flush();
+    }
+
+    /// The user's choices of which filter values to show.
+    pub fn filter_value_choices(&self) -> FilterValueChoices {
+        self.data.filter_value_choices.clone()
+    }
+
+    /// Persist the user's choices of which filter values to show.
+    pub fn save_filter_value_choices(&mut self, choices: &FilterValueChoices) {
+        self.data.filter_value_choices = choices.clone();
         self.flush();
     }
 

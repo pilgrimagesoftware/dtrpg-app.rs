@@ -9,6 +9,7 @@ use dtrpg_core::data::collection::CollectionEntry;
 use dtrpg_core::data::collections_cache::save_collections_cache;
 use dtrpg_core::data::cover_cache::load_cached_cover;
 use dtrpg_core::data::enums::*;
+use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
@@ -24,6 +25,7 @@ use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::publisher::*;
+use dtrpg_core::util::search::Field;
 use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{JobEvent, JobEvents, JobId, Outcome, Priority};
 use gpui::{AppContext, BorrowAppContext, Context, Entity, Pixels, SharedString, Window};
@@ -56,6 +58,7 @@ mod download_dispatch;
 mod download_sheet;
 mod downloads;
 mod file_tags;
+mod filter_values;
 mod filtering;
 mod helpers;
 mod inspector_actions;
@@ -78,6 +81,8 @@ mod tests_downloads;
 #[cfg(test)]
 mod tests_file_tags;
 #[cfg(test)]
+mod tests_filter_values;
+#[cfg(test)]
 mod tests_inspector;
 #[cfg(test)]
 mod tests_sign_in;
@@ -99,6 +104,7 @@ mod tests_view_cache;
 // `create_collections_symlinks` lives with the download code that uses it, but
 // the dispatch path in `download_dispatch` reaches it through `super::*`.
 pub(crate) use self::downloads::create_collections_symlinks;
+pub use self::filter_values::{CHOOSABLE_FILTER_FIELDS, FilterValueSection};
 pub(crate) use self::helpers::*;
 
 /// A collapsible section of the sidebar.
@@ -229,6 +235,11 @@ pub struct LibraryController {
     /// The user's smart collections, kept in a file in the preferences
     /// directory.
     smart_collections:             SmartCollectionStore,
+    /// Which filter values (formats, genres, types) the user shows or hides.
+    filter_choices:                FilterValueChoices,
+    /// The values the catalog has for each choosable filter field, as of the
+    /// last change to the catalog.
+    known_filter_values:           HashMap<Field, Vec<String>>,
     /// How many items each smart collection holds, by collection id, as of
     /// the last change to the catalog or the collections.
     smart_counts:                  HashMap<u64, usize>,

@@ -16,6 +16,7 @@
 //! either corrupt the cache or force a per-render re-overlay.
 
 mod cache;
+mod filter_values;
 mod overlay;
 mod smart;
 mod summary;

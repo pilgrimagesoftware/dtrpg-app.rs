@@ -25,7 +25,7 @@ use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
-use crate::controllers::library::LibraryController;
+use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::{
     AuthStateSnapshot, CacheCounts, RuleEditorType, SettingsController,
 };
@@ -88,7 +88,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              max_concurrent_downloads_input: Option<Entity<InputState>>,
                              create_collections: bool, recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
-                             font_selects: AppearanceFontSelects, native: NativePreferencesFile)
+                             font_selects: AppearanceFontSelects, native: NativePreferencesFile,
+                             filter_values: Vec<FilterValueSection>)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -145,7 +146,9 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                      &theme.fonts.label_font,
                                      &theme.fonts.value_font,
                                      recently_updated_window_days,
-                                     recently_updated_window_input).into_any_element(),
+                                     recently_updated_window_input,
+                                     &filter_values,
+                                     &library).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),
                                     colors,

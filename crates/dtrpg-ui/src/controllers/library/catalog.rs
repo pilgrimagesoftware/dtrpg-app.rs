@@ -44,6 +44,7 @@ impl LibraryController {
         if self.refresh_sidebar_facets() {
             self.revalidate_publisher_filter();
         }
+        self.refresh_known_filter_values();
         self.refresh_smart_collections();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -60,6 +61,7 @@ impl LibraryController {
                                               cx: &mut Context<Self>) {
         self.enqueue_thumbnails(items, cx);
         let _ = self.refresh_sidebar_facets();
+        self.refresh_known_filter_values();
         self.refresh_smart_collections();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
