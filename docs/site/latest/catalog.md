@@ -167,7 +167,7 @@ was showing that item when you opened the window, it closes.
 - Whether the windows reopen at launch follows your system. On macOS it
   follows System Settings > Desktop & Dock > "Close windows when quitting an
   application": with that ticked, Libri starts without them. On Windows and
-  Linux there is no such system setting, so Settings > Native Integration >
+  Linux there is no such system setting, so Settings > Advanced > Operating system >
   Windows has **Reopen windows at launch** (on by default). When windows are
   not to reopen, Libri also forgets the remembered ones, so turning the
   setting back on later does not bring back old windows.

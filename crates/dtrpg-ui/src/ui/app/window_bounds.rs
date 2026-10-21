@@ -52,3 +52,18 @@ pub fn save_library_window_bounds(window: &Window) {
     debug!(?bounds, "saving library window bounds");
     UiState::load().save_library_window_bounds(bounds);
 }
+
+/// Resolves the settings window's saved position and size, or `None` (so the
+/// window opens centered at its default size) if nothing was saved or the
+/// saved bounds no longer touch a connected display.
+pub(super) fn restore_settings_window_bounds(cx: &App) -> Option<WindowBounds> {
+    let saved = UiState::load().settings_window_bounds()?;
+    visible_window_bounds(saved, cx)
+}
+
+/// Saves the settings window's current position and size.
+pub fn save_settings_window_bounds(window: &Window) {
+    let bounds = current_window_bounds(window);
+    debug!(?bounds, "saving settings window bounds");
+    UiState::load().save_settings_window_bounds(bounds);
+}

@@ -14,9 +14,10 @@ use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::widgets::small_caps_text;
+use crate::ui::widgets::{selectable_note, small_caps_text};
 
-/// Renders the Native Integration page.
+/// Renders the operating-system integration part of the Advanced page: what
+/// Libri does with the system's own features, then what this system can do.
 pub fn render_native_section(entity: Entity<SettingsController>, native: NativePreferencesFile,
                              colors: &ColorTokens, label_font_family: &str)
                              -> impl IntoElement + 'static + use<> {
@@ -24,48 +25,44 @@ pub fn render_native_section(entity: Entity<SettingsController>, native: NativeP
         tag_switches(entity.clone(), native, colors).into_any_element()
     }
     else {
-        div().text_xs()
-             .text_color(colors.text_secondary)
-             .child(t!("settings.native_tags_unavailable").to_string())
-             .into_any_element()
+        selectable_note("native-tags-unavailable",
+                        t!("settings.native_tags_unavailable").to_string(),
+                        colors).into_any_element()
+    };
+    let heading = |text: String| {
+        div().font_family(label_font_family.to_string())
+             .text_sm()
+             .text_color(colors.text_primary)
+             .child(small_caps_text(text))
     };
 
     div().flex()
          .flex_col()
-         .gap(px(24.0))
-         .p(px(24.0))
+         .gap(px(16.0))
          .child(div().text_sm()
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(colors.text_primary)
                      .child(t!("settings.native_title").to_string()))
-         .child(div().h(px(1.0)).bg(colors.border))
-         .child(div().text_xs()
-                     .text_color(colors.text_secondary)
-                     .child(t!("settings.native_intro").to_string()))
+         .child(selectable_note("native-intro",
+                                t!("settings.native_intro").to_string(),
+                                colors))
          .child(div().flex()
                      .flex_col()
                      .gap(px(12.0))
-                     .child(div().font_family(label_font_family.to_string())
-                                 .text_sm()
-                                 .text_color(colors.text_primary)
-                                 .child(small_caps_text(t!("settings.native_capabilities_heading").to_string())))
-                     .child(capability_matrix(Platform.capabilities(), colors)))
-         .child(div().flex()
-                     .flex_col()
-                     .gap(px(12.0))
-                     .child(div().font_family(label_font_family.to_string())
-                                 .text_sm()
-                                 .text_color(colors.text_primary)
-                                 .child(small_caps_text(t!("settings.native_tags_heading").to_string())))
+                     .child(heading(t!("settings.native_tags_heading").to_string()))
                      .child(tags))
          .child(div().flex()
                      .flex_col()
                      .gap(px(12.0))
-                     .child(div().font_family(label_font_family.to_string())
-                                 .text_sm()
-                                 .text_color(colors.text_primary)
-                                 .child(small_caps_text(t!("settings.native_windows_heading").to_string())))
-                     .child(window_restore_setting(entity, native.reopen_windows_on_launch, colors)))
+                     .child(heading(t!("settings.native_windows_heading").to_string()))
+                     .child(window_restore_setting(entity,
+                                                   native.reopen_windows_on_launch,
+                                                   colors)))
+         .child(div().flex()
+                     .flex_col()
+                     .gap(px(12.0))
+                     .child(heading(t!("settings.native_capabilities_heading").to_string()))
+                     .child(capability_matrix(Platform.capabilities(), colors)))
 }
 
 /// How windows reopen at launch. macOS has its own system setting, which
@@ -73,10 +70,9 @@ pub fn render_native_section(entity: Entity<SettingsController>, native: NativeP
 fn window_restore_setting(entity: Entity<SettingsController>, reopen: bool, colors: &ColorTokens)
                           -> AnyElement {
     if cfg!(target_os = "macos") {
-        return div().text_xs()
-                    .text_color(colors.text_secondary)
-                    .child(t!("settings.native_windows_follows_system").to_string())
-                    .into_any_element();
+        return selectable_note("native-windows-follows-system",
+                               t!("settings.native_windows_follows_system").to_string(),
+                               colors).into_any_element();
     }
     switch_row("native-reopen-windows",
                t!("settings.native_reopen_title").to_string(),
@@ -151,9 +147,7 @@ fn switch_row(id: &'static str, title: String, note: String, checked: bool,
                                            .on_click(move |checked, _window, cx| {
                                                on_change(*checked, cx)
                                            })))
-         .child(div().text_xs()
-                     .text_color(colors.text_secondary)
-                     .child(SharedString::from(note)))
+         .child(selectable_note(format!("{id}-note"), note, colors))
          .into_any_element()
 }
 

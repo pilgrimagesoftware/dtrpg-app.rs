@@ -12,7 +12,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::widgets::selectable_text;
+use crate::ui::widgets::{selectable_note, selectable_text};
 
 /// Renders the File Openers settings section.
 ///
@@ -54,9 +54,9 @@ pub fn render_file_openers_section(file_openers: &[FileOpenerEntry],
                                                  .font_weight(gpui::FontWeight::SEMIBOLD)
                                                  .text_color(text_primary)
                                                  .child(t!("settings.file_openers_title")))
-                                     .child(div().text_xs()
-                                                 .text_color(text_tertiary)
-                                                 .child(t!("settings.file_openers_description"))))
+                                     .child(selectable_note("file-openers-description",
+                                                            t!("settings.file_openers_description").to_string(),
+                                                            colors)))
                          .child(render_add_button(entity.clone(),
                                                   extension_input.clone(),
                                                   accent,

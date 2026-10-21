@@ -43,18 +43,20 @@ Override which application opens a given file extension, instead of
 relying on your system's default. Add, edit, or remove per-extension
 overrides here.
 
-## Native Integration
-
-How Libri works with your operating system. On macOS and Linux, three switches
-control whether tags move between Libri and your files' tags, and whether that is
-checked at launch. A list of platform abilities above them shows what your
-system can do (cloud file state, on-demand download, file tags, showing a file in
-the file manager); anything marked *Not on this platform* is unavailable here. See [Tags]({{ '/latest/tags/' | relative_url }}).
-
 ## Advanced
 
 Cache details (size and location on disk) and maintenance actions:
 opening the cache folder directly, or clearing it.
+
+### Operating system
+
+Libri works with your operating system where it can. On macOS and Linux, three
+switches control whether tags move between Libri and your files' tags, and
+whether that is checked at launch. On Windows and Linux a switch reopens
+windows (such as an item's own window) where you left them; macOS follows its
+own setting. At the bottom, **Platform abilities** lists what your system can do
+(cloud file state, on-demand download, file tags, showing a file in the file
+manager). See [Tags]({{ '/latest/tags/' | relative_url }}).
 
 ### Filter values
 
@@ -78,3 +80,5 @@ The section appears once your library has been loaded with filters.
 
 The app name, version, and build details are in the About window (the app
 menu's "About Libri"), not in Settings.
+
+The settings window remembers its size and position.

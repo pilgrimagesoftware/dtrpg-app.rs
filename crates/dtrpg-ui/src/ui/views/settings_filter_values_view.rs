@@ -15,9 +15,18 @@ use rust_i18n::t;
 
 use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_note;
 
-/// How faint a hidden value's chip is drawn.
-const GHOSTED_OPACITY: f32 = 0.45;
+/// How faint a hidden value's chip is drawn. Faint enough to read as off, not
+/// so faint that it is hard to find.
+const GHOSTED_OPACITY: f32 = 0.7;
+
+/// The height of one row of chips with the gap below it, in pixels.
+const CHIP_ROW_HEIGHT: f32 = 30.0;
+
+/// How many rows of chips show before the list scrolls. The half row left
+/// showing at the bottom tells the user there is more.
+const VISIBLE_CHIP_ROWS: f32 = 3.5;
 
 /// The heading text of a field's group of chips.
 fn field_heading(field: Field) -> String {
@@ -45,7 +54,7 @@ fn render_chip(field: Field, index: usize, value: &str, shown: bool,
         t!("settings.filter_values_show_tooltip", name = value).to_string()
     };
     let tag = if shown {
-        Tag::primary()
+        Tag::secondary()
     }
     else {
         Tag::secondary().outline()
@@ -85,11 +94,14 @@ fn render_section(section: &FilterValueSection, library: &Entity<LibraryControll
          .child(div().text_xs()
                      .text_color(colors.text_secondary)
                      .child(field_heading(section.field)))
-         .child(div().flex()
-                     .flex_wrap()
-                     .gap(px(6.0))
-                     .children(shown)
-                     .children(hidden))
+         .child(div().id(SharedString::from(format!("filter-values-{}", section.field.keyword())))
+                     .max_h(px(CHIP_ROW_HEIGHT * VISIBLE_CHIP_ROWS))
+                     .overflow_y_scroll()
+                     .child(div().flex()
+                                 .flex_wrap()
+                                 .gap(px(6.0))
+                                 .children(shown)
+                                 .children(hidden)))
 }
 
 /// Renders the filter values section, or nothing while the catalog has no
@@ -107,9 +119,9 @@ pub fn render_filter_values_section(sections: &[FilterValueSection],
                           .font_weight(gpui::FontWeight::SEMIBOLD)
                           .text_color(colors.text_primary)
                           .child(t!("settings.filter_values_title").to_string()))
-              .child(div().text_xs()
-                          .text_color(colors.text_secondary)
-                          .child(t!("settings.filter_values_description").to_string()))
+              .child(selectable_note("filter-values-description",
+                                     t!("settings.filter_values_description").to_string(),
+                                     colors))
               .children(sections.iter()
                                 .map(|section| render_section(section, library, colors))))
 }

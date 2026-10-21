@@ -33,29 +33,32 @@ pub struct InspectorWindowPref {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UiStateFile {
     /// Width of the sidebar panel in pixels.
-    pub sidebar_width:         Option<f32>,
+    pub sidebar_width:          Option<f32>,
     /// Width of the inspector pane in pixels.
-    pub detail_width:          Option<f32>,
+    pub detail_width:           Option<f32>,
     /// Whether the Collections sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub collections_open:      Option<bool>,
+    pub collections_open:       Option<bool>,
     /// Whether the Publishers sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub publishers_open:       Option<bool>,
+    pub publishers_open:        Option<bool>,
     /// Whether the Tags sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub tags_open:             Option<bool>,
+    pub tags_open:              Option<bool>,
     /// Index of the last-active settings page (Account/Storage/File
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
-    pub settings_page_ix:      Option<usize>,
+    pub settings_page_ix:       Option<usize>,
     /// Position and size the library window was closed at, so it reopens
     /// there instead of always resetting to the default placement.
-    pub library_window_bounds: Option<WindowBoundsPref>,
+    pub library_window_bounds:  Option<WindowBoundsPref>,
+    /// Position and size the settings window was last placed at.
+    #[serde(default)]
+    pub settings_window_bounds: Option<WindowBoundsPref>,
     /// Inspectors that are popped out into their own windows. Kept last
     /// because TOML writes a list of tables after the plain values.
     #[serde(default)]
-    pub inspector_windows:     Vec<InspectorWindowPref>,
+    pub inspector_windows:      Vec<InspectorWindowPref>,
 }
 
 impl UiStateFile {
@@ -180,6 +183,18 @@ impl UiState {
     /// Persist the library window's position and size.
     pub fn save_library_window_bounds(&mut self, bounds: WindowBoundsPref) {
         self.data.library_window_bounds = Some(bounds);
+        self.flush();
+    }
+
+    /// Position and size the settings window was last placed at, or `None` if
+    /// never saved.
+    pub fn settings_window_bounds(&self) -> Option<WindowBoundsPref> {
+        self.data.settings_window_bounds
+    }
+
+    /// Persist the settings window's position and size.
+    pub fn save_settings_window_bounds(&mut self, bounds: WindowBoundsPref) {
+        self.data.settings_window_bounds = Some(bounds);
         self.flush();
     }
 
