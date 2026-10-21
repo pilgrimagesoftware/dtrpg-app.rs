@@ -33,7 +33,6 @@ use gpui_kit::component::{
 use rust_i18n::t;
 
 use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};
-use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::sidebar_tags::tags_menu;
 
@@ -135,7 +134,6 @@ struct CollectionsSection {
     /// instead of a blank submenu.
     loading:   bool,
     entity:    Entity<LibraryController>,
-    tabs:      Entity<TabsController>,
 }
 
 impl Collapsible for CollectionsSection {
@@ -160,7 +158,6 @@ impl SidebarItem for CollectionsSection {
         let open = self.open;
         let loading = self.loading;
         let entity = self.entity.clone();
-        let tabs = self.tabs.clone();
 
         let header =
             div().id(SharedString::from(format!("{id:?}-header")))
@@ -188,17 +185,14 @@ impl SidebarItem for CollectionsSection {
                              .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
                              .child(suffix));
 
-        let mut rows: Vec<AnyElement> = self.rows
-                                            .into_iter()
-                                            .enumerate()
-                                            .map(|(ix, row)| {
-                                                render_collection_row(format!("{id:?}-row-{ix}"),
-                                                                      row,
-                                                                      entity.clone(),
-                                                                      tabs.clone(),
-                                                                      cx)
-                                            })
-                                            .collect();
+        let mut rows: Vec<AnyElement> =
+            self.rows
+                .into_iter()
+                .enumerate()
+                .map(|(ix, row)| {
+                    render_collection_row(format!("{id:?}-row-{ix}"), row, entity.clone(), cx)
+                })
+                .collect();
 
         // Collections not yet known (initial fetch in flight) show a loading
         // indicator instead of a blank submenu.
@@ -238,13 +232,11 @@ impl SidebarItem for CollectionsSection {
 /// download all/reload/delete, and drop target for [`DraggedLibraryItem`]
 /// (adds the dragged catalog item as a member of this collection).
 fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
-                         entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-                         cx: &mut App)
+                         entity: Entity<LibraryController>, cx: &mut App)
                          -> AnyElement {
     let is_active = row.is_active;
     let filter = SidebarFilter::Collection(row.id, Arc::clone(&row.name));
     let click_entity = entity.clone();
-    let click_tabs = tabs;
     let download_entity = entity.clone();
     let reload_entity = entity.clone();
     let delete_entity = entity.clone();
@@ -276,7 +268,6 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
          })
          .on_click(move |_, _, cx| {
              click_entity.update(cx, |ctrl, cx| ctrl.set_filter(filter.clone(), cx));
-             click_tabs.update(cx, |ctrl, cx| ctrl.activate(TabTarget::Catalog, cx));
          })
          .child(div().flex_1()
                      .flex()

@@ -7,14 +7,15 @@ use super::*;
 /// update-in-place requirements.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
-                               entity: Entity<LibraryController>, tabs: &Entity<TabsController>,
-                               colors: &ColorTokens, window: &mut Window, cx: &mut App)
+                               entity: Entity<LibraryController>,
+                               inspector: &Entity<InspectorController>, colors: &ColorTokens,
+                               window: &mut Window, cx: &mut App)
                                -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
     let entry_dir = resolved_item_dir(&StorageConfig::load(), item);
 
-    let table = item_list_table(tabs, &entity, &entry_id, entry_dir, window, cx);
+    let table = item_list_table(inspector, &entity, &entry_id, entry_dir, window, cx);
     let table_for_prepaint = table.clone();
 
     // `DataTable` virtualizes its rows and sizes itself to its container
@@ -33,9 +34,8 @@ pub(super) fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                                           .scrollbar_visible(true, false))
              // Captures the table's rendered width so the Name column can
              // fill whatever space Type/Size/Status don't use — see
-             // `ItemListDelegate::table_width`. Mirrors
-             // `LibraryController::set_entry_bounds`'s guarded-update
-             // pattern so an unchanged width doesn't re-notify every frame.
+             // `ItemListDelegate::table_width`. Only notifies when the width
+             // changed, so an unchanged width doesn't re-notify every frame.
              .on_prepaint(move |bounds, _window, cx| {
                  table_for_prepaint.update(cx, |state, cx| {
                                        if state.delegate().table_width != Some(bounds.size.width) {

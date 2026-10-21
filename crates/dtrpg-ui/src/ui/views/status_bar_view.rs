@@ -1,4 +1,4 @@
-//! Status bar view: library totals, active-tab summary, theme picker,
+//! Status bar view: library totals, current-section summary, theme picker,
 //! activity indicator, and notification indicator.
 //!
 //! Consolidates indicators previously scattered in the sidebar footer
@@ -39,19 +39,17 @@ use crate::util::size::size_format;
 /// Data the status bar needs to render, decoupled from where it's sourced.
 pub struct StatusBarSnapshot {
     /// Total number of items in the library.
-    pub total_count:      usize,
+    pub total_count:    usize,
     /// Total size of all library items, in megabytes.
-    pub total_mb:         f64,
-    /// Title of the currently active tab (catalog section name, or an open
-    /// detail tab's item title).
-    pub active_tab_label: String,
-    /// Item count for the active tab's content (catalog: matched item count;
-    /// detail tab: always 1).
-    pub active_tab_count: usize,
+    pub total_mb:       f64,
+    /// Title of the catalog section being shown.
+    pub section_label:  String,
+    /// Number of items matching in that section.
+    pub section_count:  usize,
     /// Currently active theme.
-    pub theme_key:        ThemeId,
+    pub theme_key:      ThemeId,
     /// Currently active locale.
-    pub current_locale:   Locale,
+    pub current_locale: Locale,
 }
 
 /// Activity and alert history state needed to render the status bar's
@@ -89,8 +87,8 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
         div().text_xs()
              .text_color(colors.text_secondary)
              .child(format!("{} \u{2022} {}",
-                            snap.active_tab_label,
-                            pluralize(snap.active_tab_count, "count.item", "count.items")));
+                            snap.section_label,
+                            pluralize(snap.section_count, "count.item", "count.items")));
 
     let language_entity = entity.clone();
     let language_picker = Button::new("status-bar-language")

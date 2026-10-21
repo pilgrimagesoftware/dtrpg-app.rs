@@ -1,6 +1,7 @@
 use dtrpg_core::credentials::{CredentialStore, KeyringCredentialStore};
-use dtrpg_core::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
+use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
+use dtrpg_core::data::ui_state::UiState;
 use dtrpg_core::services::{
     LibraryService, LoginService, LoginTokens, collections::CollectionsService,
 };
@@ -13,13 +14,11 @@ use tracing::{debug, warn};
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
 use crate::ui::actions::*;
 use crate::ui::views::about_window_view::AboutWindowView;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::ui::views::settings_window_view::SettingsWindowView;
 use crate::util::init::init_globals;
-use crate::util::text::truncate_with_ellipsis;
 
 /// Snapshot of catalog view state needed to render checkmarks in the native
 /// menu bar's View menu (presentation mode, sort field/direction, and
@@ -34,6 +33,8 @@ pub struct ViewMenuState {
     pub sort:           SortMethod,
     pub sort_direction: SortDirection,
     pub group_by:       GroupBy,
+    /// Whether the inspector pane beside the catalog is shown.
+    pub inspector_open: bool,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
@@ -273,16 +274,7 @@ pub fn setup(cx: &mut App) {
                   KeyBinding::new("cmd-shift-n", AddCollection, None),
                   KeyBinding::new("cmd-r", ReloadCatalog, None),
                   KeyBinding::new("cmd-shift-r", RefreshThumbnails, None),
-                  KeyBinding::new("cmd-0", SelectTab0, None),
-                  KeyBinding::new("cmd-1", SelectTab1, None),
-                  KeyBinding::new("cmd-2", SelectTab2, None),
-                  KeyBinding::new("cmd-3", SelectTab3, None),
-                  KeyBinding::new("cmd-4", SelectTab4, None),
-                  KeyBinding::new("cmd-5", SelectTab5, None),
-                  KeyBinding::new("cmd-6", SelectTab6, None),
-                  KeyBinding::new("cmd-7", SelectTab7, None),
-                  KeyBinding::new("cmd-8", SelectTab8, None),
-                  KeyBinding::new("cmd-9", SelectTab9, None)]);
+                  KeyBinding::new("cmd-alt-i", ToggleInspector, None)]);
 
     // App-level action handlers
     cx.on_action::<Quit>(|_, cx| {
@@ -331,6 +323,14 @@ pub fn setup(cx: &mut App) {
               return;
           };
           view.update(cx, |view, cx| view.show_settings(cx));
+      });
+    cx.on_action::<ToggleInspector>(|_, cx| {
+          let Some(view) = cx.try_global::<LibraryWindowHandle>()
+                             .map(|h| h.view.clone())
+          else {
+              return;
+          };
+          view.update(cx, |view, cx| view.toggle_inspector(cx));
       });
     cx.on_action::<ShowActivity>(|_, cx| {
           let Some(view) = cx.try_global::<LibraryWindowHandle>()
@@ -415,8 +415,8 @@ pub fn setup(cx: &mut App) {
 
     // Menu bar
     install_menus(cx,
-                  &ViewMenuState::default(),
-                  &TabsController::new().snapshot());
+                  &ViewMenuState { inspector_open: UiState::load().inspector_open(),
+                                   ..ViewMenuState::default() });
 
     let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
     {
@@ -447,15 +447,6 @@ fn update_library(cx: &mut App,
     controller.update(cx, change);
 }
 
-/// Builds the full native menu bar, applying checkmarks to the View menu's
-/// Presentation and Sort submenus (and the Group toggle) based on `state`, and
-/// building the Window menu's ten tab-selection items from `tabs`.
-///
-/// `cx.set_menus` replaces the entire menu bar on every call, so this must
-/// reconstruct the whole bar rather than just the affected submenus. Called
-/// once at startup with the default state, and again by `LibraryRootView`
-/// whenever the catalog's presentation/sort/grouping changes or the open tab
-/// set changes, so the OS menu's checkmarks and tab-selection items track the
 #[path = "menus.rs"]
 mod menus;
 

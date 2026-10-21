@@ -12,7 +12,7 @@ pub(super) fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>
                           checking_items: HashSet<Arc<str>>,
                           item_activity: HashMap<Arc<str>, ItemActivity>, colors: ColorTokens,
                           density: DensityConstants, entity: Entity<LibraryController>,
-                          tabs: Entity<TabsController>, storage_root_path: PathBuf,
+                          inspector: Entity<InspectorController>, storage_root_path: PathBuf,
                           window: &Window, selection_mode: bool, selected_ids: HashSet<Arc<str>>)
                           -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
@@ -35,7 +35,7 @@ pub(super) fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>
                                                          &colors,
                                                          min_w,
                                                          entity.clone(),
-                                                         tabs.clone(),
+                                                         inspector.clone(),
                                                          storage_root_path.clone(),
                                                          window,
                                                          is_checking,
@@ -50,7 +50,8 @@ pub(super) fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>,
                                colors: &ColorTokens, card_w: f32,
-                               entity: Entity<LibraryController>, tabs: Entity<TabsController>,
+                               entity: Entity<LibraryController>,
+                               inspector: Entity<InspectorController>,
                                storage_root_path: PathBuf, window: &Window, is_checking: bool,
                                activity: ItemActivity, selection_mode: bool, selected: bool)
                                -> impl IntoElement + 'static + use<> {
@@ -80,9 +81,7 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
     let ctx_item = item.clone();
-    let ctx_tabs = tabs.clone();
-    let bounds_entity = entity.clone();
-    let bounds_id = Arc::clone(&id);
+    let ctx_inspector = inspector.clone();
     let ctx_path = dtrpg_core::data::storage::publisher_dir(&storage_root_path, &publisher);
     let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
                                             member_id:  collection_member_id(item),
@@ -155,16 +154,7 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
          .rounded(px(6.0))
          .overflow_hidden()
          .cursor_pointer()
-         // Reported continuously (not just while selected) so that if this
-         // card is the one the user clicks, its bounds are already known —
-         // it was necessarily visible, and therefore already painted, before
-         // the click could happen. See `LibraryController::entry_bounds`.
-         .on_prepaint(move |bounds, _window, cx| {
-             bounds_entity.update(cx, |ctrl, cx| {
-                              ctrl.set_entry_bounds(bounds_id.clone(), bounds, cx)
-                          });
-         })
-         .on_click(item_click_handler(Arc::clone(&id), title.clone(), entity, tabs))
+         .on_click(item_click_handler(Arc::clone(&id), entity, inspector))
          .on_drag(drag_payload, |drag, _, _, cx| {
              cx.stop_propagation();
              cx.new(|_| drag.clone())
@@ -197,14 +187,14 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
                      let remove_id = Arc::clone(&ctx_id);
                      let entity_remove = ctx_entity.clone();
                      let item_for_open = ctx_item.clone();
-                     let tabs_for_open = ctx_tabs.clone();
+                     let inspector_for_open = ctx_inspector.clone();
                      let controller_for_open = ctx_entity.clone();
                      menu.item(PopupMenuItem::new(t!("catalog.action_open")).on_click(
                         move |_, _, cx| {
-                            open_item_or_focus_detail_tab(
+                            open_item_or_show_files(
                                 &open_path,
                                 &item_for_open,
-                                &tabs_for_open,
+                                &inspector_for_open,
                                 &controller_for_open,
                                 cx,
                             );

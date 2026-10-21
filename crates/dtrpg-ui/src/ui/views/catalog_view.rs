@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use dtrpg_core::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
 use dtrpg_core::data::enums::*;
 use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
 use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
@@ -14,12 +13,10 @@ use dtrpg_core::util::publisher::ItemGroup;
 use dtrpg_core::util::sort::{SortDirection, SortMethod};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Bounds, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement,
-    MouseButton, MouseDownEvent, ObjectFit, ParentElement, Pixels, Point, Render, SharedString,
-    Styled, StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems,
-    uniform_list,
+    AnyElement, App, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement, ObjectFit,
+    ParentElement, Pixels, Render, SharedString, Styled, StyledImage, TextRun,
+    UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
-use gpui_kit::component::ElementExt;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::badge::Badge;
 use gpui_kit::component::checkbox::Checkbox;
@@ -33,19 +30,19 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Sizable, Size};
 use rust_i18n::t;
 
+use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::controllers::tabs::TabsController;
 use crate::data::events::LibraryChanged;
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::ui::library::drag::DraggedLibraryItem;
-use crate::ui::views::item_popover_view::render_item_popover;
 use crate::ui::views::list_columns::{
     ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
 };
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::reveal::reveal_in_file_manager;
+use crate::view_models::inspector::InspectorTab;
 
 #[derive(Clone, Copy)]
 enum EmptyReason {
@@ -61,7 +58,7 @@ enum EmptyReason {
 pub struct CatalogView {
     controller:                 Entity<LibraryController>,
     settings:                   Entity<SettingsController>,
-    tabs:                       Entity<TabsController>,
+    inspector:                  Entity<InspectorController>,
     scroll_handle:              UniformListScrollHandle,
     catalog_list_table:         Entity<TableState<CatalogListDelegate>>,
     /// Backs the grouped list presentation. Rows are a flattened list of
@@ -79,19 +76,6 @@ pub struct CatalogView {
     /// re-render. Also drives the flattened rows pushed into
     /// `catalog_grouped_list_table`.
     grouped_cache:              Option<Arc<Vec<ItemGroup>>>,
-
-    /// Cursor position captured at the mouse-down that opened the single-click
-    /// item popover (see `render_item_popover`). Frozen for the lifetime of
-    /// the popover — never updated by subsequent mouse movement — so the
-    /// popover stays put while the pointer wanders after opening it, instead
-    /// of following the cursor. Cleared to `None` when the popover closes.
-    ///
-    /// Used only as a fallback anchor rectangle (zero-sized, at the click
-    /// point) for the first frame after selection and for presentations
-    /// (List) whose entries don't report their own bounds — see
-    /// `LibraryController::popover_anchor_bounds` for the precise rectangle
-    /// Grid/Thumbs entries supply once painted.
-    popover_anchor_pos: Option<Point<Pixels>>,
 }
 
 impl CatalogView {
@@ -99,12 +83,12 @@ impl CatalogView {
     /// settings.
     pub fn new(window: &mut Window, cx: &mut Context<Self>,
                controller: Entity<LibraryController>, settings: Entity<SettingsController>,
-               tabs: Entity<TabsController>)
+               inspector: Entity<InspectorController>)
                -> Self {
         let storage_root = settings.read(cx).snapshot().storage_root_path;
         let chosen_columns = controller.read(cx).list_columns.clone();
         let delegate = CatalogListDelegate { controller:   controller.clone(),
-                                             tabs:         tabs.clone(),
+                                             inspector:    inspector.clone(),
                                              storage_root: storage_root.clone(),
                                              cols:         ListColumnSet::new(&chosen_columns), };
         let catalog_list_table = cx.new(|cx| {
@@ -116,7 +100,7 @@ impl CatalogView {
                                    });
 
         let grouped_delegate = GroupedCatalogListDelegate { controller: controller.clone(),
-                                                            tabs: tabs.clone(),
+                                                            inspector: inspector.clone(),
                                                             storage_root,
                                                             cols:
                                                                 ListColumnSet::new(&chosen_columns),
@@ -147,9 +131,6 @@ impl CatalogView {
                            state.refresh(cx);
                        });
                   this.grouped_cache = None;
-                  if ctrl.read(cx).selected_item().is_none() {
-                      this.popover_anchor_pos = None;
-                  }
               }
           })
           .detach();
@@ -174,16 +155,8 @@ impl CatalogView {
                                              .visible_items_slice(row_ix..row_ix + 1);
                              if let Some(item) = items.first() {
                                  let id = Arc::clone(&item.id);
-                                 let title = item.title.to_string();
-                                 this.tabs.update(cx, |t, cx| {
-                                              t.open_detail_tab(Arc::clone(&id), title, cx);
-                                          });
-                                 this.controller.update(cx, |ctrl, cx| {
-                                                    ctrl.clear_selection(cx);
-                                                    ctrl.clear_item_selection(&id, cx);
-                                                    ctrl.maybe_check_item(Arc::clone(&id), cx);
-                                                    ctrl.ensure_detail_cover(&id, cx);
-                                                });
+                                 this.inspector
+                                     .update(cx, |inspector, cx| inspector.request_pop_out(id, cx));
                              }
                          }
                          TableEvent::ColumnWidthsChanged(widths) => {
@@ -227,16 +200,8 @@ impl CatalogView {
                                                                                 });
                              if let Some(item) = item {
                                  let id = Arc::clone(&item.id);
-                                 let title = item.title.to_string();
-                                 this.tabs.update(cx, |t, cx| {
-                                              t.open_detail_tab(Arc::clone(&id), title, cx);
-                                          });
-                                 this.controller.update(cx, |ctrl, cx| {
-                                                    ctrl.clear_selection(cx);
-                                                    ctrl.clear_item_selection(&id, cx);
-                                                    ctrl.maybe_check_item(Arc::clone(&id), cx);
-                                                    ctrl.ensure_detail_cover(&id, cx);
-                                                });
+                                 this.inspector
+                                     .update(cx, |inspector, cx| inspector.request_pop_out(id, cx));
                              }
                          }
                          TableEvent::ColumnWidthsChanged(widths) => {
@@ -256,13 +221,12 @@ impl CatalogView {
 
         Self { controller,
                settings,
-               tabs,
+               inspector,
                scroll_handle: UniformListScrollHandle::default(),
                catalog_list_table,
                catalog_grouped_list_table,
                items_per_row: 4,
-               grouped_cache: None,
-               popover_anchor_pos: None }
+               grouped_cache: None }
     }
 
     /// Returns the controller's grouped items, rebuilding the flattened rows

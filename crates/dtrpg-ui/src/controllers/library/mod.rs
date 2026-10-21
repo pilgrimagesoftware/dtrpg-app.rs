@@ -25,7 +25,7 @@ use dtrpg_core::util::matching::*;
 use dtrpg_core::util::publisher::*;
 use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{JobEvent, JobEvents, JobId, Outcome, Priority};
-use gpui::{AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Window};
+use gpui::{AppContext, BorrowAppContext, Context, Entity, Pixels, SharedString, Window};
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
 
@@ -172,8 +172,6 @@ pub struct LibrarySnapshot {
     pub collection_search_open:    bool,
     /// Collections section search filter text. Session-only; never persisted.
     pub collection_search_query:   String,
-    /// Current width of the detail panel, in pixels.
-    pub detail_panel_width:        f32,
     /// Whether bulk-selection mode is active (see `catalog-selection`).
     pub bulk_selection_mode:       bool,
     /// Ids of catalog items currently selected for bulk actions.
@@ -278,22 +276,6 @@ pub struct LibraryController {
     collection_search_open:        bool,
     /// Collections section search filter text. Session-only; never persisted.
     collection_search_query:       String,
-    /// Current width of the detail panel, in pixels. Session-only; never
-    /// persisted to disk.
-    detail_panel_width:            f32,
-    /// On-screen bounds of every currently visible Grid card / Thumbs row,
-    /// keyed by item id, continuously refreshed by each entry's own render
-    /// pass (see `catalog_view::render_grid_card` / `render_thumb_row`).
-    ///
-    /// Used to anchor the single-click item popover beside the entry that
-    /// opened it. Kept for *every* visible entry (not just the selected one)
-    /// so the bounds for whichever entry gets clicked are already known —
-    /// the entry was necessarily visible, and therefore already painted,
-    /// before the click could happen — avoiding a one-frame flash at a
-    /// fallback position before the popover settles into place. Entries
-    /// scrolled out of view keep their last-known bounds; this is harmless
-    /// since a stale entry can't be clicked again until it repaints.
-    entry_bounds:                  HashMap<Arc<str>, Bounds<Pixels>>,
     /// Selected item file row (its position within the entry's `files`
     /// list) within a multi-item entry's expanded detail tab, keyed by
     /// catalog entry id. Keyed by row position rather than file id because

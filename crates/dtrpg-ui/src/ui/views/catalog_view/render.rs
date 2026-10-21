@@ -3,20 +3,6 @@
 
 use super::*;
 
-fn popover_anchor_point(entry: Bounds<Pixels>, popover_width: Pixels, margin: Pixels,
-                        window_width: Pixels)
-                        -> Point<Pixels> {
-    let right_x = entry.origin.x + entry.size.width + margin;
-    let x = if right_x + popover_width <= window_width {
-        right_x
-    }
-    else {
-        (entry.origin.x - margin - popover_width).max(px(0.0))
-    };
-    Point { x,
-            y: entry.origin.y }
-}
-
 pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                   cx: &mut Context<CatalogView>)
                                   -> impl IntoElement {
@@ -58,7 +44,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
     let items_per_row = view.items_per_row;
     let scroll_handle = view.scroll_handle.clone();
     let ctrl = view.controller.clone();
-    let tabs_entity = view.tabs.clone();
+    let inspector_entity = view.inspector.clone();
 
     let outer = div().flex_1().min_h_0().flex().flex_col();
 
@@ -134,7 +120,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             let c = colors.clone();
             let d = density.clone();
             let s = storage_root.clone();
-            let t = tabs_entity.clone();
+            let t = inspector_entity.clone();
             let selection_mode = snap.bulk_selection_mode;
             let selected_ids = snap.bulk_selected_ids.clone();
             root.px(pad_side)
@@ -201,7 +187,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                         let c = colors.clone();
                         let d = density.clone();
                         let e = view.controller.clone();
-                        let t = tabs_entity.clone();
+                        let t = inspector_entity.clone();
                         let s = storage_root.clone();
                         let cc = cover_cache.clone();
                         let checking_items = checking_items.clone();
@@ -249,7 +235,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             let c = colors.clone();
             let d = density.clone();
             let s = storage_root.clone();
-            let t = tabs_entity.clone();
+            let t = inspector_entity.clone();
             let selection_mode = snap.bulk_selection_mode;
             let selected_ids = snap.bulk_selected_ids.clone();
             root.px(pad_side)
@@ -342,7 +328,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                                 let c = colors.clone();
                                                 let d = density.clone();
                                                 let e = view.controller.clone();
-                                                let t = tabs_entity.clone();
+                                                let t = inspector_entity.clone();
                                                 let s = storage_root.clone();
                                                 let cc = cover_cache.clone();
                                                 let ci = checking_items.clone();
@@ -370,34 +356,5 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
         }
     };
 
-    let mut result = outer.relative()
-                          .on_mouse_down(MouseButton::Left,
-                                         cx.listener(|this, event: &MouseDownEvent, _window, _cx| {
-                                               this.popover_anchor_pos = Some(event.position);
-                                           }))
-                          .child(content);
-
-    if let Some(item) = snap.selected_item.as_ref() {
-        let entry_bounds = view.controller
-                               .read(cx)
-                               .entry_bounds(&item.id)
-                               .unwrap_or(Bounds { origin: view.popover_anchor_pos
-                                                               .unwrap_or_default(),
-                                                   size:   gpui::Size::default(), });
-        let anchor = popover_anchor_point(entry_bounds,
-                                          px(ITEM_POPOVER_WIDTH),
-                                          px(ITEM_POPOVER_MARGIN),
-                                          window.viewport_size().width);
-        let is_checking = view.controller.read(cx).is_checking(&item.id);
-        let is_verifying = view.controller.read(cx).is_verifying_downloads(&item.id);
-        result = result.child(render_item_popover(item,
-                                                  anchor,
-                                                  view.controller.clone(),
-                                                  tabs_entity.clone(),
-                                                  &colors,
-                                                  is_checking,
-                                                  is_verifying));
-    }
-
-    result.into_any_element()
+    outer.relative().child(content).into_any_element()
 }

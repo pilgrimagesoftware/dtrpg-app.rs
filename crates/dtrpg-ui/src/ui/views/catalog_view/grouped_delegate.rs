@@ -11,7 +11,7 @@ pub(super) struct GroupedCatalogListDelegate {
     /// Used to open/focus a multi-item entry's expanded detail tab when the
     /// row's inline open action hits
     /// `OpenError::MultipleFilesRequireSelection`.
-    pub(super) tabs:         Entity<TabsController>,
+    pub(super) inspector:    Entity<InspectorController>,
     pub(super) storage_root: PathBuf,
     pub(super) cols:         ListColumnSet,
     pub(super) rows:         Vec<GroupedRow>,
@@ -73,14 +73,14 @@ impl TableDelegate for GroupedCatalogListDelegate {
                 let remove_id = Arc::clone(&id);
                 let item_path_reveal = item_path.clone();
                 let item_for_open = item.clone();
-                let tabs_for_open = self.tabs.clone();
+                let inspector_for_open = self.inspector.clone();
                 let controller_for_open = entity.clone();
                 menu.item(PopupMenuItem::new(t!("catalog.action_open")).on_click(
                     move |_, _, cx| {
-                        open_item_or_focus_detail_tab(
+                        open_item_or_show_files(
                             &item_path,
                             &item_for_open,
-                            &tabs_for_open,
+                            &inspector_for_open,
                             &controller_for_open,
                             cx,
                         );
@@ -191,7 +191,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                                       &colors,
                                       &self.storage_root,
                                       &self.controller,
-                                      &self.tabs,
+                                      &self.inspector,
                                       column_width,
                                       window,
                                       is_checking,

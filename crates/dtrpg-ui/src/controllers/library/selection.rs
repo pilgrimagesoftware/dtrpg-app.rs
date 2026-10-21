@@ -6,10 +6,10 @@ impl LibraryController {
     // ── Selection mutations
     // ───────────────────────────────────────────────────
 
-    /// Opens the single-click item popover for `id` (see `main-window-tabs`).
+    /// Selects the item `id`, which the inspector pane then shows.
     ///
-    /// Distinct from opening an expanded detail tab, which is a separate,
-    /// double-click action handled by `TabsController::open_detail_tab`.
+    /// Popping the item out into its own window is a separate, double-click
+    /// action, requested through `InspectorController::request_pop_out`.
     pub fn select_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
         self.maybe_check_item(Arc::clone(&id), cx);
         self.verify_selected_item_download(Arc::clone(&id), cx);
@@ -17,38 +17,10 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    /// Closes the item popover, if one is open.
+    /// Clears the selection, so the inspector pane shows nothing.
     pub fn clear_selection(&mut self, cx: &mut Context<Self>) {
         self.selection = Selection::None;
         cx.emit(LibraryChanged);
-    }
-
-    /// Precise on-screen bounds of catalog entry `id`, if it has painted at
-    /// least once. Used to anchor the single-click item popover beside the
-    /// entry that opened it — see [`Self::set_entry_bounds`].
-    ///
-    /// Every visible Grid card and Thumbs row reports its bounds continuously
-    /// (not just the selected one), so by the time an entry can be clicked it
-    /// has already painted and its bounds are available immediately — no
-    /// one-frame flash at a fallback position before the popover settles
-    /// beside the entry.
-    pub fn entry_bounds(&self, id: &str) -> Option<Bounds<Pixels>> {
-        self.entry_bounds.get(id).copied()
-    }
-
-    /// Records the on-screen bounds of catalog entry `id`, called from that
-    /// entry's own render pass once painted (see
-    /// `catalog_view::render_grid_card` / `render_thumb_row`).
-    ///
-    /// Only re-emits [`LibraryChanged`] when the bounds actually changed, so
-    /// repeated paints of an entry that hasn't moved don't trigger a
-    /// re-render feedback loop.
-    pub fn set_entry_bounds(&mut self, id: Arc<str>, bounds: Bounds<Pixels>,
-                            cx: &mut Context<Self>) {
-        if self.entry_bounds.get(&id) != Some(&bounds) {
-            self.entry_bounds.insert(id, bounds);
-            cx.emit(LibraryChanged);
-        }
     }
 
     // ── Item selection (multi-item detail tab) ───────────────────────────────

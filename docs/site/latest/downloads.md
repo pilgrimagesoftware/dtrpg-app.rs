@@ -6,12 +6,11 @@ slug: downloads
 
 # Downloads
 
-Queue a catalog item's files for download from its item popover or detail
-tab.
+Queue a catalog item's files for download from the inspector.
 
 ## Choosing files and a location
 
-The **Download…** button in an item's detail tab opens the download sheet.
+The **Download…** button in the inspector opens the download sheet.
 It lists the item's files with their formats and sizes; the files you do not
 have yet start checked, and a file you already have shows a check mark and
 cannot be selected again. **All** and **None** change the selection, and the
@@ -30,7 +29,7 @@ location the rules don't know about would make the files look missing. The
 new rule goes first in the list and replaces any earlier rule for the same
 publisher; see [Storage]({{ '/latest/storage/' | relative_url }}).
 
-Downloading from the item popover or the catalog's context menu still queues
+Downloading from the catalog's context menu still queues
 every missing file straight away, without the sheet.
 
 ## Following a download in the catalog

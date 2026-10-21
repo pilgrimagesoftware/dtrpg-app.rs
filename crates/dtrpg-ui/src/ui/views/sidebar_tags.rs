@@ -9,18 +9,17 @@ use gpui_kit::component::sidebar::{SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::{LibraryController, SidebarSection};
-use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::data::theme::LibriTheme;
 use crate::ui::library::tag::{color_menu, tag_dot};
 
 /// Builds the Tags menu: a collapsible header over a row for each tag in
 /// `tags`. `active` is the filter now applied, so its tag is marked.
 pub fn tags_menu(tags: Vec<TagEntry>, open: bool, active: &SidebarFilter,
-                 entity: Entity<LibraryController>, tabs: Entity<TabsController>)
+                 entity: Entity<LibraryController>)
                  -> SidebarMenu {
     let count = tags.len();
     let rows: Vec<SidebarMenuItem> = tags.into_iter()
-                                         .map(|tag| tag_row(tag, active, &entity, &tabs))
+                                         .map(|tag| tag_row(tag, active, &entity))
                                          .collect();
     let toggle_entity = entity;
     SidebarMenu::new().child(SidebarMenuItem::new(t!("sidebar.tags").to_string())
@@ -36,13 +35,11 @@ pub fn tags_menu(tags: Vec<TagEntry>, open: bool, active: &SidebarFilter,
 }
 
 /// One tag's row.
-fn tag_row(tag: TagEntry, active: &SidebarFilter, entity: &Entity<LibraryController>,
-           tabs: &Entity<TabsController>)
+fn tag_row(tag: TagEntry, active: &SidebarFilter, entity: &Entity<LibraryController>)
            -> SidebarMenuItem {
     let is_active = matches!(active, SidebarFilter::Tag { name, .. }
                              if name.to_lowercase() == tag.name.to_lowercase());
     let (click_entity, color_entity) = (entity.clone(), entity.clone());
-    let tabs = tabs.clone();
     let (name, color, count) = (tag.name.clone(), tag.color, tag.count);
     let menu_name = tag.name.clone();
     SidebarMenuItem::new(SharedString::from(tag.name.to_string()))
@@ -59,7 +56,6 @@ fn tag_row(tag: TagEntry, active: &SidebarFilter, entity: &Entity<LibraryControl
         })
         .on_click(move |_, _, cx| {
             click_entity.update(cx, |ctrl, cx| ctrl.filter_by_tag(&name, cx));
-            tabs.update(cx, |ctrl, cx| ctrl.activate(TabTarget::Catalog, cx));
         })
         .context_menu(move |menu, _, _| color_menu(menu, &color_entity, &menu_name, color))
 }

@@ -5,9 +5,10 @@ use gpui::EventEmitter;
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::auth_state::AuthStateController;
+use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::controllers::tabs::TabsController;
+use crate::view_models::inspector::InspectorTab;
 
 // ── LibraryChanged
 // ────────────────────────────────────────────────────────────
@@ -243,19 +244,30 @@ pub struct LowDiskSpaceWarning {
 
 impl EventEmitter<LowDiskSpaceWarning> for LibraryController {}
 
-// ── TabsChanged
-// ───────────────────────────────────────────────────────────────
+// ── Inspector requests
+// ───────────────────────────────────────────────────────
 
-/// Emitted when the open tab list or the active tab changes.
-pub struct TabsChanged;
-
-impl EventEmitter<TabsChanged> for TabsController {}
-
-/// Emitted when the user asks to move an item's inspector out of the main
-/// window's tab and into its own window.
+/// Emitted when the user asks to move an item's inspector out of the docked
+/// pane and into its own window.
 pub struct InspectorPopOutRequested {
     /// Id of the catalog item whose inspector should pop out.
     pub item_id: std::sync::Arc<str>,
 }
 
-impl EventEmitter<InspectorPopOutRequested> for TabsController {}
+impl EventEmitter<InspectorPopOutRequested> for InspectorController {}
+
+/// Emitted when something asks for an item to be shown in the docked pane, on
+/// a given tab, opening the pane if it is closed.
+pub struct InspectorShowRequested {
+    /// Id of the catalog item to show.
+    pub item_id: std::sync::Arc<str>,
+    /// The inspector tab to show it on.
+    pub tab:     InspectorTab,
+}
+
+impl EventEmitter<InspectorShowRequested> for InspectorController {}
+
+/// Emitted when the user asks to close the docked pane.
+pub struct InspectorCloseRequested;
+
+impl EventEmitter<InspectorCloseRequested> for InspectorController {}

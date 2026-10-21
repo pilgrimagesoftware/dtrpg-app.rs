@@ -14,23 +14,21 @@ pub struct MenuBarHandle(pub Entity<AppMenuBar>);
 impl Global for MenuBarHandle {}
 
 /// Builds the menus for the platform the app is running on.
-pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
-    build_menus_for(Platform.kind(), state, tabs)
+pub fn build_menus(state: &ViewMenuState) -> Vec<Menu> {
+    build_menus_for(Platform.kind(), state)
 }
 
-/// Makes `build_menus(state, tabs)` the application's menus.
+/// Makes `build_menus(state)` the application's menus.
 ///
 /// On macOS they become the native menu bar. On Windows and Linux, which have
 /// none, they are also handed to the in-window menu bar, which reloads from
 /// them.
-pub fn install_menus(cx: &mut App, state: &ViewMenuState, tabs: &TabsSnapshot) {
-    cx.set_menus(build_menus(state, tabs));
+pub fn install_menus(cx: &mut App, state: &ViewMenuState) {
+    cx.set_menus(build_menus(state));
     if Platform.kind() == PlatformKind::MacOs {
         return;
     }
-    let owned = build_menus(state, tabs).into_iter()
-                                        .map(Menu::owned)
-                                        .collect();
+    let owned = build_menus(state).into_iter().map(Menu::owned).collect();
     GlobalState::global_mut(cx).set_app_menus(owned);
     if let Some(bar) = cx.try_global::<MenuBarHandle>()
                          .map(|handle| handle.0.clone())
@@ -45,8 +43,7 @@ pub fn install_menus(cx: &mut App, state: &ViewMenuState, tabs: &TabsSnapshot) {
 /// front. Windows and Linux have no such menu, so Settings and Quit go in a
 /// File menu instead, the macOS-only items are left out, and the Catalog menu
 /// is called Library.
-pub fn build_menus_for(kind: PlatformKind, state: &ViewMenuState, tabs: &TabsSnapshot)
-                       -> Vec<Menu> {
+pub fn build_menus_for(kind: PlatformKind, state: &ViewMenuState) -> Vec<Menu> {
     // Column-header clicks produce `SortMethod::Custom { col_key }` rather than
     // the named variants the menu offers; map each back to the menu item it
     // corresponds to so the checkmark still tracks column-driven sorts.
@@ -58,29 +55,6 @@ pub fn build_menus_for(kind: PlatformKind, state: &ViewMenuState, tabs: &TabsSna
         method => Some(method),
     };
     let sort_checked = |target: SortMethod| normalized_sort == Some(target);
-
-    // `cmd-0` always targets the Catalog tab (`open_tabs[0]`); `cmd-<n>` for
-    // `n` in `1..=9` targets the nth open *detail* tab (`open_tabs[n]`),
-    // since Catalog occupies index `0` and is never re-targeted by `cmd-1..9`.
-    // Returns (label, enabled, checked) — checked reflects whether the tab at
-    // this position is the currently active tab.
-    let tab_label = |position: usize| -> (SharedString, bool, bool) {
-        match tabs.open_tabs.get(position) {
-            Some(target @ TabTarget::Catalog) => {
-                (t!("tabs.catalog_tab").to_string().into(), true, *target == tabs.active)
-            }
-            Some(target @ TabTarget::Detail(id)) => {
-                let title = tabs.titles
-                                .get(id)
-                                .cloned()
-                                .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
-                (truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into(),
-                 true,
-                 *target == tabs.active)
-            }
-            None => (t!("menu.window_select_tab_empty").to_string().into(), false, false),
-        }
-    };
 
     let first_menu = if kind == PlatformKind::MacOs {
         Menu::new(t!("sidebar.app_name").to_string()).items([
@@ -182,70 +156,8 @@ pub fn build_menus_for(kind: PlatformKind, state: &ViewMenuState, tabs: &TabsSna
             ),
             MenuItem::separator(),
             MenuItem::action(t!("menu.focus_search").to_string(), FocusSearch),
-            MenuItem::submenu(
-                Menu::new(t!("menu.window_select_tab_title").to_string()).items([
-                    {
-                        let (label, enabled, checked) = tab_label(0);
-                        MenuItem::action(label, SelectTab0)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(1);
-                        MenuItem::action(label, SelectTab1)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(2);
-                        MenuItem::action(label, SelectTab2)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(3);
-                        MenuItem::action(label, SelectTab3)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(4);
-                        MenuItem::action(label, SelectTab4)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(5);
-                        MenuItem::action(label, SelectTab5)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(6);
-                        MenuItem::action(label, SelectTab6)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(7);
-                        MenuItem::action(label, SelectTab7)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(8);
-                        MenuItem::action(label, SelectTab8)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                    {
-                        let (label, enabled, checked) = tab_label(9);
-                        MenuItem::action(label, SelectTab9)
-                            .disabled(!enabled)
-                            .checked(checked)
-                    },
-                ]),
-            ),
+            MenuItem::action(t!("menu.view_show_inspector").to_string(), ToggleInspector)
+                .checked(state.inspector_open),
         ]),
         Menu::new(t!("menu.window_title").to_string()).items([
             MenuItem::action(t!("menu.window_minimize").to_string(), Minimize),
@@ -274,15 +186,12 @@ mod tests {
     use rust_i18n::t;
 
     use super::build_menus_for;
-    use crate::controllers::tabs::TabsController;
     use crate::ui::app::ViewMenuState;
 
     fn titles(kind: PlatformKind) -> Vec<String> {
-        build_menus_for(kind,
-                        &ViewMenuState::default(),
-                        &TabsController::new().snapshot()).into_iter()
-                                                          .map(|menu| menu.name.to_string())
-                                                          .collect()
+        build_menus_for(kind, &ViewMenuState::default()).into_iter()
+                                                        .map(|menu| menu.name.to_string())
+                                                        .collect()
     }
 
     #[test]
@@ -309,14 +218,36 @@ mod tests {
 
     #[test]
     fn the_file_menu_has_settings_and_quit_and_nothing_macos_only() {
-        let menus = build_menus_for(PlatformKind::Linux,
-                                    &ViewMenuState::default(),
-                                    &TabsController::new().snapshot());
+        let menus = build_menus_for(PlatformKind::Linux, &ViewMenuState::default());
         let file = &menus[0];
 
         assert_eq!(file.items.len(), 3);
         assert!(file.items
                     .iter()
                     .all(|item| !matches!(item, MenuItem::SystemMenu(_))));
+    }
+
+    /// Whether the View menu's Show Inspector item is ticked, given whether the
+    /// inspector is open; `None` if the menu has no such item.
+    fn show_inspector_is_ticked(inspector_open: bool) -> Option<bool> {
+        let state = ViewMenuState { inspector_open,
+                                    ..ViewMenuState::default() };
+        let menus = build_menus_for(PlatformKind::MacOs, &state);
+        let view = menus.iter()
+                        .find(|menu| menu.name.as_ref() == t!("menu.view_title"))?;
+        view.items.iter().find_map(|item| match item {
+                             MenuItem::Action { name, checked, .. }
+                                 if name.as_ref() == t!("menu.view_show_inspector") =>
+                             {
+                                 Some(*checked)
+                             }
+                             _ => None,
+                         })
+    }
+
+    #[test]
+    fn the_view_menu_ticks_show_inspector_while_the_inspector_is_open() {
+        assert_eq!(show_inspector_is_ticked(true), Some(true));
+        assert_eq!(show_inspector_is_ticked(false), Some(false));
     }
 }

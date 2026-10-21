@@ -9,23 +9,22 @@ use gpui::{
     Styled, Window, div,
 };
 
+use crate::controllers::inspector::{InspectorController, InspectorPlacement};
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::controllers::tabs::TabsController;
 use crate::data::events::LibraryChanged;
 use crate::data::theme::LibriTheme;
 use crate::ui::app::remember_window;
-use crate::ui::library::cover::{CoverCache, detail_cache_key};
-use crate::ui::views::detail_panel_view::render_detail_tab_content;
+use crate::ui::views::detail_panel_view::render_item_inspector;
 
 /// Root view for a popped-out inspector window.
 pub struct InspectorWindowView {
     item_id:    Arc<str>,
     controller: Entity<LibraryController>,
     settings:   Entity<SettingsController>,
-    /// Holds this window's item list state. It has no pop-out control, since
-    /// the inspector is already in its own window.
-    tabs:       Entity<TabsController>,
+    /// Holds this window's item list state. Its placement is `Window`, so the
+    /// inspector offers no pop-out or close control of its own.
+    inspector:  Entity<InspectorController>,
 }
 
 impl InspectorWindowView {
@@ -34,7 +33,7 @@ impl InspectorWindowView {
     pub fn new(item_id: Arc<str>, controller: Entity<LibraryController>,
                settings: Entity<SettingsController>, window: &mut Window, cx: &mut Context<Self>)
                -> Self {
-        let tabs = cx.new(|_| TabsController::new_for_pop_out_window());
+        let inspector = cx.new(|_| InspectorController::new(InspectorPlacement::Window));
         cx.subscribe_in(&controller,
                         window,
                         |this, _controller, _event: &LibraryChanged, window, cx| {
@@ -50,7 +49,7 @@ impl InspectorWindowView {
         Self { item_id,
                controller,
                settings,
-               tabs }
+               inspector }
     }
 
     /// Closes the window, and forgets it, once its item is no longer in the
@@ -89,17 +88,11 @@ impl Render for InspectorWindowView {
             return window_content;
         };
 
-        let cache = cx.global::<CoverCache>();
-        let cover_image = cache.get(&detail_cache_key(&item.id))
-                               .or_else(|| cache.get(&item.id));
-        let storage_root_path = self.settings.read(cx).snapshot().storage_root_path;
-        window_content.child(render_detail_tab_content(&item,
-                                                       storage_root_path,
-                                                       self.controller.clone(),
-                                                       &self.tabs,
-                                                       colors,
-                                                       cover_image,
-                                                       window,
-                                                       cx))
+        window_content.child(render_item_inspector(&item,
+                                                   &self.controller,
+                                                   &self.settings,
+                                                   &self.inspector,
+                                                   window,
+                                                   cx))
     }
 }

@@ -1,51 +1,41 @@
 use super::*;
 
-/// Builds a catalog item's `on_click` handler: a single click opens the item
-/// popover; a double click additionally opens (or activates) an expanded
-/// detail tab and dismisses the popover. Mirrors the click-count escalation
-/// pattern `gpui-kit`'s own `TableState::on_row_left_click` uses.
-pub(super) fn item_click_handler(id: Arc<str>, title: String, entity: Entity<LibraryController>,
-                                 tabs: Entity<TabsController>)
+/// Builds a catalog item's `on_click` handler: a single click selects the item,
+/// which shows it in the inspector pane; a double click also pops it out into
+/// its own window.
+pub(super) fn item_click_handler(id: Arc<str>, entity: Entity<LibraryController>,
+                                 inspector: Entity<InspectorController>)
                                  -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
     move |event, _window, cx| {
-        let count = event.click_count();
         entity.update(cx, |ctrl, cx| ctrl.select_item(Arc::clone(&id), cx));
-        if count >= 2 {
-            tabs.update(cx, |t, cx| {
-                    t.open_detail_tab(Arc::clone(&id), title.clone(), cx);
-                });
-            entity.update(cx, |ctrl, cx| {
-                      ctrl.clear_selection(cx);
-                      // Reopening a detail tab must show no pre-selected item
-                      // (selection is ephemeral, see
-                      // `catalog-entry-detail-view`).
-                      ctrl.clear_item_selection(&id, cx);
-                      ctrl.ensure_detail_cover(&id, cx);
-                  });
+        if event.click_count() >= 2 {
+            inspector.update(cx, |inspector, cx| {
+                         inspector.request_pop_out(Arc::clone(&id), cx)
+                     });
         }
     }
 }
 
 /// Opens a catalog entry's downloaded content. If the entry bundles more
-/// than one file, opens (or focuses) its expanded detail tab and clears any
-/// stale item selection instead of guessing which file to open — see
+/// than one file, shows the entry's file list in the inspector pane and clears
+/// any stale file selection instead of guessing which file to open — see
 /// `catalog-entry-detail-view`'s requirement that multi-file opens route to
 /// the persistent item list rather than a dead-end warning log.
-pub(crate) fn open_item_or_focus_detail_tab(entry_dir: &Path, item: &LibraryItem,
-                                            tabs: &Entity<TabsController>,
-                                            controller: &Entity<LibraryController>, cx: &mut App) {
+pub(crate) fn open_item_or_show_files(entry_dir: &Path, item: &LibraryItem,
+                                      inspector: &Entity<InspectorController>,
+                                      controller: &Entity<LibraryController>, cx: &mut App) {
     use crate::util::item_opener::{ItemOpener, OpenError};
 
     match ItemOpener::open_item(entry_dir, &item.files) {
         Ok(()) => {}
         Err(OpenError::MultipleFilesRequireSelection) => {
             let id = Arc::clone(&item.id);
-            let title = item.title.to_string();
-            tabs.update(cx, |t, cx| t.open_detail_tab(Arc::clone(&id), title, cx));
+            inspector.update(cx, |inspector, cx| {
+                         inspector.request_show(Arc::clone(&id), InspectorTab::Files, cx)
+                     });
             controller.update(cx, |ctrl, cx| {
                           ctrl.clear_item_selection(&id, cx);
                           ctrl.maybe_check_item(Arc::clone(&id), cx);
-                          ctrl.ensure_detail_cover(&id, cx);
                       });
         }
         Err(OpenError::FileNotFound(path)) => {
@@ -200,9 +190,9 @@ pub(crate) fn render_checking_indicator(is_checking: bool)
 pub(super) fn render_list_item_cell(item: &LibraryItem, column: ListColumn,
                                     tag_names: &[Arc<str>], colors: &ColorTokens,
                                     storage_root: &Path, controller: &Entity<LibraryController>,
-                                    tabs: &Entity<TabsController>, column_width: Pixels,
-                                    window: &Window, is_checking: bool, activity: ItemActivity,
-                                    selection_mode: bool, selected: bool)
+                                    inspector: &Entity<InspectorController>,
+                                    column_width: Pixels, window: &Window, is_checking: bool,
+                                    activity: ItemActivity, selection_mode: bool, selected: bool)
                                     -> AnyElement {
     match column {
         ListColumn::Title => {
@@ -337,7 +327,7 @@ pub(super) fn render_list_item_cell(item: &LibraryItem, column: ListColumn,
                     dtrpg_core::data::storage::publisher_dir(storage_root, &item.publisher);
                 let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
                 let item_for_open = item.clone();
-                let tabs_for_open = tabs.clone();
+                let inspector_for_open = inspector.clone();
                 let controller_for_open = controller.clone();
                 div().id(open_elem_id)
                      .h_full()
@@ -346,11 +336,11 @@ pub(super) fn render_list_item_cell(item: &LibraryItem, column: ListColumn,
                      .justify_center()
                      .cursor_pointer()
                      .on_click(move |_, _, cx| {
-                         open_item_or_focus_detail_tab(&item_open_path,
-                                                       &item_for_open,
-                                                       &tabs_for_open,
-                                                       &controller_for_open,
-                                                       cx);
+                         open_item_or_show_files(&item_open_path,
+                                                 &item_for_open,
+                                                 &inspector_for_open,
+                                                 &controller_for_open,
+                                                 cx);
                      })
                      .child(div().text_xs().text_color(colors.text_tertiary).child("▶"))
                      .into_any_element()

@@ -9,7 +9,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                              catalog_ids: Arc<HashSet<u64>>,
                              collection_sort: CollectionSortMethod,
                              collection_sort_direction: SortDirection,
-                             entity: Entity<LibraryController>, tabs: Entity<TabsController>,
+                             entity: Entity<LibraryController>,
                              collection_name_input: Entity<InputState>,
                              publisher_search: SidebarSectionSearch,
                              collection_search: SidebarSectionSearch, tags: Vec<TagEntry>,
@@ -25,26 +25,22 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                      counts.all,
                                                      active == SidebarFilter::AllTitles,
                                                      SidebarFilter::AllTitles,
-                                                     entity.clone(),
-                                                     tabs.clone()))
+                                                     entity.clone()))
                                      .child(nav_item(&t!("sidebar.recently_updated"),
                                                      counts.recently_updated,
                                                      active == SidebarFilter::RecentlyUpdated,
                                                      SidebarFilter::RecentlyUpdated,
-                                                     entity.clone(),
-                                                     tabs.clone()))
+                                                     entity.clone()))
                                      .child(nav_item(&t!("sidebar.on_this_device"),
                                                      counts.on_device,
                                                      active == SidebarFilter::OnDevice,
                                                      SidebarFilter::OnDevice,
-                                                     entity.clone(),
-                                                     tabs.clone()))
+                                                     entity.clone()))
                                      .child(nav_item(&t!("sidebar.in_the_cloud"),
                                                      counts.in_cloud,
                                                      active == SidebarFilter::InCloud,
                                                      SidebarFilter::InCloud,
-                                                     entity.clone(),
-                                                     tabs.clone()));
+                                                     entity.clone()));
 
     let publishers_count = publishers.len();
 
@@ -56,12 +52,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                   .map(|p| {
                       let is_active = active == SidebarFilter::Publisher(Arc::clone(&p.name));
                       let f = SidebarFilter::Publisher(Arc::clone(&p.name));
-                      nav_item(p.name.as_ref(),
-                               p.count,
-                               is_active,
-                               f,
-                               entity.clone(),
-                               tabs.clone())
+                      nav_item(p.name.as_ref(), p.count, is_active, f, entity.clone())
                   })
                   .collect();
 
@@ -281,8 +272,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                    on_toggle,
                                                    rows: col_rows,
                                                    loading: !collections_loaded,
-                                                   entity: entity.clone(),
-                                                   tabs: tabs.clone() };
+                                                   entity: entity.clone() };
 
     let sidebar_builder =
         sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
@@ -296,6 +286,5 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                    .child(SidebarContent::Menu(Box::new(tags_menu(tags,
                                                                   sidebar_open.tags,
                                                                   &active,
-                                                                  entity,
-                                                                  tabs))))
+                                                                  entity))))
 }

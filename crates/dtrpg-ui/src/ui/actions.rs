@@ -56,9 +56,5 @@ actions!(libri,
           SortDescending,
           ToggleGroupByPublisher,
           ToggleGroupByTag,
+          ToggleInspector,
           FocusSearch,]);
-
-// Window menu tab-selection actions
-actions!(libri,
-         [SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6,
-          SelectTab7, SelectTab8, SelectTab9,]);

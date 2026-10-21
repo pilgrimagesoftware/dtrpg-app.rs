@@ -17,8 +17,7 @@ purchases, on macOS, Linux, and Windows. This is the latest documentation.
 - [Installation]({{ '/latest/install/' | relative_url }}) - download a packaged
   release and get past the macOS/Windows unsigned-build warnings on first run.
 - [Browsing your catalog]({{ '/latest/catalog/' | relative_url }}) - layouts,
-  sorting and grouping, sidebar navigation, and the item popover vs. detail
-  tab.
+  sorting and grouping, sidebar navigation, and the inspector.
 
 ## Organizing and downloading
 

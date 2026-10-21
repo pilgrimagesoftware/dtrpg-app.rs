@@ -14,7 +14,6 @@ pub enum InspectorTab {
     #[default]
     Overview,
     Files,
-    Collections,
     Contents,
     Summary,
 }

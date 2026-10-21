@@ -16,14 +16,16 @@ use dtrpg_core::{
     credentials::{CredentialStore, KeyringCredentialStore},
     data::{
         auth_state::AuthState,
-        constants::{KEYRING_API_KEY, KEYRING_SERVICE},
+        constants::{
+            INSPECTOR_PANE_DEFAULT_WIDTH, INSPECTOR_PANE_MAX_WIDTH, INSPECTOR_PANE_MIN_WIDTH,
+            KEYRING_API_KEY, KEYRING_SERVICE,
+        },
         enums::{CatalogPresentation, GroupBy, SelectionField},
         ui_state::{InspectorWindowPref, UiState},
     },
     services::{LibraryService, collections::CollectionsService},
     util::sort::{SortDirection, SortMethod},
 };
-use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, SharedString, Styled,
@@ -44,13 +46,13 @@ use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{IconName, Sizable as _};
 use rust_i18n::t;
 
+use self::inspector_pane::render_inspector_pane;
 use self::wiring_subscriptions::RootViewEntities;
 use crate::ui::actions::{
     About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
-    ReportFeatureBug, SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5,
-    SelectTab6, SelectTab7, SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings,
-    SortAscending, SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
-    ToggleGroupByPublisher, ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
+    ReportFeatureBug, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded,
+    SortByPages, SortByPublisher, SortByTitle, SortDescending, ToggleGroupByPublisher,
+    ToggleGroupByTag, ToggleInspector, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
@@ -61,11 +63,10 @@ use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_wi
 use crate::ui::views::{
     bulk_action_bar_view::render_bulk_action_bar,
     catalog_view::CatalogView,
-    detail_panel_view::render_detail_tab_content,
+    detail_panel_view::render_item_inspector,
     notification_banner_view::render_notification_banner,
     sidebar_view::render_sidebar,
     status_bar_view::{ActivityBarData, StatusBarSnapshot, render_status_bar},
-    tab_strip_view::render_tab_strip,
     title_bar_view::render_title_bar,
     toolbar_view::render_toolbar,
 };
@@ -73,18 +74,19 @@ use crate::{
     controllers::{
         activity::ActivityController,
         auth_state::AuthStateController,
+        inspector::{InspectorController, InspectorPlacement},
         library::LibraryController,
         settings::SettingsController,
-        tabs::{TabTarget, TabsController, TabsSnapshot},
     },
     data::{
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
-            CollectionMemberRemoveFailed, DownloadComplete, DownloadError,
-            InspectorPopOutRequested, LibraryChanged, LogoutRequested, LowDiskSpaceWarning,
-            SettingsChanged, SignInSucceeded, StartupAuthBegun, StartupAuthFailed, TabsChanged,
-            ThumbnailRefreshCompleted, ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
+            CollectionMemberRemoveFailed, DownloadComplete, DownloadError, InspectorCloseRequested,
+            InspectorPopOutRequested, InspectorShowRequested, LibraryChanged, LogoutRequested,
+            LowDiskSpaceWarning, SettingsChanged, SignInSucceeded, StartupAuthBegun,
+            StartupAuthFailed, ThumbnailRefreshCompleted, ThumbnailRefreshNoOp,
+            ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
     },
@@ -122,17 +124,6 @@ fn warning_notification(message: impl Into<String>) -> Notification {
                        .with_type(NotificationType::Warning)
 }
 
-/// Resolves a Window-menu/`cmd-<n>` tab position to the `TabTarget` currently
-/// open there, if any.
-///
-/// Position `0` always resolves to `open_tabs[0]` (the Catalog tab). Positions
-/// `1..=9` resolve to `open_tabs[position]` — the 1st through 9th *detail*
-/// tab, since Catalog occupies index `0` and is never re-targeted by
-/// `cmd-1`..`cmd-9`.
-fn tab_target_at(snapshot: &TabsSnapshot, position: usize) -> Option<TabTarget> {
-    snapshot.open_tabs.get(position).cloned()
-}
-
 /// Top-level GPUI view for the Libri library window.
 pub struct LibraryRootView {
     controller:                  Entity<LibraryController>,
@@ -140,8 +131,13 @@ pub struct LibraryRootView {
     activity:                    Entity<ActivityController>,
     auth_state:                  Entity<AuthStateController>,
     catalog_view:                Entity<CatalogView>,
-    /// Open/active tab state for the main-window tab strip.
-    tabs:                        Entity<TabsController>,
+    /// State of the inspector pane docked beside the catalog, and where its
+    /// requests (pop out, close, show an item) are heard.
+    inspector:                   Entity<InspectorController>,
+    /// Whether the inspector pane is shown.
+    inspector_open:              bool,
+    /// Restored or default inspector pane initial width.
+    inspector_width:             f32,
     /// Resizable state for the two-column main layout (sidebar / catalog).
     resize_state:                Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
@@ -213,7 +209,7 @@ impl LibraryRootView {
                collections_service: Box<dyn CollectionsService>, startup_api_key: Option<String>)
                -> Self {
         let activity = cx.new(|_| ActivityController::new());
-        let tabs = cx.new(|_| TabsController::new());
+        let inspector = cx.new(|_| InspectorController::new(InspectorPlacement::Docked));
         let controller =
             cx.new(|cx| LibraryController::new(service, collections_service, activity.clone(), cx));
         let login_service = cx.global::<LoginServiceFactory>().0();
@@ -226,7 +222,7 @@ impl LibraryRootView {
                                                   cx,
                                                   controller.clone(),
                                                   settings.clone(),
-                                                  tabs.clone())
+                                                  inspector.clone())
                              });
         let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
         let root_focus = cx.focus_handle();
@@ -235,7 +231,7 @@ impl LibraryRootView {
         let misc = wiring_inputs::build_misc_inputs(window, cx, &controller, &settings);
 
         let entities = RootViewEntities { controller: controller.clone(),
-                                          tabs:       tabs.clone(),
+                                          inspector:  inspector.clone(),
                                           activity:   activity.clone(),
                                           settings:   settings.clone(),
                                           auth_state: auth_state.clone(), };
@@ -243,13 +239,24 @@ impl LibraryRootView {
 
         let ui_state = UiState::load();
         let sidebar_width = ui_state.sidebar_width().unwrap_or(250.0);
+        let inspector_width = ui_state.detail_width()
+                                      .unwrap_or(INSPECTOR_PANE_DEFAULT_WIDTH);
+        let inspector_open = ui_state.inspector_open();
         let resize_state = cx.new(|_| ResizableState::default());
 
-        cx.subscribe(&resize_state, move |_this, state, _event, cx| {
+        cx.subscribe(&resize_state, move |this, state, _event, cx| {
               let sizes = state.read(cx).sizes().clone();
-              if sizes.len() >= 2 {
-                  let sidebar = sizes[0].as_f32();
-                  UiState::load().save_sidebar_width(sidebar);
+              let Some(sidebar) = sizes.first().map(|size| size.as_f32())
+              else {
+                  return;
+              };
+              // A hidden pane keeps its last width, so only a shown one is
+              // saved.
+              match sizes.get(2) {
+                  Some(pane) if this.inspector_open => {
+                      UiState::load().save_panel_widths(sidebar, pane.as_f32());
+                  }
+                  _ => UiState::load().save_sidebar_width(sidebar),
               }
           })
           .detach();
@@ -275,7 +282,9 @@ impl LibraryRootView {
                activity,
                auth_state,
                catalog_view,
-               tabs,
+               inspector,
+               inspector_open,
+               inspector_width,
                resize_state,
                sidebar_width,
                root_focus,
@@ -309,6 +318,7 @@ impl Render for LibraryRootView {
 }
 
 mod actions;
+mod inspector_pane;
 mod inspector_windows;
 mod render;
 mod wiring_inputs;
