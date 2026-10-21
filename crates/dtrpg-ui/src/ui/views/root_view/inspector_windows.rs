@@ -21,12 +21,19 @@ pub(super) fn windows_to_reopen() -> Vec<InspectorWindowPref> {
 }
 
 impl LibraryRootView {
-    /// Moves the inspector for `item_id` out of its tab and into its own
-    /// window. If the item already has a window, that one comes to front.
+    /// Moves the inspector for `item_id` out of the docked pane and into its
+    /// own window. If the item already has a window, that one comes to
+    /// front.
     pub(crate) fn pop_out_inspector(&mut self, item_id: &Arc<str>, cx: &mut Context<Self>) {
         self.show_inspector_window(item_id, None, cx);
-        self.tabs
-            .update(cx, |tabs, cx| tabs.close_detail_tab(item_id, cx));
+        let pane_shows_item = self.controller
+                                  .read(cx)
+                                  .selected_item()
+                                  .is_some_and(|selected| selected.id == *item_id);
+        if pane_shows_item {
+            self.controller
+                .update(cx, |ctrl, cx| ctrl.clear_selection(cx));
+        }
     }
 
     /// Reopens remembered inspector windows whose items have reached the

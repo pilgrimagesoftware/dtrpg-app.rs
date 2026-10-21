@@ -83,31 +83,42 @@ empty library says so instead.
 
 ## Viewing an item
 
-- **Single-click** a catalog entry to open its item popover - a lightweight
-  anchored summary. It never shows a file list, even for multi-file entries.
-- **Double-click** to open a full expanded detail tab, appended to the tab
-  strip next to the always-open Catalog tab. Detail tabs show every
-  attribute and, for multi-file entries, a persistent file list with its own
-  column widths and selection that survive switching tabs. Close a detail
-  tab from its own close button; the Catalog tab can't be closed.
+The inspector sits beside the catalog and shows the item you have selected.
 
-### The detail tab
+- **Single-click** a catalog entry to select it and see it in the inspector.
+- **Double-click** to open it in a window of its own (see
+  [Opening an item in its own window](#opening-an-item-in-its-own-window)).
+- **View > Show Inspector** (or the close button at the top right of the
+  inspector) shows and hides it. Libri remembers whether it was open.
+- Drag the inspector's left edge to make it wider or narrower. Libri remembers
+  the width too.
 
-Under the title the detail tab shows the item's game system and type (for
-example "D&D 5E · Adventure"), when the catalog has them. Its tabs are:
+With nothing selected, the inspector asks you to select an item.
 
-- **Info** - the description, the item's tags, a table of its details (the
-  Type row is the content category DriveThruRPG files it under), and the
-  collections it belongs to.
-- **Files** - each file with its size and download state. **Verify on disk**
-  checks the files against the disk right away and corrects the catalog if a
-  file was moved or deleted outside Libri.
-- **Collections** - which collections the item is in.
+### The inspector
+
+At the top are the cover, the title, the publisher and the item's game system
+and type (for example "D&D 5E · Adventure"), when the catalog has them. Under
+that are the buttons: **Read**, **Download…** (or **Downloaded**), and a **⋮**
+menu with Show in Finder (Explorer, Files) and Refresh thumbnail. Its tabs are:
+
+- **Info** - the description, the item's tags, the collections it belongs to,
+  a table of its details (the Type row is the content category DriveThruRPG
+  files it under), and which application opens the item's file type. That
+  application is the system default unless you set one in Settings > File
+  Openers. A collapsed "Other details" section holds the ids.
+- **Files** - each file with its size and download state, with a count beside
+  the tab's name. For an item with several files this is the list you pick
+  from. **Verify on disk** checks the files against the disk right away and
+  corrects the catalog if a file was moved or deleted outside Libri.
 - **Contents** - what is inside an archive file, loaded when you open the tab.
 - **Summary** - the item's saved content summary, with the model that wrote it,
   when, and its length in tokens. Items without a summary say so. The tab only
   shows summaries; they are written elsewhere for now, for example by an agent
   through the MCP server.
+
+Reading an item that has several files shows its Files tab, so you can choose
+which file to open.
 
 On macOS and Windows, a file that the system has moved out to the cloud (it
 shows a dashed cloud) gets a **Materialize** button next to Download. It asks
@@ -116,13 +127,15 @@ the disk. Opening the file with **Read** does the same automatically.
 
 ### Opening an item in its own window
 
-The arrow-out button at the right end of the detail tab's tab row (hover it for
-"Open in its own window") moves the item into a separate window, so you can
-keep it beside the catalog or beside another item. The detail tab closes when
-the window opens. The window shows the same details and actions as the tab.
+Double-click an item, or press the arrow-out button at the top right of the
+inspector (hover it for "Open in its own window"), to move the item into a
+separate window, so you can keep it beside the catalog or beside another item.
+The window has the same layout, details and actions as the inspector, without
+the inspector's own buttons. If the inspector was showing that item, it goes
+back to asking you to select one.
 
-- Pressing the button again for an item that already has a window brings that
-  window to the front instead of opening a second one.
+- Opening an item that already has a window brings that window to the front
+  instead of opening a second one.
 - Libri remembers these windows. Where you leave one, and which items have one,
   carry over to the next launch: quit with a window open and it reopens in the
   same place. Closing a window yourself means Libri forgets it.

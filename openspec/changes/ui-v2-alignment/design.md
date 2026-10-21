@@ -108,6 +108,28 @@ Slices 4, 10 and 11 do not depend on the foundations and can start at any time.
 - **Needs Attention** means an item with a failed download, for now. It will be
   expanded later (for example unavailable items or missing files).
 
+## Inspector pane (#402)
+
+The mockups dock the inspector beside the list. The main window has no tabs any
+more: the docked pane and the pop-out window replace the detail tab.
+
+- **Single-click** selects an item, and the pane shows it. The old popover is
+  gone.
+- **Double-click** pops the item out into its own window. The pop-out window
+  uses the same layout as the pane, without the pane's pop-out and close
+  buttons.
+- **Read** on an item with several files shows its Files tab, where the file is
+  chosen.
+- The pane opens and closes from **View > Show Inspector** (Alt+Cmd+I) and its
+  close button. Its width is dragged at its left edge. Both are remembered.
+- With nothing selected the pane asks for a selection.
+- The tab strip, the Window menu's tab items and Cmd+0 to Cmd+9 are removed.
+  The Collections tab folds into Info, which now lists the description, tags,
+  collections, details, Opens With and the collapsed other details.
+- Left for later: a toolbar button for the pane, choosing the opener from
+  Opens With (it only shows the current one), the Location row (needs slice 1),
+  and the Cover tab and full-size cover viewer.
+
 ## Open questions
 
 - The mockups are light-theme only. Is a dark pass of the screens needed before

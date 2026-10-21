@@ -456,23 +456,4 @@ impl LibraryController {
         toggle_bool_flag(&mut self.file_other_details_open, key);
         cx.emit(LibraryChanged);
     }
-
-    // ── Detail panel width
-    // ────────────────────────────────────────────────────
-
-    /// Returns the current detail panel width, in pixels.
-    #[must_use]
-    pub fn detail_panel_width(&self) -> f32 {
-        self.detail_panel_width
-    }
-
-    /// Sets the detail panel width, clamped to
-    /// `[DETAIL_PANEL_MIN_WIDTH, DETAIL_PANEL_MAX_WIDTH]`.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn set_detail_panel_width(&mut self, width: f32, cx: &mut Context<Self>) {
-        self.detail_panel_width = width.clamp(dtrpg_core::data::constants::DETAIL_PANEL_MIN_WIDTH,
-                                              dtrpg_core::data::constants::DETAIL_PANEL_MAX_WIDTH);
-        cx.emit(LibraryChanged);
-    }
 }

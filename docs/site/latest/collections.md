@@ -11,8 +11,8 @@ independent of publisher or any other built-in grouping.
 
 ## Managing an item's collections
 
-Open the "Manage Collections" dialog from a catalog item (its item popover
-or detail tab) to see and change which collections that item belongs to.
+Open the "Manage Collections" dialog from a catalog item (the inspector's
+Info tab) to see and change which collections that item belongs to.
 The dialog also lets you create a new collection inline, without leaving it
 to set one up first.
 

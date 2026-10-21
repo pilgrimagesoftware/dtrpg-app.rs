@@ -6,13 +6,11 @@ use super::*;
 /// download all/reload/delete, and drop target for [`DraggedLibraryItem`]
 /// (adds the dragged catalog item as a member of this collection).
 pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
-                         entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-                         cx: &mut App)
+                         entity: Entity<LibraryController>, cx: &mut App)
                          -> AnyElement {
     let is_active = row.is_active;
     let filter = SidebarFilter::Collection(row.id, Arc::clone(&row.name));
     let click_entity = entity.clone();
-    let click_tabs = tabs;
     let download_entity = entity.clone();
     let reload_entity = entity.clone();
     let delete_entity = entity.clone();
@@ -44,7 +42,6 @@ pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow
          })
          .on_click(move |_, _, cx| {
              click_entity.update(cx, |ctrl, cx| ctrl.set_filter(filter.clone(), cx));
-             click_tabs.update(cx, |ctrl, cx| ctrl.activate(TabTarget::Catalog, cx));
          })
          .child(div().flex_1()
                      .flex()

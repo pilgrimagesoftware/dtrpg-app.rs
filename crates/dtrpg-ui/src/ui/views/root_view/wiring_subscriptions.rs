@@ -11,7 +11,7 @@ use super::*;
 /// function-argument-count convention.
 pub(super) struct RootViewEntities {
     pub(super) controller: Entity<LibraryController>,
-    pub(super) tabs:       Entity<TabsController>,
+    pub(super) inspector:  Entity<InspectorController>,
     pub(super) activity:   Entity<ActivityController>,
     pub(super) settings:   Entity<SettingsController>,
     pub(super) auth_state: Entity<AuthStateController>,
@@ -22,7 +22,7 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                                             entities: &RootViewEntities,
                                             startup_api_key: Option<String>) {
     let RootViewEntities { controller,
-                           tabs,
+                           inspector,
                            activity,
                            settings,
                            auth_state, } = entities;
@@ -123,47 +123,29 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                     })
       .detach();
 
-    cx.subscribe(controller, |this, ctrl, _event: &LibraryChanged, cx| {
-          // Keep the native View menu's checkmarks (presentation, sort,
-          // grouping) in sync with the
-          // toolbar/keyboard-driven selection. `LibraryChanged`
-          // fires far more often than the checkmark-relevant state actually
-          // changes (e.g. once per thumbnail during a catalog load), and
-          // `cx.set_menus` replaces the whole native menu bar — on macOS
-          // that tears down any menu currently tracking a
-          // click, which read as the app menu flickering or
-          // closing itself right after opening. Only
-          // rebuild when the state that drives the checkmarks has changed.
-          let ctrl = ctrl.read(cx);
-          let menu_state = ViewMenuState { presentation:   ctrl.presentation,
-                                           sort:           ctrl.sort,
-                                           sort_direction: ctrl.sort_direction,
-                                           group_by:       ctrl.group_by, };
+    cx.subscribe(controller, |this, _ctrl, _event: &LibraryChanged, cx| {
           this.restore_inspector_windows(cx);
-          if this.last_menu_state != Some(menu_state) {
-              let tabs = this.tabs.read(cx).snapshot();
-              install_menus(cx, &menu_state, &tabs);
-              this.last_menu_state = Some(menu_state);
-          }
+          this.refresh_menus(cx);
           cx.notify();
       })
       .detach();
 
-    cx.subscribe(tabs, |this, ctrl, _event: &TabsChanged, cx| {
-          // Keep the native Window menu's tab-selection items (labels and
-          // enabled state) in sync with the open tab set. Unlike
-          // `LibraryChanged`, `TabsChanged` only fires on an actual
-          // open/close/activate, so no de-duplication guard is needed here.
-          let menu_state = this.last_menu_state.unwrap_or_default();
-          let tabs = ctrl.read(cx).snapshot();
-          install_menus(cx, &menu_state, &tabs);
-          cx.notify();
-      })
+    cx.subscribe(inspector,
+                 |this, _inspector, event: &InspectorPopOutRequested, cx| {
+                     this.pop_out_inspector(&event.item_id, cx);
+                 })
       .detach();
 
-    cx.subscribe(tabs, |this, _tabs, event: &InspectorPopOutRequested, cx| {
-          this.pop_out_inspector(&event.item_id, cx);
-      })
+    cx.subscribe(inspector,
+                 |this, _inspector, event: &InspectorShowRequested, cx| {
+                     this.show_in_inspector_pane(&event.item_id, event.tab, cx);
+                 })
+      .detach();
+
+    cx.subscribe(inspector,
+                 |this, _inspector, _event: &InspectorCloseRequested, cx| {
+                     this.set_inspector_open(false, cx);
+                 })
       .detach();
 
     cx.subscribe(activity, |_this, _ctrl, _event: &ActivityChanged, cx| {

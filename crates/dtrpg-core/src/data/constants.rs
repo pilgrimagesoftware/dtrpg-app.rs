@@ -124,30 +124,14 @@ pub const ERROR_EXPIRY_SECS: u64 = 120;
 /// reached.
 pub const ALERT_LOG_CAP: usize = 100;
 
-/// Default width of the detail panel, in pixels.
-pub const DETAIL_PANEL_DEFAULT_WIDTH: f32 = 320.0;
-/// Minimum allowed detail panel width, in pixels.
-pub const DETAIL_PANEL_MIN_WIDTH: f32 = 240.0;
-/// Maximum allowed detail panel width, in pixels.
-pub const DETAIL_PANEL_MAX_WIDTH: f32 = 600.0;
-/// Maximum width of the detail panel's cover thumbnail, in pixels.
-///
-/// The thumbnail no longer grows with the panel past this size; instead it
-/// stays centered horizontally at the top of the panel.
-pub const DETAIL_PANEL_COVER_MAX_WIDTH: f32 = DETAIL_PANEL_DEFAULT_WIDTH;
-
-/// Maximum character count for a detail tab's title before it is truncated
-/// with an ellipsis.
-///
-/// The tab strip has no fixed per-tab width, so a long catalog item title
-/// otherwise stretches its tab (and the whole strip) rather than eliding —
-/// see [`crate::util::text::truncate_with_ellipsis`].
-pub const DETAIL_TAB_TITLE_MAX_CHARS: usize = 40;
-
-/// Width of the single-click item popover, in pixels.
-pub const ITEM_POPOVER_WIDTH: f32 = 260.0;
-/// Gap between the item popover and the catalog entry it's anchored beside.
-pub const ITEM_POPOVER_MARGIN: f32 = 8.0;
+/// Default width of the inspector pane beside the catalog, in pixels.
+pub const INSPECTOR_PANE_DEFAULT_WIDTH: f32 = 380.0;
+/// Minimum width the inspector pane can be dragged to, in pixels.
+pub const INSPECTOR_PANE_MIN_WIDTH: f32 = 300.0;
+/// Maximum width the inspector pane can be dragged to, in pixels.
+pub const INSPECTOR_PANE_MAX_WIDTH: f32 = 640.0;
+/// Width of the cover thumbnail in the inspector's header, in pixels.
+pub const INSPECTOR_THUMBNAIL_WIDTH: f32 = 84.0;
 
 /// Default body-font family, serif-leaning to match the app's old-style body
 /// text. Only a starting point — the Appearance settings page lets the user

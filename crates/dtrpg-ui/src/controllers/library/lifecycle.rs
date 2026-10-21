@@ -91,9 +91,6 @@ impl LibraryController {
                           publisher_search_query: String::new(),
                           collection_search_open: false,
                           collection_search_query: String::new(),
-                          detail_panel_width:
-                              dtrpg_core::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-                          entry_bounds: HashMap::new(),
                           selected_item_file: HashMap::new(),
                           inspector_tabs: HashMap::new(),
                           inspector_contents: HashMap::new(),

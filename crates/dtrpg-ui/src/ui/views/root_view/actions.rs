@@ -4,6 +4,28 @@
 use super::*;
 
 impl LibraryRootView {
+    /// Rebuilds the application menus if what their checkmarks show has
+    /// changed: the presentation, sort, grouping and whether the inspector
+    /// pane is open.
+    ///
+    /// `LibraryChanged` fires far more often than that state does (once per
+    /// thumbnail during a catalog load), and `cx.set_menus` replaces the whole
+    /// native menu bar — on macOS that tears down any menu being tracked, which
+    /// read as the menu flickering or closing right after opening. So the menus
+    /// are only rebuilt when the state behind their checkmarks changed.
+    pub(super) fn refresh_menus(&mut self, cx: &mut Context<Self>) {
+        let controller = self.controller.read(cx);
+        let menu_state = ViewMenuState { presentation:   controller.presentation,
+                                         sort:           controller.sort,
+                                         sort_direction: controller.sort_direction,
+                                         group_by:       controller.group_by,
+                                         inspector_open: self.inspector_open, };
+        if self.last_menu_state != Some(menu_state) {
+            install_menus(cx, &menu_state);
+            self.last_menu_state = Some(menu_state);
+        }
+    }
+
     /// The library controller, for app-level menu fallbacks that act on the
     /// catalog without going through this view.
     pub(crate) fn controller(&self) -> Entity<LibraryController> {

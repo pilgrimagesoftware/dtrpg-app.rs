@@ -16,7 +16,7 @@ read back into Libri.
 
 ## Tagging an item
 
-Open an item's detail tab. The Tags row shows its tags as chips.
+Select an item. The inspector's Info tab shows its tags as chips.
 
 - Choose **Add tag** to open the tag dialog. Tick a tag you have already made to
   put it on the item, or type a new name and choose **Add**.
@@ -30,7 +30,7 @@ list.
 ## Colors
 
 A tag can have one of seven colors: gray, green, purple, blue, yellow, red or
-orange. Right-click a tag, either a chip in the detail tab or a row in the
+orange. Right-click a tag, either a chip in the inspector or a row in the
 sidebar, and choose a color, or **No color**. The color applies to the tag
 wherever it appears.
 
