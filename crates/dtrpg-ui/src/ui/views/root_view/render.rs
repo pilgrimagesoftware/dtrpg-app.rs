@@ -192,7 +192,15 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                          .min_h_0()
                          .flex()
                          .children(filters_column)
-                         .child(div().flex_1().min_w_0().child(view.catalog_view.clone())));
+                         // A column, so the catalog view's own `flex_1` has a height to fill:
+                         // as a plain box it collapsed to nothing and the whole content
+                         // area went blank.
+                         .child(div().flex_1()
+                                     .min_w_0()
+                                     .min_h_0()
+                                     .flex()
+                                     .flex_col()
+                                     .child(view.catalog_view.clone())));
 
     let surface = colors.surface;
     let text_primary = colors.text_primary;
