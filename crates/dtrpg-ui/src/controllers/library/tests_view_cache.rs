@@ -107,3 +107,21 @@ fn a_thumbnail_attempt_for_an_item_nobody_has_changes_nothing(cx: &mut TestAppCo
                                       .all(|item| item.thumbnail_last_attempted.is_none()));
                       });
 }
+
+#[gpui::test]
+fn the_view_is_loading_only_while_the_catalog_loads_and_nothing_is_on_show(cx: &mut TestAppContext)
+{
+    let fixture = fixture_with_numbered_items(cx, 5);
+
+    fixture.controller.update(cx, |ctrl, _| {
+                          ctrl.catalog_loading = true;
+                          assert!(!ctrl.is_view_loading(), "items are on show");
+
+                          ctrl.search_query = "type:no-such-type".to_owned();
+                          ctrl.invalidate_cache();
+                          assert!(ctrl.is_view_loading(), "nothing is on show yet");
+
+                          ctrl.catalog_loading = false;
+                          assert!(!ctrl.is_view_loading(), "loading has finished");
+                      });
+}

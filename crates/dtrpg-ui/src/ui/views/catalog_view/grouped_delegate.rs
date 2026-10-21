@@ -29,7 +29,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
     }
 
     fn loading(&self, cx: &App) -> bool {
-        self.controller.read(cx).is_loading()
+        self.controller.read(cx).is_view_loading()
     }
 
     fn rows_count(&self, _cx: &App) -> usize {

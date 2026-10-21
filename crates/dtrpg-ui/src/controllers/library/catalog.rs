@@ -248,6 +248,17 @@ impl LibraryController {
         self.catalog_loading && self.index().count_all().unwrap_or(0) == 0
     }
 
+    /// Returns true while the catalog is still loading and nothing is on show,
+    /// so the content area has to say it is loading instead of staying blank.
+    ///
+    /// This differs from [`Self::is_loading`] when items have arrived but none
+    /// of them is in the current view yet, as when a collection is opened
+    /// before its members have come in. It also reads no index, which matters
+    /// because the table asks every frame.
+    pub fn is_view_loading(&self) -> bool {
+        self.catalog_loading && self.visible_items_count() == 0
+    }
+
     /// Returns true until the catalog fetch has finished, even when some
     /// items have already arrived. Unlike [`Self::is_loading`], an item that
     /// is missing while this is true may still be on its way.
