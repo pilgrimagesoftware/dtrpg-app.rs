@@ -170,6 +170,15 @@ impl LibraryIndex {
         items::count_all(&self.conn)
     }
 
+    /// The combined size of every item, in megabytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn total_size_mb(&self) -> Result<f64, IndexError> {
+        items::total_size_mb(&self.conn)
+    }
+
     /// Counts items whose `status` matches `status`.
     ///
     /// # Errors

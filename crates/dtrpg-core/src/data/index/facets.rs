@@ -132,6 +132,24 @@ mod tests {
     }
 
     #[test]
+    fn total_size_mb_sums_every_item() {
+        let mut big = item("big", "Paizo", ItemStatus::Cloud, None);
+        big.size_mb = 12.5;
+        let mut small = item("small", "Paizo", ItemStatus::Cloud, None);
+        small.size_mb = 0.5;
+        let mut index = LibraryIndex::open_in_memory().unwrap();
+        index.replace_all_items(&[big, small]).unwrap();
+
+        assert!((index.total_size_mb().unwrap() - 13.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn total_size_mb_of_an_empty_index_is_zero() {
+        let index = LibraryIndex::open_in_memory().unwrap();
+        assert!(index.total_size_mb().unwrap().abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn section_counts_on_an_empty_index_is_zeroed() {
         let index = LibraryIndex::open_in_memory().unwrap();
         assert_eq!(index.section_counts(1_770_000_000, 30).unwrap(),

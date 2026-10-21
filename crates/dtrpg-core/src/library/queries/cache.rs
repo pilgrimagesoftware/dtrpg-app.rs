@@ -188,6 +188,19 @@ impl Library {
             }
             Err(error) => tracing::warn!(%error, "could not count the catalog sections"),
         }
+        let total = self.index
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .total_size_mb();
+        match total {
+            Ok(total_mb) => {
+                self.query_cache
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .total_mb = total_mb;
+            }
+            Err(error) => tracing::warn!(%error, "could not total the catalog size"),
+        }
     }
 
     /// Refreshes both sidebar facet lists (section counts and publishers),
@@ -263,6 +276,16 @@ impl Library {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .section_counts
+    }
+
+    /// The combined size of the catalog in megabytes, from the most recent
+    /// refresh of the section counts. Cheap: the render path asks every frame.
+    #[must_use]
+    pub fn total_size_mb(&self) -> f64 {
+        self.query_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .total_mb
     }
 
     /// The publisher list, from the most recent `invalidate_cache` call.
