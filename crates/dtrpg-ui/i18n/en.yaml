@@ -522,6 +522,8 @@ download_sheet:
   download: "Download"
 
 filters:
+  format: "Format"
+  genre: "Genre"
   save_as_smart_collection: "Save as smart collection"
   save_as_smart_collection_tooltip: "Make a smart collection from these filters"
   toggle_tooltip: "Show or hide the filters"
@@ -537,6 +539,8 @@ filters:
 smart_collections:
   edit: "Edit smart collection…"
   editor:
+    field_format: "format"
+    field_genre: "genre"
     title_new: "New smart collection"
     title_edit: "Edit smart collection"
     description: "Membership is recomputed whenever the library changes - nothing to maintain by hand."

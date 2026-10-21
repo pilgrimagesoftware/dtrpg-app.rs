@@ -124,6 +124,8 @@ fn field_label(field: Field) -> String {
         Field::Publisher => t!("smart_collections.editor.field_publisher"),
         Field::System => t!("smart_collections.editor.field_system"),
         Field::Type => t!("smart_collections.editor.field_type"),
+        Field::Format => t!("smart_collections.editor.field_format"),
+        Field::Genre => t!("smart_collections.editor.field_genre"),
         Field::Availability => t!("smart_collections.editor.field_availability"),
     }.to_string()
 }
@@ -398,6 +400,8 @@ mod tests {
                     "smart_collections.editor.remove_rule_tooltip",
                     "smart_collections.editor.on_match_later_tooltip",
                     "smart_collections.editor.no_equivalent_query",
+                    "smart_collections.editor.field_format",
+                    "smart_collections.editor.field_genre",
                     "smart_collections.editor.save",
                     "smart_collections.edit",
                     "filters.save_as_smart_collection",

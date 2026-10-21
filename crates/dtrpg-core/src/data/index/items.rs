@@ -7,6 +7,7 @@ use rusqlite::{Connection, OptionalExtension, Row, params};
 use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, tags};
 use crate::data::library::{LibraryItem, LibraryItemFile};
+use crate::data::product_filter::ProductFilter;
 
 pub(super) fn status_to_text(status: ItemStatus) -> &'static str {
     match status {
@@ -39,6 +40,7 @@ pub(super) fn replace_all_items(conn: &mut Connection, items: &[LibraryItem])
                                 -> Result<(), IndexError> {
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM files", [])?;
+    tx.execute("DELETE FROM item_filters", [])?;
     tx.execute("DELETE FROM items", [])?;
     tx.execute("DELETE FROM items_fts", [])?;
 
@@ -64,6 +66,8 @@ pub(super) fn replace_all_items(conn: &mut Connection, items: &[LibraryItem])
 pub(super) fn replace_item(conn: &mut Connection, item: &LibraryItem) -> Result<(), IndexError> {
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM files WHERE item_id = ?1",
+               params![item.id.as_ref()])?;
+    tx.execute("DELETE FROM item_filters WHERE item_id = ?1",
                params![item.id.as_ref()])?;
     tx.execute("DELETE FROM items WHERE id = ?1", params![item.id.as_ref()])?;
     tx.execute("DELETE FROM items_fts WHERE item_id = ?1",
@@ -123,6 +127,16 @@ fn insert_item(conn: &Connection, item: &LibraryItem) -> rusqlite::Result<()> {
         )?;
     }
 
+    for filter in &item.filters {
+        conn.execute("INSERT OR REPLACE INTO item_filters (item_id, filter_id, parent_id, category, name)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+                     params![item.id.as_ref(),
+                             filter.id as i64,
+                             filter.parent_id as i64,
+                             filter.category.as_ref(),
+                             filter.name.as_ref()])?;
+    }
+
     let file_names = item.files
                          .iter()
                          .map(|f| f.name.as_ref())
@@ -170,7 +184,32 @@ pub(super) fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
                      thumbnail_last_attempted:  None,
                      is_available:              row.get("is_available")?,
                      availability_last_checked: None,
-                     files:                     Vec::new(), })
+                     files:                     Vec::new(),
+                     filters:                   Vec::new(), })
+}
+
+/// Reads the filters of the item `item_id`, in the order they were stored.
+pub(super) fn load_filters_for(conn: &Connection, item_id: &str)
+                               -> rusqlite::Result<Vec<ProductFilter>> {
+    let mut stmt = conn.prepare(
+                                "SELECT filter_id, parent_id, category, name
+         FROM item_filters WHERE item_id = ?1 ORDER BY rowid",
+    )?;
+    let filters = stmt.query_map(params![item_id], |row| {
+                          Ok(ProductFilter { id:        row.get::<_, i64>(0)? as u64,
+                                             parent_id: row.get::<_, i64>(1)? as u64,
+                                             category:  Arc::from(row.get::<_, String>(2)?),
+                                             name:      Arc::from(row.get::<_, String>(3)?), })
+                      })?
+                      .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(filters)
+}
+
+/// Reads what is stored outside the item's own row: its files and filters.
+pub(super) fn attach_details(conn: &Connection, item: &mut LibraryItem) -> rusqlite::Result<()> {
+    item.files = load_files_for(conn, &item.id)?;
+    item.filters = load_filters_for(conn, &item.id)?;
+    Ok(())
 }
 
 pub(super) fn load_files_for(conn: &Connection, item_id: &str)
@@ -204,7 +243,7 @@ pub(super) fn list_items(conn: &Connection) -> Result<Vec<LibraryItem>, IndexErr
     let mut items = stmt.query_map([], row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut items {
-        item.files = load_files_for(conn, &item.id)?;
+        attach_details(conn, item)?;
     }
     Ok(items)
 }
@@ -221,7 +260,7 @@ pub(super) fn get_item(conn: &Connection, id: &str) -> Result<Option<LibraryItem
     else {
         return Ok(None);
     };
-    item.files = load_files_for(conn, &item.id)?;
+    attach_details(conn, &mut item)?;
     Ok(Some(item))
 }
 
@@ -249,7 +288,7 @@ pub(super) fn search(conn: &Connection, query: &str) -> Result<Vec<LibraryItem>,
     let mut items = stmt.query_map(params![fts_query], row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut items {
-        item.files = load_files_for(conn, &item.id)?;
+        attach_details(conn, item)?;
     }
     Ok(items)
 }

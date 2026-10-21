@@ -499,6 +499,8 @@ download_sheet:
   download: "Télécharger"
 
 filters:
+  format: "Format"
+  genre: "Genre"
   save_as_smart_collection: "Enregistrer comme collection intelligente"
   save_as_smart_collection_tooltip: "Créer une collection intelligente à partir de ces filtres"
   toggle_tooltip: "Afficher ou masquer les filtres"
@@ -514,6 +516,8 @@ filters:
 smart_collections:
   edit: "Modifier la collection intelligente…"
   editor:
+    field_format: "format"
+    field_genre: "genre"
     title_new: "Nouvelle collection intelligente"
     title_edit: "Modifier la collection intelligente"
     description: "Les membres sont recalculés à chaque modification de la bibliothèque - rien à entretenir à la main."

@@ -9,10 +9,12 @@ use dtrpg_core::data::smart_collection::{MatchMode, Operator, Rule, SmartCollect
 use dtrpg_core::util::search::{Field, SearchQuery};
 
 /// The fields a rule can test, in the order the field menu lists them.
-pub const RULE_FIELDS: [Field; 5] = [Field::Tag,
+pub const RULE_FIELDS: [Field; 7] = [Field::Tag,
                                      Field::Publisher,
                                      Field::System,
                                      Field::Type,
+                                     Field::Format,
+                                     Field::Genre,
                                      Field::Availability];
 
 /// A smart collection as it is being edited.

@@ -9,6 +9,9 @@ use dtrpg_sdk::{
 };
 
 use crate::constants::{BYTES_PER_MB, DEFAULT_COLOR, DTRPG_IMAGES_BASE_URL};
+use crate::data::product_filter::{
+    CATEGORY_PRODUCT_TYPE, CATEGORY_RULE_SYSTEM, ProductFilter, most_specific,
+};
 use crate::data::{
     enums::ItemStatus,
     library::{LibraryItem, LibraryItemFile},
@@ -140,19 +143,30 @@ fn resolve_detail_cover_url(product_info: Option<&OrderProductInfo>) -> Option<S
                 })
 }
 
-fn resolve_kind(attributes: &OrderProductAttributes) -> String {
+/// The product's filters, mapped from the API's.
+fn map_filters(attributes: &OrderProductAttributes) -> Vec<ProductFilter> {
     attributes.filters
-              .as_ref()
-              .and_then(|filters| filters.iter().find(|f| f.parent_filter_id == 0))
-              .map(|f| {
-                  if f.parent_name.is_empty() {
-                      f.name.clone()
-                  }
-                  else {
-                      f.parent_name.clone()
-                  }
-              })
-              .unwrap_or_else(|| "Library item".to_string())
+              .iter()
+              .flatten()
+              .map(|filter| ProductFilter { id:        filter.filter_id,
+                                            parent_id: filter.parent_filter_id,
+                                            category:  filter.parent_name.as_str().into(),
+                                            name:      filter.name.as_str().into(), })
+              .collect()
+}
+
+/// The product's game system: its most specific rule system, or empty if the
+/// API names none.
+fn resolve_system(filters: &[ProductFilter]) -> String {
+    most_specific(filters, CATEGORY_RULE_SYSTEM).map(|filter| filter.name.to_string())
+                                                .unwrap_or_default()
+}
+
+/// The product's type: its most specific product type, or a placeholder if the
+/// API names none.
+fn resolve_kind(filters: &[ProductFilter]) -> String {
+    most_specific(filters, CATEGORY_PRODUCT_TYPE).map_or_else(|| "Library item".to_string(),
+                                                              |filter| filter.name.to_string())
 }
 
 // File `title` is the document's display name (e.g. "Player's Handbook"), not
@@ -226,7 +240,9 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
     let product_info = resolve_product_info(item, products);
     let cover_url = resolve_cover_url(product_info);
     let detail_cover_url = resolve_detail_cover_url(product_info);
-    let kind = resolve_kind(attributes);
+    let filters = map_filters(attributes);
+    let line = resolve_system(&filters);
+    let kind = resolve_kind(&filters);
     let format = resolve_format(&attributes.files);
     let size_mb = attributes.files.iter().map(|f| f.size as f64).sum::<f64>() / BYTES_PER_MB;
     let files = map_files(&attributes.files);
@@ -267,7 +283,7 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
                   product_id: attributes.product_id,
                   title: attributes.name.as_str().into(),
                   publisher: publisher.as_str().into(),
-                  line: "".into(),
+                  line: line.as_str().into(),
                   kind: kind.as_str().into(),
                   format: format.as_str().into(),
                   pages: 0,
@@ -284,7 +300,8 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
                   thumbnail_last_attempted: None,
                   is_available: true,
                   availability_last_checked: None,
-                  files }
+                  files,
+                  filters }
 }
 
 #[cfg(test)]

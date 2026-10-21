@@ -46,7 +46,7 @@ up to date.
 The editor has a name, a list of rules and a line that says how many titles match
 right now, for example "Matches 17 of 18 titles right now". It changes as you type.
 
-Each rule has a field (tag, publisher, system, type or availability), "is" or "is
+Each rule has a field (tag, publisher, system, type, format, genre or availability), "is" or "is
 not", and a value. Capital letters do not matter. A rule with no value is ignored while
 you are still typing it. Choose whether a title has to meet **all** of the rules or
 **any** of them.

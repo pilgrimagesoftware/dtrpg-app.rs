@@ -25,7 +25,7 @@ fn item(id: &str, publisher: &str) -> LibraryItem {
                      ItemStatus::Cloud,
                      "#000000",
                      "",
-                     None)
+                     None).with_filter("Product Type", "Core")
 }
 
 fn test_storage_config() -> StorageConfig {
