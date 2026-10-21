@@ -48,6 +48,18 @@ The sidebar has three sections:
 The toolbar's search box filters the current section's titles as you type. It also finds items by tag: see
 [Tags]({{ '/latest/tags/' | relative_url }}).
 
+## When there is nothing to show
+
+While the catalog loads for the first time, grey placeholders stand in for the
+titles: rows in the thumbnail layout and cards in the grid. The list layout
+draws its own.
+
+If your search and section leave no titles, the catalog says "No titles match
+these filters" and tells you what to change: clear the search (the x in the
+search box), go back to all titles, or both. When a section other than All
+Titles is chosen, a **Show all titles** button goes back to it in one click. An
+empty library says so instead.
+
 ## Viewing an item
 
 - **Single-click** a catalog entry to open its item popover - a lightweight

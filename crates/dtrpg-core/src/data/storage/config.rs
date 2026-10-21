@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::paths::{collection_dir, publisher_dir, validate_writable};
-use super::placement::{self, PlacementCondition, PlacementRule};
+use super::placement::{self, PlacementRule};
 use super::roots::{RootHealth, StorageRoot, root_health};
 use crate::data::constants::{
     RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, RECENTLY_UPDATED_WINDOW_MAX_DAYS,
@@ -41,6 +41,8 @@ pub enum StorageError {
 
 // ── StorageConfig
 // ─────────────────────────────────────────────────────────────
+
+mod rules;
 
 /// Default number of concurrent thumbnail/download fetches when no override
 /// has been saved.
@@ -184,6 +186,21 @@ impl StorageConfig {
                next_root_id:                 1, }
     }
 
+    /// Returns this configuration with `roots` as its additional storage
+    /// roots, in memory only, without saving them or checking that they exist.
+    ///
+    /// For tests only, for the reason [`for_test`](Self::for_test) gives:
+    /// [`add_root`](Self::add_root) saves to the real, shared config file.
+    #[must_use]
+    pub fn with_extra_roots(mut self, roots: Vec<StorageRoot>) -> Self {
+        self.next_root_id = roots.iter()
+                                 .map(|root| root.id)
+                                 .max()
+                                 .map_or(1, |id| id + 1);
+        self.extra_roots = roots;
+        self
+    }
+
     /// Returns this configuration with the "Create collections" setting set to
     /// `enabled` in memory only, without saving it.
     ///
@@ -307,46 +324,6 @@ impl StorageConfig {
         let before = self.extra_roots.len();
         self.extra_roots.retain(|r| r.id != id);
         if self.extra_roots.len() != before {
-            self.save();
-        }
-    }
-
-    /// Returns the configured placement rules, in evaluation order.
-    #[must_use]
-    pub fn rules(&self) -> &[PlacementRule] {
-        &self.rules
-    }
-
-    /// Appends a new placement rule to the end of the evaluation order.
-    pub fn add_rule(&mut self, condition: PlacementCondition, target_root_id: u32) {
-        self.rules.push(PlacementRule { condition,
-                                        target_root_id });
-        self.save();
-    }
-
-    /// Removes the rule at `index`, if one exists there.
-    pub fn remove_rule(&mut self, index: usize) {
-        if index < self.rules.len() {
-            self.rules.remove(index);
-            self.save();
-        }
-    }
-
-    /// Moves the rule at `index` earlier in evaluation order, swapping it
-    /// with its predecessor. A no-op if `index` is `0` or out of range.
-    pub fn move_rule_up(&mut self, index: usize) {
-        if index > 0 && index < self.rules.len() {
-            self.rules.swap(index, index - 1);
-            self.save();
-        }
-    }
-
-    /// Moves the rule at `index` later in evaluation order, swapping it
-    /// with its successor. A no-op if `index` is the last rule or out of
-    /// range.
-    pub fn move_rule_down(&mut self, index: usize) {
-        if index + 1 < self.rules.len() {
-            self.rules.swap(index, index + 1);
             self.save();
         }
     }

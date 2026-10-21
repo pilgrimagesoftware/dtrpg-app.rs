@@ -38,6 +38,7 @@ use crate::controllers::tabs::{TabsController, item_list_table};
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
+use crate::ui::views::download_sheet_dialog::open_download_sheet_dialog;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::ui::views::tags_section_view::render_tags_section;
 use crate::ui::widgets::{selectable_text, small_caps_text};
@@ -284,7 +285,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     } else if is_downloaded {
                                         t!("detail.downloaded_button")
                                     } else {
-                                        t!("detail.download_button")
+                                        t!("detail.download_sheet_button")
                                     })
                                     .on_click(move |_, window, cx| {
                                         let id = Arc::clone(&item_id);
@@ -310,6 +311,14 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                                         true
                                                     })
                                             });
+                                        }
+                                        else if let Some(sheet) =
+                                            entity_download.read(cx).download_sheet_for(&id)
+                                        {
+                                            open_download_sheet_dialog(window,
+                                                                       cx,
+                                                                       entity_download.clone(),
+                                                                       sheet);
                                         }
                                         else {
                                             entity_download.update(cx, |ctrl, cx| {
