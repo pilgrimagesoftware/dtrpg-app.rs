@@ -95,6 +95,26 @@ fn detect_os_locale() -> String {
 mod tests {
     use super::*;
 
+    /// A placeholder is written `%{name}`. A bare `{name}` is printed as it is,
+    /// braces and all, so no text may have one.
+    #[test]
+    fn every_placeholder_in_every_language_file_uses_the_percent_form() {
+        let files = [("en", include_str!("../../i18n/en.yaml")),
+                     ("de", include_str!("../../i18n/de.yaml")),
+                     ("fr", include_str!("../../i18n/fr.yaml"))];
+        for (locale, text) in files {
+            for (line_number, line) in text.lines().enumerate() {
+                let bytes = line.as_bytes();
+                for (ix, byte) in bytes.iter().enumerate() {
+                    let bare_brace = *byte == b'{' && (ix == 0 || bytes[ix - 1] != b'%');
+                    assert!(!bare_brace,
+                            "{locale}.yaml line {}: `{{` is not a placeholder; write `%{{name}}`: {line}",
+                            line_number + 1);
+                }
+            }
+        }
+    }
+
     #[test]
     fn locale_code_and_label_round_trip() {
         for locale in Locale::ALL {
