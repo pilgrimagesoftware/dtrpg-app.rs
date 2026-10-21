@@ -357,3 +357,29 @@ fn path_for_publisher_in_derives_under_the_given_root() {
     let path = StorageConfig::path_for_publisher_in(&root, "Chaosium");
     assert_eq!(path, Path::new("/tmp/External/items/Chaosium"));
 }
+
+#[test]
+fn a_remembered_publisher_root_goes_first_and_wins_over_earlier_rules() {
+    let mut cfg = config_with(vec![extra_root(1, "External"), extra_root(2, "Vault")],
+                              vec![PlacementRule { condition:
+                                                       PlacementCondition::SizeAtLeastMb(100.0),
+                                                   target_root_id: 2, }]);
+
+    cfg.set_publisher_rule("Free League", 1);
+
+    assert_eq!(cfg.resolve_root_for("Free League", &[], 500.0).id, 1);
+    assert_eq!(cfg.resolve_root_for("Chaosium", &[], 500.0).id, 2);
+    assert_eq!(cfg.rules().len(), 2);
+}
+
+#[test]
+fn remembering_a_publisher_root_again_replaces_its_rule() {
+    let mut cfg = config_with(vec![extra_root(1, "External"), extra_root(2, "Vault")],
+                              Vec::new());
+
+    cfg.set_publisher_rule("Free League", 1);
+    cfg.set_publisher_rule("Free League", 2);
+
+    assert_eq!(cfg.rules().len(), 1);
+    assert_eq!(cfg.resolve_root_for("Free League", &[], 1.0).id, 2);
+}

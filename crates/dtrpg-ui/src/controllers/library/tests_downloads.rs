@@ -357,3 +357,32 @@ fn a_download_that_reports_nothing_keeps_an_indeterminate_bar(cx: &mut TestAppCo
     fixture.library.release(1);
     wait_for(cx, |cx| file_downloaded(&fixture, cx, "a"));
 }
+
+#[gpui::test]
+fn the_download_sheet_queues_only_the_files_that_were_chosen(cx: &mut TestAppContext) {
+    use crate::view_models::download_sheet::DownloadPlan;
+
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               3,
+                               vec![item_with_files("a", A, 3)]);
+    let plan = DownloadPlan { file_indexes:     vec![0, 2],
+                              remember_root_id: None, };
+
+    fixture.controller
+           .update(cx, |ctrl, cx| ctrl.start_sheet_download("a", &plan, cx));
+    wait_for(cx, |cx| {
+        fixture.controller.read_with(cx, |ctrl, _| {
+                              ctrl.item_by_id("a")
+                                  .is_some_and(|item| {
+                                      item.files[0].downloaded && item.files[2].downloaded
+                                  })
+                          })
+    });
+
+    let middle_downloaded = fixture.controller.read_with(cx, |ctrl, _| {
+                                                  ctrl.item_by_id("a").unwrap().files[1].downloaded
+                                              });
+    assert!(!middle_downloaded);
+}
