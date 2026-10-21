@@ -13,7 +13,7 @@ use rusqlite::Connection;
 
 use super::items;
 use crate::data::enums::ItemStatus;
-use crate::data::index::IndexError;
+use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::SectionCounts;
 
 /// Returns each publisher with its item count — the index-backed equivalent
@@ -59,6 +59,17 @@ pub(super) fn section_counts(conn: &Connection, now_secs: i64, window_days: u32)
                                                                        window_days)?,
                        on_device:        items::count_by_status(conn, ItemStatus::Downloaded)?,
                        in_cloud:         items::count_by_status(conn, ItemStatus::Cloud)?, })
+}
+
+impl LibraryIndex {
+    /// The combined size of every item, in megabytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn total_size_mb(&self) -> Result<f64, IndexError> {
+        items::total_size_mb(&self.conn)
+    }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
