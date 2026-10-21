@@ -38,7 +38,9 @@ use crate::util::file_presence::{
     ItemVerification, collection_ids_for_item, find_presence_changes_in_collections,
     resolved_file_path_in_collections, resolved_item_dir,
 };
-use crate::view_models::inspector::{InspectorContentsState, InspectorPreviewState, InspectorTab};
+use crate::view_models::inspector::{
+    InspectorContentsState, InspectorPreviewState, InspectorSummaryState, InspectorTab,
+};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 mod bulk_selection;
@@ -54,6 +56,7 @@ mod downloads;
 mod file_tags;
 mod filtering;
 mod helpers;
+mod inspector_actions;
 mod lifecycle;
 mod preferences;
 mod selection;
@@ -71,6 +74,8 @@ mod tests_collection_links;
 mod tests_downloads;
 #[cfg(test)]
 mod tests_file_tags;
+#[cfg(test)]
+mod tests_inspector;
 #[cfg(test)]
 mod tests_support;
 #[cfg(test)]
@@ -302,6 +307,9 @@ pub struct LibraryController {
     inspector_tabs:                HashMap<Arc<str>, InspectorTab>,
     /// Lazily loaded archive entries for each inspector entry.
     inspector_contents:            HashMap<Arc<str>, InspectorContentsState>,
+    /// Stored summary of each inspector entry, read lazily when its summary tab
+    /// opens.
+    inspector_summaries:           HashMap<Arc<str>, InspectorSummaryState>,
     /// Selected archive entry paths per inspector entry.
     inspector_selected_entries:    HashMap<Arc<str>, HashSet<String>>,
     /// Whether an extraction task is active for an inspector entry.

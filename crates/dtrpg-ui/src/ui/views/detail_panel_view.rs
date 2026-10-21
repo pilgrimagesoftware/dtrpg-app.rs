@@ -45,7 +45,8 @@ use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::view_models::inspector::{
-    InspectorContentsState, InspectorPreviewState, InspectorTab, InspectorViewModel,
+    InspectorContentsState, InspectorPreviewState, InspectorSummaryState, InspectorTab,
+    InspectorViewModel,
 };
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -96,6 +97,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let entity_tags = entity.clone();
     let entity_tabs = entity.clone();
     let inspector_entry_id = Arc::clone(&item.id);
+    let entity_materialize = entity.clone();
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
@@ -115,6 +117,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     };
     let has_cover = item.detail_cover_url.is_some() || item.cover_url.is_some();
     let refresh_item_id = Arc::clone(&item_id);
+    let materialize_item_id = Arc::clone(&item_id);
+    let can_materialize = is_offloaded && Platform.capabilities().materialize;
 
     div()
         .id("detail-tab-content")
@@ -201,7 +205,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     .children(render_checking_indicator(is_checking)),
                             )
                             .child(
-                                selectable_text("detail-tab-line", snapshot.line.to_string())
+                                selectable_text("detail-tab-line", snapshot.system_and_type())
                                     .text_sm()
                                     .text_color(text_secondary),
                             ),
@@ -312,6 +316,21 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                         }
                                     }),
                             )
+                            .when(can_materialize, |row| {
+                                row.child(
+                                    Button::new("detail-tab-materialize")
+                                        .ghost()
+                                        .outline()
+                                        .icon(IconName::ArrowDown)
+                                        .label(t!("detail.materialize_button").to_string())
+                                        .tooltip(t!("detail.materialize_tooltip").to_string())
+                                        .on_click(move |_, _, cx| {
+                                            entity_materialize.update(cx, |ctrl, cx| {
+                                                                  ctrl.materialize_item(&materialize_item_id, cx);
+                                                              });
+                                        }),
+                                )
+                            })
                             .when(is_downloaded, |row| {
                                 let item_path =
                                     dtrpg_core::data::storage::publisher_dir(&storage_root_path,

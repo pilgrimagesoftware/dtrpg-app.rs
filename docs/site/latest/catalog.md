@@ -58,6 +58,29 @@ The toolbar's search box filters the current section's titles as you type. It al
   column widths and selection that survive switching tabs. Close a detail
   tab from its own close button; the Catalog tab can't be closed.
 
+### The detail tab
+
+Under the title the detail tab shows the item's game system and type (for
+example "D&D 5E · Adventure"), when the catalog has them. Its tabs are:
+
+- **Info** - the description, the item's tags, a table of its details (the
+  Type row is the content category DriveThruRPG files it under), and the
+  collections it belongs to.
+- **Files** - each file with its size and download state. **Verify on disk**
+  checks the files against the disk right away and corrects the catalog if a
+  file was moved or deleted outside Libri.
+- **Collections** - which collections the item is in.
+- **Contents** - what is inside an archive file, loaded when you open the tab.
+- **Summary** - the item's saved content summary, with the model that wrote it,
+  when, and its length in tokens. Items without a summary say so. The tab only
+  shows summaries; they are written elsewhere for now, for example by an agent
+  through the MCP server.
+
+On macOS and Windows, a file that the system has moved out to the cloud (it
+shows a dashed cloud) gets a **Materialize** button next to Download. It asks
+the system for the local copy and waits for it, then checks the file against
+the disk. Opening the file with **Read** does the same automatically.
+
 ## Bulk selection
 
 Enter bulk-selection mode from the toolbar to check multiple items at once.

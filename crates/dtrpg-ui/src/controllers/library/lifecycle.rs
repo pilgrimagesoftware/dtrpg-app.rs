@@ -97,6 +97,7 @@ impl LibraryController {
                           selected_item_file: HashMap::new(),
                           inspector_tabs: HashMap::new(),
                           inspector_contents: HashMap::new(),
+                          inspector_summaries: HashMap::new(),
                           inspector_selected_entries: HashMap::new(),
                           inspector_extractions: HashMap::new(),
                           inspector_preview: HashMap::new(),
