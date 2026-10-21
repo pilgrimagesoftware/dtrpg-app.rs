@@ -495,3 +495,14 @@ download_sheet:
   shortfall: "Pas assez d'espace libre sur {root} : {needed} nécessaires, {free} libres."
   cancel: "Annuler"
   download: "Télécharger"
+
+filters:
+  toggle_tooltip: "Afficher ou masquer les filtres"
+  toggle_tooltip_applied: "Afficher ou masquer les filtres ({n} appliqués)"
+  remove_chip_tooltip: "Retirer ce filtre"
+  availability: "Disponibilité"
+  type: "Type"
+  system: "Système de jeu"
+  tags: "Étiquettes"
+  downloaded: "Sur cet appareil"
+  cloud: "Dans le cloud"

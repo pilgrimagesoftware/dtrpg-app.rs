@@ -2,7 +2,10 @@
 //! content, and status bar from the controllers' snapshots, and wires the
 //! window-level menu/keyboard actions.
 
+use gpui_kit::component::Selectable as _;
+
 use super::*;
+use crate::ui::views::filters_column::{render_filter_chips, render_filters_column};
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
                                cx: &mut Context<LibraryRootView>)
@@ -113,6 +116,9 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  collection_search,
                                  tags,
                                  snap.sidebar_open);
+    let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
+    let filters_toggle =
+        render_filters_toggle(view.filters_open, search_query.terms().len(), cx.entity());
     let toolbar = render_toolbar(&filter,
                                  snap.filter_count,
                                  matched_count,
@@ -125,7 +131,16 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  presentation,
                                  bulk_selection_mode,
                                  lib_entity.clone(),
+                                 filters_toggle,
                                  colors);
+    let chips = render_filter_chips(&search_query, &view.search_input, colors);
+    let filters_column =
+        view.filters_open.then(|| {
+                             render_filters_column(&view.controller.read(cx).visible_facets(),
+                                                   &search_query,
+                                                   &view.search_input,
+                                                   colors)
+                         });
     let title_bar = render_title_bar(&settings_snap.auth,
                                      settings_entity.clone(),
                                      colors,
@@ -149,14 +164,20 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                          alert_snap: &alert_snap, },
                                        colors);
 
-    let catalog_content = div().flex_1()
-                               .min_h_0()
-                               .flex()
-                               .flex_col()
-                               .child(toolbar)
-                               .children(bulk_action_bar)
-                               .child(banner)
-                               .child(view.catalog_view.clone());
+    let catalog_content =
+        div().flex_1()
+             .min_h_0()
+             .flex()
+             .flex_col()
+             .child(toolbar)
+             .children(chips)
+             .children(bulk_action_bar)
+             .child(banner)
+             .child(div().flex_1()
+                         .min_h_0()
+                         .flex()
+                         .children(filters_column)
+                         .child(div().flex_1().min_w_0().child(view.catalog_view.clone())));
 
     let surface = colors.surface;
     let text_primary = colors.text_primary;
@@ -325,4 +346,32 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                 )
                 .child(status_bar),
         )
+}
+
+/// Renders the toolbar button that shows or hides the filters column. A number
+/// on its tooltip says how many filters are applied.
+fn render_filters_toggle(open: bool, applied: usize, root: Entity<LibraryRootView>) -> AnyElement {
+    let tooltip = if applied == 0 {
+        t!("filters.toggle_tooltip").to_string()
+    }
+    else {
+        t!("filters.toggle_tooltip_applied", n = applied).to_string()
+    };
+    let button = Button::new("filters-toggle").icon(gpui_kit::component::Icon::empty()
+                                                        .path("icons/sliders-horizontal.svg"))
+                                              .ghost()
+                                              .selected(open)
+                                              .tooltip(tooltip)
+                                              .on_click(move |_, _, cx| {
+                                                  root.update(cx, |view, cx| {
+                                                          view.filters_open = !view.filters_open;
+                                                          cx.notify();
+                                                      });
+                                              });
+    if applied == 0 {
+        return button.into_any_element();
+    }
+    gpui_kit::component::badge::Badge::new().count(applied)
+                                            .child(button)
+                                            .into_any_element()
 }
