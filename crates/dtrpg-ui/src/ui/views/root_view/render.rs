@@ -127,7 +127,11 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  bulk_selection_mode,
                                  lib_entity.clone(),
                                  colors);
-    let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
+    let title_bar = render_title_bar(&settings_snap.auth,
+                                     settings_entity.clone(),
+                                     colors,
+                                     view.menu_bar.clone(),
+                                     cx);
     let tab_strip = render_tab_strip(view.tabs.clone(), cx);
     let banner = render_notification_banner(notices, auth_entity, cx.entity(), colors);
 

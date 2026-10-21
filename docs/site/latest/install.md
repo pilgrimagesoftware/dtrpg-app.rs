@@ -70,6 +70,18 @@ sudo apt install gnome-keyring
 No additional setup required — the app uses Windows Credential Manager for
 credential storage.
 
+## The window on Windows and Linux
+
+Windows and Linux have no menu bar at the top of the screen, so Libri draws its
+own. It sits at the left of the strip across the top of the window, with the
+menus File, Edit, View, Library, Window and Help. Settings and Quit are in the
+File menu. The minimize, maximize and close buttons are at the right end of the
+same strip, and you can drag the window by any empty part of it.
+
+On Linux, some window managers draw their own title bar around windows
+instead. If yours does, Libri leaves the window buttons to it and shows only its
+menu bar.
+
 ## Building from source
 
 ```bash

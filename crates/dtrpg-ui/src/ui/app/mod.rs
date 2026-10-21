@@ -116,6 +116,13 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
                 traffic_light_position: Some(point(px(12.0), px(14.0))),
             }),
             window_bounds,
+            // The title bar draws the window controls itself (see
+            // `title_bar_view`), so ask X11 for client-side decorations as
+            // Wayland already gives by default. The platform may decline, in
+            // which case the title bar leaves the controls to the window
+            // manager.
+            #[cfg(target_os = "linux")]
+            window_decorations: Some(WindowDecorations::Client),
             ..Default::default()
         },
         cx,
@@ -436,7 +443,9 @@ pub fn setup(cx: &mut App) {
       });
 
     // Menu bar
-    cx.set_menus(build_menus(&ViewMenuState::default(), &TabsController::new().snapshot()));
+    install_menus(cx,
+                  &ViewMenuState::default(),
+                  &TabsController::new().snapshot());
 
     let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
     {
@@ -479,4 +488,4 @@ fn update_library(cx: &mut App,
 #[path = "menus.rs"]
 mod menus;
 
-pub use menus::build_menus;
+pub use menus::{MenuBarHandle, build_menus, build_menus_for, install_menus};

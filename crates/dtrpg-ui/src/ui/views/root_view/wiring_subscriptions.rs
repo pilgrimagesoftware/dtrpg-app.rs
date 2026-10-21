@@ -140,7 +140,8 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                                            sort_direction: ctrl.sort_direction,
                                            group_by:       ctrl.group_by, };
           if this.last_menu_state != Some(menu_state) {
-              cx.set_menus(build_menus(&menu_state, &this.tabs.read(cx).snapshot()));
+              let tabs = this.tabs.read(cx).snapshot();
+              install_menus(cx, &menu_state, &tabs);
               this.last_menu_state = Some(menu_state);
           }
           cx.notify();
@@ -153,7 +154,8 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
           // `LibraryChanged`, `TabsChanged` only fires on an actual
           // open/close/activate, so no de-duplication guard is needed here.
           let menu_state = this.last_menu_state.unwrap_or_default();
-          cx.set_menus(build_menus(&menu_state, &ctrl.read(cx).snapshot()));
+          let tabs = ctrl.read(cx).snapshot();
+          install_menus(cx, &menu_state, &tabs);
           cx.notify();
       })
       .detach();
