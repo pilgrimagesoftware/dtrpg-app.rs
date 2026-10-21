@@ -23,6 +23,9 @@ gpui-kit's fork in one change, not file-by-file.
 
 ## UI Policy
 
+- Every control, button or label that is only an image (an icon, or a glyph such as `✓`, `☁` or `×`) MUST have
+  a tooltip saying what it does or means, and the text goes through `rust_i18n::t!` like any other. A purely
+  decorative image next to text that already says the same thing does not need one.
 - Preserve the separation between UI rendering, interaction state, and service adapters.
 - Keep code structured so stubs can be replaced by SDK adapters without rewriting views.
 
