@@ -255,3 +255,7 @@ pub const CATALOG_REFRESH_TIMER_INTERVAL_SECS: u64 = 3600;
 /// item; a selection in the thousands has been observed to lock up the
 /// default viewer app under that many simultaneous launches.
 pub const BULK_ACTION_CONFIRM_THRESHOLD: usize = 20;
+
+/// The file, in the preferences directory, that holds the user's smart
+/// collections.
+pub const SMART_COLLECTIONS_FILE: &str = "smart_collections.toml";

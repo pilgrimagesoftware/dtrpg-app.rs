@@ -46,6 +46,22 @@ impl Field {
                                 Self::Type,
                                 Self::Availability];
 
+    /// The field whose keyword is `keyword`, ignoring case.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::util::search::Field;
+    ///
+    /// assert_eq!(Field::from_keyword("Type"), Some(Field::Type));
+    /// assert_eq!(Field::from_keyword("title"), None);
+    /// ```
+    #[must_use]
+    pub fn from_keyword(keyword: &str) -> Option<Self> {
+        Self::ALL.into_iter()
+                 .find(|field| field.keyword().eq_ignore_ascii_case(keyword))
+    }
+
     /// The word before the colon in a term.
     #[must_use]
     pub const fn keyword(self) -> &'static str {
@@ -89,7 +105,7 @@ impl Term {
     /// Whether `item`, which has the tags `tags`, has the term's value,
     /// before the term's negation is applied. An availability value that
     /// names no state is never held.
-    fn is_held_by(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
+    pub(crate) fn is_held_by(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
         let equals = |text: &str| text.to_lowercase() == self.value;
         match self.field {
             Field::Tag => tags.iter().any(|tag| equals(tag)),
