@@ -24,7 +24,7 @@ impl TableDelegate for CatalogListDelegate {
     }
 
     fn loading(&self, cx: &App) -> bool {
-        self.controller.read(cx).is_loading()
+        self.controller.read(cx).is_view_loading()
     }
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
