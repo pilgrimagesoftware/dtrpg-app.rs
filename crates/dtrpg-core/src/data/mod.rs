@@ -16,6 +16,7 @@ pub mod notification;
 pub mod paths;
 pub mod profile;
 pub mod selection;
+pub mod smart_collection;
 pub mod storage;
 pub mod summary;
 pub mod summary_settings;
