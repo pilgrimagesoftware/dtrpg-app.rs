@@ -61,36 +61,6 @@ pub(super) fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     }
 }
 
-/// Renders a small status icon next to the item title: a checkmark when
-/// downloaded, a cloud glyph otherwise. Replaces the old text-only "Status" row
-/// in the metadata table.
-/// Renders the detail tab's title-row status glyph. While `is_verifying` is
-/// true (a file-presence check per `verify-downloaded-status-against-disk`
-/// is in flight), shows a distinct pending glyph and tooltip rather than a
-/// downloaded/cloud state that may be stale.
-pub(super) fn render_status_icon(is_downloaded: bool, is_offloaded: bool, is_verifying: bool,
-                                 color: gpui::Hsla)
-                                 -> impl IntoElement + 'static {
-    let (glyph, tooltip_text) = if is_verifying {
-        ("\u{22ef}", t!("detail.tooltip_verifying_download").to_string())
-    }
-    else if is_offloaded {
-        ("\u{2601}", t!("detail.tooltip_offloaded_download").to_string())
-    }
-    else if is_downloaded {
-        ("\u{2713}", t!("detail.status_on_device").to_string())
-    }
-    else {
-        ("\u{2601}", t!("detail.status_in_cloud").to_string())
-    };
-
-    div().id("detail-status-icon")
-         .text_sm()
-         .text_color(color)
-         .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
-         .child(glyph)
-}
-
 /// Renders a metadata value, falling back to an em dash when the underlying
 /// data is empty (e.g. the API did not report a game system/line for this
 /// item).
