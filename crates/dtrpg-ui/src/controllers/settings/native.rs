@@ -24,6 +24,12 @@ impl SettingsController {
         self.native.save_reconcile_on_launch(enabled);
         cx.notify();
     }
+
+    /// Saves whether windows that were open at quit reopen at the next launch.
+    pub fn set_reopen_windows_on_launch(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.native.save_reopen_windows_on_launch(enabled);
+        cx.notify();
+    }
 }
 
 #[cfg(test)]

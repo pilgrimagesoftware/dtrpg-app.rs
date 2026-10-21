@@ -1,7 +1,7 @@
 //! Persisted preferences for how Libri works with the operating system:
-//! whether a tag moves between the library and a file's tags, and whether that
-//! is checked at launch. These are the Tags switches in Settings > Native
-//! Integration.
+//! whether a tag moves between the library and a file's tags, whether that
+//! is checked at launch, and whether windows reopen at launch. These are the
+//! switches in Settings > Native Integration.
 //!
 //! Backed by `{app_preferences_dir}/native.toml`.
 
@@ -17,19 +17,24 @@ use crate::data::paths::app_preferences_dir;
 #[serde(default)]
 pub struct NativePreferencesFile {
     /// Whether the library's tags are written to files' tags.
-    pub write_tags_to_files:  bool,
+    pub write_tags_to_files:      bool,
     /// Whether tags added or removed on files outside Libri are read back into
     /// the library.
-    pub read_tags_from_files: bool,
+    pub read_tags_from_files:     bool,
     /// Whether files' tags are compared with the library's at launch.
-    pub reconcile_on_launch:  bool,
+    pub reconcile_on_launch:      bool,
+    /// Whether windows that were open at quit reopen at the next launch. Only
+    /// used where the system has no setting of its own; macOS follows its
+    /// "Close windows when quitting an application" setting instead.
+    pub reopen_windows_on_launch: bool,
 }
 
 impl Default for NativePreferencesFile {
     fn default() -> Self {
-        Self { write_tags_to_files:  true,
-               read_tags_from_files: true,
-               reconcile_on_launch:  true, }
+        Self { write_tags_to_files:      true,
+               read_tags_from_files:     true,
+               reconcile_on_launch:      true,
+               reopen_windows_on_launch: true, }
     }
 }
 
@@ -96,6 +101,19 @@ impl NativePreferences {
     #[must_use]
     pub fn reconcile_on_launch(&self) -> bool {
         self.data.reconcile_on_launch
+    }
+
+    /// Whether windows that were open at quit reopen at the next launch, when
+    /// the system has no setting of its own.
+    #[must_use]
+    pub fn reopen_windows_on_launch(&self) -> bool {
+        self.data.reopen_windows_on_launch
+    }
+
+    /// Persists whether windows that were open at quit reopen at launch.
+    pub fn save_reopen_windows_on_launch(&mut self, enabled: bool) {
+        self.data.reopen_windows_on_launch = enabled;
+        self.flush();
     }
 
     /// Persists whether the library's tags are written to files' tags.
@@ -175,6 +193,17 @@ mod tests {
         assert!(reloaded.write_tags_to_files());
         assert!(!reloaded.read_tags_from_files());
         assert!(!reloaded.reconcile_on_launch());
+    }
+
+    #[test]
+    fn windows_reopen_by_default_and_the_choice_is_saved() {
+        let (_dir, path) = in_temp_dir();
+        let mut preferences = NativePreferences::load_from(&path);
+        assert!(preferences.reopen_windows_on_launch());
+
+        preferences.save_reopen_windows_on_launch(false);
+
+        assert!(!NativePreferences::load_from(&path).reopen_windows_on_launch());
     }
 
     #[test]

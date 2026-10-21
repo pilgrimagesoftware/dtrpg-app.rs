@@ -11,6 +11,7 @@ mod file_tag;
 mod materialize;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod tags;
+pub mod window_restore;
 
 pub use file_tag::FileTag;
 pub use materialize::{MaterializeWait, materialize_and_wait};
