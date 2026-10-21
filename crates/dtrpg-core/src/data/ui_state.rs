@@ -201,6 +201,12 @@ impl UiState {
         self.flush();
     }
 
+    /// Forgets every popped-out inspector.
+    pub fn clear_inspector_windows(&mut self) {
+        self.data.inspector_windows.clear();
+        self.flush();
+    }
+
     fn flush(&self) {
         let path = state_path();
         if let Some(parent) = path.parent() {

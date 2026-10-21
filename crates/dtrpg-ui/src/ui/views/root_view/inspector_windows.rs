@@ -1,9 +1,24 @@
 //! Popped-out inspector windows: opening one from an item's tab, and
 //! reopening the ones left open at the last quit.
 
+use dtrpg_core::data::native_preferences::NativePreferences;
 use dtrpg_core::data::ui_state::WindowBoundsPref;
+use dtrpg_core::platform::window_restore::reopen_windows_at_launch;
 
 use super::*;
+
+/// The popped-out inspectors to reopen at launch. When windows are not to
+/// reopen (see [`reopen_windows_at_launch`]), the remembered ones are
+/// forgotten instead, so turning the setting back on later does not bring
+/// back old windows.
+pub(super) fn windows_to_reopen() -> Vec<InspectorWindowPref> {
+    let mut ui_state = UiState::load();
+    if reopen_windows_at_launch(&NativePreferences::load().snapshot()) {
+        return ui_state.inspector_windows();
+    }
+    ui_state.clear_inspector_windows();
+    Vec::new()
+}
 
 impl LibraryRootView {
     /// Moves the inspector for `item_id` out of its tab and into its own

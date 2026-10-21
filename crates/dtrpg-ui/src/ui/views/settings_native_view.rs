@@ -21,7 +21,7 @@ pub fn render_native_section(entity: Entity<SettingsController>, native: NativeP
                              colors: &ColorTokens, label_font_family: &str)
                              -> impl IntoElement + 'static + use<> {
     let tags: AnyElement = if Platform.capabilities().filesystem_tags {
-        tag_switches(entity, native, colors).into_any_element()
+        tag_switches(entity.clone(), native, colors).into_any_element()
     }
     else {
         div().text_xs()
@@ -50,6 +50,36 @@ pub fn render_native_section(entity: Entity<SettingsController>, native: NativeP
                                  .text_color(colors.text_primary)
                                  .child(small_caps_text(t!("settings.native_tags_heading").to_string())))
                      .child(tags))
+         .child(div().flex()
+                     .flex_col()
+                     .gap(px(12.0))
+                     .child(div().font_family(label_font_family.to_string())
+                                 .text_sm()
+                                 .text_color(colors.text_primary)
+                                 .child(small_caps_text(t!("settings.native_windows_heading").to_string())))
+                     .child(window_restore_setting(entity, native.reopen_windows_on_launch, colors)))
+}
+
+/// How windows reopen at launch. macOS has its own system setting, which
+/// Libri follows, so only a note is shown there; other platforms get a switch.
+fn window_restore_setting(entity: Entity<SettingsController>, reopen: bool, colors: &ColorTokens)
+                          -> AnyElement {
+    if cfg!(target_os = "macos") {
+        return div().text_xs()
+                    .text_color(colors.text_secondary)
+                    .child(t!("settings.native_windows_follows_system").to_string())
+                    .into_any_element();
+    }
+    switch_row("native-reopen-windows",
+               t!("settings.native_reopen_title").to_string(),
+               t!("settings.native_reopen_note").to_string(),
+               reopen,
+               colors,
+               move |checked, cx| {
+                   entity.update(cx, |ctrl, cx| {
+                             ctrl.set_reopen_windows_on_launch(checked, cx)
+                         });
+               })
 }
 
 /// The three tag switches, each with a title and what it does.

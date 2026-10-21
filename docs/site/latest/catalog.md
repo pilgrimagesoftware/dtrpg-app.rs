@@ -105,6 +105,13 @@ the window opens. The window shows the same details and actions as the tab.
 - Libri remembers these windows. Where you leave one, and which items have one,
   carry over to the next launch: quit with a window open and it reopens in the
   same place. Closing a window yourself means Libri forgets it.
+- Whether the windows reopen at launch follows your system. On macOS it
+  follows System Settings > Desktop & Dock > "Close windows when quitting an
+  application": with that ticked, Libri starts without them. On Windows and
+  Linux there is no such system setting, so Settings > Native Integration >
+  Windows has **Reopen windows at launch** (on by default). When windows are
+  not to reopen, Libri also forgets the remembered ones, so turning the
+  setting back on later does not bring back old windows.
 - If an item leaves your library, its window closes.
   Libri waits for the catalog to finish loading first, so a window is not
   closed just because its item has not arrived yet.

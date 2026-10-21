@@ -283,7 +283,7 @@ impl LibraryRootView {
                report_feature_bug_window: None,
                about_window: None,
                inspector_windows: HashMap::new(),
-               pending_inspector_restores: UiState::load().inspector_windows(),
+               pending_inspector_restores: inspector_windows::windows_to_reopen(),
                search_input: misc.search_input,
                collection_name_input: misc.collection_name_input,
                file_opener_extension_input: misc.file_opener_extension_input,
