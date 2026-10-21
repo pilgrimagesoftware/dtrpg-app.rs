@@ -72,23 +72,41 @@ fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query:
     if counts.is_empty() {
         return None;
     }
+    let largest = counts.iter()
+                        .map(|count| count.count)
+                        .max()
+                        .unwrap_or(1)
+                        .max(1);
     let rows = counts.iter().enumerate().map(|(ix, count)| {
         let value = count.value.clone();
         let query = query.clone();
         let input = search_input.clone();
+        // The bar is a share of the largest count in this list.
+        let share = count.count as f32 / largest as f32;
         div().flex()
-             .items_center()
-             .justify_between()
-             .gap(px(8.0))
-             .child(Checkbox::new((field.keyword(), ix)).label(facet_label(field, count))
-                                                        .checked(query.asks_for(field, &value))
-                                                        .on_click(move |_, window, cx| {
-                                                            let next = query.toggled(field, &value);
-                                                            set_search_text(&input, &next, window, cx);
-                                                        }))
-             .child(div().text_xs()
-                         .text_color(colors.text_tertiary)
-                         .child(count.count.to_string()))
+             .flex_col()
+             .gap(px(2.0))
+             .child(div().flex()
+                         .items_center()
+                         .justify_between()
+                         .gap(px(8.0))
+                         .child(Checkbox::new((field.keyword(), ix)).label(facet_label(field, count))
+                                                                    .checked(query.asks_for(field, &value))
+                                                                    .on_click(move |_, window, cx| {
+                                                                        let next = query.toggled(field, &value);
+                                                                        set_search_text(&input, &next, window, cx);
+                                                                    }))
+                         .child(div().text_xs()
+                                     .text_color(colors.text_tertiary)
+                                     .child(count.count.to_string())))
+             .child(div().h(px(3.0))
+                         .w_full()
+                         .rounded(px(2.0))
+                         .bg(colors.surface_alt)
+                         .child(div().h_full()
+                                     .w(gpui::relative(share))
+                                     .rounded(px(2.0))
+                                     .bg(colors.accent_soft)))
     });
     Some(div().flex()
               .flex_col()
