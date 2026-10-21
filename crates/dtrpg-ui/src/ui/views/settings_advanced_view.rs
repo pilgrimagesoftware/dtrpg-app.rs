@@ -5,6 +5,7 @@ use dtrpg_core::data::constants::{
     FORCE_RELOAD_COOLDOWN_SECS, ITEM_CHECK_BATCH_COOLDOWN_SECS, ITEM_CHECK_BATCH_TIMER_SECS,
     ITEM_CHECK_COOLDOWN_SECS, STALE_SECS, THUMBNAIL_COOLDOWN_SECS,
 };
+use dtrpg_core::data::native_preferences::NativePreferencesFile;
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
@@ -20,7 +21,8 @@ use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::{CacheCounts, SettingsController};
 use crate::data::theme::ColorTokens;
 use crate::ui::views::settings_filter_values_view::render_filter_values_section;
-use crate::ui::widgets::small_caps_text;
+use crate::ui::views::settings_native_view::render_native_section;
+use crate::ui::widgets::{selectable_note, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::pluralize::pluralize;
 
@@ -74,9 +76,9 @@ fn row_frame(label: impl Into<SharedString>, value_el: impl IntoElement,
                                  .text_color(colors.text_primary)
                                  .child(small_caps_text(label)))
                      .child(value_el))
-         .child(div().text_xs()
-                     .text_color(colors.text_tertiary)
-                     .child(description))
+         .child(selectable_note(SharedString::from(format!("cache-note-{description}")),
+                                description,
+                                colors))
 }
 
 /// Renders one "Cache details" data point with a plain-text value: counts
@@ -252,7 +254,8 @@ fn render_recently_updated_window_row(recently_updated_window_days: u32,
 /// cache folder" action, and a "Clear cache" action with a confirmation
 /// dialog.
 #[allow(clippy::too_many_arguments)]
-pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts: CacheCounts,
+pub fn render_advanced_section(entity: Entity<SettingsController>,
+                               native: NativePreferencesFile, cache_counts: CacheCounts,
                                colors: &ColorTokens, label_font_family: &str,
                                value_font_family: &str, recently_updated_window_days: u32,
                                recently_updated_window_input: Option<Entity<InputState>>,
@@ -284,6 +287,8 @@ pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts:
         ))
         .child(div().h(px(1.0)).bg(border))
         .children(render_filter_values_section(filter_values, library, colors))
+        .child(div().h(px(1.0)).bg(border))
+        .child(render_native_section(entity.clone(), native, colors, label_font_family))
         .child(div().h(px(1.0)).bg(border))
         .child(render_cache_details(
             cache_counts,

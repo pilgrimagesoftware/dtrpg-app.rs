@@ -19,7 +19,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::{RuleEditorType, SettingsController};
 use crate::data::theme::ColorTokens;
-use crate::ui::widgets::selectable_text;
+use crate::ui::widgets::{selectable_note, selectable_text};
 use crate::view_models::storage_display::StorageDisplay;
 
 /// Lower bound for the concurrency field: 0 would mean thumbnails and
@@ -188,9 +188,9 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            // ── Divider ───────────────────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
            // ── Note ─────────────────────────────────────────────────────────
-           .child(div().text_xs()
-                       .text_color(warning_text)
-                       .child(format!("\u{26A0} {}", t!("settings.storage_note"))))
+           .child(selectable_text("storage-note",
+                                  format!("\u{26A0} {}", t!("settings.storage_note"))).text_xs()
+                                                                                       .text_color(warning_text))
            // ── Divider ───────────────────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
            // ── Concurrency field ─────────────────────────────────────────────
@@ -237,7 +237,6 @@ fn render_create_collections_toggle(create_collections: bool,
                                     entity: Entity<SettingsController>, colors: &ColorTokens)
                                     -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
-    let text_secondary = colors.text_secondary;
 
     div()
         .flex()
@@ -267,12 +266,7 @@ fn render_create_collections_toggle(create_collections: bool,
                         }),
                 ),
         )
-        .child(
-            div()
-                .text_xs()
-                .text_color(text_secondary)
-                .child(create_collections_note()),
-        )
+        .child(selectable_note("create-collections-note", create_collections_note(), colors))
 }
 
 /// Returns the "Create collections" note text, appending the Windows
@@ -301,7 +295,6 @@ fn render_concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<
                           colors: &ColorTokens)
                           -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
-    let text_secondary = colors.text_secondary;
 
     let field: AnyElement = if let Some(input_state) = input {
         NumberInput::new(&input_state).into_any_element()
@@ -321,9 +314,9 @@ fn render_concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<
                      .text_color(text_primary)
                      .child(t!("settings.max_concurrent_downloads_title")))
          .child(div().w(px(140.0)).child(field))
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(t!("settings.max_concurrent_downloads_note")))
+         .child(selectable_note("max-concurrent-downloads-note",
+                                t!("settings.max_concurrent_downloads_note").to_string(),
+                                colors))
 }
 
 // ── Helpers

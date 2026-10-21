@@ -151,6 +151,10 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 const SETTINGS_MIN_SIZE: Size<Pixels> = Size { width:  px(560.),
                                                height: px(360.), };
 
+/// The size the settings window opens at the first time, as (width, height):
+/// room for a page such as Storage without scrolling at once.
+const SETTINGS_DEFAULT_SIZE: (Pixels, Pixels) = (px(900.), px(680.));
+
 /// Opens the settings window as a separate, non-modal window.
 ///
 /// Shares `settings` and `library` with the caller's `LibraryRootView` rather
@@ -169,8 +173,8 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
                             file_opener_extension_input: Entity<InputState>, cx: &mut App)
                             -> WindowHandle<Root> {
     let settings_for_close = settings.clone();
-    let window_size = Size { width:  px(720.),
-                             height: px(520.), };
+    let window_size = Size { width:  SETTINGS_DEFAULT_SIZE.0,
+                             height: SETTINGS_DEFAULT_SIZE.1, };
     let (window, _view) = gpui_kit::open_window(
         WindowOptions {
             // `appears_transparent: true` hides the native opaque title
@@ -197,7 +201,10 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
                 traffic_light_position: Some(point(px(12.0), px(6.0))),
                 ..Default::default()
             }),
-            window_bounds: Some(WindowBounds::centered(window_size, cx)),
+            window_bounds: Some(restore_settings_window_bounds(cx).unwrap_or_else(|| {
+                                                                WindowBounds::centered(window_size,
+                                                                                       cx)
+                                                            })),
             window_min_size: Some(SETTINGS_MIN_SIZE),
             is_resizable: true,
             is_minimizable: false,
@@ -244,8 +251,8 @@ pub use cover_viewer::open_cover_viewer_window;
 pub use inspector_window::{
     ShuttingDown, open_inspector_window, remember_window, show_library_window,
 };
-use window_bounds::restore_library_window_bounds;
-pub use window_bounds::save_library_window_bounds;
+use window_bounds::{restore_library_window_bounds, restore_settings_window_bounds};
+pub use window_bounds::{save_library_window_bounds, save_settings_window_bounds};
 
 /// Initializes the GPUI application and routes to the login or library window.
 ///

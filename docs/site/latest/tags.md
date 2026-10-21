@@ -117,7 +117,7 @@ tags, and does not read the missing tags as something you removed.
 
 ## Settings
 
-The Tags section of **Settings > Native Integration** has three switches, all on by
+The Tags section of **Settings > Advanced > Operating system** has three switches, all on by
 default. They are shown only on platforms where files keep tags.
 
 - **Write Libri tags to the file's tags.** Turn it off and Libri stops changing

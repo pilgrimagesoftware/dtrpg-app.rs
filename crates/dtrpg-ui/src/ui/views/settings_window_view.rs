@@ -11,6 +11,7 @@ use gpui_kit::component::input::InputState;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::LibriTheme;
+use crate::ui::app::save_settings_window_bounds;
 use crate::ui::views::settings_appearance_view::AppearanceFontSelects;
 use crate::ui::views::settings_view::render_settings_panel;
 use crate::view_models::storage_display::StorageDisplay;
@@ -42,6 +43,12 @@ impl SettingsWindowView {
                -> Self {
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
+        // Remember the size and place on every move or resize, as the main
+        // window does, so the next opening is the same.
+        cx.observe_window_bounds(window, |_this, window, _cx| {
+              save_settings_window_bounds(window);
+          })
+          .detach();
         Self { settings,
                library,
                file_opener_extension_input,

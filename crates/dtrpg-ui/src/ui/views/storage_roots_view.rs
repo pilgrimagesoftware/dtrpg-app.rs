@@ -7,6 +7,7 @@ use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
 
 use super::*;
+use crate::ui::widgets::selectable_note;
 use crate::view_models::storage_display::{StorageDisplay, free_space_label, titles_here_label};
 
 /// Renders the configured roots and lets the user add or remove named roots.
@@ -109,7 +110,9 @@ pub(super) fn render_storage_roots(roots: Vec<StorageRoot>, display: &StorageDis
                                 .child(root.path.to_string_lossy().into_owned())
                                 .truncate(),
                         )
-                        .child(div().text_xs().text_color(text_secondary).child(details)),
+                        .child(selectable_note(SharedString::from(format!("root-details-{root_id}")),
+                                               details,
+                                               colors)),
                 )
                 .when(can_remove, |row| {
                     row.child(

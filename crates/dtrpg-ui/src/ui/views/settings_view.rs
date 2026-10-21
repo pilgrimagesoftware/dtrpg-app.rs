@@ -35,7 +35,6 @@ use crate::ui::views::{
     settings_advanced_view::render_advanced_section,
     settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
     settings_file_openers_view::render_file_openers_section,
-    settings_native_view::render_native_section,
     settings_storage_view::render_storage_section,
 };
 use crate::view_models::storage_display::StorageDisplay;
@@ -43,7 +42,7 @@ use crate::view_models::storage_display::StorageDisplay;
 /// Number of settings pages (Account, Appearance, Downloads Location, File
 /// Openers, Native Integration, Advanced); see [`page_title`] and the `match`
 /// in [`render_settings_panel`]. Sidebar order matches index order.
-const PAGE_COUNT: usize = 6;
+const PAGE_COUNT: usize = 5;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
 /// is out of range (defensive default for a persisted index from a prior app
@@ -53,8 +52,7 @@ fn page_title(ix: usize) -> String {
         1 => t!("settings.appearance_title").to_string(),
         2 => t!("settings.downloads_location").to_string(),
         3 => t!("settings.file_openers_title").to_string(),
-        4 => t!("settings.native_title").to_string(),
-        5 => t!("settings.advanced_title").to_string(),
+        4 => t!("settings.advanced_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -141,9 +139,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        4 => render_native_section(entity.clone(), native, colors, &theme.fonts.label_font)
-            .into_any_element(),
-        5 => render_advanced_section(entity.clone(),
+        4 => render_advanced_section(entity.clone(),
+                                     native,
                                      cache_counts,
                                      colors,
                                      &theme.fonts.label_font,
