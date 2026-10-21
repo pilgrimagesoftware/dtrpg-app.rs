@@ -95,17 +95,33 @@ impl LibraryController {
         self.vm.pane_state()
     }
 
+    /// Forgets the stored library, its collections and the selection, so that
+    /// whoever signs in next does not see this account's titles. Called when
+    /// the user signs out.
+    pub fn forget_library(&mut self, cx: &mut Context<Self>) {
+        self.library.clear_catalog();
+        self.library.clear_collections();
+        self.collection_members.clear();
+        self.selection = Selection::default();
+        self.invalidate_cache();
+        cx.emit(LibraryChanged);
+    }
+
     /// Replaces the backing services and triggers a fresh catalog and
     /// collections load.
     ///
     /// Clears the activity panel so stale error messages from the previous
     /// (unauthenticated) service do not persist after sign-in.
     ///
-    /// Sets `catalog_loading` before clearing the catalog so the catalog view
-    /// shows its loading spinner instead of the "library empty" state for the
-    /// gap between this clear and `start_load` repopulating it — otherwise a
-    /// catalog already populated from disk cache (e.g. during startup's
-    /// silent re-authentication) flashes empty before reappearing.
+    /// Sets `catalog_loading` so the catalog view shows that it is loading
+    /// while `start_load` checks the library against the service.
+    ///
+    /// The catalog is kept. It is the on-disk copy of the library, which the
+    /// load reads first (to skip or shorten the fetch) and which has to
+    /// survive a quit or a crash part way through a load. Clearing it here
+    /// threw away everything fetched so far on each launch, because the quiet
+    /// sign-in at startup comes through this method. Signing out is what
+    /// forgets the library (see [`forget_library`](Self::forget_library)).
     pub fn replace_service(&mut self, service: Box<dyn LibraryService>,
                            collections_service: Box<dyn CollectionsService>,
                            cx: &mut Context<Self>) {
@@ -113,7 +129,6 @@ impl LibraryController {
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
-        self.library.clear_catalog();
         self.library.clear_collections();
         self.collection_members.clear();
         self.selection = Selection::default();

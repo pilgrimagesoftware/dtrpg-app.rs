@@ -213,10 +213,16 @@ impl Library {
                                   let (last_checkpoint_page, last_checkpoint_at) =
                                       *checkpoint.borrow();
                                   let pages_since_checkpoint = page_num - last_checkpoint_page;
-                                  if pages_since_checkpoint >= CATALOG_CHECKPOINT_PAGE_INTERVAL
-                   || last_checkpoint_at.elapsed()
-                      >= std::time::Duration::from_secs(CATALOG_CHECKPOINT_MIN_INTERVAL_SECS)
-                {
+                                  // A catalog that was already stored is
+                                  // not checkpointed: writing the pages so
+                                  // far over it would shrink it until the
+                                  // fetch finishes, and a quit in between
+                                  // would keep the shrunken copy.
+                                  let checkpoint_due =
+                                      pages_since_checkpoint >= CATALOG_CHECKPOINT_PAGE_INTERVAL
+                                      || last_checkpoint_at.elapsed()
+                                         >= std::time::Duration::from_secs(CATALOG_CHECKPOINT_MIN_INTERVAL_SECS);
+                                  if catalog_was_empty && checkpoint_due {
                     if let Err(e) = save_catalog_cache(&self.cache_root, &live_items.borrow()) {
                         tracing::warn!(error = %e, "failed to checkpoint catalog cache");
                     }

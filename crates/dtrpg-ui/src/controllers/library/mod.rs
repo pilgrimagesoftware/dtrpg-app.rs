@@ -78,6 +78,8 @@ mod tests_file_tags;
 #[cfg(test)]
 mod tests_inspector;
 #[cfg(test)]
+mod tests_sign_in;
+#[cfg(test)]
 mod tests_support;
 #[cfg(test)]
 mod tests_tags;
