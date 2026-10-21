@@ -178,3 +178,28 @@ fn a_smart_collection_counts_and_lists_the_items_that_match_its_rules() {
     let ids = library.smart_collection_member_ids(&collection);
     assert_eq!(ids, [11, 21].into_iter().collect());
 }
+
+#[test]
+fn the_filter_values_of_a_field_are_listed_once_across_the_whole_catalog() {
+    use crate::util::search::Field;
+
+    let library = open_library();
+    let items = [item("a", "Paizo").with_filter("Format", "PDF")
+                                   .with_filter("Format", "Audio"),
+                 item("b", "Other").with_filter("Format", "pdf")
+                                   .with_filter("Genre", "Horror")];
+    library.index
+           .lock()
+           .unwrap()
+           .replace_all_items(&items)
+           .unwrap();
+
+    let mut formats = library.filter_values(Field::Format);
+    formats.sort_by_key(|value| value.to_lowercase());
+
+    assert_eq!(formats.len(), 2);
+    assert_eq!(formats[0], "Audio");
+    assert_eq!(formats[1].to_lowercase(), "pdf");
+    assert_eq!(library.filter_values(Field::Genre), ["Horror"]);
+    assert!(library.filter_values(Field::Publisher).is_empty());
+}

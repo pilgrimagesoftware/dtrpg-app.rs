@@ -5,7 +5,9 @@
 use gpui_kit::component::Selectable as _;
 
 use super::*;
-use crate::ui::views::filters_column::{render_filter_chips, render_filters_column};
+use crate::ui::views::filters_column::{
+    render_filter_chips, render_filters_column, without_hidden_values,
+};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
@@ -147,7 +149,9 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
     let filters_column =
         view.filters_open.then(|| {
-                             render_filters_column(&view.controller.read(cx).visible_facets(),
+                             let ctrl = view.controller.read(cx);
+                             render_filters_column(&without_hidden_values(&ctrl.visible_facets(),
+                                                     ctrl.filter_value_choices()),
                                                    &search_query,
                                                    &view.search_input,
                                                    colors)

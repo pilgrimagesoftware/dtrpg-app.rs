@@ -207,6 +207,13 @@ detail:
   materialize_tooltip: "Download the local copy of the files iCloud has offloaded"
 
 settings:
+  filter_values_title: "Filter values"
+  filter_values_description: "Choose which values the filters column lists. Lit values are listed; ghosted ones are hidden. Click a value to move it. A hidden value still works in a search."
+  filter_values_format: "Format"
+  filter_values_genre: "Genre"
+  filter_values_type: "Product type"
+  filter_values_hide_tooltip: "Hide {name} from the filters"
+  filter_values_show_tooltip: "Show {name} in the filters"
   title: "Settings"
   account_title: "Account"
   not_signed_in: "Not signed in to DriveThruRPG"

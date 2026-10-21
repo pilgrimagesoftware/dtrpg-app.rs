@@ -18,6 +18,7 @@ pub mod settings_account_view;
 pub mod settings_advanced_view;
 pub mod settings_appearance_view;
 pub mod settings_file_openers_view;
+pub mod settings_filter_values_view;
 pub mod settings_native_view;
 pub mod settings_storage_view;
 pub mod settings_theme_gallery;

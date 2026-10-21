@@ -118,7 +118,8 @@ impl Render for SettingsWindowView {
                                           snap.recently_updated_window_days,
                                           snap.recently_updated_window_input,
                                           font_selects,
-                                          snap.native);
+                                          snap.native,
+                                          self.library.read(cx).filter_value_sections());
 
         div().size_full().child(panel)
     }

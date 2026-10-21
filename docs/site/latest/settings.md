@@ -54,5 +54,25 @@ checked at launch. See [Tags]({{ '/latest/tags/' | relative_url }}).
 Cache details (size and location on disk) and maintenance actions:
 opening the cache folder directly, or clearing it.
 
+### Filter values
+
+DriveThruRPG puts filters on every product, such as its format and genre, and some of the
+values are useful to you while others are not. The **Filter values** section lists every
+format, genre and product type your library has as a chip, so you choose which ones the
+[filters column]({{ '/latest/catalog/' | relative_url }}#filtering-with-the-filters-column) lists.
+
+- A lit chip is shown. Ghosted chips are hidden and listed after the lit ones. Each group is in
+  alphabetical order.
+- Click a chip to move it to the other group.
+- A hidden value is only left out of the filters column. It still works if you type it into the
+  search, such as `format:"creation method"`, and it still shows as a chip under the toolbar while
+  it is applied.
+- Libri starts with a short list of values it hides, such as `Human-Created Without AI` under
+  Format, because they say little about a title. Show one by clicking it. Libri keeps only what you
+  change, so a value you never touched follows Libri's own list, even when that list improves
+  in a later version.
+
+The section appears once your library has been loaded with filters.
+
 The app name, version, and build details are in the About window (the app
 menu's "About Libri"), not in Settings.

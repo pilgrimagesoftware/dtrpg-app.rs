@@ -16,8 +16,10 @@ use gpui_kit::component::input::{InputState, NumberInput};
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
+use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::{CacheCounts, SettingsController};
 use crate::data::theme::ColorTokens;
+use crate::ui::views::settings_filter_values_view::render_filter_values_section;
 use crate::ui::widgets::small_caps_text;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::pluralize::pluralize;
@@ -253,7 +255,9 @@ fn render_recently_updated_window_row(recently_updated_window_days: u32,
 pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts: CacheCounts,
                                colors: &ColorTokens, label_font_family: &str,
                                value_font_family: &str, recently_updated_window_days: u32,
-                               recently_updated_window_input: Option<Entity<InputState>>)
+                               recently_updated_window_input: Option<Entity<InputState>>,
+                               filter_values: &[FilterValueSection],
+                               library: &Entity<LibraryController>)
                                -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -278,6 +282,8 @@ pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts:
             recently_updated_window_input,
             colors,
         ))
+        .child(div().h(px(1.0)).bg(border))
+        .children(render_filter_values_section(filter_values, library, colors))
         .child(div().h(px(1.0)).bg(border))
         .child(render_cache_details(
             cache_counts,
