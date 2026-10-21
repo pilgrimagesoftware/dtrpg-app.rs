@@ -267,6 +267,19 @@ impl Library {
             .map_or(0, Vec::len)
     }
 
+    /// Returns the whole filtered, sorted result set, without copying it. The
+    /// same `Arc` comes back until the next `invalidate_cache` call replaces
+    /// it, so a caller can tell the set has changed by comparing the pointers.
+    #[must_use]
+    pub fn visible_items_all(&self) -> Arc<Vec<LibraryItem>> {
+        self.query_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .items
+            .clone()
+            .unwrap_or_default()
+    }
+
     /// Returns a slice of the filtered, sorted result set.
     ///
     /// `range` is 0-based relative to the start of the full result set.

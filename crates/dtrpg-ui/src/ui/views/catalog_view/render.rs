@@ -85,16 +85,30 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
     }
 
     let group_by = snap.group_by;
+    if is_list_presentation {
+        view.refit_columns(window, cx);
+    }
+    let list_table = view.catalog_list_table.clone();
+    let grouped_list_table = view.catalog_grouped_list_table.clone();
     let content: AnyElement = match (snap.presentation, group_by.is_grouped()) {
         // ── List, ungrouped — DataTable (handles header/row alignment) ──
         (CatalogPresentation::List, false) => {
             use gpui_kit::component::Size;
             root.px(pad_side)
                     .child(
-                        DataTable::new(&view.catalog_list_table)
-                            .with_size(Size::Size(density.row_text_height))
-                            .bordered(false)
-                            .scrollbar_visible(true, false),
+                        div().flex_1()
+                             .min_h_0()
+                             .on_prepaint(move |bounds, _window, cx| {
+                                 let width = bounds.size.width;
+                                 set_list_table_width(&list_table,
+                                                           &grouped_list_table,
+                                                           width,
+                                                           cx);
+                             })
+                             .child(DataTable::new(&view.catalog_list_table)
+                                        .with_size(Size::Size(density.row_text_height))
+                                        .bordered(false)
+                                        .scrollbar_visible(true, false)),
                     )
                     .into_any_element()
         }
@@ -107,10 +121,19 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             view.grouped_items(cx);
             root.px(pad_side)
                     .child(
-                        DataTable::new(&view.catalog_grouped_list_table)
-                            .with_size(Size::Size(density.row_text_height))
-                            .bordered(false)
-                            .scrollbar_visible(true, false),
+                        div().flex_1()
+                             .min_h_0()
+                             .on_prepaint(move |bounds, _window, cx| {
+                                 let width = bounds.size.width;
+                                 set_list_table_width(&list_table,
+                                                           &grouped_list_table,
+                                                           width,
+                                                           cx);
+                             })
+                             .child(DataTable::new(&view.catalog_grouped_list_table)
+                                        .with_size(Size::Size(density.row_text_height))
+                                        .bordered(false)
+                                        .scrollbar_visible(true, false)),
                     )
                     .into_any_element()
         }
