@@ -13,13 +13,16 @@ use gpui::{
     px,
 };
 use gpui_kit::component::IconName;
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::scroll::ScrollableElement as _;
 use rust_i18n::t;
 
+use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
+use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// The width of the filters column.
 const FILTERS_COLUMN_WIDTH: f32 = 220.0;
@@ -151,7 +154,7 @@ pub fn render_filters_column(facets: &Facets, query: &SearchQuery,
 /// takes its term out of the search when pressed. Nothing is rendered while
 /// the search has no terms.
 pub fn render_filter_chips(query: &SearchQuery, search_input: &Entity<InputState>,
-                           colors: &ColorTokens)
+                           controller: &Entity<LibraryController>, colors: &ColorTokens)
                            -> Option<impl IntoElement + use<>> {
     if query.terms().is_empty() {
         return None;
@@ -170,6 +173,17 @@ pub fn render_filter_chips(query: &SearchQuery, search_input: &Entity<InputState
                                             set_search_text(&input, &next, window, cx);
                                         })
                                                 });
+    let (save_query, save_controller) = (query.clone(), controller.clone());
+    let save = Button::new("filter-chips-save").ghost()
+                                               .compact()
+                                               .label(t!("filters.save_as_smart_collection"))
+                                               .tooltip(t!("filters.save_as_smart_collection_tooltip"))
+                                               .on_click(move |_, window, cx| {
+                                                   open_smart_collection_editor(window,
+                                                                                cx,
+                                                                                save_controller.clone(),
+                                                                                SmartCollectionDraft::from_search(&save_query));
+                                               });
     Some(div().flex()
               .flex_wrap()
               .items_center()
@@ -179,7 +193,8 @@ pub fn render_filter_chips(query: &SearchQuery, search_input: &Entity<InputState
               .border_b_1()
               .border_color(colors.border)
               .bg(colors.surface)
-              .children(chips))
+              .children(chips)
+              .child(save))
 }
 
 #[cfg(test)]

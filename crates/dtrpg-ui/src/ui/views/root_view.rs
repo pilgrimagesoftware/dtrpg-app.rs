@@ -60,6 +60,7 @@ use crate::ui::app::{
     save_library_window_bounds,
 };
 use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
+use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
 use crate::ui::views::{
     bulk_action_bar_view::render_bulk_action_bar,
     catalog_view::CatalogView,
@@ -70,6 +71,7 @@ use crate::ui::views::{
     title_bar_view::render_title_bar,
     toolbar_view::render_toolbar,
 };
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 use crate::{
     controllers::{
         activity::ActivityController,

@@ -20,6 +20,7 @@ actions!(libri, [Minimize, Zoom, ToggleFullscreen]);
 // Catalog menu actions
 actions!(libri,
          [AddCollection,
+          NewSmartCollection,
           ReloadCatalog,
           RefreshThumbnails,
           CheckItemAvailability]);

@@ -20,6 +20,14 @@ impl LibraryController {
         self.smart_counts.get(&id).copied().unwrap_or_default()
     }
 
+    /// How many items match `collection`, of how many there are, for the
+    /// editor's live count. Reads the whole catalog, so call it when the
+    /// collection changes, not while drawing.
+    #[must_use]
+    pub fn smart_collection_preview(&self, collection: &SmartCollection) -> (usize, usize) {
+        self.library.smart_collection_match_count(collection)
+    }
+
     /// Adds `collection` and returns its id. The collection is kept in
     /// memory even when it could not be saved, and the failure is logged.
     pub fn add_smart_collection(&mut self, collection: SmartCollection, cx: &mut Context<Self>)
