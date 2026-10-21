@@ -125,6 +125,19 @@ impl LibraryController {
     pub fn replace_service(&mut self, service: Box<dyn LibraryService>,
                            collections_service: Box<dyn CollectionsService>,
                            cx: &mut Context<Self>) {
+        self.install_services(service, collections_service, cx);
+        // Collections are loaded as the first stage of `start_load`, sharing
+        // its single activity item rather than starting a separate one.
+        self.start_load(cx);
+    }
+
+    /// Installs the new services and resets what depended on the old ones,
+    /// without starting a load. [`replace_service`](Self::replace_service)
+    /// is this followed by the load; tests call this alone, so that they do
+    /// not start a background load that outlives them.
+    pub(super) fn install_services(&mut self, service: Box<dyn LibraryService>,
+                                   collections_service: Box<dyn CollectionsService>,
+                                   cx: &mut Context<Self>) {
         tracing::debug!("replace_service: installing authenticated services");
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
@@ -135,9 +148,6 @@ impl LibraryController {
         self.invalidate_cache();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
-        // Collections are loaded as the first stage of `start_load`, sharing
-        // its single activity item rather than starting a separate one.
-        self.start_load(cx);
     }
 
     /// Starts a background task to create a new collection with the given name.
