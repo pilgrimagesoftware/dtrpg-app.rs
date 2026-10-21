@@ -214,15 +214,18 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
       })
       .detach();
 
-    // Handle logout: delete the API key and transition to unauthenticated.
+    // Handle logout: delete the API key, forget the stored library, and
+    // transition to unauthenticated.
     // Tokens are in-memory only and need no explicit deletion.
     let auth_state_for_logout = auth_state.clone();
+    let controller_for_logout = controller.clone();
     cx.subscribe(settings,
                  move |_this, _ctrl, _event: &LogoutRequested, cx| {
                      let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
                      if let Err(e) = store.delete() {
                          tracing::warn!("credential delete (api-key): {e}");
                      }
+                     controller_for_logout.update(cx, |ctrl, cx| ctrl.forget_library(cx));
                      auth_state_for_logout.update(cx, |ctrl, cx| {
                                               ctrl.set_state(AuthState::Unauthenticated, cx)
                                           });
