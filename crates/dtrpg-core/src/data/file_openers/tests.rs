@@ -174,15 +174,15 @@ fn a_saved_name_that_is_not_a_choosable_column_is_ignored() {
 }
 
 #[test]
-fn the_columns_shown_are_the_title_the_chosen_ones_in_order_then_status_and_open() {
+fn the_columns_shown_are_status_and_title_the_chosen_ones_in_order_then_open() {
     assert_eq!(ListColumn::shown(&[ListColumn::Tags, ListColumn::Publisher]),
-               [ListColumn::Title,
+               [ListColumn::Status,
+                ListColumn::Title,
                 ListColumn::Publisher,
                 ListColumn::Tags,
-                ListColumn::Status,
                 ListColumn::Open]);
     assert_eq!(ListColumn::shown(&[]),
-               [ListColumn::Title, ListColumn::Status, ListColumn::Open]);
+               [ListColumn::Status, ListColumn::Title, ListColumn::Open]);
 }
 
 #[test]

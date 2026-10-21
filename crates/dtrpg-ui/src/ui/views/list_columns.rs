@@ -172,13 +172,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_columns_follow_the_chosen_ones_with_the_title_first_and_status_and_open_last() {
+    fn the_columns_follow_the_chosen_ones_with_status_and_title_first_and_open_last() {
         let columns = ListColumnSet::new(&[ListColumn::Tags, ListColumn::Size]);
 
         assert_eq!(columns.len(), 5);
-        assert_eq!(columns.kind(0), Some(ListColumn::Title));
-        assert_eq!(columns.position_of(ListColumn::Size), Some(1));
-        assert_eq!(columns.position_of(ListColumn::Tags), Some(2));
+        assert_eq!(columns.kind(0), Some(ListColumn::Status));
+        assert_eq!(columns.kind(1), Some(ListColumn::Title));
+        assert_eq!(columns.position_of(ListColumn::Size), Some(2));
+        assert_eq!(columns.position_of(ListColumn::Tags), Some(3));
         assert_eq!(columns.kind(4), Some(ListColumn::Open));
         assert_eq!(columns.position_of(ListColumn::Pages), None);
     }
@@ -186,13 +187,13 @@ mod tests {
     #[test]
     fn a_dragged_width_stays_with_its_column_when_others_come_and_go() {
         let mut columns = ListColumnSet::new(&[ListColumn::Publisher, ListColumn::Size]);
-        // Title, Publisher, Size, Status, Open.
-        columns.apply_widths(&[px(300.), px(200.), px(60.), px(24.), px(28.)]);
+        // Status, Title, Publisher, Size, Open.
+        columns.apply_widths(&[px(24.), px(300.), px(200.), px(60.), px(28.)]);
 
         let changed = columns.set_chosen(&[ListColumn::Size, ListColumn::Tags]);
 
         assert!(changed);
-        // Title, Size, Tags, Status, Open: Publisher's width is gone, Size's is
+        // Status, Title, Size, Tags, Open: Publisher's width is gone, Size's is
         // not.
         let size = columns.position_of(ListColumn::Size).unwrap();
         let tags = columns.position_of(ListColumn::Tags).unwrap();
@@ -213,7 +214,8 @@ mod tests {
 
         columns.apply_widths(&[px(500.)]);
 
-        assert_eq!(columns.column(0).width, px(300.));
+        let title = columns.position_of(ListColumn::Title).unwrap();
+        assert_eq!(columns.column(title).width, px(300.));
     }
 
     #[test]
