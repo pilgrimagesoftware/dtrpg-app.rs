@@ -1706,6 +1706,7 @@ dependencies = [
  "lopdf",
  "md5",
  "plist",
+ "proptest",
  "reqwest 0.12.28",
  "rusqlite",
  "sentry",

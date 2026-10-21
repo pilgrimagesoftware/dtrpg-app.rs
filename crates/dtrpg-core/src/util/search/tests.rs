@@ -138,3 +138,88 @@ fn only_a_search_with_a_tag_term_needs_the_items_tags() {
     assert!(!SearchQuery::parse("moria").has_tag_terms());
     assert!(!SearchQuery::parse("tagged").has_tag_terms());
 }
+
+fn typed_item(publisher: &str, system: &str, kind: &str, status: ItemStatus) -> LibraryItem {
+    LibraryItem::new("a", "Moria", publisher, system, kind, "PDF", 100, 10.0, 2024, 0, status,
+                     "#000000", "", None)
+}
+
+#[test]
+fn a_publisher_term_matches_the_whole_publisher_ignoring_case() {
+    let moria = typed_item("Free League", "", "Core", ItemStatus::Cloud);
+
+    assert!(matches("publisher:\"free league\"", &moria, &[]));
+    assert!(matches("PUBLISHER:\"FREE LEAGUE\"", &moria, &[]));
+    assert!(!matches("publisher:free", &moria, &[]));
+    assert!(matches("-publisher:paizo", &moria, &[]));
+    assert!(!matches("-publisher:\"free league\"", &moria, &[]));
+}
+
+#[test]
+fn a_system_term_tests_the_game_system() {
+    let moria = typed_item("Free League", "The One Ring", "Core", ItemStatus::Cloud);
+
+    assert!(matches("system:\"the one ring\"", &moria, &[]));
+    assert!(!matches("system:\"pathfinder 2e\"", &moria, &[]));
+    assert!(matches("-system:\"pathfinder 2e\"", &moria, &[]));
+}
+
+#[test]
+fn a_type_term_tests_the_content_type() {
+    let moria = typed_item("Free League", "", "Adventure", ItemStatus::Cloud);
+
+    assert!(matches("type:adventure", &moria, &[]));
+    assert!(!matches("type:core", &moria, &[]));
+    assert!(matches("-type:core", &moria, &[]));
+}
+
+#[test]
+fn an_availability_term_tests_the_download_state() {
+    let cloud = typed_item("", "", "Core", ItemStatus::Cloud);
+    let downloaded = typed_item("", "", "Core", ItemStatus::Downloaded);
+
+    assert!(matches("availability:cloud", &cloud, &[]));
+    assert!(!matches("availability:cloud", &downloaded, &[]));
+    assert!(matches("-availability:cloud", &downloaded, &[]));
+}
+
+#[test]
+fn an_availability_that_names_no_state_holds_for_no_item() {
+    let cloud = typed_item("", "", "Core", ItemStatus::Cloud);
+
+    assert!(!matches("availability:lost", &cloud, &[]));
+    assert!(matches("-availability:lost", &cloud, &[]));
+}
+
+#[test]
+fn every_term_must_hold_and_the_text_must_match() {
+    let moria = typed_item("Free League", "The One Ring", "Core", ItemStatus::Cloud);
+
+    assert!(matches("moria type:core -tag:solo system:\"the one ring\"",
+                    &moria,
+                    &["horror"]));
+    assert!(!matches("moria type:adventure system:\"the one ring\"", &moria, &[]));
+    assert!(!matches("starfinder type:core", &moria, &[]));
+}
+
+#[test]
+fn a_word_before_a_colon_that_is_not_a_field_is_free_text() {
+    let query = SearchQuery::parse("location:cloud");
+
+    assert_eq!(query.free_text(), "location:cloud");
+    assert!(query.terms().is_empty());
+}
+
+#[test]
+fn a_query_prints_its_terms_in_the_order_typed_then_its_text() {
+    let query = SearchQuery::parse("moria -tag:solo Publisher:\"Free League\" type:core");
+
+    assert_eq!(query.to_string(),
+               "-tag:solo publisher:\"free league\" type:core moria");
+}
+
+#[test]
+fn a_term_with_no_value_is_not_printed() {
+    assert_eq!(SearchQuery::parse("tag: system:\"\" moria").to_string(),
+               "moria");
+}
