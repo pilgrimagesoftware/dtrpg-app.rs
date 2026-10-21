@@ -17,9 +17,9 @@ fn signing_in_keeps_the_stored_library(cx: &mut TestAppContext) {
                                items);
 
     let stored = fixture.controller.update(cx, |ctrl, cx| {
-                                       ctrl.replace_service(fixture.library_service(),
-                                                            fixture.collections_service(),
-                                                            cx);
+                                       ctrl.install_services(fixture.library_service(),
+                                                             fixture.collections_service(),
+                                                             cx);
                                        ctrl.library.all_items().len()
                                    });
 
