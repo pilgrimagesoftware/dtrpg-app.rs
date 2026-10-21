@@ -127,3 +127,26 @@ fn tags_round_trip_through_set_and_get() {
 
     assert_eq!(library.tags().entries().len(), 1);
 }
+
+#[test]
+fn the_facets_count_the_items_on_show_without_the_choices_made_in_that_facet() {
+    let library = open_library();
+    library.index
+           .lock()
+           .unwrap()
+           .replace_all_items(&[item("a", "Paizo"), item("b", "Paizo")])
+           .unwrap();
+    let view = ViewState { search_query: "type:core".to_owned(),
+                           ..ViewState::default() };
+
+    library.invalidate_cache(&view, 0, "Untagged");
+    let facets = library.visible_facets();
+
+    // Both items are "Core"; the type facet is counted without the type choice,
+    // and availability with it.
+    assert_eq!(facets.types.len(), 1);
+    assert_eq!(facets.types[0].count, 2);
+    assert_eq!(facets.availability.len(), 1);
+    assert_eq!(facets.availability[0].count, 2);
+    assert!(facets.systems.is_empty());
+}

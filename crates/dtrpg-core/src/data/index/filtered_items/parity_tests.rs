@@ -169,7 +169,11 @@ const CASES: &[(&str, &str, Option<ItemStatus>, Option<&str>)] =
       ("negated availability that names no state", "-availability:lost", None, None),
       ("terms combine", "system:adventures tag:horror", None, None),
       ("terms and text", "publisher:paizo sourcebook", None, None),
-      ("a word that is not a field is text", "location:cloud", None, None)];
+      ("a word that is not a field is text", "location:cloud", None, None),
+      ("same field terms are alternatives", "system:adventures system:realms", None, None),
+      ("alternatives across statuses", "availability:downloaded availability:cloud", None, None),
+      ("alternatives and another field", "system:misc system:realms publisher:paizo", None, None),
+      ("alternatives with a negation", "system:misc system:adventures -system:misc", None, None)];
 
 #[test]
 fn search_parity_over_the_full_battery() {

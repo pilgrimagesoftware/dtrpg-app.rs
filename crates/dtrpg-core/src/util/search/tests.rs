@@ -223,3 +223,69 @@ fn a_term_with_no_value_is_not_printed() {
     assert_eq!(SearchQuery::parse("tag: system:\"\" moria").to_string(),
                "moria");
 }
+
+#[test]
+fn terms_for_the_same_field_are_alternatives() {
+    let core = typed_item("", "", "Core", ItemStatus::Cloud);
+    let adventure = typed_item("", "", "Adventure", ItemStatus::Cloud);
+    let setting = typed_item("", "", "Setting", ItemStatus::Cloud);
+
+    assert!(matches("type:core type:adventure", &core, &[]));
+    assert!(matches("type:core type:adventure", &adventure, &[]));
+    assert!(!matches("type:core type:adventure", &setting, &[]));
+}
+
+#[test]
+fn alternatives_for_one_field_still_have_to_agree_with_the_other_terms() {
+    let moria = typed_item("Free League", "", "Core", ItemStatus::Cloud);
+
+    assert!(matches("type:core type:adventure publisher:\"free league\"",
+                    &moria,
+                    &[]));
+    assert!(!matches("type:core type:adventure publisher:paizo", &moria, &[]));
+    assert!(!matches("type:core type:adventure -type:core", &moria, &[]));
+}
+
+#[test]
+fn tag_terms_all_have_to_hold_unlike_other_fields() {
+    let moria = typed_item("", "", "Core", ItemStatus::Cloud);
+
+    assert!(!matches("tag:solo tag:printed", &moria, &["solo"]));
+}
+
+#[test]
+fn a_value_is_toggled_on_and_off() {
+    let query = SearchQuery::parse("moria");
+    let on = query.toggled(Field::System, "D&D 5E");
+
+    assert!(on.asks_for(Field::System, "d&d 5e"));
+    assert_eq!(on.to_string(), "system:\"d&d 5e\" moria");
+    assert_eq!(on.toggled(Field::System, "D&D 5E"), query);
+}
+
+#[test]
+fn toggling_a_value_leaves_a_negated_term_for_it_alone() {
+    let query = SearchQuery::parse("-type:core");
+
+    let toggled = query.toggled(Field::Type, "core");
+
+    assert!(toggled.asks_for(Field::Type, "core"));
+    assert_eq!(toggled.terms().len(), 2);
+}
+
+#[test]
+fn toggling_nothing_changes_nothing() {
+    let query = SearchQuery::parse("moria");
+
+    assert_eq!(query.toggled(Field::Tag, "  "), query);
+}
+
+#[test]
+fn a_term_or_a_whole_field_can_be_taken_out() {
+    let query = SearchQuery::parse("type:core type:adventure tag:solo");
+    let core = query.terms()[0].clone();
+
+    assert_eq!(query.without_term(&core).to_string(),
+               "type:adventure tag:solo");
+    assert_eq!(query.without_field(Field::Type).to_string(), "tag:solo");
+}

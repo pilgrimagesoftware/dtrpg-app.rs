@@ -5,13 +5,13 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::{Arc, PoisonError};
 
-use super::ViewState;
+use super::{Facets, ViewState};
 use crate::data::enums::GroupBy;
 use crate::data::index::ItemFilter;
 use crate::data::library::{LibraryItem, SectionCounts};
 use crate::library::Library;
 use crate::util::publisher::{ItemGroup, PublisherEntry, split_by_publisher, split_by_tag};
-use crate::util::search::SearchQuery;
+use crate::util::search::{Field, SearchQuery};
 
 impl Library {
     /// Builds an `ItemFilter` representing `view`'s sidebar filter, before
@@ -94,6 +94,7 @@ impl Library {
         let items = self.overlaid_items(matched);
         let grouped = self.build_grouped_cache(view, now_secs, untagged_label);
         let catalog_ids = self.compute_catalog_ids();
+        let facets = Arc::new(self.count_facets(view, now_secs, &query));
 
         let mut cache = self.query_cache
                             .lock()
@@ -101,6 +102,35 @@ impl Library {
         cache.items = Some(Arc::new(items));
         cache.grouped = grouped;
         cache.catalog_ids = Arc::new(catalog_ids);
+        cache.facets = facets;
+    }
+
+    /// Counts the items on show by each facet value.
+    ///
+    /// A facet whose values are alternatives (availability, system, type) is
+    /// counted without its own choices, so picking one value does not hide the
+    /// others. Tags all have to hold, so their counts keep the tag choices and
+    /// show what narrowing further would leave. A facet that cannot be counted
+    /// shows no values, and the failure is logged.
+    fn count_facets(&self, view: &ViewState, now_secs: i64, query: &SearchQuery) -> Facets {
+        let index = self.index.lock().unwrap_or_else(PoisonError::into_inner);
+        let count = |field: Field| {
+            let scoped = if field == Field::Tag {
+                query.clone()
+            }
+            else {
+                query.without_field(field)
+            };
+            let mut filter = Self::item_filter(view, now_secs);
+            filter.search = Some(&scoped);
+            index.facet_counts(&filter, field)
+                 .inspect_err(|error| tracing::warn!(%error, ?field, "could not count a facet"))
+                 .unwrap_or_default()
+        };
+        Facets { availability: count(Field::Availability),
+                 systems:      count(Field::System),
+                 types:        count(Field::Type),
+                 tags:         count(Field::Tag), }
     }
 
     /// Builds the grouped-items cache for `view.group_by`, or `None` when
@@ -293,6 +323,16 @@ impl Library {
             .and_then(|items| items.get(range))
             .map(<[LibraryItem]>::to_vec)
             .unwrap_or_default()
+    }
+
+    /// Returns the counts for the filter column, as of the most recent
+    /// `invalidate_cache` call.
+    #[must_use]
+    pub fn visible_facets(&self) -> Arc<Facets> {
+        Arc::clone(&self.query_cache
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .facets)
     }
 
     /// Returns the grouped result set for the most recent `invalidate_cache`

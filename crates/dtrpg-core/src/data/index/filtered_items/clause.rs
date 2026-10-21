@@ -160,8 +160,24 @@ pub(super) fn build_where(filter: &ItemFilter<'_>) -> (String, Vec<Box<dyn ToSql
                          WHERE it.item_id = items.id AND instr(ulower(tg.name), ?{n}) > 0))"
             ));
         }
-        for term in query.terms() {
+        // A `-` term and a tag term each have to hold. For every other field,
+        // its terms are alternatives, so they join with OR in one clause.
+        for term in query.terms()
+                         .iter()
+                         .filter(|term| term.negated || term.field == Field::Tag)
+        {
             clauses.extend(term_clause(term, &mut args));
+        }
+        for field in Field::ALL.into_iter().filter(|field| *field != Field::Tag) {
+            let alternatives: Vec<String> =
+                query.terms()
+                     .iter()
+                     .filter(|term| !term.negated && term.field == field)
+                     .filter_map(|term| term_clause(term, &mut args))
+                     .collect();
+            if !alternatives.is_empty() {
+                clauses.push(format!("({})", alternatives.join(" OR ")));
+            }
         }
     }
 
