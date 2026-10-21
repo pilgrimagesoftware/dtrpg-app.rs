@@ -21,6 +21,8 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::future::Future;
+use std::time::Duration;
 
 use dtrpg_core::constants::{API_BASE_URL_ENV, APPLICATION_KEY_ENV};
 use dtrpg_core::credentials::{CredentialStore, KeyringCredentialStore};
@@ -31,6 +33,25 @@ use serde_json::json;
 
 /// How many products to ask for per page.
 const PAGE_SIZE: u32 = 100;
+
+/// How long one step may take before the example gives up and says which.
+const STEP_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Waits for `step` on the runtime, giving up after [`STEP_TIMEOUT`] so that a
+/// website that does not answer (for example, while it is down for
+/// maintenance) ends in a message instead of a silent hang.
+fn run_step<T, E>(runtime: &tokio::runtime::Handle, name: &str,
+                  step: impl Future<Output = Result<T, E>>)
+                  -> Result<T, Box<dyn Error>>
+    where E: Error + 'static {
+    eprintln!("{name}...");
+    match runtime.block_on(tokio::time::timeout(STEP_TIMEOUT, step)) {
+        Ok(result) => Ok(result?),
+        Err(_) => Err(format!("{name}: no answer after {} seconds; the DriveThruRPG site may \
+                               be down",
+                              STEP_TIMEOUT.as_secs()).into()),
+    }
+}
 
 /// What to print, from the command line.
 struct Options {
@@ -61,6 +82,8 @@ fn parse_options(args: impl Iterator<Item = String>) -> Result<Options, String> 
 
 /// The application key from the keyring, or from the environment.
 fn application_key() -> Result<String, Box<dyn Error>> {
+    eprintln!("Reading the application key from the system keyring (an unlock prompt may \
+               appear)...");
     let stored = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
                                                                               .ok()
                                                                               .flatten()
@@ -81,7 +104,9 @@ fn list_products(application_key: &str) -> Result<Vec<OrderProductItem>, Box<dyn
         Err(_) => Config::new(application_key.to_owned()),
     };
     let runtime = dtrpg_core::runtime::handle()?;
-    let tokens = runtime.block_on(key_exchange::authenticate(application_key, &config))?;
+    let tokens = run_step(&runtime,
+                          "Signing in",
+                          key_exchange::authenticate(application_key, &config))?;
     let mut sdk = DriveThruRpgSdk::with_config(config);
     sdk.apply_auth_response(tokens)?;
     let client = sdk.library_client()?;
@@ -95,7 +120,9 @@ fn list_products(application_key: &str) -> Result<Vec<OrderProductItem>, Box<dyn
                                           library:            Some(true),
                                           archived:           Some(false),
                                           updated_date_after: None, };
-        let response = runtime.block_on(client.list_order_products(params))?;
+        let response = run_step(&runtime,
+                                &format!("Listing library page {page}"),
+                                client.list_order_products(params))?;
         let last_page = response.links.next.is_none();
         products.extend(response.data);
         if last_page {
