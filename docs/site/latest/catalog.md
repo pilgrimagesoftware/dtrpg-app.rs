@@ -45,8 +45,29 @@ The sidebar has three sections:
 - **Collections** - your custom collections (see
   [Collections]({{ '/latest/collections/' | relative_url }})).
 
-The toolbar's search box filters the current section's titles as you type. It also finds items by tag: see
-[Tags]({{ '/latest/tags/' | relative_url }}).
+The toolbar's search box filters the current section's titles as you type. It also finds items by tag and by
+other fields: see [Searching by field](#searching-by-field) below and [Tags]({{ '/latest/tags/' | relative_url }}).
+
+## Searching by field
+
+Type a field, a colon and a value to keep only the items whose field has exactly that value. Capital letters
+do not matter. Put a minus sign in front to keep only the items that do not have it, and put a value with
+spaces in quotes.
+
+| Field | Finds items whose | Example |
+| --- | --- | --- |
+| `tag` | tags include the value | `tag:solo` |
+| `publisher` | publisher is the value | `publisher:"free league"` |
+| `system` | game system is the value | `system:"the one ring"` |
+| `type` | content type is the value (core rules, adventure, and so on) | `type:adventure` |
+| `availability` | download state is `downloaded` or `cloud` | `-availability:cloud` |
+
+Combine terms with each other and with ordinary words: `type:adventure -tag:solo moria`. An item has to meet
+every term. A word before a colon that is not one of these fields, such as `location:cloud`, is searched
+for as ordinary text.
+
+`system` and `type` find nothing yet for most libraries: DriveThruRPG does not give Libri the game system,
+and the content type is only the product's first category. Both will fill in as the catalog data improves.
 
 ## When there is nothing to show
 

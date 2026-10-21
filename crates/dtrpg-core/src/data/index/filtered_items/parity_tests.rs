@@ -153,7 +153,23 @@ const CASES: &[(&str, &str, Option<ItemStatus>, Option<&str>)] =
       ("tag section", "", None, Some("Solo")),
       ("tag section x search", "source", None, Some("HÖRRAH")),
       ("tag section x text", "solo", None, Some("solo")),
-      ("everything excluded", "eowyn -tag:solo tag:solo", None, None)];
+      ("everything excluded", "eowyn -tag:solo tag:solo", None, None),
+      ("publisher term", "publisher:paizo", None, None),
+      ("negated publisher", "-publisher:paizo", None, None),
+      ("quoted publisher", "publisher:\"angry goblin games\"", None, None),
+      ("publisher is the whole value", "publisher:paiz", None, None),
+      ("system term", "system:adventures", None, None),
+      ("negated system", "-system:misc", None, None),
+      ("type term", "type:core", None, None),
+      ("type with no match", "type:adventure", None, None),
+      ("negated type", "-type:core", None, None),
+      ("availability term", "availability:downloaded", None, None),
+      ("negated availability", "-availability:downloaded", None, None),
+      ("availability that names no state", "availability:lost", None, None),
+      ("negated availability that names no state", "-availability:lost", None, None),
+      ("terms combine", "system:adventures tag:horror", None, None),
+      ("terms and text", "publisher:paizo sourcebook", None, None),
+      ("a word that is not a field is text", "location:cloud", None, None)];
 
 #[test]
 fn search_parity_over_the_full_battery() {
@@ -166,7 +182,16 @@ fn search_parity_over_the_full_battery() {
         assert_eq!(new, old, "parity broken for {label} ({typed:?})");
         assert!(!old.is_empty()
                 || matches!(*typed,
-                            "   " | "orr" | "tag:to run" | "tagged" | "eowyn -tag:solo tag:solo"),
+                            "   "
+                            | "orr"
+                            | "tag:to run"
+                            | "tagged"
+                            | "eowyn -tag:solo tag:solo"
+                            | "publisher:paiz"
+                            | "type:adventure"
+                            | "-type:core"
+                            | "availability:lost"
+                            | "location:cloud"),
                 "case {label} should match something: {new:?} vs {old:?}");
     }
 }
@@ -193,7 +218,13 @@ fn each_battery_case_narrows_or_partitions_meaningfully() {
                    ("unicode upper query", 1),
                    ("tag: required", 2),
                    ("quoted tag", 2),
-                   ("status x search", 2)]
+                   ("status x search", 2),
+                   ("publisher term", 2),
+                   ("system term", 2),
+                   ("type term", 5),
+                   ("availability term", 2),
+                   ("negated availability that names no state", 5),
+                   ("terms combine", 1)]
     {
         assert_eq!(seen_hits.get(expect.0),
                    Some(&expect.1),

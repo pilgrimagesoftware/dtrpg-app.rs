@@ -11,7 +11,7 @@ use rusqlite::ToSql;
 
 use crate::data::enums::ItemStatus;
 use crate::data::index::items::status_to_text;
-use crate::util::search::SearchQuery;
+use crate::util::search::{Field, SearchQuery, Term};
 
 /// A sidebar-filter/search dimension to apply, beyond what's always true
 /// (`SidebarFilter::AllTitles`). At most one *sidebar* dimension is ever set
@@ -38,9 +38,9 @@ pub struct ItemFilter<'a> {
     /// the old post-query pass over `TagLibrary::items_with(name)`'s id set.
     pub tag_name:              Option<&'a str>,
     /// The parsed search-box query, exactly as `SearchQuery::parse` produced
-    /// it: free text substring-matched over title/publisher/line/tag names,
-    /// `tag:` terms required, `-tag:` terms forbidden. Parsing itself never
-    /// moves into SQL.
+    /// it: free text substring-matched over title/publisher/line/tag names, and
+    /// `field:value` terms required (`-field:value` forbidden). Parsing itself
+    /// never moves into SQL.
     pub search:                Option<&'a SearchQuery>,
 }
 
@@ -52,6 +52,39 @@ fn tag_exists_clause(negated: bool, n: usize) -> String {
                   WHERE it.item_id = items.id AND ulower(tg.name) = ?";
     let prefix = if negated { "NOT " } else { "" };
     format!("{prefix}{exists}{n})")
+}
+
+/// The clause for one search term, or `None` when the term keeps every item.
+/// Pushes the term's argument, so the clause's `?n` matches its position.
+///
+/// Values are lower cased already, and `ulower` folds the columns the same
+/// way. An availability value that names no state holds for no item, so a
+/// positive term keeps none and a negated one keeps all.
+fn term_clause(term: &Term, args: &mut Vec<Box<dyn ToSql>>) -> Option<String> {
+    let column = match term.field {
+        Field::Tag => {
+            let n = args.len() + 1;
+            args.push(Box::new(term.value.clone()));
+            return Some(tag_exists_clause(term.negated, n));
+        }
+        Field::Availability => {
+            let Some(status) = term.availability()
+            else {
+                return (!term.negated).then(|| "1 = 0".to_owned());
+            };
+            let n = args.len() + 1;
+            args.push(Box::new(status_to_text(status)));
+            let operator = if term.negated { "<>" } else { "=" };
+            return Some(format!("status {operator} ?{n}"));
+        }
+        Field::Publisher => "publisher",
+        Field::System => "line",
+        Field::Type => "kind",
+    };
+    let n = args.len() + 1;
+    args.push(Box::new(term.value.clone()));
+    let operator = if term.negated { "<>" } else { "=" };
+    Some(format!("ulower({column}) {operator} ?{n}"))
 }
 
 /// Builds the `WHERE` clause (empty string when nothing applies) and its
@@ -127,15 +160,8 @@ pub(super) fn build_where(filter: &ItemFilter<'_>) -> (String, Vec<Box<dyn ToSql
                          WHERE it.item_id = items.id AND instr(ulower(tg.name), ?{n}) > 0))"
             ));
         }
-        for tag in query.required_tags() {
-            let n = args.len() + 1;
-            args.push(Box::new(tag.clone()));
-            clauses.push(tag_exists_clause(false, n));
-        }
-        for tag in query.excluded_tags() {
-            let n = args.len() + 1;
-            args.push(Box::new(tag.clone()));
-            clauses.push(tag_exists_clause(true, n));
+        for term in query.terms() {
+            clauses.extend(term_clause(term, &mut args));
         }
     }
 

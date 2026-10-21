@@ -1,96 +1,140 @@
-//! The library search box: free text, and `tag:` terms.
+//! The library search box: free text, and `field:value` terms.
 //!
-//! `tag:solo` keeps only the items that have the tag "solo", and `-tag:solo`
-//! only those that do not. A name with spaces is quoted: `tag:"to run"`.
-//! Anything else is free text, matched against an item's title, publisher, game
-//! line and tag names. Tag names are compared ignoring case.
+//! A term keeps only the items whose field has exactly that value, ignoring
+//! case; a `-` in front keeps only those that do not. The fields are `tag`,
+//! `publisher`, `system` (the game system), `type` (the content type, such as
+//! a core rulebook or an adventure) and `availability` (`downloaded` or
+//! `cloud`). A value with spaces is quoted: `tag:"to run"`. Anything else is
+//! free text, matched against an item's title, publisher, game line and tag
+//! names.
+//!
+//! A search is parsed into a typed [`SearchQuery`], and a query prints back to
+//! text with [`std::fmt::Display`], so the search box, the filter chips and a
+//! smart collection's rule line can all show the same query.
 
+use std::fmt;
 use std::sync::Arc;
 
+use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
+
+mod parse;
+
+/// The item property a [`Term`] tests.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Field {
+    /// A tag the item has.
+    Tag,
+    /// The item's publisher.
+    Publisher,
+    /// The item's game system. Held in the item's game line.
+    System,
+    /// The item's content type. Held in the item's kind.
+    Type,
+    /// Whether the item is `downloaded` or still in the `cloud`.
+    Availability,
+}
+
+impl Field {
+    /// Every field, in the order a search is documented.
+    pub const ALL: [Self; 5] = [Self::Tag,
+                                Self::Publisher,
+                                Self::System,
+                                Self::Type,
+                                Self::Availability];
+
+    /// The word before the colon in a term.
+    #[must_use]
+    pub const fn keyword(self) -> &'static str {
+        match self {
+            Self::Tag => "tag",
+            Self::Publisher => "publisher",
+            Self::System => "system",
+            Self::Type => "type",
+            Self::Availability => "availability",
+        }
+    }
+}
+
+/// One `field:value` term of a search, such as `-tag:solo`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Term {
+    /// What the term tests.
+    pub field:   Field,
+    /// The value the field must have, or must not have if `negated`. Lower
+    /// cased, and never empty.
+    pub value:   String,
+    /// Whether the item must not have the value.
+    pub negated: bool,
+}
+
+impl Term {
+    /// The download state an `availability` term names, or `None` for any
+    /// other field or a value that names no state.
+    #[must_use]
+    pub fn availability(&self) -> Option<ItemStatus> {
+        if self.field != Field::Availability {
+            return None;
+        }
+        match self.value.as_str() {
+            "downloaded" => Some(ItemStatus::Downloaded),
+            "cloud" => Some(ItemStatus::Cloud),
+            _ => None,
+        }
+    }
+
+    /// Whether `item`, which has the tags `tags`, has the term's value,
+    /// before the term's negation is applied. An availability value that
+    /// names no state is never held.
+    fn is_held_by(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
+        let equals = |text: &str| text.to_lowercase() == self.value;
+        match self.field {
+            Field::Tag => tags.iter().any(|tag| equals(tag)),
+            Field::Publisher => equals(&item.publisher),
+            Field::System => equals(&item.line),
+            Field::Type => equals(&item.kind),
+            Field::Availability => self.availability() == Some(item.status),
+        }
+    }
+}
+
+impl fmt::Display for Term {
+    /// Prints the term as it is typed, quoting a value that has spaces.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sign = if self.negated { "-" } else { "" };
+        let keyword = self.field.keyword();
+        if self.value.contains(char::is_whitespace) {
+            write!(f, "{sign}{keyword}:\"{}\"", self.value)
+        }
+        else {
+            write!(f, "{sign}{keyword}:{}", self.value)
+        }
+    }
+}
 
 /// A search as the user typed it, split into what it asks for.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SearchQuery {
     /// The free text, or empty. Lower cased.
-    text:         String,
-    /// The tags an item must have, lower cased.
-    with_tags:    Vec<String>,
-    /// The tags an item must not have, lower cased.
-    without_tags: Vec<String>,
-}
-
-/// Removes `prefix` from the start of `text`, ignoring ASCII case.
-fn strip_prefix_ignoring_case<'text>(text: &'text str, prefix: &str) -> Option<&'text str> {
-    let head = text.get(..prefix.len())?;
-    head.eq_ignore_ascii_case(prefix)
-        .then(|| &text[prefix.len()..])
-}
-
-/// Reads a tag name from the start of `text`: a quoted name up to the closing
-/// quote (or the end), or up to the next space. Returns the name and the rest.
-fn read_tag_name(text: &str) -> (&str, &str) {
-    if let Some(quoted) = text.strip_prefix('"') {
-        return match quoted.split_once('"') {
-            Some((name, rest)) => (name, rest),
-            None => (quoted, ""),
-        };
-    }
-    text.split_once(char::is_whitespace).unwrap_or((text, ""))
+    text:  String,
+    /// The terms, in the order they were typed.
+    terms: Vec<Term>,
 }
 
 impl SearchQuery {
-    /// Splits what the user typed into free text and tag terms.
-    ///
-    /// The stored text is always lower cased. A query with no tag term keeps
-    /// the typed text's spacing verbatim (untrimmed, whole-query), so a plain
-    /// search behaves as it always has; with a tag term the leftover words
-    /// rejoin with single spaces. A `tag:` with no name is a tag term that
-    /// asks for nothing, and is left out of the text.
+    /// Builds a query from its parts, for a caller that has them already, such
+    /// as a smart collection's rules. `text` is lower cased, as a parsed one
+    /// is.
     #[must_use]
-    pub fn parse(query: &str) -> Self {
-        let mut parsed = Self::default();
-        let mut words: Vec<&str> = Vec::new();
-        let mut saw_a_term = false;
-        let mut rest = query.trim_start();
-        while !rest.is_empty() {
-            let term = strip_prefix_ignoring_case(rest, "-tag:").map(|after| (true, after))
-                                                                .or_else(|| {
-                                                                    strip_prefix_ignoring_case(rest, "tag:").map(|after| (false, after))
-                                                                });
-            if let Some((negated, after)) = term {
-                saw_a_term = true;
-                let (name, remainder) = read_tag_name(after);
-                let name = name.trim().to_lowercase();
-                if !name.is_empty() {
-                    if negated {
-                        parsed.without_tags.push(name);
-                    }
-                    else {
-                        parsed.with_tags.push(name);
-                    }
-                }
-                rest = remainder.trim_start();
-            }
-            else {
-                let (word, remainder) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
-                words.push(word);
-                rest = remainder.trim_start();
-            }
-        }
-        parsed.text = if saw_a_term {
-            words.join(" ").to_lowercase()
-        }
-        else {
-            query.to_lowercase()
-        };
-        parsed
+    pub fn new(text: &str, terms: Vec<Term>) -> Self {
+        Self { text: text.to_lowercase(),
+               terms }
     }
 
     /// Whether the search has any tag term, and so needs each item's tags.
     #[must_use]
     pub fn has_tag_terms(&self) -> bool {
-        !self.with_tags.is_empty() || !self.without_tags.is_empty()
+        self.terms.iter().any(|term| term.field == Field::Tag)
     }
 
     /// The free-text part, always lower cased — see [`Self::parse`] for when
@@ -99,14 +143,9 @@ impl SearchQuery {
         &self.text
     }
 
-    /// The tags an item must have, lower cased.
-    pub(crate) fn required_tags(&self) -> &[String] {
-        &self.with_tags
-    }
-
-    /// The tags an item must not have, lower cased.
-    pub(crate) fn excluded_tags(&self) -> &[String] {
-        &self.without_tags
+    /// The terms, in the order they were typed.
+    pub(crate) fn terms(&self) -> &[Term] {
+        &self.terms
     }
 
     /// Whether `item`, which has the tags `tags`, matches the search.
@@ -118,8 +157,10 @@ impl SearchQuery {
     /// retiring that equivalence bar.
     #[must_use]
     pub fn matches(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
-        let has = |wanted: &String| tags.iter().any(|tag| tag.to_lowercase() == *wanted);
-        if !self.with_tags.iter().all(has) || self.without_tags.iter().any(has) {
+        if !self.terms
+                .iter()
+                .all(|term| term.is_held_by(item, tags) != term.negated)
+        {
             return false;
         }
         self.text.is_empty()
@@ -131,5 +172,28 @@ impl SearchQuery {
     }
 }
 
+impl fmt::Display for SearchQuery {
+    /// Prints the query as text that parses back to the same query: the terms
+    /// first, then the free text.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::util::search::SearchQuery;
+    ///
+    /// let query = SearchQuery::parse("moria -tag:solo system:\"the one ring\"");
+    /// assert_eq!(query.to_string(), "-tag:solo system:\"the one ring\" moria");
+    /// ```
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts: Vec<String> = self.terms.iter().map(ToString::to_string).collect();
+        if !self.text.is_empty() {
+            parts.push(self.text.clone());
+        }
+        f.write_str(&parts.join(" "))
+    }
+}
+
+#[cfg(test)]
+mod round_trip_tests;
 #[cfg(test)]
 mod tests;
