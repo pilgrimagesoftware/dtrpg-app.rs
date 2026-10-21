@@ -18,6 +18,8 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::ui::views::sidebar_view::SIDEBAR_ROW_GAP;
+use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// What the sidebar needs to draw one smart collection.
 #[derive(Clone)]
@@ -64,10 +66,29 @@ fn smart_collection_row(row: SmartCollectionRow, active: &SidebarFilter,
         })
         .context_menu(move |menu, _, _| {
             let (entity, name) = (delete_entity.clone(), name.clone());
-            menu.item(PopupMenuItem::new(t!("smart_collections.delete")).on_click(
-                move |_, window, cx| confirm_delete(&entity, id, &name, window, cx),
-            ))
+            let edit_entity = delete_entity.clone();
+            menu.item(PopupMenuItem::new(t!("smart_collections.edit")).on_click(
+                     move |_, window, cx| edit(&edit_entity, id, window, cx),
+                 ))
+                .item(PopupMenuItem::new(t!("smart_collections.delete")).on_click(
+                    move |_, window, cx| confirm_delete(&entity, id, &name, window, cx),
+                ))
         })
+}
+
+/// Opens the editor on the smart collection `id`, if it still exists.
+fn edit(entity: &Entity<LibraryController>, id: u64, window: &mut Window, cx: &mut App) {
+    let collection = entity.read(cx)
+                           .smart_collections()
+                           .iter()
+                           .find(|collection| collection.id == id)
+                           .cloned();
+    if let Some(collection) = collection {
+        open_smart_collection_editor(window,
+                                     cx,
+                                     entity.clone(),
+                                     SmartCollectionDraft::editing(collection));
+    }
 }
 
 /// Asks for confirmation, then deletes the smart collection `id`.

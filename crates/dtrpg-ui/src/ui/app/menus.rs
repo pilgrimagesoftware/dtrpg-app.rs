@@ -92,6 +92,8 @@ pub fn build_menus_for(kind: PlatformKind, state: &ViewMenuState) -> Vec<Menu> {
         first_menu,
         Menu::new(catalog_title.to_string()).items([
             MenuItem::action(t!("menu.catalog_add_collection").to_string(), AddCollection),
+            MenuItem::action(t!("menu.catalog_new_smart_collection").to_string(),
+                             NewSmartCollection),
             MenuItem::separator(),
             MenuItem::action(t!("menu.catalog_reload").to_string(), ReloadCatalog),
             MenuItem::action(

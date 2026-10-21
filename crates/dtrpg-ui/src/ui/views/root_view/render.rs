@@ -146,7 +146,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  lib_entity.clone(),
                                  filters_toggle,
                                  colors);
-    let chips = render_filter_chips(&search_query, &view.search_input, colors);
+    let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
     let filters_column =
         view.filters_open.then(|| {
                              let ctrl = view.controller.read(cx);

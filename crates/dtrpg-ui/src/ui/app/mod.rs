@@ -341,6 +341,17 @@ pub fn setup(cx: &mut App) {
           };
           view.update(cx, |view, cx| view.show_alert_history(cx));
       });
+    cx.on_action::<NewSmartCollection>(|_, cx| {
+          let Some((view, window)) = cx.try_global::<LibraryWindowHandle>()
+                                       .map(|h| (h.view.clone(), h.window))
+          else {
+              return;
+          };
+          window.update(cx, |_, window, cx| {
+                    view.update(cx, |view, cx| view.show_smart_collection_editor(window, cx));
+                })
+                .ok();
+      });
     cx.on_action::<AddCollection>(|_, cx| {
           let Some((view, window)) = cx.try_global::<LibraryWindowHandle>()
                                        .map(|h| (h.view.clone(), h.window))

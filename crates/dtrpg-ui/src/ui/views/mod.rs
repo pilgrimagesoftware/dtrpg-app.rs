@@ -27,6 +27,7 @@ pub mod settings_window_view;
 pub mod sidebar_smart;
 pub mod sidebar_tags;
 pub mod sidebar_view;
+pub mod smart_collection_editor_dialog;
 pub mod status_bar_view;
 pub mod tags_section_view;
 pub mod title_bar_view;

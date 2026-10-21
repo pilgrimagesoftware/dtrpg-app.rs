@@ -104,6 +104,15 @@ impl LibraryRootView {
         self.activity.update(cx, |a, cx| a.toggle_alert_panel(cx));
     }
 
+    /// Opens the smart collection editor on a new, empty collection.
+    pub(crate) fn show_smart_collection_editor(&mut self, window: &mut gpui::Window,
+                                               cx: &mut Context<Self>) {
+        open_smart_collection_editor(window,
+                                     cx,
+                                     self.controller.clone(),
+                                     SmartCollectionDraft::new());
+    }
+
     /// Opens the "Add Collection" dialog. See [`Self::show_settings`] for why
     /// this is a method rather than inline closure logic.
     pub(crate) fn show_add_collection_dialog(&mut self, window: &mut gpui::Window,
