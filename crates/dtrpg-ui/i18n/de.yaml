@@ -65,10 +65,12 @@ search:
   collections_placeholder: "Sammlungen suchen…"
 
 catalog:
-  no_titles_match: "Keine Titel gefunden."
+  no_titles_match: "Keine Titel passen zu diesen Filtern."
   library_empty: "Ihre Bibliothek ist leer."
-  try_clear_search: "Versuchen Sie, die Suche zurückzusetzen."
-  try_different_section: "Versuchen Sie einen anderen Bereich auszuwählen."
+  try_clear_search: "Lösche die Suche, um mehr Titel zu sehen."
+  try_clear_search_and_section: "Lösche die Suche oder gehe zurück zu allen Titeln."
+  show_all_titles: "Alle Titel anzeigen"
+  try_different_section: "Wähle einen anderen Bereich oder gehe zurück zu allen Titeln."
   col_title: "Titel"
   col_publisher: "Verlag"
   col_system: "System"

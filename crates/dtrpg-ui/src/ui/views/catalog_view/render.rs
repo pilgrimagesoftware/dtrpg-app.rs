@@ -79,9 +79,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                     .pb(pad_bottom);
 
     if snap.catalog_loading && item_count == 0 && !is_list_presentation {
-        return outer.child(root.justify_center()
-                               .items_center()
-                               .child(Spinner::new().with_size(Size::Large)))
+        return outer.child(root.child(render_loading_skeleton(snap.presentation, &colors)))
                     .into_any_element();
     }
 
@@ -91,7 +89,10 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                 render_library_empty_state(colors.text_tertiary).into_any_element()
             }
             EmptyReason::NoMatches => {
-                render_no_matches_state(&snap.search_query, colors.text_tertiary).into_any_element()
+                render_no_matches_state(&snap.search_query,
+                                        &snap.filter,
+                                        ctrl.clone(),
+                                        colors.text_tertiary).into_any_element()
             }
         };
         return outer.child(root.child(empty_state)).into_any_element();

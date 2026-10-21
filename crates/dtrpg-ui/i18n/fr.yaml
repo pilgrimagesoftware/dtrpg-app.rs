@@ -65,10 +65,12 @@ search:
   collections_placeholder: "Rechercher des collections…"
 
 catalog:
-  no_titles_match: "Aucun titre ne correspond."
+  no_titles_match: "Aucun titre ne correspond à ces filtres."
   library_empty: "Votre bibliothèque est vide."
-  try_clear_search: "Essayez d'effacer votre recherche."
-  try_different_section: "Essayez de sélectionner une autre section."
+  try_clear_search: "Effacez la recherche pour voir plus de titres."
+  try_clear_search_and_section: "Effacez la recherche ou revenez à tous les titres."
+  show_all_titles: "Afficher tous les titres"
+  try_different_section: "Choisissez une autre section ou revenez à tous les titres."
   col_title: "Titre"
   col_publisher: "Éditeur"
   col_system: "Système"

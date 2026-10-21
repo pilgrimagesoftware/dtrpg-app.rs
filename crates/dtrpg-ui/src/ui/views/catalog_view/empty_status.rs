@@ -1,13 +1,27 @@
+use dtrpg_core::util::filter::SidebarFilter;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::{Icon, IconName};
+
 use super::*;
 
-pub(super) fn render_no_matches_state(search_query: &str, text_color: Hsla)
-                                      -> impl IntoElement + 'static {
-    let hint = if search_query.is_empty() {
-        t!("catalog.try_different_section")
+/// The translation key of the line under "No titles match", which says what
+/// the user can change: the search, the section, or both.
+pub(super) fn no_matches_hint_key(has_search: bool, has_section: bool) -> &'static str {
+    match (has_search, has_section) {
+        (true, true) => "catalog.try_clear_search_and_section",
+        (true, false) => "catalog.try_clear_search",
+        (false, _) => "catalog.try_different_section",
     }
-    else {
-        t!("catalog.try_clear_search")
-    };
+}
+
+/// Renders the screen shown when the catalog has titles but none match the
+/// search and section: what happened, what to change, and a button that goes
+/// back to all titles when a section other than that one is chosen.
+pub(super) fn render_no_matches_state(search_query: &str, filter: &SidebarFilter,
+                                      entity: Entity<LibraryController>, text_color: Hsla)
+                                      -> impl IntoElement + 'static {
+    let has_section = *filter != SidebarFilter::AllTitles;
+    let hint = t!(no_matches_hint_key(!search_query.is_empty(), has_section));
 
     div().flex()
          .flex_col()
@@ -15,11 +29,23 @@ pub(super) fn render_no_matches_state(search_query: &str, text_color: Hsla)
          .justify_center()
          .h_full()
          .gap(px(12.0))
-         .child(div().text_2xl().text_color(text_color).child("⊘"))
+         .child(div().text_color(text_color)
+                     .child(Icon::new(IconName::Search).with_size(Size::Large)))
          .child(div().text_sm()
                      .text_color(text_color)
                      .child(t!("catalog.no_titles_match")))
          .child(div().text_xs().text_color(text_color).child(hint))
+         .when(has_section, |column| {
+             column.child(Button::new("show-all-titles")
+                              .ghost()
+                              .outline()
+                              .label(t!("catalog.show_all_titles").to_string())
+                              .on_click(move |_, _, cx| {
+                                  entity.update(cx, |ctrl, cx| {
+                                            ctrl.set_filter(SidebarFilter::AllTitles, cx);
+                                        });
+                              }))
+         })
 }
 
 pub(super) fn render_library_empty_state(text_color: Hsla) -> impl IntoElement + 'static {
@@ -152,4 +178,24 @@ pub(super) fn render_verifying_indicator(id: &Arc<str>, colors: &ColorTokens)
          .tooltip(|window, cx| {
              Tooltip::new(t!("detail.tooltip_verifying_download").to_string()).build(window, cx)
          })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::no_matches_hint_key;
+
+    #[test]
+    fn the_hint_names_whatever_the_user_can_change() {
+        assert_eq!(no_matches_hint_key(true, true),
+                   "catalog.try_clear_search_and_section");
+        assert_eq!(no_matches_hint_key(true, false), "catalog.try_clear_search");
+        assert_eq!(no_matches_hint_key(false, true),
+                   "catalog.try_different_section");
+    }
+
+    #[test]
+    fn with_no_search_and_no_section_the_hint_still_points_somewhere() {
+        assert_eq!(no_matches_hint_key(false, false),
+                   "catalog.try_different_section");
+    }
 }
