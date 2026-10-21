@@ -13,6 +13,40 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 
+/// The share of the table's width a fitted column may take at most.
+const FIT_WIDTH_SHARE: f32 = 0.6;
+
+/// How far, in pixels, a reported width may be from a column's own before the
+/// user is taken to have dragged it.
+const DRAG_TOLERANCE: f32 = 0.5;
+
+/// The width of a fitted column that is not the content's: the cell's padding.
+pub(super) const FIT_CELL_PADDING: f32 = 24.0;
+
+/// How many of a column's longest texts are measured to find its widest. The
+/// widest text on screen is almost always among the longest by characters, so
+/// measuring a few spares shaping every item's text.
+pub(super) const FIT_CANDIDATES: usize = 8;
+
+/// The width of the widest of the `count` longest `texts`, as `measure` gives
+/// it.
+pub(super) fn widest_of_longest<'a>(texts: impl Iterator<Item = &'a str>, count: usize,
+                                    measure: impl Fn(&str) -> Pixels)
+                                    -> Pixels {
+    let mut texts: Vec<&str> = texts.collect();
+    texts.sort_unstable_by_key(|text| std::cmp::Reverse(text.chars().count()));
+    texts.into_iter()
+         .take(count)
+         .map(measure)
+         .fold(Pixels::ZERO, Pixels::max)
+}
+
+/// `ideal` limited to [`FIT_WIDTH_SHARE`] of `table_width`, when the table's
+/// width is known.
+pub(super) fn capped_width(ideal: Pixels, table_width: Option<Pixels>) -> Pixels {
+    table_width.map_or(ideal, |width| ideal.min(width * FIT_WIDTH_SHARE))
+}
+
 /// The text in a column's heading.
 fn heading(column: ListColumn) -> String {
     match column {
@@ -75,6 +109,12 @@ pub(super) struct ListColumnSet {
     columns:     Vec<Column>,
     /// Index for index with `shown`: `None` means the usual width.
     user_widths: Vec<Option<Pixels>>,
+    /// Index for index with `shown`: the width that fits the column's widest
+    /// item, before it is limited to a share of the table. `None` means no fit
+    /// was found, and the usual width stands.
+    fitted:      Vec<Option<Pixels>>,
+    /// The width the table was last drawn at, which limits the fitted widths.
+    table_width: Option<Pixels>,
 }
 
 impl ListColumnSet {
@@ -83,6 +123,8 @@ impl ListColumnSet {
         let shown = ListColumn::shown(chosen);
         Self { columns: shown.iter().map(|column| table_column(*column)).collect(),
                user_widths: vec![None; shown.len()],
+               fitted: vec![None; shown.len()],
+               table_width: None,
                shown }
     }
 
@@ -101,25 +143,58 @@ impl ListColumnSet {
         self.shown.iter().position(|shown| *shown == column)
     }
 
-    /// The table's definition of the column at `index`, at the width the user
-    /// has dragged it to, if they have.
+    /// The columns shown, in order.
+    pub(super) fn shown(&self) -> &[ListColumn] {
+        &self.shown
+    }
+
+    /// The table's definition of the column at `index`: at the width the user
+    /// has dragged it to if they have, else at the width that fits its widest
+    /// item (never more than a share of the table), else at its usual width.
     pub(super) fn column(&self, index: usize) -> Column {
         let column = self.columns[index].clone();
-        match self.user_widths.get(index) {
-            Some(Some(width)) => column.width(width.as_f32()),
-            _ => column,
+        let width = self.user_widths.get(index).copied().flatten().or_else(|| {
+                                                                      self.fitted
+                                .get(index)
+                                .copied()
+                                .flatten()
+                                .map(|ideal| capped_width(ideal, self.table_width))
+                                                                  });
+        match width {
+            Some(width) => column.width(width.as_f32()),
+            None => column,
         }
     }
 
+    /// Records the widths that fit each column's widest item. Widths for a
+    /// different set of columns are ignored.
+    pub(super) fn set_fitted(&mut self, widths: Vec<Option<Pixels>>) {
+        if widths.len() == self.shown.len() {
+            self.fitted = widths;
+        }
+    }
+
+    /// Records the width the table was drawn at. Returns whether it changed,
+    /// so a caller redraws only then.
+    pub(super) fn set_table_width(&mut self, width: Pixels) -> bool {
+        let changed = self.table_width != Some(width);
+        self.table_width = Some(width);
+        changed
+    }
+
     /// Records the widths the table reports after the user drags a column.
-    /// Widths for a different set of columns, as can arrive while the columns
-    /// are changing, are ignored.
+    /// Only a column whose width differs from the one it had is the user's
+    /// now; the others keep fitting their items. Widths for a different set of
+    /// columns, as can arrive while the columns are changing, are ignored.
     pub(super) fn apply_widths(&mut self, widths: &[Pixels]) {
         if widths.len() != self.user_widths.len() {
             return;
         }
-        for (slot, width) in self.user_widths.iter_mut().zip(widths) {
-            *slot = Some(*width);
+        for (index, width) in widths.iter().enumerate() {
+            let current = self.column(index).width;
+            if (width.as_f32() - current.as_f32()).abs() > DRAG_TOLERANCE {
+                self.user_widths[index] = Some(*width);
+            }
         }
     }
 
@@ -140,6 +215,8 @@ impl ListColumnSet {
         self.user_widths = shown.iter()
                                 .map(|column| kept.get(column).copied())
                                 .collect();
+        // The fit is for the old set of columns; it is found again for the new.
+        self.fitted = vec![None; shown.len()];
         self.shown = shown;
         true
     }
@@ -241,5 +318,95 @@ mod tests {
                    Some(ListColumn::Added));
         assert_eq!(column_sorted_by(SortMethod::Custom { col_key: "nonsense", }),
                    None);
+    }
+
+    #[test]
+    fn the_widest_of_the_longest_texts_sets_the_width() {
+        let measure = |text: &str| px(text.chars().count() as f32 * 7.0);
+
+        let widest = widest_of_longest(["ab", "abcdef", "abc", "abcd"].into_iter(), 2, measure);
+
+        assert_eq!(widest, px(42.));
+    }
+
+    #[test]
+    fn no_texts_need_no_width() {
+        assert_eq!(widest_of_longest(std::iter::empty(), 4, |_| px(10.)),
+                   px(0.));
+    }
+
+    #[test]
+    fn a_fitted_width_is_limited_to_sixty_percent_of_the_table() {
+        assert_eq!(capped_width(px(700.), Some(px(1000.))), px(600.));
+        assert_eq!(capped_width(px(200.), Some(px(1000.))), px(200.));
+        assert_eq!(capped_width(px(700.), None), px(700.));
+    }
+
+    #[test]
+    fn a_column_uses_its_fitted_width_until_the_user_drags_it() {
+        let mut columns = ListColumnSet::new(&[ListColumn::Publisher]);
+        let publisher = columns.position_of(ListColumn::Publisher).unwrap();
+        let mut fitted = vec![None; columns.len()];
+        fitted[publisher] = Some(px(210.));
+        columns.set_fitted(fitted);
+        assert_eq!(columns.column(publisher).width, px(210.));
+
+        let mut dragged = vec![px(24.); columns.len()];
+        dragged[publisher] = px(150.);
+        columns.apply_widths(&dragged);
+
+        assert_eq!(columns.column(publisher).width, px(150.));
+    }
+
+    #[test]
+    fn dragging_one_column_leaves_the_others_fitting() {
+        let mut columns = ListColumnSet::new(&[ListColumn::Publisher, ListColumn::System]);
+        let publisher = columns.position_of(ListColumn::Publisher).unwrap();
+        let system = columns.position_of(ListColumn::System).unwrap();
+        let mut fitted = vec![None; columns.len()];
+        fitted[publisher] = Some(px(210.));
+        fitted[system] = Some(px(95.));
+        columns.set_fitted(fitted);
+
+        // The table reports every column's width, one of them changed.
+        let mut reported: Vec<_> = (0..columns.len()).map(|ix| columns.column(ix).width)
+                                                     .collect();
+        reported[publisher] = px(160.);
+        columns.apply_widths(&reported);
+        let mut refitted = vec![None; columns.len()];
+        refitted[publisher] = Some(px(500.));
+        refitted[system] = Some(px(120.));
+        columns.set_fitted(refitted);
+
+        assert_eq!(columns.column(publisher).width, px(160.));
+        assert_eq!(columns.column(system).width, px(120.));
+    }
+
+    #[test]
+    fn the_table_width_limits_a_fitted_column() {
+        let mut columns = ListColumnSet::new(&[]);
+        let title = columns.position_of(ListColumn::Title).unwrap();
+        let mut fitted = vec![None; columns.len()];
+        fitted[title] = Some(px(900.));
+        columns.set_fitted(fitted);
+
+        assert!(columns.set_table_width(px(1000.)));
+        assert!(!columns.set_table_width(px(1000.)));
+
+        assert_eq!(columns.column(title).width, px(600.));
+    }
+
+    #[test]
+    fn showing_other_columns_forgets_the_fit() {
+        let mut columns = ListColumnSet::new(&[ListColumn::Publisher]);
+        let publisher = columns.position_of(ListColumn::Publisher).unwrap();
+        let mut fitted = vec![None; columns.len()];
+        fitted[publisher] = Some(px(210.));
+        columns.set_fitted(fitted);
+
+        columns.set_chosen(&[ListColumn::Publisher, ListColumn::Size]);
+
+        let publisher = columns.position_of(ListColumn::Publisher).unwrap();
+        assert_eq!(columns.column(publisher).width, px(130.));
     }
 }

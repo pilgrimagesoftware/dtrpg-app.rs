@@ -17,6 +17,7 @@ use gpui::{
     ParentElement, Pixels, Render, SharedString, Styled, StyledImage, TextRun,
     UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
 };
+use gpui_kit::component::ElementExt;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::badge::Badge;
 use gpui_kit::component::checkbox::Checkbox;
@@ -76,6 +77,10 @@ pub struct CatalogView {
     /// re-render. Also drives the flattened rows pushed into
     /// `catalog_grouped_list_table`.
     grouped_cache:              Option<Arc<Vec<ItemGroup>>>,
+    /// The items the list columns were last sized to fit. Compared by Arc
+    /// pointer, like `grouped_cache`, so the columns are measured again only
+    /// when the items on show change.
+    fitted_items:               Option<Arc<Vec<LibraryItem>>>,
 }
 
 impl CatalogView {
@@ -126,10 +131,15 @@ impl CatalogView {
                                                          state.refresh(cx);
                                                      }
                                                  });
-                  table.update(cx, |state, cx| {
-                           state.delegate_mut().cols.set_chosen(&chosen);
-                           state.refresh(cx);
-                       });
+                  let columns_changed = table.update(cx, |state, cx| {
+                                                 let changed =
+                                                     state.delegate_mut().cols.set_chosen(&chosen);
+                                                 state.refresh(cx);
+                                                 changed
+                                             });
+                  if columns_changed {
+                      this.fitted_items = None;
+                  }
                   this.grouped_cache = None;
               }
           })
@@ -226,7 +236,8 @@ impl CatalogView {
                catalog_list_table,
                catalog_grouped_list_table,
                items_per_row: 4,
-               grouped_cache: None }
+               grouped_cache: None,
+               fitted_items: None }
     }
 
     /// Returns the controller's grouped items, rebuilding the flattened rows
@@ -266,6 +277,7 @@ impl Render for CatalogView {
     }
 }
 
+mod column_fit;
 mod empty_status;
 mod grid;
 mod grouped_delegate;
@@ -275,6 +287,7 @@ mod loading_skeleton;
 mod render;
 mod thumb_row;
 
+use column_fit::set_list_table_width;
 use empty_status::*;
 use grid::*;
 use grouped_delegate::*;

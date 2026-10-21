@@ -28,6 +28,13 @@ impl LibraryController {
         self.library.visible_items_count()
     }
 
+    /// Returns the whole filtered, sorted result set without copying it. The
+    /// same `Arc` comes back until the set changes.
+    #[must_use]
+    pub fn visible_items_all(&self) -> Arc<Vec<LibraryItem>> {
+        self.library.visible_items_all()
+    }
+
     /// Returns a slice of the filtered, sorted result set.
     ///
     /// `range` is 0-based relative to the start of the full result set. Used

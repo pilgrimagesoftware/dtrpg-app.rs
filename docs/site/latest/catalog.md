@@ -29,8 +29,13 @@ one at a time.
 
 In List layout, right-click any column heading to show or hide columns. The choices are
 Publisher, System, Pages, Size, Added and Tags; the title, the download status and the open
-button are always there. Libri remembers which columns you chose. A width you drag a column to
-lasts until you quit, and survives showing and hiding other columns. The Tags column lists an item's tags separated by commas.
+button are always there. Libri remembers which columns you chose.
+
+Each column is as wide as its widest item, but never more than 60% of the table's width, so
+one very long title cannot push the other columns out of view. The widths follow the items on
+show, so they change as you search or filter. A width you drag a column to replaces its fitted
+width for that column only, lasts until you quit, and survives showing and hiding other
+columns. The Tags column lists an item's tags separated by commas.
 It does not sort, because a list of tags has no order to sort by. Publisher, System,
 Pages, Size and Added are shown until you choose otherwise.
 
