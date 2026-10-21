@@ -26,6 +26,10 @@ gpui-kit's fork in one change, not file-by-file.
 - Every control, button or label that is only an image (an icon, or a glyph such as `✓`, `☁` or `×`) MUST have
   a tooltip saying what it does or means, and the text goes through `rust_i18n::t!` like any other. A purely
   decorative image next to text that already says the same thing does not need one.
+- Use a pre-made control (from `gpui_kit`, or an existing Libri one) rather than rolling your own, unless there
+  is no alternative. When you do roll your own, say why in a comment at the definition: what the pre-made
+  control cannot do. `CollectionsSection` is the example: the sidebar's menu item has no drop hook, and
+  collections must accept dragged items.
 - Preserve the separation between UI rendering, interaction state, and service adapters.
 - Keep code structured so stubs can be replaced by SDK adapters without rewriting views.
 

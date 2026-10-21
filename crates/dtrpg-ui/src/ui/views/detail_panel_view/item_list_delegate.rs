@@ -186,10 +186,7 @@ impl TableDelegate for ItemListDelegate {
                              Tooltip::new(t!("detail.item_status_local").to_string()).build(window,
                                                                                             cx)
                          })
-                         // Checkmark for "on this device", matching
-                         // `render_status_icon`'s glyph convention rather than a
-                         // separate `IconName` so both status indicators read the
-                         // same way.
+                         // Checkmark for "on this device".
                          .child("\u{2713}")
                          .into_any_element()
                 }
