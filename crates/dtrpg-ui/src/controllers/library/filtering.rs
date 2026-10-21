@@ -73,6 +73,7 @@ impl LibraryController {
             self.collection_members.clear();
         }
         self.filter = filter;
+        self.refresh_smart_members();
         self.selection = Selection::None;
         self.invalidate_cache();
         self.save_view_prefs();

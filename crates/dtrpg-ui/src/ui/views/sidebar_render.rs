@@ -13,6 +13,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                              collection_name_input: Entity<InputState>,
                              publisher_search: SidebarSectionSearch,
                              collection_search: SidebarSectionSearch, tags: Vec<TagEntry>,
+                             smart_collections: Vec<SmartCollectionRow>,
                              sidebar_open: SidebarOpen)
                              -> impl IntoElement + 'static {
     let active = filter.clone();
@@ -277,9 +278,19 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                    entity: entity.clone() };
 
     let sidebar_builder =
-        sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
-                       .child(SidebarContent::Separator)
-                       .child(SidebarContent::Menu(Box::new(pub_menu)));
+        sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)));
+    // Nothing to list until a smart collection has been made.
+    let sidebar_builder = if smart_collections.is_empty() {
+        sidebar_builder
+    }
+    else {
+        sidebar_builder.child(SidebarContent::Separator)
+                       .child(SidebarContent::Menu(Box::new(smart_collections_menu(smart_collections,
+                                                                                   &active,
+                                                                                   &entity))))
+    };
+    let sidebar_builder = sidebar_builder.child(SidebarContent::Separator)
+                                         .child(SidebarContent::Menu(Box::new(pub_menu)));
     // Nothing to list until something has been tagged.
     if tags.is_empty() {
         return sidebar_builder;

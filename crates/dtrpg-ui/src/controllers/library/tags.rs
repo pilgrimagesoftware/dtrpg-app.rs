@@ -76,6 +76,7 @@ impl LibraryController {
             return;
         }
         self.refresh_tag_filter();
+        self.refresh_smart_collections();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }

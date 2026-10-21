@@ -1,4 +1,5 @@
 sidebar:
+  smart_collections: "Intelligente Sammlungen"
   all_titles: "Alle Titel"
   recently_updated: "Kürzlich aktualisiert"
   on_this_device: "Auf diesem Gerät"
@@ -511,3 +512,8 @@ filters:
   tags: "Schlagwörter"
   downloaded: "Auf diesem Gerät"
   cloud: "In der Cloud"
+
+smart_collections:
+  delete: "Intelligente Sammlung löschen"
+  delete_confirm_title: "„{name}“ löschen?"
+  delete_confirm_description: "Die Sammlung wird entfernt. Die Titel darin bleiben in Ihrer Bibliothek."

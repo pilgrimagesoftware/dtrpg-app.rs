@@ -34,6 +34,7 @@ use rust_i18n::t;
 
 use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};
 use crate::ui::library::drag::DraggedLibraryItem;
+use crate::ui::views::sidebar_smart::{SmartCollectionRow, smart_collections_menu};
 use crate::ui::views::sidebar_tags::tags_menu;
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or

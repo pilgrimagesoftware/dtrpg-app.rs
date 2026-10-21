@@ -30,7 +30,7 @@ pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
         SidebarFilter::Publisher(name) => {
             t!("toolbar.filter_title_publisher", name = name).to_string()
         }
-        SidebarFilter::Collection(_, name) => {
+        SidebarFilter::Collection(_, name) | SidebarFilter::SmartCollection(_, name) => {
             t!("toolbar.filter_title_collection", name = name).to_string()
         }
         SidebarFilter::Tag { name, .. } => t!("toolbar.filter_title_tag", name = name).to_string(),

@@ -150,3 +150,31 @@ fn the_facets_count_the_items_on_show_without_the_choices_made_in_that_facet() {
     assert_eq!(facets.availability[0].count, 2);
     assert!(facets.systems.is_empty());
 }
+
+#[test]
+fn a_smart_collection_counts_and_lists_the_items_that_match_its_rules() {
+    use crate::data::smart_collection::{MatchMode, Operator, Rule, SmartCollection};
+    use crate::util::search::Field;
+
+    let library = open_library();
+    let mut paizo = item("a", "Paizo");
+    paizo.order_product_id = 11;
+    paizo.product_id = 21;
+    let mut other = item("b", "Other");
+    other.order_product_id = 12;
+    other.product_id = 22;
+    library.index
+           .lock()
+           .unwrap()
+           .replace_all_items(&[paizo, other])
+           .unwrap();
+    let collection = SmartCollection { mode: MatchMode::All,
+                                       rules: vec![Rule { field:    Field::Publisher,
+                                                          operator: Operator::Is,
+                                                          value:    "paizo".to_owned(), }],
+                                       ..SmartCollection::default() };
+
+    assert_eq!(library.smart_collection_match_count(&collection), (1, 2));
+    let ids = library.smart_collection_member_ids(&collection);
+    assert_eq!(ids, [11, 21].into_iter().collect());
+}

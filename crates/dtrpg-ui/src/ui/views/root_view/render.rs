@@ -6,6 +6,7 @@ use gpui_kit::component::Selectable as _;
 
 use super::*;
 use crate::ui::views::filters_column::{render_filter_chips, render_filters_column};
+use crate::ui::views::sidebar_smart::SmartCollectionRow;
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
                                cx: &mut Context<LibraryRootView>)
@@ -101,6 +102,15 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                                query: snap.collection_search_query,
                                                                input: view.collection_search_input
                                                                           .clone(), };
+    let smart_rows = {
+        let ctrl = view.controller.read(cx);
+        ctrl.smart_collections()
+            .iter()
+            .map(|collection| SmartCollectionRow { id:    collection.id,
+                                                   name:  collection.name.as_str().into(),
+                                                   count: ctrl.smart_collection_count(collection.id), })
+            .collect::<Vec<_>>()
+    };
     let sidebar = render_sidebar(filter.clone(),
                                  counts,
                                  publishers,
@@ -115,6 +125,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  publisher_search,
                                  collection_search,
                                  tags,
+                                 smart_rows,
                                  snap.sidebar_open);
     let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
     let filters_toggle =

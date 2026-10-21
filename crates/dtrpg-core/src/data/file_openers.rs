@@ -97,7 +97,9 @@ impl CatalogViewPrefs {
             // simply aren't remembered. A tag filter matches by a set of item
             // ids that is not known until the tags have loaded, so it isn't
             // remembered either.
-            SidebarFilter::Collection(..) | SidebarFilter::Tag { .. } => (None, None),
+            SidebarFilter::Collection(..)
+            | SidebarFilter::SmartCollection(..)
+            | SidebarFilter::Tag { .. } => (None, None),
         };
         Self { sort: Some(match sort {
                               SortMethod::Title => "Title",

@@ -1,4 +1,5 @@
 sidebar:
+  smart_collections: "Smart collections"
   all_titles: "All Titles"
   recently_updated: "Recently Updated"
   on_this_device: "On This Device"
@@ -529,3 +530,8 @@ filters:
   tags: "Tags"
   downloaded: "On this device"
   cloud: "In the cloud"
+
+smart_collections:
+  delete: "Delete smart collection"
+  delete_confirm_title: "Delete “{name}”?"
+  delete_confirm_description: "The collection is removed. The titles in it stay in your library."
