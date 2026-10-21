@@ -4,6 +4,7 @@ use super::*;
 /// what opens the file, and the collapsed "other details".
 pub(super) fn render_info_tab(item: &LibraryItem, storage_root_path: &Path,
                               file_openers: &[FileOpenerEntry],
+                              settings: &Entity<SettingsController>,
                               controller: Entity<LibraryController>, colors: &ColorTokens,
                               cx: &App)
                               -> AnyElement {
@@ -22,6 +23,7 @@ pub(super) fn render_info_tab(item: &LibraryItem, storage_root_path: &Path,
         render_collections_section(item, controller.clone(), colors, cx).into_any_element();
     let details = render_metadata_table(item,
                                         storage_root_path,
+                                        colors,
                                         &label_font_family,
                                         &value_font_family).into_any_element();
 
@@ -36,7 +38,7 @@ pub(super) fn render_info_tab(item: &LibraryItem, storage_root_path: &Path,
          .child(section(t!("detail.collections_heading").to_string(), collections))
          .child(section(t!("detail.details_heading").to_string(), details))
          .child(section(t!("detail.opens_with_heading").to_string(),
-                        render_opens_with(item, file_openers, colors)))
+                        render_opens_with(item, file_openers, settings, colors)))
          .child(render_other_details(item, controller, colors, cx))
          .into_any_element()
 }

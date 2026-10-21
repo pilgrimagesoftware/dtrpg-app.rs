@@ -52,7 +52,7 @@ use crate::ui::actions::{
     About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
     ReportFeatureBug, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded,
     SortByPages, SortByPublisher, SortByTitle, SortDescending, ToggleGroupByPublisher,
-    ToggleGroupByTag, ToggleInspector, ViewAsGrid, ViewAsList, ViewAsThumbs,
+    ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
@@ -132,10 +132,9 @@ pub struct LibraryRootView {
     auth_state:                  Entity<AuthStateController>,
     catalog_view:                Entity<CatalogView>,
     /// State of the inspector pane docked beside the catalog, and where its
-    /// requests (pop out, close, show an item) are heard.
+    /// requests (pop out, close, show an item) are heard. The pane is shown
+    /// while an item is selected.
     inspector:                   Entity<InspectorController>,
-    /// Whether the inspector pane is shown.
-    inspector_open:              bool,
     /// Restored or default inspector pane initial width.
     inspector_width:             f32,
     /// Resizable state for the two-column main layout (sidebar / catalog).
@@ -241,7 +240,6 @@ impl LibraryRootView {
         let sidebar_width = ui_state.sidebar_width().unwrap_or(250.0);
         let inspector_width = ui_state.detail_width()
                                       .unwrap_or(INSPECTOR_PANE_DEFAULT_WIDTH);
-        let inspector_open = ui_state.inspector_open();
         let resize_state = cx.new(|_| ResizableState::default());
 
         cx.subscribe(&resize_state, move |this, state, _event, cx| {
@@ -252,8 +250,9 @@ impl LibraryRootView {
               };
               // A hidden pane keeps its last width, so only a shown one is
               // saved.
+              let pane_shown = this.controller.read(cx).selected_item().is_some();
               match sizes.get(2) {
-                  Some(pane) if this.inspector_open => {
+                  Some(pane) if pane_shown => {
                       UiState::load().save_panel_widths(sidebar, pane.as_f32());
                   }
                   _ => UiState::load().save_sidebar_width(sidebar),
@@ -283,7 +282,6 @@ impl LibraryRootView {
                auth_state,
                catalog_view,
                inspector,
-               inspector_open,
                inspector_width,
                resize_state,
                sidebar_width,

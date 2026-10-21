@@ -215,3 +215,17 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                                           .child(content))))
          .into_any_element()
 }
+
+#[cfg(test)]
+mod page_tests {
+    use rust_i18n::t;
+
+    use super::page_title;
+    use crate::controllers::settings::FILE_OPENERS_PAGE_IX;
+
+    #[test]
+    fn the_file_openers_page_index_is_the_file_openers_page() {
+        assert_eq!(page_title(FILE_OPENERS_PAGE_IX),
+                   t!("settings.file_openers_title"));
+    }
+}

@@ -103,8 +103,15 @@ pub(super) fn value_or_dash(value: &str) -> String {
     }
 }
 
+/// Width of the label column in the details table, in pixels.
+const DETAILS_LABEL_WIDTH: f32 = 110.0;
+
+/// Renders the details table: plain labels on the left, values on the right,
+/// in the order System, Type, Format, Pages, Size, Released, Added, Updated.
+/// Rows the catalog has nothing for are left out.
 pub(super) fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path,
-                                    label_font_family: &str, value_font_family: &str)
+                                    colors: &ColorTokens, label_font_family: &str,
+                                    value_font_family: &str)
                                     -> impl IntoElement + 'static + use<> {
     let file_size_label = if item.files.len() > 1 {
         t!("detail.field_total_file_size").to_string()
@@ -160,89 +167,55 @@ pub(super) fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path
         }
     };
 
-    let mut list = DescriptionList::vertical()
-        .columns(2)
-        .bordered(false)
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_system").to_string(),
-                label_font_family,
-            ))
-            .value(Text::from(
-                selectable_text("detail-field-system", value_or_dash(&item.line))
-                    .font_family(value_font_family.to_string()),
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_released").to_string(),
-                label_font_family,
-            ))
-            .value(Text::from(
-                selectable_text("detail-field-released", item.year.to_string())
-                    .font_family(value_font_family.to_string()),
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_format").to_string(),
-                label_font_family,
-            ))
-            .value(Text::from(
-                selectable_text("detail-field-format", item.format.to_string())
-                    .font_family(value_font_family.to_string()),
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(file_size_label, label_font_family)).value(
-                Text::from(
-                    selectable_text("detail-field-file-size", file_size_value)
-                        .font_family(value_font_family.to_string()),
-                ),
-            ),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_category").to_string(),
-                label_font_family,
-            ))
-            .value(Text::from(
-                selectable_text("detail-field-kind", item.kind.to_string())
-                    .font_family(value_font_family.to_string()),
-            ))
-            .span(2),
-        );
+    let text_value = |id: &'static str, value: String| {
+        selectable_text(id, value).font_family(value_font_family.to_string())
+                                  .into_any_element()
+    };
+
+    let mut rows: Vec<(String, AnyElement)> =
+        vec![(t!("detail.field_system").to_string(),
+              text_value("detail-field-system", value_or_dash(&item.line))),
+             (t!("detail.field_category").to_string(),
+              text_value("detail-field-kind", item.kind.to_string())),
+             (t!("detail.field_format").to_string(),
+              text_value("detail-field-format", item.format.to_string()))];
 
     // The DriveThruRPG order-product API does not always report a page count;
     // omit the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
-        list = list.child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_pages").to_string(),
-                label_font_family,
-            ))
-            .value(Text::from(
-                selectable_text("detail-field-pages", item.pages.to_string())
-                    .font_family(value_font_family.to_string()),
-            ))
-            .span(2),
-        );
+        rows.push((t!("detail.field_pages").to_string(),
+                   text_value("detail-field-pages", item.pages.to_string())));
     }
-
+    rows.push((file_size_label, text_value("detail-field-file-size", file_size_value)));
+    rows.push((t!("detail.field_released").to_string(),
+               text_value("detail-field-released", item.year.to_string())));
     if let Some(ts) = item.date_added {
-        let value = render_relative_date_value(&item.id, "added", ts, value_font_family);
-        list = list.child(DescriptionItem::new(styled_label(t!("detail.field_added").to_string(),
-                                                            label_font_family)).value(value)
-                                                                               .span(2));
+        rows.push((t!("detail.field_added").to_string(),
+                   render_relative_date_value(&item.id, "added", ts, value_font_family)));
     }
-
     if let Some(ts) = item.date_updated {
-        let value = render_relative_date_value(&item.id, "updated", ts, value_font_family);
-        list =
-            list.child(DescriptionItem::new(styled_label(t!("detail.field_updated").to_string(),
-                                                         label_font_family)).value(value)
-                                                                            .span(2));
+        rows.push((t!("detail.field_updated").to_string(),
+                   render_relative_date_value(&item.id, "updated", ts, value_font_family)));
     }
 
-    list
+    let label_color = colors.text_secondary;
+    let value_color = colors.text_primary;
+    div().flex()
+         .flex_col()
+         .gap(px(6.0))
+         .children(rows.into_iter().map(|(label, value)| {
+                                       div().flex()
+                                            .items_baseline()
+                                            .gap(px(12.0))
+                                            .text_sm()
+                                            .child(div().flex_none()
+                                                        .w(px(DETAILS_LABEL_WIDTH))
+                                                        .font_family(label_font_family.to_string())
+                                                        .text_color(label_color)
+                                                        .child(label))
+                                            .child(div().flex_1()
+                                                        .min_w_0()
+                                                        .text_color(value_color)
+                                                        .child(value))
+                                   }))
 }

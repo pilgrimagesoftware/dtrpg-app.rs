@@ -14,7 +14,8 @@ use gpui_kit::component::table::{TableEvent, TableState};
 
 use crate::controllers::library::LibraryController;
 use crate::data::events::{
-    InspectorCloseRequested, InspectorPopOutRequested, InspectorShowRequested,
+    InspectorCloseRequested, InspectorPopBackRequested, InspectorPopOutRequested,
+    InspectorShowRequested,
 };
 use crate::ui::views::detail_panel_view::{ItemListDelegate, item_list_columns};
 use crate::view_models::inspector::InspectorTab;
@@ -55,6 +56,12 @@ impl InspectorController {
     /// window.
     pub fn request_pop_out(&mut self, item_id: Arc<str>, cx: &mut Context<Self>) {
         cx.emit(InspectorPopOutRequested { item_id });
+    }
+
+    /// Asks the popped-out window this inspector belongs to to put its item
+    /// back in the docked pane.
+    pub fn request_pop_back(&mut self, cx: &mut Context<Self>) {
+        cx.emit(InspectorPopBackRequested);
     }
 
     /// Asks the main window to show `item_id` in the docked pane, on `tab`,

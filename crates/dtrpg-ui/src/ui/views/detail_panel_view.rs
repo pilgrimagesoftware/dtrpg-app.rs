@@ -35,14 +35,14 @@ use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
-use gpui_kit::component::text::Text;
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::inspector::{InspectorController, InspectorPlacement, item_list_table};
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::SettingsController;
+use crate::controllers::settings::{FILE_OPENERS_PAGE_IX, SettingsController};
 use crate::data::theme::{ColorTokens, LibriTheme};
+use crate::ui::actions::ShowSettings;
 use crate::ui::library::cover::{
     CoverCache, cover_style, detail_cache_key, render_generative_cover,
 };
@@ -67,6 +67,8 @@ pub struct InspectorContext<'a> {
     pub storage_root_path: PathBuf,
     /// The configured per-extension file openers, for the Opens With section.
     pub file_openers:      Vec<FileOpenerEntry>,
+    /// The settings, which the Opens With section links to.
+    pub settings:          Entity<SettingsController>,
     /// The library the item belongs to.
     pub controller:        Entity<LibraryController>,
     /// The state of the surface the item is shown in.
@@ -89,10 +91,11 @@ pub fn render_item_inspector(item: &LibraryItem, controller: &Entity<LibraryCont
     let covers = cx.global::<CoverCache>();
     let cover_image = covers.get(&detail_cache_key(&item.id))
                             .or_else(|| covers.get(&item.id));
-    let settings = settings.read(cx).snapshot();
+    let settings_snapshot = settings.read(cx).snapshot();
     render_inspector(InspectorContext { item,
-                                        storage_root_path: settings.storage_root_path,
-                                        file_openers: settings.file_openers,
+                                        storage_root_path: settings_snapshot.storage_root_path,
+                                        file_openers: settings_snapshot.file_openers,
+                                        settings: settings.clone(),
                                         controller: controller.clone(),
                                         inspector,
                                         colors: &colors,
@@ -112,18 +115,18 @@ pub fn render_inspector(context: InspectorContext<'_>, window: &mut Window, cx: 
     let InspectorContext { item,
                            storage_root_path,
                            file_openers,
+                           settings,
                            controller,
                            inspector,
                            colors,
                            cover_image, } = context;
 
     let tab = controller.read(cx).inspector_tab_for(&item.id);
-    let pop_out =
-        (inspector.read(cx).placement() == InspectorPlacement::Docked).then(|| inspector.clone());
     let body = if tab == InspectorTab::Overview {
         render_info_tab(item,
                         &storage_root_path,
                         &file_openers,
+                        &settings,
                         controller.clone(),
                         colors,
                         cx)
@@ -149,7 +152,7 @@ pub fn render_inspector(context: InspectorContext<'_>, window: &mut Window, cx: 
          .bg(colors.surface)
          .child(render_inspector_header(item,
                                         cover_image,
-                                        pop_out.as_ref(),
+                                        inspector,
                                         controller.clone(),
                                         colors,
                                         cx))
