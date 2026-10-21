@@ -9,6 +9,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::{
     credentials::{CredentialStore, KeyringCredentialStore},
     data::{
@@ -33,6 +34,7 @@ use gpui_kit::component::dialog::{
     DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle,
 };
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::notification::{Notification, NotificationType};
 use gpui_kit::component::resizable::{ResizableState, h_resizable, resizable_panel};
 use gpui_kit::component::searchable_list::SearchableListDelegate as _;
@@ -49,8 +51,8 @@ use crate::ui::actions::{
     ToggleGroupByPublisher, ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
-    CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
-    open_about_window, open_settings_window, save_library_window_bounds,
+    CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
+    install_menus, open_about_window, open_settings_window, save_library_window_bounds,
 };
 use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::{
@@ -184,6 +186,9 @@ pub struct LibraryRootView {
     /// flicker. Skip the rebuild when the checkmark-relevant state hasn't
     /// actually changed.
     last_menu_state:             Option<ViewMenuState>,
+    /// The in-window menu bar shown in the title bar on Windows and Linux,
+    /// which have no native menu bar. `None` on macOS.
+    menu_bar:                    Option<Entity<AppMenuBar>>,
 }
 
 impl LibraryRootView {
@@ -246,6 +251,14 @@ impl LibraryRootView {
           })
           .detach();
 
+        // Windows and Linux have no native menu bar, so the title bar draws one
+        // from the menus `install_menus` hands to the application.
+        let menu_bar = (Platform.kind() != PlatformKind::MacOs).then(|| {
+                           let bar = AppMenuBar::new(cx);
+                           cx.set_global(MenuBarHandle(bar.clone()));
+                           bar
+                       });
+
         Self { controller,
                settings,
                activity,
@@ -265,7 +278,8 @@ impl LibraryRootView {
                collection_search_input: misc.collection_search_input,
                bulk_pattern_input: misc.bulk_pattern_input,
                bulk_pattern_field: misc.bulk_pattern_field,
-               last_menu_state: None }
+               last_menu_state: None,
+               menu_bar }
     }
 }
 
