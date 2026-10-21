@@ -12,9 +12,10 @@ use gpui::{
 use crate::controllers::inspector::{InspectorController, InspectorPlacement};
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
+use crate::data::events::InspectorPopBackRequested;
 use crate::data::events::LibraryChanged;
 use crate::data::theme::LibriTheme;
-use crate::ui::app::remember_window;
+use crate::ui::app::{remember_window, show_library_window};
 use crate::ui::views::detail_panel_view::render_item_inspector;
 
 /// Root view for a popped-out inspector window.
@@ -40,6 +41,12 @@ impl InspectorWindowView {
                             this.close_if_item_left_library(window, cx);
                         })
           .detach();
+        cx.subscribe_in(&inspector,
+                        window,
+                        |this, _inspector, _event: &InspectorPopBackRequested, window, cx| {
+                            this.pop_back(window, cx);
+                        })
+          .detach();
         cx.observe(&controller, |_this, _controller, cx| cx.notify())
           .detach();
         cx.observe_window_bounds(window, |this, window, _cx| {
@@ -50,6 +57,17 @@ impl InspectorWindowView {
                controller,
                settings,
                inspector }
+    }
+
+    /// Puts the item back in the docked pane: selects it in the main window,
+    /// brings that window forward, and closes and forgets this one.
+    fn pop_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        UiState::load().remove_inspector_window(&self.item_id);
+        self.controller.update(cx, |ctrl, cx| {
+                           ctrl.select_item(Arc::clone(&self.item_id), cx)
+                       });
+        show_library_window(cx);
+        window.remove_window();
     }
 
     /// Closes the window, and forgets it, once its item is no longer in the

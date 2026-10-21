@@ -5,8 +5,7 @@ use super::*;
 
 impl LibraryRootView {
     /// Rebuilds the application menus if what their checkmarks show has
-    /// changed: the presentation, sort, grouping and whether the inspector
-    /// pane is open.
+    /// changed: the presentation, sort and grouping.
     ///
     /// `LibraryChanged` fires far more often than that state does (once per
     /// thumbnail during a catalog load), and `cx.set_menus` replaces the whole
@@ -18,8 +17,7 @@ impl LibraryRootView {
         let menu_state = ViewMenuState { presentation:   controller.presentation,
                                          sort:           controller.sort,
                                          sort_direction: controller.sort_direction,
-                                         group_by:       controller.group_by,
-                                         inspector_open: self.inspector_open, };
+                                         group_by:       controller.group_by, };
         if self.last_menu_state != Some(menu_state) {
             install_menus(cx, &menu_state);
             self.last_menu_state = Some(menu_state);

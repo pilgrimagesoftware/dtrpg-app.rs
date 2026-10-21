@@ -179,7 +179,6 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let this_entity_for_add = this_entity.clone();
     let this_entity_for_activity = this_entity.clone();
     let this_entity_for_alert_history = this_entity.clone();
-    let this_entity_for_inspector = this_entity.clone();
     let this_entity_for_report_bug = this_entity.clone();
     let controller_for_reload = view.controller.clone();
     let controller_for_refresh_thumbnails = view.controller.clone();
@@ -197,8 +196,9 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let controller_for_group_by_tag = view.controller.clone();
     let search_input_for_focus = view.search_input.clone();
     let sidebar_initial = view.sidebar_width;
-    let inspector_open = view.inspector_open;
-    let inspector_pane = inspector_open.then(|| render_inspector_pane(view, window, cx));
+    let selected_item = view.controller.read(cx).selected_item();
+    let inspector_pane = selected_item.as_ref()
+                                      .map(|item| render_inspector_pane(view, item, window, cx));
 
     div()
         .size_full()
@@ -291,9 +291,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
         .on_action(move |_: &ShowAlertHistory, _, cx| {
             this_entity_for_alert_history.update(cx, |view, cx| view.show_alert_history(cx));
         })
-        .on_action(move |_: &ToggleInspector, _, cx| {
-            this_entity_for_inspector.update(cx, |view, cx| view.toggle_inspector(cx));
-        })
+
         .child(
             div()
                 .size_full()
@@ -317,7 +315,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                             )
                             .child(
                                 resizable_panel()
-                                    .visible(inspector_open)
+                                    .visible(inspector_pane.is_some())
                                     .size(px(view.inspector_width))
                                     .size_range(px(INSPECTOR_PANE_MIN_WIDTH)
                                                 ..px(INSPECTOR_PANE_MAX_WIDTH))

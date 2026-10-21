@@ -45,9 +45,6 @@ pub struct UiStateFile {
     /// Whether the Tags sidebar section is open (`true`) or collapsed
     /// (`false`).
     pub tags_open:             Option<bool>,
-    /// Whether the inspector pane beside the catalog is shown (`true`) or
-    /// hidden (`false`).
-    pub inspector_open:        Option<bool>,
     /// Index of the last-active settings page (Account/Storage/File
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
@@ -143,18 +140,6 @@ impl UiState {
     /// Whether the Tags sidebar section is open. Defaults to open.
     pub fn tags_open(&self) -> bool {
         self.data.tags_open.unwrap_or(true)
-    }
-
-    /// Whether the inspector pane beside the catalog is shown. Defaults to
-    /// shown.
-    pub fn inspector_open(&self) -> bool {
-        self.data.inspector_open.unwrap_or(true)
-    }
-
-    /// Persist whether the inspector pane is shown.
-    pub fn save_inspector_open(&mut self, open: bool) {
-        self.data.inspector_open = Some(open);
-        self.flush();
     }
 
     /// Persist the Collections section open state.
@@ -294,23 +279,5 @@ mod tests {
         let loaded: UiStateFile = toml::from_str("sidebar_width = 250.0\n").unwrap_or_default();
         assert!(loaded.inspector_windows.is_empty());
         assert_eq!(loaded.sidebar_width, Some(250.0));
-    }
-
-    #[test]
-    fn the_inspector_choice_survives_a_toml_round_trip() {
-        let file = UiStateFile { inspector_open: Some(false),
-                                 ..UiStateFile::default() };
-
-        let text = toml::to_string(&file).unwrap_or_default();
-        let loaded: UiStateFile = toml::from_str(&text).unwrap_or_default();
-
-        assert_eq!(loaded.inspector_open, Some(false));
-    }
-
-    #[test]
-    fn a_file_with_no_inspector_choice_leaves_it_to_the_default() {
-        let loaded: UiStateFile = toml::from_str("sidebar_width = 250.0\n").unwrap_or_default();
-
-        assert_eq!(loaded.inspector_open, None);
     }
 }

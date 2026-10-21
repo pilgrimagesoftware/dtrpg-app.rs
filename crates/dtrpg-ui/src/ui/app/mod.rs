@@ -1,7 +1,6 @@
 use dtrpg_core::credentials::{CredentialStore, KeyringCredentialStore};
 use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
-use dtrpg_core::data::ui_state::UiState;
 use dtrpg_core::services::{
     LibraryService, LoginService, LoginTokens, collections::CollectionsService,
 };
@@ -33,8 +32,6 @@ pub struct ViewMenuState {
     pub sort:           SortMethod,
     pub sort_direction: SortDirection,
     pub group_by:       GroupBy,
-    /// Whether the inspector pane beside the catalog is shown.
-    pub inspector_open: bool,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
@@ -244,7 +241,9 @@ mod window_bounds;
 
 pub use about::open_about_window;
 pub use cover_viewer::open_cover_viewer_window;
-pub use inspector_window::{ShuttingDown, open_inspector_window, remember_window};
+pub use inspector_window::{
+    ShuttingDown, open_inspector_window, remember_window, show_library_window,
+};
 use window_bounds::restore_library_window_bounds;
 pub use window_bounds::save_library_window_bounds;
 
@@ -276,8 +275,7 @@ pub fn setup(cx: &mut App) {
                   KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
                   KeyBinding::new("cmd-shift-n", AddCollection, None),
                   KeyBinding::new("cmd-r", ReloadCatalog, None),
-                  KeyBinding::new("cmd-shift-r", RefreshThumbnails, None),
-                  KeyBinding::new("cmd-alt-i", ToggleInspector, None)]);
+                  KeyBinding::new("cmd-shift-r", RefreshThumbnails, None)]);
 
     // App-level action handlers
     cx.on_action::<Quit>(|_, cx| {
@@ -326,14 +324,6 @@ pub fn setup(cx: &mut App) {
               return;
           };
           view.update(cx, |view, cx| view.show_settings(cx));
-      });
-    cx.on_action::<ToggleInspector>(|_, cx| {
-          let Some(view) = cx.try_global::<LibraryWindowHandle>()
-                             .map(|h| h.view.clone())
-          else {
-              return;
-          };
-          view.update(cx, |view, cx| view.toggle_inspector(cx));
       });
     cx.on_action::<ShowActivity>(|_, cx| {
           let Some(view) = cx.try_global::<LibraryWindowHandle>()
@@ -417,9 +407,7 @@ pub fn setup(cx: &mut App) {
       });
 
     // Menu bar
-    install_menus(cx,
-                  &ViewMenuState { inspector_open: UiState::load().inspector_open(),
-                                   ..ViewMenuState::default() });
+    install_menus(cx, &ViewMenuState::default());
 
     let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
     {

@@ -73,6 +73,17 @@ pub fn open_inspector_window(item_id: Arc<str>, title: &str,
           .expect("open_window's root entity is always Root")
 }
 
+/// Brings the library window to the front, if it is open.
+pub fn show_library_window(cx: &mut App) {
+    let Some(window) = cx.try_global::<super::LibraryWindowHandle>()
+                         .map(|handle| handle.window)
+    else {
+        return;
+    };
+    // The window may have been closed; there is then nothing to bring forward.
+    let _ = window.update(cx, |_, window, _| window.activate_window());
+}
+
 /// Size of an inspector window that has no saved place: wide enough for the
 /// cover beside the details.
 fn default_size() -> gpui::Size<gpui::Pixels> {
