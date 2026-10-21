@@ -1,15 +1,18 @@
 - [x] Review all 22 v2 mockups against the current views and core types.
 - [x] Write the gap matrix and the proposed slices (`design.md`).
-- [ ] Decide the open questions in `design.md`.
+- [x] Decide System/Type and what Needs Attention means (see Decisions in `design.md`).
+- [ ] Decide the remaining open questions in `design.md`.
+- [x] File an issue per slice (#382 to #392).
+- [ ] Set issue type, project, milestone, size and effort on #382 to #392.
 - [ ] Recapture `upgrade-a-collection.png` in `dtrpg-design` (it duplicates the smart-collection sheet).
-- [ ] Slice 1: Domain foundations (availability states, per-file location, System/Type, facet queries).
-- [ ] Slice 2: Query language (shared parser).
-- [ ] Slice 3: Library chrome (Filters button and facet column, token chips, sidebar, status bar).
-- [ ] Slice 4: Inspector parity.
-- [ ] Slice 5: Download sheet.
-- [ ] Slice 6: Smart collections.
-- [ ] Slice 7: Insights.
-- [ ] Slice 8: Settings parity (Agent & MCP, Storage, Native, Appearance check).
-- [ ] Slice 9: MCP completion (tools, scopes, audit log).
-- [ ] Slice 10: Windows and Linux chrome.
-- [ ] Slice 11: Empty and loading states.
+- [ ] #382 Slice 1: Domain foundations (availability states, per-file location, System/Type, facet queries).
+- [ ] #383 Slice 2: Query language (shared parser).
+- [ ] #384 Slice 3: Library chrome (Filters button and facet column, token chips, sidebar, status bar).
+- [ ] #385 Slice 4: Inspector parity.
+- [ ] #386 Slice 5: Download sheet.
+- [ ] #387 Slice 6: Smart collections.
+- [ ] #388 Slice 7: Insights.
+- [ ] #389 Slice 8: Settings parity (Agent & MCP, Storage, Native, Appearance check).
+- [ ] #390 Slice 9: MCP completion (tools, scopes, audit log).
+- [ ] #391 Slice 10: Windows and Linux chrome.
+- [ ] #392 Slice 11: Empty and loading states.

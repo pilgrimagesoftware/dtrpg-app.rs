@@ -93,13 +93,27 @@ Ordered by dependency. Each becomes its own issue and OpenSpec change.
 
 Slices 4, 10 and 11 do not depend on the foundations and can start at any time.
 
+## Decisions
+
+- **System** is the game system (D&D 5E, Pathfinder 2E). **Type** is the
+  content type (Core Rules, Adventure, Setting). `format` is the file type
+  (PDF, EPUB) and is not a facet in the mockups.
+- What the code holds today: `LibraryItem.line` is **never populated**
+  (`services/sdk/library/mapping.rs` hard-codes `""`), so System has no data
+  yet. `LibraryItem.kind` is the product's first top-level DriveThruRPG filter
+  category (`parent_filter_id == 0`), which fits Type. The SDK returns a list of
+  filter categories per product; slice 1 starts with a spike to capture real
+  responses and find which categories carry the game system and the content
+  type. The only fixture in the repo is invented.
+- **Needs Attention** means an item with a failed download, for now. It will be
+  expanded later (for example unavailable items or missing files).
+
 ## Open questions
 
-- Is `line` the System and `kind` the Type, and are the values clean enough to
-  facet on?
-- Should "Needs Attention" mean failed downloads only, or also items that are no
-  longer available (`is_available == false`) and missing files?
 - The mockups are light-theme only. Is a dark pass of the screens needed before
   building, or is the theme-token system enough?
 - Several mockups carry content the app may not have data for (pages, "Released"
-  date). Confirm which fields the DriveThruRPG API provides.
+  date). Confirm which fields the DriveThruRPG API provides. Slice 1's spike
+  covers System and Type; the rest still needs checking.
+- Issue types, project, milestone, size and effort could not be set through the
+  integration used to file the issues, and still need setting.
