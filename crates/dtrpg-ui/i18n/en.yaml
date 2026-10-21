@@ -366,6 +366,8 @@ menu:
   app_show_all: "Show All"
   app_quit: "Quit Libri"
   catalog_title: "Catalog"
+  library_title: "Library"
+  file_title: "File"
   catalog_add_collection: "Add Collection…"
   catalog_reload: "Reload"
   catalog_refresh_thumbnails: "Refresh Thumbnails"

@@ -343,6 +343,8 @@ menu:
   app_show_all: "Tout afficher"
   app_quit: "Quitter Libri"
   catalog_title: "Catalogue"
+  library_title: "Bibliothèque"
+  file_title: "Fichier"
   catalog_add_collection: "Ajouter une collection…"
   catalog_reload: "Actualiser"
   catalog_refresh_thumbnails: "Actualiser les vignettes"

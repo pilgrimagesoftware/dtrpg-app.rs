@@ -348,6 +348,8 @@ menu:
   app_show_all: "Alle einblenden"
   app_quit: "Libri beenden"
   catalog_title: "Katalog"
+  library_title: "Bibliothek"
+  file_title: "Datei"
   catalog_add_collection: "Sammlung hinzufügen…"
   catalog_reload: "Neu laden"
   catalog_refresh_thumbnails: "Miniaturansichten aktualisieren"
