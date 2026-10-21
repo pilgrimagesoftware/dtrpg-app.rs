@@ -12,7 +12,7 @@ impl SettingsController {
     pub fn open(&mut self, cx: &mut Context<Self>) {
         if !self.is_open {
             self.is_open = true;
-            self.refresh_cache_counts();
+            self.refresh_page_data();
             cx.emit(SettingsChanged);
         }
     }

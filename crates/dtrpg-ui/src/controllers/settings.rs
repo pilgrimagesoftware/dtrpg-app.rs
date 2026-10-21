@@ -5,6 +5,7 @@
 //! `file_openers`, `snapshot`, `wiring`), each its own `impl
 //! SettingsController` block doing `use super::*;`.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -122,6 +123,10 @@ pub struct SettingsSnapshot {
     pub storage_roots:                  Vec<StorageRoot>,
     /// Ordered placement rules used for future downloads.
     pub storage_rules:                  Vec<PlacementRule>,
+    /// The location downloads go to when no placement rule matches.
+    pub default_root_id:                u32,
+    /// Free and total space by location id, in megabytes.
+    pub root_volumes:                   HashMap<u32, (Option<f64>, Option<f64>)>,
     /// Input state for a new publisher placement rule.
     pub publisher_rule_input:           Option<Entity<InputState>>,
     pub collection_rule_input:          Option<Entity<InputState>>,
@@ -238,6 +243,10 @@ pub struct SettingsController {
     /// [`Self::refresh_cache_counts`] — rather than recomputed on every
     /// render pass, so rendering performs no disk I/O.
     cache_counts:                   CacheCounts,
+    /// Free and total space of each storage root's volume, by root id, for
+    /// the Storage page. Refreshed with the cache counts, so rendering does
+    /// no disk I/O.
+    root_volumes:                   HashMap<u32, (Option<f64>, Option<f64>)>,
     /// `true` when the email input should be focused on the settings
     /// window's next render pass. Set by
     /// [`Self::request_email_focus_on_account_tab`] and consumed (cleared)
@@ -346,6 +355,7 @@ impl SettingsController {
                                   dtrpg_core::data::ui_state::UiState::load().settings_page_ix()
                                                                              .unwrap_or(0),
                               cache_counts: CacheCounts::default(),
+                              root_volumes: HashMap::new(),
                               focus_email_pending: false,
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
@@ -359,7 +369,7 @@ impl SettingsController {
                               label_font_select: None,
                               mono_font_select: None };
         ctrl.check_storage_path_exists(initial_path, cx);
-        ctrl.refresh_cache_counts();
+        ctrl.refresh_page_data();
         ctrl
     }
 
@@ -394,6 +404,7 @@ impl SettingsController {
                pending_file_opener: None,
                active_page_ix: 0,
                cache_counts: CacheCounts::default(),
+               root_volumes: HashMap::new(),
                focus_email_pending: false,
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
@@ -418,7 +429,7 @@ impl SettingsController {
     /// settings window reopens on the same page next time.
     pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
         self.active_page_ix = ix;
-        self.refresh_cache_counts();
+        self.refresh_page_data();
         dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
     }

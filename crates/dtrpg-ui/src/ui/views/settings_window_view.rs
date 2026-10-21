@@ -13,6 +13,7 @@ use crate::controllers::settings::SettingsController;
 use crate::data::theme::LibriTheme;
 use crate::ui::views::settings_appearance_view::AppearanceFontSelects;
 use crate::ui::views::settings_view::render_settings_panel;
+use crate::view_models::storage_display::StorageDisplay;
 
 /// Root view for the settings window.
 ///
@@ -85,12 +86,18 @@ impl Render for SettingsWindowView {
                                                    label: snap.label_font_select,
                                                    mono:  snap.mono_font_select, };
 
+        let storage_display =
+            StorageDisplay { default_root_id:  snap.default_root_id,
+                             volumes:          snap.root_volumes.clone(),
+                             title_counts:     self.library.read(cx).root_title_counts().clone(),
+                             collection_names: self.library.read(cx).collection_names(), };
         let panel = render_settings_panel(&snap.file_openers,
                                           snap.auth,
                                           snap.storage_root_path,
                                           snap.storage_path_exists,
                                           snap.storage_roots,
                                           snap.storage_rules,
+                                          storage_display,
                                           snap.publisher_rule_input,
                                           snap.collection_rule_input,
                                           snap.size_rule_input,

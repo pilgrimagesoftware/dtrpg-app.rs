@@ -6,7 +6,7 @@
 //! faked: where files keep no tags, the switches are replaced by a note.
 
 use dtrpg_core::data::native_preferences::NativePreferencesFile;
-use dtrpg_core::platform::{Platform, PlatformIntegration};
+use dtrpg_core::platform::{Capabilities, Platform, PlatformIntegration};
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, SharedString, div, px};
 use gpui_kit::component::switch::Switch;
@@ -42,6 +42,14 @@ pub fn render_native_section(entity: Entity<SettingsController>, native: NativeP
          .child(div().text_xs()
                      .text_color(colors.text_secondary)
                      .child(t!("settings.native_intro").to_string()))
+         .child(div().flex()
+                     .flex_col()
+                     .gap(px(12.0))
+                     .child(div().font_family(label_font_family.to_string())
+                                 .text_sm()
+                                 .text_color(colors.text_primary)
+                                 .child(small_caps_text(t!("settings.native_capabilities_heading").to_string())))
+                     .child(capability_matrix(Platform.capabilities(), colors)))
          .child(div().flex()
                      .flex_col()
                      .gap(px(12.0))
@@ -147,4 +155,32 @@ fn switch_row(id: &'static str, title: String, note: String, checked: bool,
                      .text_color(colors.text_secondary)
                      .child(SharedString::from(note)))
          .into_any_element()
+}
+
+/// What this operating system lets Libri do, one row per ability, each marked
+/// as available or not on this platform. Abilities that are missing are shown,
+/// not hidden, so it is clear why a feature does nothing here.
+fn capability_matrix(capabilities: Capabilities, colors: &ColorTokens)
+                     -> impl IntoElement + 'static + use<> {
+    let rows = [(t!("settings.native_capability_file_state"), capabilities.file_state),
+                (t!("settings.native_capability_materialize"), capabilities.materialize),
+                (t!("settings.native_capability_tags"), capabilities.filesystem_tags),
+                (t!("settings.native_capability_reveal"), capabilities.reveal)];
+    div().flex()
+         .flex_col()
+         .gap(px(6.0))
+         .children(rows.into_iter().map(|(name, available)| {
+             let (status, color) = if available {
+                 (t!("settings.native_capability_available"), colors.text_primary)
+             }
+             else {
+                 (t!("settings.native_capability_unavailable"), colors.text_secondary)
+             };
+             div().flex()
+                  .items_center()
+                  .justify_between()
+                  .text_xs()
+                  .child(div().text_color(colors.text_primary).child(SharedString::from(name.to_string())))
+                  .child(div().text_color(color).child(SharedString::from(status.to_string())))
+         }))
 }

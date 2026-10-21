@@ -66,6 +66,7 @@ mod lifecycle;
 mod preferences;
 mod selection;
 mod smart_collections;
+mod storage_usage;
 mod tags;
 mod theme_files;
 mod thumbnails;
@@ -242,6 +243,8 @@ pub struct LibraryController {
     /// The values the catalog has for each choosable filter field, as of the
     /// last change to the catalog.
     known_filter_values:           HashMap<Field, Vec<String>>,
+    /// How many downloaded titles each storage location holds, by location id.
+    root_title_counts:             HashMap<u32, usize>,
     /// How many items each smart collection holds, by collection id, as of
     /// the last change to the catalog or the collections.
     smart_counts:                  HashMap<u64, usize>,
