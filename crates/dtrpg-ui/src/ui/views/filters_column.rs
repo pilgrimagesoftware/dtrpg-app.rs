@@ -25,9 +25,11 @@ use crate::data::theme::ColorTokens;
 const FILTERS_COLUMN_WIDTH: f32 = 220.0;
 
 /// The facets the column lists, in order, with the heading of each.
-const FACET_SECTIONS: [(Field, &str); 4] = [(Field::Availability, "filters.availability"),
-                                            (Field::Type, "filters.type"),
+const FACET_SECTIONS: [(Field, &str); 6] = [(Field::Availability, "filters.availability"),
                                             (Field::System, "filters.system"),
+                                            (Field::Type, "filters.type"),
+                                            (Field::Format, "filters.format"),
+                                            (Field::Genre, "filters.genre"),
                                             (Field::Tag, "filters.tags")];
 
 /// Replaces the search box text with `query`, which the box reports to the
@@ -58,6 +60,8 @@ fn counts_for(facets: &Facets, field: Field) -> &[FacetCount] {
     match field {
         Field::Availability => &facets.availability,
         Field::Type => &facets.types,
+        Field::Format => &facets.formats,
+        Field::Genre => &facets.genres,
         Field::System => &facets.systems,
         Field::Tag => &facets.tags,
         Field::Publisher => &[],
@@ -195,6 +199,8 @@ mod tests {
                     "filters.availability",
                     "filters.type",
                     "filters.system",
+                    "filters.format",
+                    "filters.genre",
                     "filters.tags"]
         {
             assert_ne!(t!(key).to_string(), key, "{key} has no text");

@@ -131,6 +131,8 @@ impl Library {
         Facets { availability: count(Field::Availability),
                  systems:      count(Field::System),
                  types:        count(Field::Type),
+                 formats:      count(Field::Format),
+                 genres:       count(Field::Genre),
                  tags:         count(Field::Tag), }
     }
 

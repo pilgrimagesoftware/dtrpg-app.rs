@@ -14,6 +14,7 @@ pub mod library;
 pub mod native_preferences;
 pub mod notification;
 pub mod paths;
+pub mod product_filter;
 pub mod profile;
 pub mod selection;
 pub mod smart_collection;

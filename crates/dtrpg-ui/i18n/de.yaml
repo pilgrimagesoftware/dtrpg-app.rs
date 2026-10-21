@@ -503,6 +503,8 @@ download_sheet:
   download: "Herunterladen"
 
 filters:
+  format: "Format"
+  genre: "Genre"
   toggle_tooltip: "Filter ein- oder ausblenden"
   toggle_tooltip_applied: "Filter ein- oder ausblenden ({n} angewendet)"
   remove_chip_tooltip: "Diesen Filter entfernen"

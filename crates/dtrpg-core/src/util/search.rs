@@ -20,6 +20,9 @@ use std::sync::Arc;
 
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
+use crate::data::product_filter::{
+    CATEGORY_FORMAT, CATEGORY_GENRE, CATEGORY_PRODUCT_TYPE, CATEGORY_RULE_SYSTEM,
+};
 
 mod parse;
 
@@ -30,20 +33,27 @@ pub enum Field {
     Tag,
     /// The item's publisher.
     Publisher,
-    /// The item's game system. Held in the item's game line.
+    /// A game system the item is for, from its `Rule System` filters. An
+    /// item can have several, and each level of a nested system counts.
     System,
-    /// The item's content type. Held in the item's kind.
+    /// A type the item has, from its `Product Type` filters.
     Type,
+    /// A format the item has, from its `Format` filters.
+    Format,
+    /// A genre the item has, from its `Genre` filters.
+    Genre,
     /// Whether the item is `downloaded` or still in the `cloud`.
     Availability,
 }
 
 impl Field {
     /// Every field, in the order a search is documented.
-    pub const ALL: [Self; 5] = [Self::Tag,
+    pub const ALL: [Self; 7] = [Self::Tag,
                                 Self::Publisher,
                                 Self::System,
                                 Self::Type,
+                                Self::Format,
+                                Self::Genre,
                                 Self::Availability];
 
     /// The field whose keyword is `keyword`, ignoring case.
@@ -70,7 +80,31 @@ impl Field {
             Self::Publisher => "publisher",
             Self::System => "system",
             Self::Type => "type",
+            Self::Format => "format",
+            Self::Genre => "genre",
             Self::Availability => "availability",
+        }
+    }
+
+    /// The category of product filters this field reads, or `None` for a field
+    /// that reads something else.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::util::search::Field;
+    ///
+    /// assert_eq!(Field::System.category(), Some("Rule System"));
+    /// assert_eq!(Field::Publisher.category(), None);
+    /// ```
+    #[must_use]
+    pub const fn category(self) -> Option<&'static str> {
+        match self {
+            Self::System => Some(CATEGORY_RULE_SYSTEM),
+            Self::Type => Some(CATEGORY_PRODUCT_TYPE),
+            Self::Format => Some(CATEGORY_FORMAT),
+            Self::Genre => Some(CATEGORY_GENRE),
+            Self::Tag | Self::Publisher | Self::Availability => None,
         }
     }
 }
@@ -110,8 +144,12 @@ impl Term {
         match self.field {
             Field::Tag => tags.iter().any(|tag| equals(tag)),
             Field::Publisher => equals(&item.publisher),
-            Field::System => equals(&item.line),
-            Field::Type => equals(&item.kind),
+            Field::System | Field::Type | Field::Format | Field::Genre => {
+                let category = self.field.category().unwrap_or_default();
+                item.filters
+                    .iter()
+                    .any(|filter| filter.is_in(category) && equals(&filter.name))
+            }
             Field::Availability => self.availability() == Some(item.status),
         }
     }

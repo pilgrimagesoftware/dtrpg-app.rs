@@ -41,7 +41,11 @@ use crate::data::library::LibraryItem;
 /// large-context cover. Caches written before this field existed
 /// deserialize it as `None` via `#[serde(default)]` and would otherwise never
 /// populate it until the 7-day staleness window expired.
-const CACHE_SCHEMA_VERSION: u32 = 3;
+///
+/// Version 4: the product's filters (rule system, product type, format,
+/// genre) are kept with the item. A catalog stored before then has none, so a
+/// fresh-looking cache is treated as stale and the next load fetches them.
+const CACHE_SCHEMA_VERSION: u32 = 4;
 
 // ── CacheMetadata
 // ─────────────────────────────────────────────────────────────

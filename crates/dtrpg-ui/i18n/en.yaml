@@ -521,6 +521,8 @@ download_sheet:
   download: "Download"
 
 filters:
+  format: "Format"
+  genre: "Genre"
   toggle_tooltip: "Show or hide the filters"
   toggle_tooltip_applied: "Show or hide the filters ({n} applied)"
   remove_chip_tooltip: "Remove this filter"

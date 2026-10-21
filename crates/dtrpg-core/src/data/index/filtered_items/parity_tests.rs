@@ -16,20 +16,23 @@ use crate::util::search::SearchQuery;
 use crate::util::sort::{SortDirection, SortMethod};
 
 fn item(id: &str, title: &str, publisher: &str, line: &str, status: ItemStatus) -> LibraryItem {
-    LibraryItem::new(id,
-                     title,
-                     publisher,
-                     line,
-                     "Core",
-                     "PDF",
-                     10,
-                     1.0,
-                     2024,
-                     0,
-                     status,
-                     "#1C2A44",
-                     "",
-                     Some(1_700_000_000))
+    let item = LibraryItem::new(id,
+                                title,
+                                publisher,
+                                line,
+                                "Core",
+                                "PDF",
+                                10,
+                                1.0,
+                                2024,
+                                0,
+                                status,
+                                "#1C2A44",
+                                "",
+                                Some(1_700_000_000));
+    // The line stands in for the game system, and every item is a core book.
+    item.with_filter("Rule System", line)
+        .with_filter("Product Type", "Core")
 }
 
 fn seeded() -> LibraryIndex {

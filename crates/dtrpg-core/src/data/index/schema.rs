@@ -56,6 +56,16 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
         );
         CREATE INDEX IF NOT EXISTS files_by_item ON files(item_id);
 
+        CREATE TABLE IF NOT EXISTS item_filters (
+            item_id   TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            filter_id INTEGER NOT NULL,
+            parent_id INTEGER NOT NULL,
+            category  TEXT NOT NULL,
+            name      TEXT NOT NULL,
+            PRIMARY KEY (item_id, filter_id)
+        );
+        CREATE INDEX IF NOT EXISTS item_filters_by_category ON item_filters(category, name);
+
         CREATE TABLE IF NOT EXISTS collections (
             id         INTEGER PRIMARY KEY,
             name       TEXT NOT NULL,

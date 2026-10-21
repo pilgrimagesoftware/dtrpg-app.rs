@@ -140,8 +140,26 @@ fn only_a_search_with_a_tag_term_needs_the_items_tags() {
 }
 
 fn typed_item(publisher: &str, system: &str, kind: &str, status: ItemStatus) -> LibraryItem {
-    LibraryItem::new("a", "Moria", publisher, system, kind, "PDF", 100, 10.0, 2024, 0, status,
-                     "#000000", "", None)
+    let item = LibraryItem::new("a", "Moria", publisher, system, kind, "PDF", 100, 10.0, 2024, 0,
+                                status, "#000000", "", None);
+    with_system_and_type(item, system, kind)
+}
+
+/// The item with a rule system and a product type filter for each of `system`
+/// and `kind` that is not empty.
+fn with_system_and_type(item: LibraryItem, system: &str, kind: &str) -> LibraryItem {
+    let item = if system.is_empty() {
+        item
+    }
+    else {
+        item.with_filter("Rule System", system)
+    };
+    if kind.is_empty() {
+        item
+    }
+    else {
+        item.with_filter("Product Type", kind)
+    }
 }
 
 #[test]
@@ -288,4 +306,36 @@ fn a_term_or_a_whole_field_can_be_taken_out() {
     assert_eq!(query.without_term(&core).to_string(),
                "type:adventure tag:solo");
     assert_eq!(query.without_field(Field::Type).to_string(), "tag:solo");
+}
+
+#[test]
+fn a_product_with_several_systems_matches_each_of_them() {
+    let item = typed_item("Paizo", "", "Adventure", ItemStatus::Cloud)
+        .with_filter("Rule System", "Pathfinder / Starfinder")
+        .with_filter("Rule System", "Pathfinder OGL 1E");
+
+    assert!(matches("system:\"pathfinder / starfinder\"", &item, &[]));
+    assert!(matches("system:\"pathfinder ogl 1e\"", &item, &[]));
+    assert!(!matches("system:\"5e-compatible\"", &item, &[]));
+    assert!(!matches("-system:\"pathfinder ogl 1e\"", &item, &[]));
+}
+
+#[test]
+fn format_and_genre_terms_read_their_own_filters() {
+    let item = typed_item("Paizo", "", "", ItemStatus::Cloud).with_filter("Format", "PDF")
+                                                             .with_filter("Genre", "Horror");
+
+    assert!(matches("format:pdf genre:horror", &item, &[]));
+    assert!(!matches("format:horror", &item, &[]),
+            "a value is only read in its own category");
+    assert!(!matches("genre:pdf", &item, &[]));
+    assert!(matches("-genre:fantasy", &item, &[]));
+}
+
+#[test]
+fn a_filter_in_another_category_does_not_answer_a_term() {
+    let item = typed_item("Paizo", "", "", ItemStatus::Cloud).with_filter("Genre", "Fantasy");
+
+    assert!(!matches("system:fantasy", &item, &[]));
+    assert!(!matches("type:fantasy", &item, &[]));
 }

@@ -30,14 +30,23 @@ pub struct FacetCount {
 pub(in crate::data::index) fn facet_counts(conn: &Connection, filter: &ItemFilter<'_>,
                                            field: Field)
                                            -> Result<Vec<FacetCount>, IndexError> {
-    let (where_clause, args) = build_where(filter);
+    let (where_clause, mut args) = build_where(filter);
     let sql = match field {
         Field::Availability => {
             format!("SELECT status, COUNT(*) FROM items {where_clause} \
                      GROUP BY status ORDER BY COUNT(*) DESC, status")
         }
-        Field::System => text_column_sql("line", &where_clause),
-        Field::Type => text_column_sql("kind", &where_clause),
+        Field::System | Field::Type | Field::Format | Field::Genre => {
+            let category = field.category().unwrap_or_default().to_lowercase();
+            let n = args.len() + 1;
+            args.push(Box::new(category));
+            format!("SELECT MIN(f.name), COUNT(DISTINCT f.item_id) \
+                     FROM item_filters f \
+                     WHERE ulower(f.category) = ?{n} \
+                     AND f.item_id IN (SELECT id FROM items {where_clause}) \
+                     GROUP BY ulower(f.name) \
+                     ORDER BY COUNT(DISTINCT f.item_id) DESC, ulower(MIN(f.name))")
+        }
         Field::Tag => {
             format!("SELECT MIN(tg.name), COUNT(DISTINCT it.item_id) \
                      FROM item_tags it JOIN tags tg ON tg.id = it.tag_id \
@@ -55,18 +64,4 @@ pub(in crate::data::index) fn facet_counts(conn: &Connection, filter: &ItemFilte
                      })?
                      .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(counts)
-}
-
-/// The query counting items by a text column, folding case, and leaving out
-/// items that have nothing in it.
-fn text_column_sql(column: &str, where_clause: &str) -> String {
-    let not_empty = format!("{column} <> ''");
-    let where_clause = if where_clause.is_empty() {
-        format!("WHERE {not_empty}")
-    }
-    else {
-        format!("{where_clause} AND {not_empty}")
-    };
-    format!("SELECT MIN({column}), COUNT(*) FROM items {where_clause} \
-             GROUP BY ulower({column}) ORDER BY COUNT(*) DESC, ulower(MIN({column}))")
 }

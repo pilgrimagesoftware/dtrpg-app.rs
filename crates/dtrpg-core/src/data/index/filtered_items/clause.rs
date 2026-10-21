@@ -54,6 +54,15 @@ fn tag_exists_clause(negated: bool, n: usize) -> String {
     format!("{prefix}{exists}{n})")
 }
 
+/// One item's `EXISTS`/`NOT EXISTS` over a product filter, bound at parameters
+/// `category_n` (the lower-cased category) and `name_n` (the lower-cased name).
+fn filter_exists_clause(negated: bool, category_n: usize, name_n: usize) -> String {
+    let exists = "EXISTS (SELECT 1 FROM item_filters f \
+                  WHERE f.item_id = items.id AND ulower(f.category) = ?";
+    let prefix = if negated { "NOT " } else { "" };
+    format!("{prefix}{exists}{category_n} AND ulower(f.name) = ?{name_n})")
+}
+
 /// The clause for one search term, or `None` when the term keeps every item.
 /// Pushes the term's argument, so the clause's `?n` matches its position.
 ///
@@ -78,8 +87,13 @@ fn term_clause(term: &Term, args: &mut Vec<Box<dyn ToSql>>) -> Option<String> {
             return Some(format!("status {operator} ?{n}"));
         }
         Field::Publisher => "publisher",
-        Field::System => "line",
-        Field::Type => "kind",
+        Field::System | Field::Type | Field::Format | Field::Genre => {
+            let category = term.field.category().unwrap_or_default().to_lowercase();
+            let n = args.len() + 1;
+            args.push(Box::new(category));
+            args.push(Box::new(term.value.clone()));
+            return Some(filter_exists_clause(term.negated, n, n + 1));
+        }
     };
     let n = args.len() + 1;
     args.push(Box::new(term.value.clone()));

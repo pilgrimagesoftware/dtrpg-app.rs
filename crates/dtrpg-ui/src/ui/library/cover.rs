@@ -274,7 +274,8 @@ mod tests {
                       thumbnail_last_attempted:  None,
                       is_available:              true,
                       availability_last_checked: None,
-                      files:                     Vec::new(), }
+                      files:                     Vec::new(),
+                      filters:                   Vec::new(), }
     }
 
     #[test]

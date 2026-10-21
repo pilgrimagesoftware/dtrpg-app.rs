@@ -9,20 +9,32 @@ use crate::data::tag_color::TagColor;
 use crate::util::search::{Field, SearchQuery};
 
 fn item(id: &str, system: &str, kind: &str, status: ItemStatus) -> LibraryItem {
-    LibraryItem::new(id,
-                     id,
-                     "Publisher",
-                     system,
-                     kind,
-                     "PDF",
-                     10,
-                     1.0,
-                     2024,
-                     0,
-                     status,
-                     "#1C2A44",
-                     "",
-                     Some(1_700_000_000))
+    let item = LibraryItem::new(id,
+                                id,
+                                "Publisher",
+                                system,
+                                kind,
+                                "PDF",
+                                10,
+                                1.0,
+                                2024,
+                                0,
+                                status,
+                                "#1C2A44",
+                                "",
+                                Some(1_700_000_000));
+    let item = if system.is_empty() {
+        item
+    }
+    else {
+        item.with_filter("Rule System", system)
+    };
+    if kind.is_empty() {
+        item
+    }
+    else {
+        item.with_filter("Product Type", kind)
+    }
 }
 
 /// Four items: two systems (one spelled in two cases, one missing), two types,
@@ -114,4 +126,52 @@ fn a_field_with_no_facet_gives_no_values() {
     let index = seeded();
 
     assert!(counts(&index, &ItemFilter::default(), Field::Publisher).is_empty());
+}
+
+#[test]
+fn format_and_genre_facets_count_each_value_once_per_item() {
+    let mut index = LibraryIndex::open_in_memory().unwrap();
+    let items = [item("a", "", "", ItemStatus::Cloud).with_filter("Format", "PDF")
+                                                     .with_filter("Genre", "Fantasy")
+                                                     .with_filter("Genre", "Horror"),
+                 item("b", "", "", ItemStatus::Cloud).with_filter("Format", "pdf")
+                                                     .with_filter("Genre", "Fantasy"),
+                 item("c", "", "", ItemStatus::Cloud)];
+    index.replace_all_items(&items).unwrap();
+    let none = ItemFilter::default();
+
+    assert_eq!(counts(&index, &none, Field::Format),
+               [("pdf".to_owned(), 2)]);
+    assert_eq!(counts(&index, &none, Field::Genre),
+               [("fantasy".to_owned(), 2), ("horror".to_owned(), 1)]);
+}
+
+#[test]
+fn the_filters_of_an_item_survive_a_round_trip_through_the_index() {
+    let mut index = LibraryIndex::open_in_memory().unwrap();
+    let stored = item("a", "D&D 5E", "Core", ItemStatus::Cloud).with_filter("Genre", "Horror");
+    index.replace_all_items(std::slice::from_ref(&stored))
+         .unwrap();
+
+    let read = index.get_item("a").unwrap().unwrap();
+    let listed = index.list_items().unwrap();
+
+    assert_eq!(read.filters, stored.filters);
+    assert_eq!(listed[0].filters, stored.filters);
+    assert_eq!(read.filters.len(), 3);
+}
+
+#[test]
+fn replacing_one_item_replaces_its_filters() {
+    let mut index = LibraryIndex::open_in_memory().unwrap();
+    let before = item("a", "D&D 5E", "", ItemStatus::Cloud);
+    index.replace_all_items(std::slice::from_ref(&before))
+         .unwrap();
+    let after = item("a", "Pathfinder", "", ItemStatus::Cloud);
+
+    index.replace_item(&after).unwrap();
+
+    let read = index.get_item("a").unwrap().unwrap();
+    assert_eq!(read.filters.len(), 1);
+    assert_eq!(read.filters[0].name.as_ref(), "Pathfinder");
 }

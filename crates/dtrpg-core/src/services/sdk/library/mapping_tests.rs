@@ -454,3 +454,41 @@ fn last_page_from_links_returns_none_when_no_page_param() {
                           next:  None, };
     assert_eq!(last_page_from_links(&links), None);
 }
+
+fn filter(id: u64, parent_id: u64, category: &str, name: &str) -> dtrpg_sdk::OrderProductFilter {
+    dtrpg_sdk::OrderProductFilter { filter_id:        id,
+                                    parent_filter_id: parent_id,
+                                    name:             name.to_string(),
+                                    parent_name:      category.to_string(), }
+}
+
+#[test]
+fn map_order_product_keeps_every_filter_and_reads_system_and_type_from_them() {
+    let mut item = order_product_item(1, "Moria");
+    item.attributes.filters = Some(vec![filter(10, 0, "Rule System", "Pathfinder / Starfinder"),
+                                        filter(20, 10, "Rule System", "Pathfinder OGL 1E"),
+                                        filter(30, 0, "Product Type", "Adventures"),
+                                        filter(40, 0, "Format", "PDF")]);
+
+    let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+    assert_eq!(mapped.filters.len(), 4);
+    assert_eq!(mapped.filters[1].category.as_ref(), "Rule System");
+    assert_eq!(mapped.filters[1].parent_id, 10);
+    assert_eq!(mapped.line.as_ref(),
+               "Pathfinder OGL 1E",
+               "the most specific system");
+    assert_eq!(mapped.kind.as_ref(), "Adventures");
+}
+
+#[test]
+fn map_order_product_without_filters_has_no_system_and_a_placeholder_type() {
+    let mut item = order_product_item(1, "Moria");
+    item.attributes.filters = None;
+
+    let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
+
+    assert!(mapped.filters.is_empty());
+    assert_eq!(mapped.line.as_ref(), "");
+    assert_eq!(mapped.kind.as_ref(), "Library item");
+}

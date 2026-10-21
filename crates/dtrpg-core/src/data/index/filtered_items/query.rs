@@ -7,7 +7,7 @@ use rusqlite::{Connection, params_from_iter};
 
 use super::clause::{ItemFilter, build_where};
 use crate::data::index::IndexError;
-use crate::data::index::items::{load_files_for, row_to_item};
+use crate::data::index::items::{attach_details, row_to_item};
 use crate::data::library::LibraryItem;
 use crate::util::sort::{SortDirection, SortMethod};
 
@@ -34,7 +34,7 @@ pub(in crate::data::index) fn list_items_filtered(conn: &Connection, filter: &It
                                    row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut items {
-        item.files = load_files_for(conn, &item.id)?;
+        attach_details(conn, item)?;
     }
     if direction == SortDirection::Descending {
         items.reverse();
@@ -83,7 +83,7 @@ pub(in crate::data::index) fn list_items_for_grouping_by_publisher(
                                    row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut items {
-        item.files = load_files_for(conn, &item.id)?;
+        attach_details(conn, item)?;
     }
     Ok(items)
 }
@@ -134,7 +134,7 @@ pub(in crate::data::index) fn list_items_for_grouping_by_tag(
                                       row_to_item)?
                            .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut untagged {
-        item.files = load_files_for(conn, &item.id)?;
+        attach_details(conn, item)?;
     }
     out.extend(untagged.into_iter().map(|item| (None, item)));
 

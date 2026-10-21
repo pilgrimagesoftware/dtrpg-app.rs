@@ -39,8 +39,12 @@ pub struct Facets {
     pub availability: Vec<FacetCount>,
     /// Items by game system.
     pub systems:      Vec<FacetCount>,
-    /// Items by content type.
+    /// Items by product type.
     pub types:        Vec<FacetCount>,
+    /// Items by format.
+    pub formats:      Vec<FacetCount>,
+    /// Items by genre.
+    pub genres:       Vec<FacetCount>,
     /// Items by tag.
     pub tags:         Vec<FacetCount>,
 }

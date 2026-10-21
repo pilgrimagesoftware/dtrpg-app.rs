@@ -23,7 +23,7 @@ fn item(publisher: &str, kind: &str, status: ItemStatus) -> LibraryItem {
                      status,
                      "#1C2A44",
                      "",
-                     Some(1_700_000_000))
+                     Some(1_700_000_000)).with_filter("Product Type", kind)
 }
 
 fn rule(field: Field, operator: Operator, value: &str) -> Rule {

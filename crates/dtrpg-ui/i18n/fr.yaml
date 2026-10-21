@@ -498,6 +498,8 @@ download_sheet:
   download: "Télécharger"
 
 filters:
+  format: "Format"
+  genre: "Genre"
   toggle_tooltip: "Afficher ou masquer les filtres"
   toggle_tooltip_applied: "Afficher ou masquer les filtres ({n} appliqués)"
   remove_chip_tooltip: "Retirer ce filtre"

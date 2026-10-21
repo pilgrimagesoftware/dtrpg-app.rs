@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::data::constants::THUMBNAIL_COOLDOWN_SECS;
 use crate::data::enums::ItemStatus;
+use crate::data::product_filter::ProductFilter;
 use crate::util::matching::item_recently_updated;
 
 // ── LibraryItem
@@ -90,6 +91,11 @@ pub struct LibraryItem {
     /// field existed.
     #[serde(default)]
     pub files:                     Vec<LibraryItemFile>,
+    /// The filters DriveThruRPG attaches to the product: its rule systems,
+    /// product types, formats and genres. Defaults to empty for entries cached
+    /// before this field existed, until the next full load.
+    #[serde(default)]
+    pub filters:                   Vec<ProductFilter>,
 }
 
 impl LibraryItem {
@@ -121,7 +127,26 @@ impl LibraryItem {
                thumbnail_last_attempted: None,
                is_available: true,
                availability_last_checked: None,
-               files: Vec::new() }
+               files: Vec::new(),
+               filters: Vec::new() }
+    }
+
+    /// The item with one more filter, in `category`, named `name`, for building
+    /// items in tests and fixtures. Its id is the next unused one, and it sits
+    /// directly under the category's root.
+    #[must_use]
+    pub fn with_filter(mut self, category: &str, name: &str) -> Self {
+        let id = self.filters
+                     .iter()
+                     .map(|filter| filter.id)
+                     .max()
+                     .unwrap_or(0)
+                 + 1;
+        self.filters.push(ProductFilter { id,
+                                          parent_id: 0,
+                                          category: category.into(),
+                                          name: name.into() });
+        self
     }
 
     /// Returns `true` if this catalog entry bundles more than one

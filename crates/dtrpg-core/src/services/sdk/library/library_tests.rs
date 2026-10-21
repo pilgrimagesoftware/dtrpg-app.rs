@@ -241,8 +241,8 @@ fn order_product_item(id: u64, name: &str) -> OrderProductItem {
             filters: Some(vec![dtrpg_sdk::OrderProductFilter {
                 filter_id: 1,
                 parent_filter_id: 0,
-                name: "Dungeon".to_string(),
-                parent_name: "Adventure".to_string(),
+                name: "Adventure".to_string(),
+                parent_name: "Product Type".to_string(),
             }]),
             history: None,
             attributes: None,
