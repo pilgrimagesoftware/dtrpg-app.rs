@@ -23,5 +23,5 @@ mod tags;
 mod tests;
 mod types;
 
-pub use types::ViewState;
 pub(super) use types::{EphemeralOverlay, QueryCache};
+pub use types::{Facets, ViewState};

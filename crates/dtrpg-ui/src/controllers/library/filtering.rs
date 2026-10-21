@@ -19,6 +19,12 @@ impl LibraryController {
         self.library.visible_items()
     }
 
+    /// Returns the facet counts for the items on show.
+    #[must_use]
+    pub fn visible_facets(&self) -> Arc<dtrpg_core::library::Facets> {
+        self.library.visible_facets()
+    }
+
     /// Returns the number of items in the filtered, sorted result set.
     ///
     /// Cheap: it does not copy the result set. The list asks for it several

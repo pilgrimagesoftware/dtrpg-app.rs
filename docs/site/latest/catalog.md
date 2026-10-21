@@ -68,11 +68,24 @@ spaces in quotes.
 | `availability` | download state is `downloaded` or `cloud` | `-availability:cloud` |
 
 Combine terms with each other and with ordinary words: `type:adventure -tag:solo moria`. An item has to meet
-every term. A word before a colon that is not one of these fields, such as `location:cloud`, is searched
+every term, except that several terms for the same field (`type:adventure type:core`) are alternatives: an
+item needs only one of them. Tag terms and terms with a minus sign must all hold. A word before a colon that is not one of these fields, such as `location:cloud`, is searched
 for as ordinary text.
 
 `system` and `type` find nothing yet for most libraries: DriveThruRPG does not give Libri the game system,
 and the content type is only the product's first category. Both will fill in as the catalog data improves.
+
+## Filtering with the filters column
+
+The sliders button in the toolbar shows or hides the filters column beside the catalog. It lists
+what the items on show have: whether they are on this device or in the cloud, their types, game
+systems and tags, each with a count. Tick a box to keep only those items. Ticking two values in the
+same list, such as two types, shows items with either one. Ticking two tags shows items with both.
+A list does not count its own ticks, so you can see what else you could add.
+
+Every tick is a `field:value` term in the search box, and each term also appears as a chip under the
+toolbar. Press a chip to remove its term. A search you type by hand fills in the boxes the same way.
+The button's tooltip says how many filters are applied.
 
 ## When there is nothing to show
 

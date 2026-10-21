@@ -27,7 +27,7 @@ mod summary_tests;
 use std::path::Path;
 use std::sync::Arc;
 
-pub use filtered_items::ItemFilter;
+pub use filtered_items::{FacetCount, ItemFilter};
 use rusqlite::Connection;
 use thiserror::Error;
 
@@ -35,6 +35,7 @@ use crate::data::collection::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, SectionCounts};
 use crate::data::summary::ContentSummary;
+use crate::util::search::Field;
 use crate::util::sort::{SortDirection, SortMethod};
 
 /// Errors from opening or querying the library index.
@@ -227,6 +228,17 @@ impl LibraryIndex {
                                direction: SortDirection)
                                -> Result<Vec<LibraryItem>, IndexError> {
         filtered_items::list_items_filtered(&self.conn, filter, sort, direction)
+    }
+
+    /// Counts the items matching `filter` by each value of the facet `field`,
+    /// the most common value first. See [`FacetCount`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn facet_counts(&self, filter: &ItemFilter<'_>, field: Field)
+                        -> Result<Vec<FacetCount>, IndexError> {
+        filtered_items::facet_counts(&self.conn, filter, field)
     }
 
     /// Counts the items matching `filter` without materializing them. Pass

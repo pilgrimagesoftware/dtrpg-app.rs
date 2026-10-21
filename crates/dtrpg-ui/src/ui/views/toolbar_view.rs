@@ -5,7 +5,7 @@ use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::sort::*;
 use gpui::prelude::*;
-use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
+use gpui::{AnyElement, Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
 use gpui_kit::component::Icon;
 use gpui_kit::component::Selectable;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -84,7 +84,8 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
                       total_count: usize, search_query: &str, search_input: Entity<InputState>,
                       sort: SortMethod, sort_direction: SortDirection, group_by: GroupBy,
                       presentation: CatalogPresentation, selection_mode: bool,
-                      entity: Entity<LibraryController>, colors: &ColorTokens)
+                      entity: Entity<LibraryController>, filters_toggle: AnyElement,
+                      colors: &ColorTokens)
                       -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
@@ -131,6 +132,7 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
                      .items_center()
                      .gap(px(10.0))
                      .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
+                     .child(filters_toggle)
                      .child(render_sort_selector(sort, sort_direction, group_by, entity.clone()))
                      .child(render_layout_switcher(presentation, entity.clone()))
                      .child(render_selection_mode_toggle(selection_mode, entity)))

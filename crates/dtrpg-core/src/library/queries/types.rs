@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use crate::data::enums::GroupBy;
+use crate::data::index::FacetCount;
 use crate::data::library::{LibraryItem, SectionCounts};
 use crate::util::filter::SidebarFilter;
 use crate::util::publisher::{ItemGroup, PublisherEntry};
@@ -29,6 +30,21 @@ pub struct ViewState {
     pub recently_updated_window_days: u32,
 }
 
+/// The contents of the filter column: how many of the items on show have each
+/// value of each facet. Counts for a facet leave out the choices already made
+/// in that facet, so the other values it offers stay visible.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Facets {
+    /// Items by download state (`downloaded` or `cloud`).
+    pub availability: Vec<FacetCount>,
+    /// Items by game system.
+    pub systems:      Vec<FacetCount>,
+    /// Items by content type.
+    pub types:        Vec<FacetCount>,
+    /// Items by tag.
+    pub tags:         Vec<FacetCount>,
+}
+
 /// The cached result of the most recent
 /// [`super::super::Library::invalidate_cache`] call: the filtered/sorted item
 /// list, its grouped view, the sidebar facet counts, and the full-catalog
@@ -42,6 +58,7 @@ pub(crate) struct QueryCache {
     pub(super) catalog_ids:    Arc<HashSet<u64>>,
     pub(super) section_counts: SectionCounts,
     pub(super) publishers:     Vec<PublisherEntry>,
+    pub(super) facets:         Arc<Facets>,
 }
 
 /// Session-only per-item timestamps the index never persists, overlaid onto

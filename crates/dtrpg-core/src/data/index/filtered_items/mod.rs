@@ -6,8 +6,13 @@
 //! `openspec/changes/search-box-semantics-sql`.
 
 mod clause;
+mod facets;
 mod query;
 
+#[cfg(test)]
+// Index fixtures use unwrap for known-good in-memory database operations.
+#[allow(clippy::unwrap_used)]
+mod facet_tests;
 #[cfg(test)]
 // Index fixtures use unwrap for known-good in-memory database operations.
 #[allow(clippy::unwrap_used)]
@@ -18,6 +23,8 @@ mod group_parity_tests;
 mod parity_tests;
 
 pub use clause::ItemFilter;
+pub use facets::FacetCount;
+pub(super) use facets::facet_counts;
 pub(super) use query::{
     count_items_filtered, list_items_filtered, list_items_for_grouping_by_publisher,
     list_items_for_grouping_by_tag,

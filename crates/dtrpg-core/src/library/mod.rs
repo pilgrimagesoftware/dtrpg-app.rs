@@ -19,6 +19,6 @@ pub use mutations::{
     RemovedMember, add_member, apply_check_result, remove_member, restore_removed_member,
     revert_added_member,
 };
-pub use queries::ViewState;
+pub use queries::{Facets, ViewState};
 pub use session::Library;
 pub use sync::{LibraryEvent, LibraryEvents, SyncStage, reload_cooldown_active};

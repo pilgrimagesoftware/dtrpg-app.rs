@@ -500,3 +500,14 @@ download_sheet:
   shortfall: "Nicht genug freier Speicher auf {root}: {needed} benötigt, {free} frei."
   cancel: "Abbrechen"
   download: "Herunterladen"
+
+filters:
+  toggle_tooltip: "Filter ein- oder ausblenden"
+  toggle_tooltip_applied: "Filter ein- oder ausblenden ({n} angewendet)"
+  remove_chip_tooltip: "Diesen Filter entfernen"
+  availability: "Verfügbarkeit"
+  type: "Typ"
+  system: "Spielsystem"
+  tags: "Schlagwörter"
+  downloaded: "Auf diesem Gerät"
+  cloud: "In der Cloud"

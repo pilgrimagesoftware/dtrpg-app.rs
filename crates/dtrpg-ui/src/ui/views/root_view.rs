@@ -137,6 +137,8 @@ pub struct LibraryRootView {
     inspector:                   Entity<InspectorController>,
     /// Restored or default inspector pane initial width.
     inspector_width:             f32,
+    /// Whether the filters column beside the catalog is shown. Session-only.
+    filters_open:                bool,
     /// Resizable state for the two-column main layout (sidebar / catalog).
     resize_state:                Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
@@ -283,6 +285,7 @@ impl LibraryRootView {
                catalog_view,
                inspector,
                inspector_width,
+               filters_open: false,
                resize_state,
                sidebar_width,
                root_focus,

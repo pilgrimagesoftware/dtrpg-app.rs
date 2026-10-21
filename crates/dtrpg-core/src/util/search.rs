@@ -1,7 +1,10 @@
 //! The library search box: free text, and `field:value` terms.
 //!
 //! A term keeps only the items whose field has exactly that value, ignoring
-//! case; a `-` in front keeps only those that do not. The fields are `tag`,
+//! case; a `-` in front keeps only those that do not. Several terms for the
+//! same field (other than `tag`) are alternatives: `type:core type:adventure`
+//! keeps items of either type. Terms for different fields, tag terms, and
+//! `-` terms all have to hold together. The fields are `tag`,
 //! `publisher`, `system` (the game system), `type` (the content type, such as
 //! a core rulebook or an adventure) and `availability` (`downloaded` or
 //! `cloud`). A value with spaces is quoted: `tag:"to run"`. Anything else is
@@ -144,8 +147,79 @@ impl SearchQuery {
     }
 
     /// The terms, in the order they were typed.
-    pub(crate) fn terms(&self) -> &[Term] {
+    #[must_use]
+    pub fn terms(&self) -> &[Term] {
         &self.terms
+    }
+
+    /// Whether the query asks for items whose `field` has `value`, ignoring
+    /// case.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::util::search::{Field, SearchQuery};
+    ///
+    /// let query = SearchQuery::parse("type:adventure moria");
+    /// assert!(query.asks_for(Field::Type, "Adventure"));
+    /// assert!(!query.asks_for(Field::Type, "core"));
+    /// ```
+    #[must_use]
+    pub fn asks_for(&self, field: Field, value: &str) -> bool {
+        let value = value.to_lowercase();
+        self.terms
+            .iter()
+            .any(|term| !term.negated && term.field == field && term.value == value)
+    }
+
+    /// The query with `field:value` added if it did not ask for it, or taken
+    /// away if it did. A value with nothing in it leaves the query as it was.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::util::search::{Field, SearchQuery};
+    ///
+    /// let query = SearchQuery::parse("moria");
+    /// let with = query.toggled(Field::Type, "Adventure");
+    /// assert_eq!(with.to_string(), "type:adventure moria");
+    /// assert_eq!(with.toggled(Field::Type, "adventure"), query);
+    /// ```
+    #[must_use]
+    pub fn toggled(&self, field: Field, value: &str) -> Self {
+        let value = value.trim().to_lowercase();
+        let mut query = self.clone();
+        if value.is_empty() {
+            return query;
+        }
+        if self.asks_for(field, &value) {
+            query.terms
+                 .retain(|term| term.negated || term.field != field || term.value != value);
+        }
+        else {
+            query.terms.push(Term { field,
+                                    value,
+                                    negated: false });
+        }
+        query
+    }
+
+    /// The query without `term`, wherever it sits among the others.
+    #[must_use]
+    pub fn without_term(&self, term: &Term) -> Self {
+        let mut query = self.clone();
+        query.terms.retain(|other| other != term);
+        query
+    }
+
+    /// The query without any term for `field`, which is what a facet counts
+    /// its own values against: the other choices still narrow the result, but
+    /// its own do not.
+    #[must_use]
+    pub fn without_field(&self, field: Field) -> Self {
+        let mut query = self.clone();
+        query.terms.retain(|term| term.field != field);
+        query
     }
 
     /// Whether `item`, which has the tags `tags`, matches the search.
@@ -157,10 +231,7 @@ impl SearchQuery {
     /// retiring that equivalence bar.
     #[must_use]
     pub fn matches(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
-        if !self.terms
-                .iter()
-                .all(|term| term.is_held_by(item, tags) != term.negated)
-        {
+        if !self.terms_hold(item, tags) {
             return false;
         }
         self.text.is_empty()
@@ -169,6 +240,29 @@ impl SearchQuery {
         || item.line.to_lowercase().contains(&self.text)
         || tags.iter()
                .any(|tag| tag.to_lowercase().contains(&self.text))
+    }
+}
+
+impl SearchQuery {
+    /// Whether the terms hold for `item`: each `-` term and each tag term on
+    /// its own, and, for every other field with terms, at least one of them.
+    fn terms_hold(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
+        let held = |term: &Term| term.is_held_by(item, tags);
+        let singly = self.terms
+                         .iter()
+                         .filter(|term| term.negated || term.field == Field::Tag)
+                         .all(|term| held(term) != term.negated);
+        let alternatives =
+            Field::ALL.into_iter()
+                      .filter(|field| *field != Field::Tag)
+                      .all(|field| {
+                          let mut terms = self.terms
+                                              .iter()
+                                              .filter(|term| !term.negated && term.field == field)
+                                              .peekable();
+                          terms.peek().is_none() || terms.any(held)
+                      });
+        singly && alternatives
     }
 }
 
