@@ -89,6 +89,8 @@ mod tests_sign_in;
 #[cfg(test)]
 mod tests_smart_collections;
 #[cfg(test)]
+mod tests_startup;
+#[cfg(test)]
 mod tests_support;
 #[cfg(test)]
 mod tests_tags;

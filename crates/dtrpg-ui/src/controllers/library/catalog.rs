@@ -50,6 +50,16 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
+    /// Builds what the views read (the visible items, the counts, the smart
+    /// collections and filter values) from the catalog as it is stored, without
+    /// waiting for a load to say anything.
+    pub(super) fn show_stored_catalog(&mut self) {
+        let _ = self.refresh_sidebar_facets();
+        self.refresh_known_filter_values();
+        self.refresh_smart_collections();
+        self.invalidate_cache();
+    }
+
     /// Reacts to items appended incrementally during cache pre-population or
     /// the live fetch's catalog-was-empty fast path: enqueues their
     /// thumbnails, refreshes the sidebar facets *without* revalidating the

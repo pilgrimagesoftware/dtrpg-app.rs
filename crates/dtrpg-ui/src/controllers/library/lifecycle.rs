@@ -22,6 +22,11 @@ impl LibraryController {
             Self::build(service, collections_service, activity);
         ctrl.start_work_event_pump(work_events, cx);
         ctrl.start_catalog_sync_event_pump(sync_events, cx);
+        // The catalog is stored between runs, so show it at once. A load that
+        // never reaches the network (not signed in yet, offline) must not leave
+        // the content area empty beside a sidebar that counts the stored
+        // titles.
+        ctrl.show_stored_catalog();
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
@@ -313,9 +318,9 @@ impl LibraryController {
             }
             LibraryEvent::CachePrepopulated { items,
                                               force_reload, } => {
-                if !items.is_empty() {
-                    self.react_to_prepopulated_items(&items, cx);
-                }
+                // Also when nothing was appended: the catalog may already be
+                // stored, and the views have to be built from it either way.
+                self.react_to_prepopulated_items(&items, cx);
                 self.begin_tag_sync(force_reload, cx);
             }
             LibraryEvent::CollectionsChanged(entries) => self.apply_collections(entries, cx),
@@ -330,6 +335,7 @@ impl LibraryController {
             LibraryEvent::SkippedFreshCache => {
                 self.catalog_loading = false;
                 self.revalidate_publisher_filter();
+                self.show_stored_catalog();
                 cx.emit(LibraryChanged);
                 self.complete_catalog_activity(cx);
                 self.verify_catalog_downloads(cx);
