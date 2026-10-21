@@ -139,6 +139,7 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                                            sort:           ctrl.sort,
                                            sort_direction: ctrl.sort_direction,
                                            group_by:       ctrl.group_by, };
+          this.restore_inspector_windows(cx);
           if this.last_menu_state != Some(menu_state) {
               let tabs = this.tabs.read(cx).snapshot();
               install_menus(cx, &menu_state, &tabs);
@@ -157,6 +158,11 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
           let tabs = ctrl.read(cx).snapshot();
           install_menus(cx, &menu_state, &tabs);
           cx.notify();
+      })
+      .detach();
+
+    cx.subscribe(tabs, |this, _tabs, event: &InspectorPopOutRequested, cx| {
+          this.pop_out_inspector(&event.item_id, cx);
       })
       .detach();
 

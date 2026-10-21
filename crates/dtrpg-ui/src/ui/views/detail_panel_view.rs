@@ -87,6 +87,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                                                        window,
                                                                        cx });
     }
+    let pop_out = tabs.read(cx).allows_pop_out().then(|| tabs.clone());
     let inspector = InspectorViewModel::new(&item);
     let snapshot = inspector.snapshot();
     let is_checking = entity.read(cx).is_checking(&item.id);
@@ -173,6 +174,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                    .child(render_inspector_tab_bar(inspector_entry_id,
                                                    entity_tabs,
                                                    inspector_tab,
+                                                   pop_out,
                                                    colors))
                    .child(div()
                     .overflow_y_scrollbar()

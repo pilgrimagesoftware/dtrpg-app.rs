@@ -125,6 +125,7 @@ detail:
   tooltip_offloaded_download: "Downloaded, but the local bytes were evicted to iCloud"
   tooltip_verifying_download: "Checking download status…"
   refresh_thumbnail_tooltip: "Refresh thumbnail"
+  pop_out_tooltip: "Open in its own window"
   field_system: "System"
   field_category: "Type"
   field_format: "Format"

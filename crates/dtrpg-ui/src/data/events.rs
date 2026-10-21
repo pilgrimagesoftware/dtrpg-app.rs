@@ -250,3 +250,12 @@ impl EventEmitter<LowDiskSpaceWarning> for LibraryController {}
 pub struct TabsChanged;
 
 impl EventEmitter<TabsChanged> for TabsController {}
+
+/// Emitted when the user asks to move an item's inspector out of the main
+/// window's tab and into its own window.
+pub struct InspectorPopOutRequested {
+    /// Id of the catalog item whose inspector should pop out.
+    pub item_id: std::sync::Arc<str>,
+}
+
+impl EventEmitter<InspectorPopOutRequested> for TabsController {}

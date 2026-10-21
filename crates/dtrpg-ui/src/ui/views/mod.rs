@@ -5,6 +5,7 @@ pub mod bulk_action_bar_view;
 pub mod catalog_view;
 pub mod detail_panel_view;
 pub mod download_sheet_dialog;
+pub mod inspector_window_view;
 pub mod item_popover_view;
 pub mod list_columns;
 pub mod manage_collections_dialog;

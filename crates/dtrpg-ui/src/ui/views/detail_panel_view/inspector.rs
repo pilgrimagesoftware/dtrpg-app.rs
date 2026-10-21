@@ -28,8 +28,12 @@ pub(super) fn inspector_tab_label(tab: InspectorTab) -> String {
     }
 }
 
+/// Renders the row of inspector tabs, plus, when `pop_out` is given, a
+/// control at the right end that moves the inspector into its own window.
 pub(super) fn render_inspector_tab_bar(entry_id: Arc<str>, entity: Entity<LibraryController>,
-                                       active: InspectorTab, colors: &ColorTokens)
+                                       active: InspectorTab,
+                                       pop_out: Option<Entity<TabsController>>,
+                                       colors: &ColorTokens)
                                        -> AnyElement {
     let tabs = [InspectorTab::Overview,
                 InspectorTab::Files,
@@ -70,6 +74,32 @@ pub(super) fn render_inspector_tab_bar(entry_id: Arc<str>, entity: Entity<Librar
                  })
                  .child(inspector_tab_label(tab))
          }))
+         .children(pop_out.map(|tabs| render_pop_out_button(&entry_id, tabs, colors)))
+         .into_any_element()
+}
+
+/// The control that moves an item's inspector out of the main window's tab
+/// and into its own window.
+fn render_pop_out_button(entry_id: &Arc<str>, tabs: Entity<TabsController>, colors: &ColorTokens)
+                         -> AnyElement {
+    let item_id = Arc::clone(entry_id);
+    div().flex_1()
+         .flex()
+         .justify_end()
+         .child(div().id("inspector-pop-out")
+                     .p(px(6.0))
+                     .rounded_sm()
+                     .cursor_pointer()
+                     .text_color(colors.text_secondary)
+                     .tooltip(|window, cx| {
+                         Tooltip::new(t!("detail.pop_out_tooltip").to_string()).build(window, cx)
+                     })
+                     .on_click(move |_, _, cx| {
+                         tabs.update(cx, |tabs, cx| {
+                                 tabs.request_pop_out(Arc::clone(&item_id), cx)
+                             });
+                     })
+                     .child(Icon::new(IconName::ExternalLink).size(px(14.0))))
          .into_any_element()
 }
 
@@ -367,12 +397,21 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
         InspectorTab::Overview => div().into_any_element(),
     };
 
+    let pop_out = context.tabs
+                         .read(context.cx)
+                         .allows_pop_out()
+                         .then(|| context.tabs.clone());
+
     div().id("inspector-secondary-tab")
          .flex_1()
          .min_h_0()
          .flex()
          .flex_col()
-         .child(render_inspector_tab_bar(Arc::clone(&item.id), context.entity, tab, context.colors))
+         .child(render_inspector_tab_bar(Arc::clone(&item.id),
+                                         context.entity,
+                                         tab,
+                                         pop_out,
+                                         context.colors))
          .child(div().flex_1()
                      .min_h_0()
                      .overflow_y_scrollbar()

@@ -249,6 +249,13 @@ impl LibraryController {
         self.catalog_loading && self.index().count_all().unwrap_or(0) == 0
     }
 
+    /// Returns true until the catalog fetch has finished, even when some
+    /// items have already arrived. Unlike [`Self::is_loading`], an item that
+    /// is missing while this is true may still be on its way.
+    pub fn is_catalog_loading(&self) -> bool {
+        self.catalog_loading
+    }
+
     /// Builds the set of all product IDs that can match a collection's
     /// `member_ids`, by a full catalog scan.
     pub(super) fn catalog_ids(&self) -> HashSet<u64> {

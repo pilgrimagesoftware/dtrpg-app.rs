@@ -1,5 +1,6 @@
 //! Ephemeral UI state: panel widths, sidebar section-open flags, the
-//! last-active settings tab, and the library window's position/size.
+//! last-active settings tab, the library window's position/size, and which
+//! inspectors are popped out into their own windows.
 //! Regenerated from defaults if lost — not something a user would expect to
 //! find or hand-edit, unlike [`crate::data::ui_preferences`].
 //!
@@ -16,6 +17,17 @@ pub struct WindowBoundsPref {
     pub y:      f32,
     pub width:  f32,
     pub height: f32,
+}
+
+/// A catalog item's inspector that is popped out into its own window, so the
+/// window can be reopened in the same place at the next launch.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InspectorWindowPref {
+    /// Id of the catalog item the window shows.
+    pub item_id: String,
+    /// Where the window was last placed, or `None` if it has not been moved
+    /// or resized yet.
+    pub bounds:  Option<WindowBoundsPref>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -40,6 +52,27 @@ pub struct UiStateFile {
     /// Position and size the library window was closed at, so it reopens
     /// there instead of always resetting to the default placement.
     pub library_window_bounds: Option<WindowBoundsPref>,
+    /// Inspectors that are popped out into their own windows. Kept last
+    /// because TOML writes a list of tables after the plain values.
+    #[serde(default)]
+    pub inspector_windows:     Vec<InspectorWindowPref>,
+}
+
+impl UiStateFile {
+    /// Records that the inspector for `item_id` is popped out, replacing any
+    /// earlier entry for the same item.
+    fn upsert_inspector_window(&mut self, item_id: &str, bounds: Option<WindowBoundsPref>) {
+        self.remove_inspector_window(item_id);
+        self.inspector_windows
+            .push(InspectorWindowPref { item_id: item_id.to_owned(),
+                                        bounds });
+    }
+
+    /// Forgets the popped-out inspector for `item_id`, if there is one.
+    fn remove_inspector_window(&mut self, item_id: &str) {
+        self.inspector_windows
+            .retain(|window| window.item_id != item_id);
+    }
 }
 
 /// Persists and restores ephemeral UI state.
@@ -150,6 +183,24 @@ impl UiState {
         self.flush();
     }
 
+    /// Inspectors that were popped out into their own windows, oldest first.
+    pub fn inspector_windows(&self) -> Vec<InspectorWindowPref> {
+        self.data.inspector_windows.clone()
+    }
+
+    /// Records the popped-out inspector for `item_id` and where its window is.
+    pub fn save_inspector_window(&mut self, item_id: &str, bounds: Option<WindowBoundsPref>) {
+        self.data.upsert_inspector_window(item_id, bounds);
+        self.flush();
+    }
+
+    /// Forgets the popped-out inspector for `item_id`, so it is not reopened
+    /// at the next launch.
+    pub fn remove_inspector_window(&mut self, item_id: &str) {
+        self.data.remove_inspector_window(item_id);
+        self.flush();
+    }
+
     fn flush(&self) {
         let path = state_path();
         if let Some(parent) = path.parent() {
@@ -163,4 +214,64 @@ impl UiState {
 
 fn state_path() -> std::path::PathBuf {
     app_data_dir().join("ui_state.toml")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{UiStateFile, WindowBoundsPref};
+
+    fn bounds(x: f32) -> WindowBoundsPref {
+        WindowBoundsPref { x,
+                           y: 20.0,
+                           width: 600.0,
+                           height: 400.0 }
+    }
+
+    #[test]
+    fn upsert_replaces_the_entry_for_the_same_item() {
+        let mut file = UiStateFile::default();
+        file.upsert_inspector_window("a", None);
+        file.upsert_inspector_window("b", Some(bounds(1.0)));
+        file.upsert_inspector_window("a", Some(bounds(2.0)));
+
+        let ids: Vec<_> = file.inspector_windows
+                              .iter()
+                              .map(|w| w.item_id.as_str())
+                              .collect();
+        assert_eq!(ids, ["b", "a"]);
+        assert!(file.inspector_windows[1].bounds.is_some());
+    }
+
+    #[test]
+    fn remove_forgets_only_the_named_item() {
+        let mut file = UiStateFile::default();
+        file.upsert_inspector_window("a", None);
+        file.upsert_inspector_window("b", None);
+        file.remove_inspector_window("a");
+
+        assert_eq!(file.inspector_windows.len(), 1);
+        assert_eq!(file.inspector_windows[0].item_id, "b");
+    }
+
+    #[test]
+    fn popped_out_windows_survive_a_toml_round_trip() {
+        let mut file = UiStateFile { library_window_bounds: Some(bounds(5.0)),
+                                     ..UiStateFile::default() };
+        file.upsert_inspector_window("a", Some(bounds(1.0)));
+        file.upsert_inspector_window("b", None);
+
+        let text = toml::to_string(&file).unwrap_or_default();
+        let loaded: UiStateFile = toml::from_str(&text).unwrap_or_default();
+
+        assert_eq!(loaded.inspector_windows.len(), 2);
+        assert_eq!(loaded.inspector_windows[0].item_id, "a");
+        assert!(loaded.inspector_windows[1].bounds.is_none());
+    }
+
+    #[test]
+    fn a_file_saved_before_pop_out_existed_still_loads() {
+        let loaded: UiStateFile = toml::from_str("sidebar_width = 250.0\n").unwrap_or_default();
+        assert!(loaded.inspector_windows.is_empty());
+        assert_eq!(loaded.sidebar_width, Some(250.0));
+    }
 }

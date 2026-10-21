@@ -107,6 +107,7 @@ detail:
   tooltip_offloaded_download: "Heruntergeladen, aber die lokalen Daten wurden nach iCloud ausgelagert"
   tooltip_verifying_download: "Download-Status wird überprüft…"
   refresh_thumbnail_tooltip: "Miniaturansicht aktualisieren"
+  pop_out_tooltip: "In eigenem Fenster öffnen"
   field_system: "System"
   field_category: "Typ"
   field_format: "Format"
