@@ -367,6 +367,19 @@ pub(super) struct Fixture {
     _dirs:                 Vec<tempfile::TempDir>,
 }
 
+impl Fixture {
+    /// A new library service sharing this fixture's scripted library, for a
+    /// test that signs in again.
+    pub(super) fn library_service(&self) -> Box<dyn LibraryService> {
+        Box::new(SharedLibrary(Arc::clone(&self.library)))
+    }
+
+    /// A new collections service for a test that signs in again.
+    pub(super) fn collections_service(&self) -> Box<dyn CollectionsService> {
+        Box::new(UnusedCollections)
+    }
+}
+
 /// Builds a controller holding entries with covers for `ids`, fetching covers
 /// through `transport` and running at most `limit` jobs at once.
 pub(super) fn fixture(cx: &mut TestAppContext, transport: Arc<ScriptedTransport>, limit: usize,
