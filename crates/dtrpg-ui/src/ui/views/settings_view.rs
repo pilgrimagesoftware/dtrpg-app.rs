@@ -38,6 +38,7 @@ use crate::ui::views::{
     settings_native_view::render_native_section,
     settings_storage_view::render_storage_section,
 };
+use crate::view_models::storage_display::StorageDisplay;
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
 /// Openers, Native Integration, Advanced); see [`page_title`] and the `match`
@@ -69,6 +70,7 @@ fn page_title(ix: usize) -> String {
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage_root_path: PathBuf, storage_path_exists: bool,
                              storage_roots: Vec<StorageRoot>, storage_rules: Vec<PlacementRule>,
+                             storage_display: StorageDisplay,
                              publisher_rule_input: Option<Entity<InputState>>,
                              collection_rule_input: Option<Entity<InputState>>,
                              size_rule_input: Option<Entity<InputState>>,
@@ -127,6 +129,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     create_collections,
                                     storage_roots,
                                     storage_rules,
+                                    storage_display,
                                     publisher_rule_input,
                                     collection_rule_input,
                                     size_rule_input,

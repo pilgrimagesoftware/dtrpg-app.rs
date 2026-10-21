@@ -3,11 +3,10 @@
 
 use std::path::PathBuf;
 
-use dtrpg_core::data::storage::placement::{PlacementCondition, PlacementRule};
+use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::validate_writable;
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
-use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, Element, Entity, IntoElement, ParentElement, SharedString, Styled, div, px,
 };
@@ -21,6 +20,7 @@ use rust_i18n::t;
 use crate::controllers::settings::{RuleEditorType, SettingsController};
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
+use crate::view_models::storage_display::StorageDisplay;
 
 /// Lower bound for the concurrency field: 0 would mean thumbnails and
 /// downloads never start.
@@ -44,6 +44,7 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                               max_concurrent_downloads_input: Option<Entity<InputState>>,
                               create_collections: bool, storage_roots: Vec<StorageRoot>,
                               storage_rules: Vec<PlacementRule>,
+                              storage_display: StorageDisplay,
                               publisher_rule_input: Option<Entity<InputState>>,
                               collection_rule_input: Option<Entity<InputState>>,
                               size_rule_input: Option<Entity<InputState>>,
@@ -202,9 +203,13 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            .child(render_create_collections_toggle(create_collections, entity.clone(), colors))
            // ── Additional roots ───────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
-           .child(render_storage_roots(storage_roots.clone(), entity.clone(), colors))
+           .child(render_storage_roots(storage_roots.clone(),
+                                       &storage_display,
+                                       entity.clone(),
+                                       colors))
            .child(div().h(px(1.0)).bg(border))
            .child(render_storage_rules(storage_rules,
+                                       &storage_display,
                                        entity,
                                        colors,
                                        storage_roots,
@@ -220,20 +225,6 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
 mod storage_rules_view;
 
 use storage_rules_view::render_storage_rules;
-
-fn format_rule(rule: &PlacementRule) -> String {
-    match &rule.condition {
-        PlacementCondition::Publisher(name) => {
-            format!("Publisher: {name} → root {}", rule.target_root_id)
-        }
-        PlacementCondition::Collection(id) => {
-            format!("Collection: {id} → root {}", rule.target_root_id)
-        }
-        PlacementCondition::SizeAtLeastMb(size) => {
-            format!("Size ≥ {size:.1} MB → root {}", rule.target_root_id)
-        }
-    }
-}
 
 #[path = "storage_roots_view.rs"]
 mod storage_roots_view;

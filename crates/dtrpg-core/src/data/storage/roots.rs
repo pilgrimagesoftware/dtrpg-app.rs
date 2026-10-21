@@ -24,6 +24,8 @@ pub struct StorageRoot {
 /// Disk capacity for a [`StorageRoot`], in megabytes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RootCapacity {
+    /// Total size of the volume the root lives on, if it could be measured.
+    pub total_mb:     Option<f64>,
     /// Space already used by this root's own contents (`items/` and
     /// `collections/` combined), if it could be measured.
     pub used_mb:      Option<f64>,
@@ -43,6 +45,74 @@ pub enum RootHealth {
     NotDirectory,
     /// The path or its volume could not be queried.
     Unavailable,
+}
+
+/// What kind of place a storage root is, which the settings page shows as a
+/// badge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootKind {
+    /// A folder on the computer's own disk.
+    Local,
+    /// A folder on a disk that can be unplugged (an external or network drive).
+    External,
+    /// A folder that a cloud service (iCloud Drive, OneDrive, Dropbox, ...)
+    /// keeps in step with the cloud.
+    Cloud,
+}
+
+/// Folder names that mark a folder as kept by a cloud service, ignoring case.
+const CLOUD_FOLDER_MARKERS: [&str; 7] = ["mobile documents",
+                                         "icloud",
+                                         "onedrive",
+                                         "dropbox",
+                                         "google drive",
+                                         "googledrive",
+                                         "cloudstorage"];
+
+/// Where drives that can be unplugged are mounted, on macOS and Linux.
+const EXTERNAL_MOUNT_PREFIXES: [&str; 4] = ["/Volumes/", "/media/", "/mnt/", "/run/media/"];
+
+/// Guesses the kind of place `path` is from where it is: a cloud service's
+/// folder, a mounted external drive, or the computer's own disk. It is a guess
+/// from the path alone, so an unusual setup can be called the wrong thing.
+///
+/// A cloud folder on an external drive counts as cloud.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use dtrpg_core::data::storage::roots::{RootKind, root_kind};
+///
+/// assert_eq!(root_kind(Path::new("/Volumes/Vault/RPG")),
+///            RootKind::External);
+/// assert_eq!(root_kind(Path::new("/Users/me/Dropbox/Libri")),
+///            RootKind::Cloud);
+/// assert_eq!(root_kind(Path::new("/Users/me/Documents/Libri")),
+///            RootKind::Local);
+/// ```
+#[must_use]
+pub fn root_kind(path: &std::path::Path) -> RootKind {
+    let is_cloud = path.components().any(|component| {
+                                        let name =
+                                            component.as_os_str().to_string_lossy().to_lowercase();
+                                        CLOUD_FOLDER_MARKERS.iter()
+                                                            .any(|marker| name.contains(marker))
+                                    });
+    if is_cloud {
+        return RootKind::Cloud;
+    }
+    let text = path.to_string_lossy();
+    let on_other_windows_drive =
+        text.len() >= 3 && text.as_bytes()[1] == b':' && !text[..1].eq_ignore_ascii_case("c");
+    if EXTERNAL_MOUNT_PREFIXES.iter()
+                              .any(|prefix| text.starts_with(prefix))
+       || on_other_windows_drive
+    {
+        return RootKind::External;
+    }
+    RootKind::Local
 }
 
 /// Returns the total size, in megabytes, of every regular file under
@@ -84,10 +154,22 @@ pub fn used_space_mb(path: &std::path::Path) -> Option<f64> {
 /// free space on the volume it lives on.
 #[must_use]
 pub fn root_capacity(root: &StorageRoot) -> RootCapacity {
-    RootCapacity { used_mb:      used_space_mb(&root.path),
+    RootCapacity { total_mb:
+                       fs4::total_space(&root.path).ok()
+                                                   .map(|bytes| bytes as f64 / 1_048_576.0),
+                   used_mb:      used_space_mb(&root.path),
                    available_mb:
                        fs4::available_space(&root.path).ok()
                                                        .map(|bytes| bytes as f64 / 1_048_576.0), }
+}
+
+/// Free and total space, in megabytes, of the volume `root` lives on. Unlike
+/// [`root_capacity`] it does not walk the root's files, so it is cheap.
+#[must_use]
+pub fn volume_space_mb(root: &StorageRoot) -> (Option<f64>, Option<f64>) {
+    let megabytes = |bytes: u64| bytes as f64 / 1_048_576.0;
+    (fs4::available_space(&root.path).ok().map(megabytes),
+     fs4::total_space(&root.path).ok().map(megabytes))
 }
 
 /// Checks whether a root is usable without creating files or changing it.

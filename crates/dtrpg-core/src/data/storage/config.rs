@@ -87,6 +87,11 @@ pub(crate) struct StorageConfigFile {
     /// matching whatever new root later reuses that id.
     #[serde(default = "default_next_root_id")]
     pub(crate) next_root_id:                 u32,
+    /// The root a download goes to when no placement rule matches. The
+    /// default root (`0`) for every config file written before it could be
+    /// chosen.
+    #[serde(default)]
+    pub(crate) default_root_id:              u32,
 }
 
 fn default_next_root_id() -> u32 {
@@ -113,6 +118,8 @@ pub struct StorageConfig {
     pub(crate) rules:                        Vec<PlacementRule>,
     /// Next id to assign to an added root.
     pub(crate) next_root_id:                 u32,
+    /// The root a download goes to when no placement rule matches.
+    pub(crate) default_root_id:              u32,
 }
 
 impl StorageConfig {
@@ -150,13 +157,16 @@ impl StorageConfig {
                         .map(|cfg| cfg.rules.clone())
                         .unwrap_or_default();
         let next_root_id = file.as_ref().map_or(1, |cfg| cfg.next_root_id);
+        let default_root_id = file.as_ref()
+                                  .map_or(DEFAULT_ROOT_ID, |cfg| cfg.default_root_id);
         let config = Self { override_path,
                             max_concurrent_downloads,
                             create_collections,
                             recently_updated_window_days,
                             extra_roots,
                             rules,
-                            next_root_id };
+                            next_root_id,
+                            default_root_id };
         if !file_existed {
             config.save();
         }
@@ -183,7 +193,8 @@ impl StorageConfig {
                recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                extra_roots:                  Vec::new(),
                rules:                        Vec::new(),
-               next_root_id:                 1, }
+               next_root_id:                 1,
+               default_root_id:              DEFAULT_ROOT_ID, }
     }
 
     /// Returns this configuration with `roots` as its additional storage
@@ -323,6 +334,9 @@ impl StorageConfig {
         }
         let before = self.extra_roots.len();
         self.extra_roots.retain(|r| r.id != id);
+        if self.default_root_id == id {
+            self.default_root_id = DEFAULT_ROOT_ID;
+        }
         if self.extra_roots.len() != before {
             self.save();
         }
@@ -336,12 +350,29 @@ impl StorageConfig {
     #[must_use]
     pub fn resolve_root_for(&self, publisher: &str, collection_ids: &[u64], size_mb: f64)
                             -> StorageRoot {
-        let default_root = StorageRoot { id:   DEFAULT_ROOT_ID,
-                                         name: "Default".to_string(),
-                                         path: self.root_path(), };
         placement::resolve_root_id(&self.rules, publisher, collection_ids, size_mb)
             .and_then(|id| self.root(id))
-            .unwrap_or(default_root)
+            .unwrap_or_else(|| self.default_root())
+    }
+
+    /// The root a download goes to when no placement rule matches: the one the
+    /// user chose, or the first root if that one has been removed.
+    #[must_use]
+    pub fn default_root(&self) -> StorageRoot {
+        self.root(self.default_root_id)
+            .or_else(|| self.root(DEFAULT_ROOT_ID))
+            .unwrap_or_else(|| StorageRoot { id:   DEFAULT_ROOT_ID,
+                                             name: "Default".to_string(),
+                                             path: self.root_path(), })
+    }
+
+    /// Chooses the root downloads go to when no placement rule matches, and
+    /// saves it. Does nothing if no root has the id `id`.
+    pub fn set_default_root(&mut self, id: u32) {
+        if self.root(id).is_some() && self.default_root_id != id {
+            self.default_root_id = id;
+            self.save();
+        }
     }
 
     /// Derives the directory an item's files are stored in under `root`,
@@ -429,7 +460,8 @@ impl StorageConfig {
                                           self.recently_updated_window_days,
                                       extra_roots:                  self.extra_roots.clone(),
                                       rules:                        self.rules.clone(),
-                                      next_root_id:                 self.next_root_id, };
+                                      next_root_id:                 self.next_root_id,
+                                      default_root_id:              self.default_root_id, };
         let Some(config_file) = config_path()
         else {
             return;

@@ -193,6 +193,18 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                  })
       .detach();
 
+    // Placement rules and locations decide how many titles each location
+    // holds, so recount when the storage settings change.
+    let controller_for_usage = controller.clone();
+    cx.subscribe(settings,
+                 move |_this, _ctrl, _event: &SettingsChanged, cx| {
+                     controller_for_usage.update(cx, |ctrl, cx| {
+                                             ctrl.refresh_root_title_counts();
+                                             cx.emit(LibraryChanged);
+                                         });
+                 })
+      .detach();
+
     // Propagate a `recently_updated_window_days` change from the Storage
     // settings page to the controller that actually applies it, so it
     // takes effect immediately rather than only on next app launch.

@@ -1,12 +1,13 @@
 //! Placement-rule settings controls.
 
 use super::*;
+use crate::view_models::storage_display::describe_rule;
 
 /// Renders saved placement rules in evaluation order. Rule creation is kept
 /// in the core configuration API; this view makes persisted rules visible and
 /// safely supports removing or reordering them.
 #[allow(clippy::too_many_arguments)] // Render state is split into independent settings controls.
-pub(super) fn render_storage_rules(rules: Vec<PlacementRule>,
+pub(super) fn render_storage_rules(rules: Vec<PlacementRule>, display: &StorageDisplay,
                                    entity: Entity<SettingsController>, colors: &ColorTokens,
                                    roots: Vec<StorageRoot>,
                                    publisher_input: Option<Entity<InputState>>,
@@ -133,6 +134,7 @@ pub(super) fn render_storage_rules(rules: Vec<PlacementRule>,
              let entity_up = entity.clone();
              let entity_down = entity.clone();
              let entity_remove = entity.clone();
+             let description = describe_rule(&rule, &roots, &display.collection_names);
              div()
                 .flex()
                 .items_center()
@@ -143,9 +145,10 @@ pub(super) fn render_storage_rules(rules: Vec<PlacementRule>,
                 .child(
                     div()
                         .flex_1()
-                        .text_xs()
-                        .text_color(text_secondary)
-                        .child(format_rule(&rule)),
+                        .flex()
+                        .flex_col()
+                        .child(div().text_sm().text_color(text_primary).child(description.title))
+                        .child(div().text_xs().text_color(text_secondary).child(description.category)),
                 )
                 .child(
                     Button::new(SharedString::from(format!("rule-up-{index}")))

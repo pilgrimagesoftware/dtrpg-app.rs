@@ -31,6 +31,8 @@ impl SettingsController {
                            storage_root_path: self.storage.root_path(),
                            storage_roots: self.storage.roots(),
                            storage_rules: self.storage.rules().to_vec(),
+                           default_root_id: self.default_root_id(),
+                           root_volumes: self.root_volumes.clone(),
                            publisher_rule_input: self.publisher_rule_input.clone(),
                            collection_rule_input: self.collection_rule_input.clone(),
                            size_rule_input: self.size_rule_input.clone(),

@@ -90,7 +90,8 @@ fn test_storage_config() -> StorageConfig {
                         crate::data::constants::RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                     extra_roots:                  Vec::new(),
                     rules:                        Vec::new(),
-                    next_root_id:                 1, }
+                    next_root_id:                 1,
+                    default_root_id:              0, }
 }
 
 fn open_library() -> (Arc<Library>, super::LibraryEvents) {

@@ -45,6 +45,7 @@ impl LibraryController {
             self.revalidate_publisher_filter();
         }
         self.refresh_known_filter_values();
+        self.refresh_root_title_counts();
         self.refresh_smart_collections();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -56,6 +57,7 @@ impl LibraryController {
     pub(super) fn show_stored_catalog(&mut self) {
         let _ = self.refresh_sidebar_facets();
         self.refresh_known_filter_values();
+        self.refresh_root_title_counts();
         self.refresh_smart_collections();
         self.invalidate_cache();
     }
@@ -72,6 +74,7 @@ impl LibraryController {
         self.enqueue_thumbnails(items, cx);
         let _ = self.refresh_sidebar_facets();
         self.refresh_known_filter_values();
+        self.refresh_root_title_counts();
         self.refresh_smart_collections();
         self.invalidate_cache();
         cx.emit(LibraryChanged);

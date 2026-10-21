@@ -91,6 +91,7 @@ impl LibraryController {
                           smart_counts: HashMap::new(),
                           filter_choices: prefs.filter_value_choices(),
                           known_filter_values: HashMap::new(),
+                          root_title_counts: HashMap::new(),
                           library,
                           thumbnail_activity_id: None,
                           thumbnail_processed: 0,

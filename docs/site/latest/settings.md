@@ -47,7 +47,9 @@ overrides here.
 
 How Libri works with your operating system. On macOS and Linux, three switches
 control whether tags move between Libri and your files' tags, and whether that is
-checked at launch. See [Tags]({{ '/latest/tags/' | relative_url }}).
+checked at launch. A list of platform abilities above them shows what your
+system can do (cloud file state, on-demand download, file tags, showing a file in
+the file manager); anything marked *Not on this platform* is unavailable here. See [Tags]({{ '/latest/tags/' | relative_url }}).
 
 ## Advanced
 

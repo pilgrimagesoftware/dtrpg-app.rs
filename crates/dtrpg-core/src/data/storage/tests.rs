@@ -22,7 +22,8 @@ fn default_path_is_non_empty() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     let path = cfg.root_path();
     assert!(path.components().count() > 0);
     assert!(path.ends_with("dtrpg"));
@@ -37,7 +38,8 @@ fn override_path_is_returned_when_set() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert_eq!(cfg.root_path(), custom);
 }
 
@@ -49,7 +51,8 @@ fn path_for_publisher_is_under_root() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     let publisher_path = cfg.path_for_publisher("Chaosium");
     assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Chaosium"));
 }
@@ -65,7 +68,8 @@ fn path_for_publisher_sanitizes_a_name_containing_a_path_separator() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     let publisher_path = cfg.path_for_publisher("/Evil/Publisher");
     assert_eq!(publisher_path, Path::new("/tmp/dtrpg/items/Evil_Publisher"));
 }
@@ -78,7 +82,8 @@ fn path_for_publisher_converts_spaces_to_underscores() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     let publisher_path = cfg.path_for_publisher("The Forge Studios");
     assert_eq!(publisher_path,
                Path::new("/tmp/dtrpg/items/The_Forge_Studios"));
@@ -111,7 +116,8 @@ fn is_default_true_without_override() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert!(cfg.is_default());
 }
 
@@ -123,7 +129,8 @@ fn is_default_false_with_override() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert!(!cfg.is_default());
 }
 
@@ -137,7 +144,8 @@ fn ensure_root_exists_creates_missing_directory() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert!(!cfg.is_accessible());
     cfg.ensure_root_exists().unwrap();
     assert!(cfg.is_accessible());
@@ -153,7 +161,8 @@ fn ensure_root_exists_is_idempotent_on_existing_directory() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert!(cfg.ensure_root_exists().is_ok());
     assert!(cfg.ensure_root_exists().is_ok());
 }
@@ -166,7 +175,8 @@ fn max_concurrent_downloads_defaults_to_three() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert_eq!(cfg.max_concurrent_downloads(), 3);
 }
 
@@ -185,7 +195,8 @@ fn create_collections_defaults_to_false() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert!(!cfg.create_collections());
 }
 
@@ -204,7 +215,8 @@ fn create_collections_round_trips_through_toml_serialization() {
                                       RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                                   extra_roots:                  Vec::new(),
                                   rules:                        Vec::new(),
-                                  next_root_id:                 1, };
+                                  next_root_id:                 1,
+                                  default_root_id:              0, };
     let text = toml::to_string(&cfg).unwrap();
     let reloaded: StorageConfigFile = toml::from_str(&text).unwrap();
     assert!(reloaded.create_collections);
@@ -218,7 +230,8 @@ fn path_for_collection_is_under_root() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     let collection_path = cfg.path_for_collection("Adventures");
     assert_eq!(collection_path,
                Path::new("/tmp/dtrpg/collections/Adventures"));
@@ -244,7 +257,8 @@ fn recently_updated_window_days_defaults_to_thirty() {
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
-                              next_root_id:                 1, };
+                              next_root_id:                 1,
+                              default_root_id:              0, };
     assert_eq!(cfg.recently_updated_window_days(), 30);
 }
 
@@ -279,7 +293,8 @@ fn config_with(extra_roots: Vec<StorageRoot>, rules: Vec<PlacementRule>) -> Stor
                     recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                     extra_roots,
                     rules,
-                    next_root_id: 1 }
+                    next_root_id: 1,
+                    default_root_id: 0 }
 }
 
 fn extra_root(id: u32, name: &str) -> StorageRoot {
@@ -382,4 +397,92 @@ fn remembering_a_publisher_root_again_replaces_its_rule() {
 
     assert_eq!(cfg.rules().len(), 1);
     assert_eq!(cfg.resolve_root_for("Free League", &[], 1.0).id, 2);
+}
+
+// ── Root kinds, the chosen default root, and per-root title counts ──
+
+#[test]
+fn a_roots_kind_is_guessed_from_its_path() {
+    use super::roots::{RootKind, root_kind};
+
+    assert_eq!(root_kind(Path::new("/Volumes/Vault/RPG")),
+               RootKind::External);
+    assert_eq!(root_kind(Path::new("/media/me/disk/RPG")),
+               RootKind::External);
+    assert_eq!(root_kind(Path::new("D:\\Games\\Libri")), RootKind::External);
+    assert_eq!(root_kind(Path::new("C:\\Users\\me\\Libri")),
+               RootKind::Local);
+    assert_eq!(root_kind(Path::new("/Users/me/Documents/Libri")),
+               RootKind::Local);
+    assert_eq!(root_kind(Path::new("/Users/me/Library/Mobile Documents/com~apple~CloudDocs/Libri")),
+               RootKind::Cloud);
+    assert_eq!(root_kind(Path::new("/Users/me/Dropbox/Libri")),
+               RootKind::Cloud);
+    assert_eq!(root_kind(Path::new("/Volumes/Vault/OneDrive/Libri")),
+               RootKind::Cloud,
+               "cloud wins over external");
+}
+
+fn two_root_config() -> StorageConfig {
+    StorageConfig::for_test(PathBuf::from("/tmp/dtrpg-default")).with_extra_roots(vec![StorageRoot { id:   1,
+                                                                                                    name: "Vault".to_owned(),
+                                                                                                    path: PathBuf::from("/tmp/dtrpg-vault"), }])
+}
+
+#[test]
+fn with_no_rule_a_download_goes_to_the_chosen_default_root() {
+    let mut cfg = two_root_config();
+
+    assert_eq!(cfg.resolve_root_for("Paizo", &[], 1.0).id, DEFAULT_ROOT_ID);
+    cfg.default_root_id = 1;
+    assert_eq!(cfg.resolve_root_for("Paizo", &[], 1.0).id, 1);
+    assert_eq!(cfg.default_root().name, "Vault");
+}
+
+#[test]
+fn a_matching_rule_beats_the_chosen_default_root() {
+    let mut cfg = two_root_config();
+    cfg.default_root_id = 1;
+    cfg.rules = vec![PlacementRule { condition:
+                                         PlacementCondition::Publisher("Paizo".to_owned()),
+                                     target_root_id: DEFAULT_ROOT_ID, }];
+
+    assert_eq!(cfg.resolve_root_for("Paizo", &[], 1.0).id, DEFAULT_ROOT_ID);
+    assert_eq!(cfg.resolve_root_for("Other", &[], 1.0).id, 1);
+}
+
+#[test]
+fn a_default_root_that_no_longer_exists_falls_back_to_the_first_root() {
+    let mut cfg = two_root_config();
+    cfg.default_root_id = 9;
+
+    assert_eq!(cfg.default_root().id, DEFAULT_ROOT_ID);
+}
+
+#[test]
+fn titles_are_counted_for_the_root_the_rules_send_them_to() {
+    use super::titles_per_root;
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::LibraryItem;
+
+    let item = |id: &str, publisher: &str, status| {
+        LibraryItem::new(id, id, publisher, "", "", "PDF", 1, 1.0, 2024, 0, status, "#000000", "",
+                         None)
+    };
+    let mut cfg = two_root_config();
+    cfg.rules = vec![PlacementRule { condition:
+                                         PlacementCondition::Publisher("Paizo".to_owned()),
+                                     target_root_id: 1, }];
+    let items = [item("a", "Paizo", ItemStatus::Downloaded),
+                 item("b", "Paizo", ItemStatus::Downloaded),
+                 item("c", "Other", ItemStatus::Downloaded),
+                 item("d", "Paizo", ItemStatus::Cloud)];
+
+    let counts = titles_per_root(&cfg, &items, &[]);
+
+    assert_eq!(counts.get(&1), Some(&2));
+    assert_eq!(counts.get(&DEFAULT_ROOT_ID), Some(&1));
+    assert_eq!(counts.len(),
+               2,
+               "a title that is only in the cloud is held by no root");
 }

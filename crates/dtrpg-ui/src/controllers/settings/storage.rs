@@ -18,6 +18,7 @@ impl SettingsController {
     pub fn add_storage_root(&mut self, name: String, path: PathBuf, cx: &mut Context<Self>)
                             -> Result<u32, StorageError> {
         let id = self.storage.add_root(name, path)?;
+        self.refresh_root_volumes();
         cx.emit(SettingsChanged);
         Ok(id)
     }
@@ -187,7 +188,7 @@ impl SettingsController {
         {
             tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
         }
-        self.refresh_cache_counts();
+        self.refresh_page_data();
         cx.emit(CacheCleared);
     }
 
@@ -201,6 +202,43 @@ impl SettingsController {
     /// itself performs no disk I/O.
     pub fn refresh_cache_counts(&mut self) {
         self.cache_counts = compute_cache_counts();
+    }
+
+    /// Refreshes everything the pages read from disk: the cache counts and
+    /// the free space of each storage root's volume. Runs on the same paths
+    /// as [`Self::refresh_cache_counts`].
+    pub fn refresh_page_data(&mut self) {
+        self.refresh_cache_counts();
+        self.refresh_root_volumes();
+    }
+
+    /// Reads the free and total space of each root's volume.
+    pub fn refresh_root_volumes(&mut self) {
+        self.root_volumes =
+            self.storage
+                .roots()
+                .iter()
+                .map(|root| (root.id, dtrpg_core::data::storage::roots::volume_space_mb(root)))
+                .collect();
+    }
+
+    /// The free and total space (in megabytes) of the volume of each root, by
+    /// root id, as of the last refresh.
+    #[must_use]
+    pub fn root_volumes(&self) -> &HashMap<u32, (Option<f64>, Option<f64>)> {
+        &self.root_volumes
+    }
+
+    /// The id of the root downloads go to when no placement rule matches.
+    #[must_use]
+    pub fn default_root_id(&self) -> u32 {
+        self.storage.default_root().id
+    }
+
+    /// Chooses the root downloads go to when no placement rule matches.
+    pub fn set_default_root(&mut self, id: u32, cx: &mut Context<Self>) {
+        self.storage.set_default_root(id);
+        cx.emit(SettingsChanged);
     }
 
     /// Opens the OS file manager at the app cache directory, creating it
