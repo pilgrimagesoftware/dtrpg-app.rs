@@ -9,6 +9,30 @@ slug: downloads
 Queue a catalog item's files for download from its item popover or detail
 tab.
 
+## Choosing files and a location
+
+The **Download…** button in an item's detail tab opens the download sheet.
+It lists the item's files with their formats and sizes; the files you do not
+have yet start checked, and a file you already have shows a check mark and
+cannot be selected again. **All** and **None** change the selection, and the
+bottom of the sheet shows how many files and how much space you have chosen.
+
+Below the files, the sheet lists your storage locations with their free
+space. The one your placement rules would pick for this title is chosen to
+begin with. If the chosen files are larger than what is free on the chosen
+location, the sheet says so, but still lets you go ahead.
+
+**Remember this choice for the publisher** saves a placement rule that sends
+every title from that publisher to the chosen location. It is off for the
+usual location. Choosing a different location turns it on and locks it,
+because Libri finds your downloaded files through your placement rules, so a
+location the rules don't know about would make the files look missing. The
+new rule goes first in the list and replaces any earlier rule for the same
+publisher; see [Storage]({{ '/latest/storage/' | relative_url }}).
+
+Downloading from the item popover or the catalog's context menu still queues
+every missing file straight away, without the sheet.
+
 ## Following a download in the catalog
 
 An item with a file queued or downloading shows a small spinner in the

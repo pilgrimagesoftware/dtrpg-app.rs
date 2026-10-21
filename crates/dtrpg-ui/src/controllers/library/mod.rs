@@ -52,6 +52,7 @@ mod collections;
 mod concurrency;
 mod detail;
 mod download_dispatch;
+mod download_sheet;
 mod downloads;
 mod file_tags;
 mod filtering;
