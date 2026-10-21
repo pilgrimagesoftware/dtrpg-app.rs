@@ -74,7 +74,6 @@ impl LibraryController {
         self.enqueue_thumbnails(items, cx);
         let _ = self.refresh_sidebar_facets();
         self.refresh_known_filter_values();
-        self.refresh_root_title_counts();
         self.refresh_smart_collections();
         self.invalidate_cache();
         cx.emit(LibraryChanged);

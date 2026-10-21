@@ -13,7 +13,7 @@ use rusqlite::Connection;
 
 use super::items;
 use crate::data::enums::ItemStatus;
-use crate::data::index::IndexError;
+use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::SectionCounts;
 
 /// Returns each publisher with its item count — the index-backed equivalent
@@ -59,6 +59,17 @@ pub(super) fn section_counts(conn: &Connection, now_secs: i64, window_days: u32)
                                                                        window_days)?,
                        on_device:        items::count_by_status(conn, ItemStatus::Downloaded)?,
                        in_cloud:         items::count_by_status(conn, ItemStatus::Cloud)?, })
+}
+
+impl LibraryIndex {
+    /// The combined size of every item, in megabytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn total_size_mb(&self) -> Result<f64, IndexError> {
+        items::total_size_mb(&self.conn)
+    }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -129,6 +140,24 @@ mod tests {
         assert_eq!(scanned.recently_updated, 2, "fixture must exercise recency");
         let queried = index.section_counts(now, window).unwrap();
         assert_eq!(queried, scanned);
+    }
+
+    #[test]
+    fn total_size_mb_sums_every_item() {
+        let mut big = item("big", "Paizo", ItemStatus::Cloud, None);
+        big.size_mb = 12.5;
+        let mut small = item("small", "Paizo", ItemStatus::Cloud, None);
+        small.size_mb = 0.5;
+        let mut index = LibraryIndex::open_in_memory().unwrap();
+        index.replace_all_items(&[big, small]).unwrap();
+
+        assert!((index.total_size_mb().unwrap() - 13.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn total_size_mb_of_an_empty_index_is_zero() {
+        let index = LibraryIndex::open_in_memory().unwrap();
+        assert!(index.total_size_mb().unwrap().abs() < f64::EPSILON);
     }
 
     #[test]

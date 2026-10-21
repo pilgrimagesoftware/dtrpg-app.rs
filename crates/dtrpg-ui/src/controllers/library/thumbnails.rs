@@ -48,6 +48,16 @@ impl LibraryController {
         }
     }
 
+    /// Queues the covers of the stored catalog that are not already loaded.
+    ///
+    /// A catalog kept between runs arrives with no new items to react to, so
+    /// without this its covers would wait for a full fetch to finish, which may
+    /// never happen (offline, not signed in yet).
+    pub(super) fn enqueue_stored_thumbnails(&mut self, cx: &mut Context<Self>) {
+        let items = self.all_items();
+        self.enqueue_thumbnails(&items, cx);
+    }
+
     /// Submits one cover fetch via `Library` and marks it in flight in
     /// `CoverCache`.
     ///

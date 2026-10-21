@@ -322,6 +322,7 @@ impl LibraryController {
                 // Also when nothing was appended: the catalog may already be
                 // stored, and the views have to be built from it either way.
                 self.react_to_prepopulated_items(&items, cx);
+                self.enqueue_stored_thumbnails(cx);
                 self.begin_tag_sync(force_reload, cx);
             }
             LibraryEvent::CollectionsChanged(entries) => self.apply_collections(entries, cx),
@@ -337,6 +338,7 @@ impl LibraryController {
                 self.catalog_loading = false;
                 self.revalidate_publisher_filter();
                 self.show_stored_catalog();
+                self.enqueue_stored_thumbnails(cx);
                 cx.emit(LibraryChanged);
                 self.complete_catalog_activity(cx);
                 self.verify_catalog_downloads(cx);

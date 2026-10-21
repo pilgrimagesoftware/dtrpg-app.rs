@@ -61,6 +61,7 @@ pub(crate) struct QueryCache {
     pub(super) filter_count:   usize,
     pub(super) catalog_ids:    Arc<HashSet<u64>>,
     pub(super) section_counts: SectionCounts,
+    pub(super) total_mb:       f64,
     pub(super) publishers:     Vec<PublisherEntry>,
     pub(super) facets:         Arc<Facets>,
 }

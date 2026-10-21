@@ -49,3 +49,24 @@ fn a_load_that_skips_the_fetch_leaves_the_stored_catalog_on_show(cx: &mut TestAp
     assert_eq!(shown, 3);
     assert!(!loading);
 }
+
+#[gpui::test]
+fn the_stored_catalogs_covers_are_queued_when_the_cache_is_prepopulated(cx: &mut TestAppContext) {
+    let mut with_cover = item_numbered("id1", 1);
+    with_cover.cover_url = Some("https://example.invalid/cover.png".into());
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               1,
+                               vec![with_cover]);
+
+    fixture.controller.update(cx, |ctrl, cx| {
+                          ctrl.handle_sync_event(LibraryEvent::CachePrepopulated { items:
+                                                                                       Vec::new(),
+                                                                                   force_reload:
+                                                                                       false, },
+                                                 cx);
+                      });
+
+    assert!(in_flight(cx, "id1"));
+}

@@ -319,6 +319,17 @@ pub(super) fn count_all(conn: &Connection) -> Result<usize, IndexError> {
     Ok(count as usize)
 }
 
+/// The combined size of every item, in megabytes.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+pub(super) fn total_size_mb(conn: &Connection) -> Result<f64, IndexError> {
+    Ok(conn.query_row("SELECT COALESCE(SUM(size_mb), 0.0) FROM items", [], |row| {
+               row.get(0)
+           })?)
+}
+
 /// Counts items whose `status` matches `status`.
 ///
 /// # Errors

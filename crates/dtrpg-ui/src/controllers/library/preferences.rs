@@ -145,6 +145,6 @@ impl LibraryController {
     /// Total file size of all items in the catalog, in MB.
     #[must_use]
     pub fn total_size_mb(&self) -> f64 {
-        self.all_items().iter().map(|i| i.size_mb).sum()
+        self.library.total_size_mb()
     }
 }
