@@ -167,6 +167,8 @@ detail:
   inspector_files_tab: "Fichiers"
   inspector_contents_tab: "Contenu"
   inspector_summary_tab: "Résumé"
+  inspector_cover_tab: "Couverture"
+  cover_open_tooltip: "Double-cliquez pour voir la couverture en taille réelle"
   inspector_contents_loading: "Chargement du contenu de l'archive…"
   inspector_contents_unavailable: "Le contenu de l'archive est indisponible."
   inspector_contents_filter_placeholder: "Filtrer les entrées…"

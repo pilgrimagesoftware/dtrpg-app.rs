@@ -235,12 +235,15 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
 #[allow(clippy::expect_used)]
 #[path = "about.rs"]
 mod about;
+#[path = "cover_viewer.rs"]
+mod cover_viewer;
 #[path = "inspector_window.rs"]
 mod inspector_window;
 #[path = "window_bounds.rs"]
 mod window_bounds;
 
 pub use about::open_about_window;
+pub use cover_viewer::open_cover_viewer_window;
 pub use inspector_window::{ShuttingDown, open_inspector_window, remember_window};
 use window_bounds::restore_library_window_bounds;
 pub use window_bounds::save_library_window_bounds;

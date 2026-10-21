@@ -24,6 +24,7 @@ pub(super) fn inspector_tab_label(tab: InspectorTab) -> String {
         InspectorTab::Files => t!("detail.inspector_files_tab").to_string(),
         InspectorTab::Contents => t!("detail.inspector_contents_tab").to_string(),
         InspectorTab::Summary => t!("detail.inspector_summary_tab").to_string(),
+        InspectorTab::Cover => t!("detail.inspector_cover_tab").to_string(),
     }
 }
 
@@ -37,7 +38,8 @@ pub(super) fn render_inspector_tab_bar(item: &LibraryItem, entity: Entity<Librar
     let tabs = [InspectorTab::Overview,
                 InspectorTab::Files,
                 InspectorTab::Contents,
-                InspectorTab::Summary];
+                InspectorTab::Summary,
+                InspectorTab::Cover];
     let file_count = item.files.len();
     div().id("inspector-tabs")
          .flex()
@@ -79,6 +81,9 @@ pub(super) fn render_inspector_tab_bar(item: &LibraryItem, entity: Entity<Librar
                          }
                          if tab == InspectorTab::Summary {
                              controller.load_inspector_summary(Arc::clone(&click_id), cx);
+                         }
+                         if tab == InspectorTab::Cover {
+                             controller.ensure_detail_cover(&click_id, cx);
                          }
                      });
                  })
@@ -374,6 +379,9 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
                                .read(context.cx)
                                .inspector_summary_for(&item.id);
             render_inspector_summary(&state, context.colors)
+        }
+        InspectorTab::Cover => {
+            render_cover_tab(item, context.entity.clone(), context.colors, context.cx)
         }
         InspectorTab::Overview => div().into_any_element(),
     };

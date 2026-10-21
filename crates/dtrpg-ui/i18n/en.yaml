@@ -185,6 +185,8 @@ detail:
   inspector_files_tab: "Files"
   inspector_contents_tab: "Contents"
   inspector_summary_tab: "Summary"
+  inspector_cover_tab: "Cover"
+  cover_open_tooltip: "Double-click to see the cover at full size"
   inspector_contents_loading: "Loading archive contents…"
   inspector_contents_unavailable: "Archive contents are unavailable."
   inspector_contents_filter_placeholder: "Filter entries…"
