@@ -335,6 +335,9 @@ pub(super) fn render_list_item_cell(item: &LibraryItem, column: ListColumn,
                      .items_center()
                      .justify_center()
                      .cursor_pointer()
+                     .tooltip(|window, cx| {
+                         Tooltip::new(t!("catalog.action_open").to_string()).build(window, cx)
+                     })
                      .on_click(move |_, _, cx| {
                          open_item_or_show_files(&item_open_path,
                                                  &item_for_open,

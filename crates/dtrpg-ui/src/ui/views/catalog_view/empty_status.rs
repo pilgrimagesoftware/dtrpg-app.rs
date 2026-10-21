@@ -127,23 +127,30 @@ pub(super) fn render_status(id: &Arc<str>, status: ItemStatus, offloaded: bool,
     }
     let accent = colors.accent;
     let text_tertiary = colors.text_tertiary;
-    match status {
-        ItemStatus::Downloaded if offloaded => div().text_xs()
-                                                    .text_color(colors.warning_text)
-                                                    .flex_none()
-                                                    .child("☁")
-                                                    .into_any_element(),
-        ItemStatus::Downloaded => div().size(px(7.0))
-                                       .rounded_full()
-                                       .bg(accent)
-                                       .flex_none()
-                                       .into_any_element(),
-        ItemStatus::Cloud => div().text_xs()
-                                  .text_color(text_tertiary)
-                                  .flex_none()
-                                  .child("☁")
-                                  .into_any_element(),
-    }
+    let (glyph, tooltip_text) = match status {
+        ItemStatus::Downloaded if offloaded => {
+            (div().text_xs()
+                  .text_color(colors.warning_text)
+                  .child("☁")
+                  .into_any_element(),
+             t!("detail.tooltip_offloaded_download").to_string())
+        }
+        ItemStatus::Downloaded => (div().size(px(7.0))
+                                        .rounded_full()
+                                        .bg(accent)
+                                        .into_any_element(),
+                                   t!("detail.status_on_device").to_string()),
+        ItemStatus::Cloud => (div().text_xs()
+                                   .text_color(text_tertiary)
+                                   .child("☁")
+                                   .into_any_element(),
+                              t!("detail.status_in_cloud").to_string()),
+    };
+    div().id(SharedString::from(format!("status-{id}")))
+         .flex_none()
+         .child(glyph)
+         .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+         .into_any_element()
 }
 
 /// Renders an accent-colored spinner with a "Downloading…" tooltip for a

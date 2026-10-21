@@ -239,14 +239,14 @@ impl ListColumn {
     }
 
     /// Every column in the order they appear when `chosen` are shown: the
-    /// title, then `chosen` in their usual order whatever order they are
-    /// given in, then the status and open columns.
+    /// download status, the title, then `chosen` in their usual order whatever
+    /// order they are given in, then the open column.
     #[must_use]
     pub fn shown(chosen: &[Self]) -> Vec<Self> {
-        let mut columns = vec![Self::Title];
+        let mut columns = vec![Self::Status, Self::Title];
         columns.extend(Self::CHOOSABLE.into_iter()
                                       .filter(|column| chosen.contains(column)));
-        columns.extend([Self::Status, Self::Open]);
+        columns.push(Self::Open);
         columns
     }
 }
