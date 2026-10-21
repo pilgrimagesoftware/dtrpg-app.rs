@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::enums::ItemStatus;
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+use dtrpg_core::data::summary::ContentSummary;
 use dtrpg_core::util::container::ContainerEntry;
 
 /// Inspector sections shown by the v2 detail surface.
@@ -24,6 +25,17 @@ pub enum InspectorContentsState {
     Unavailable,
     Loading,
     Loaded(Vec<ContainerEntry>),
+}
+
+/// State of the lazily loaded summary tab.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InspectorSummaryState {
+    /// The stored summary is being read.
+    Loading,
+    /// The item has no stored summary.
+    Missing,
+    /// The item's stored summary.
+    Loaded(ContentSummary),
 }
 
 /// State of an individual archive entry preview.
@@ -66,6 +78,7 @@ pub struct InspectorSnapshot {
     pub title:        Arc<str>,
     pub publisher:    Arc<str>,
     pub line:         Arc<str>,
+    pub kind:         Arc<str>,
     pub description:  Arc<str>,
     pub status:       ItemStatus,
     pub is_available: bool,
@@ -78,10 +91,23 @@ impl From<&LibraryItem> for InspectorSnapshot {
                title:        Arc::clone(&item.title),
                publisher:    Arc::clone(&item.publisher),
                line:         Arc::clone(&item.line),
+               kind:         Arc::clone(&item.kind),
                description:  Arc::clone(&item.desc),
                status:       item.status,
                is_available: item.is_available,
                files:        item.files.iter().map(InspectorFile::from).collect(), }
+    }
+}
+
+impl InspectorSnapshot {
+    /// The game system and content type, for the line under the title: both
+    /// when both are known, one when only one is, and nothing when neither is.
+    #[must_use]
+    pub fn system_and_type(&self) -> String {
+        [self.line.trim(), self.kind.trim()].into_iter()
+                                            .filter(|part| !part.is_empty())
+                                            .collect::<Vec<_>>()
+                                            .join(" \u{b7} ")
     }
 }
 
@@ -295,5 +321,35 @@ mod tests {
 
         let names: Vec<&str> = visible.iter().map(|entry| entry.name.as_str()).collect();
         assert_eq!(names, vec!["readme.txt"]);
+    }
+
+    fn snapshot_with(line: &str, kind: &str) -> InspectorSnapshot {
+        InspectorSnapshot { item_id:      "a".into(),
+                            title:        "Title".into(),
+                            publisher:    "Publisher".into(),
+                            line:         line.into(),
+                            kind:         kind.into(),
+                            description:  "".into(),
+                            status:       ItemStatus::Cloud,
+                            is_available: true,
+                            files:        Vec::new(), }
+    }
+
+    #[test]
+    fn system_and_type_joins_both_when_both_are_known() {
+        assert_eq!(snapshot_with("D&D 5E", "Adventure").system_and_type(),
+                   "D&D 5E \u{b7} Adventure");
+    }
+
+    #[test]
+    fn system_and_type_shows_the_one_that_is_known() {
+        assert_eq!(snapshot_with("", "Adventure").system_and_type(),
+                   "Adventure");
+        assert_eq!(snapshot_with("D&D 5E", "  ").system_and_type(), "D&D 5E");
+    }
+
+    #[test]
+    fn system_and_type_is_empty_when_neither_is_known() {
+        assert_eq!(snapshot_with("", "").system_and_type(), "");
     }
 }

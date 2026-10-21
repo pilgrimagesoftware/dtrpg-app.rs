@@ -17,6 +17,7 @@
 
 mod cache;
 mod overlay;
+mod summary;
 mod tags;
 #[cfg(test)]
 mod tests;

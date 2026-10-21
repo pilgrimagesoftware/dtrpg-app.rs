@@ -105,7 +105,7 @@ detail:
   tooltip_verifying_download: "Download-Status wird überprüft…"
   refresh_thumbnail_tooltip: "Miniaturansicht aktualisieren"
   field_system: "System"
-  field_category: "Kategorie"
+  field_category: "Typ"
   field_format: "Format"
   field_pages: "Seiten"
   field_file_size: "Dateigröße"
@@ -164,6 +164,11 @@ detail:
   inspector_preview_close: "Vorschau schließen"
   inspector_extract_selected: "Ausgewählte extrahieren…"
   inspector_summary_empty: "Für diesen Eintrag ist keine Zusammenfassung verfügbar."
+  inspector_summary_loading: "Zusammenfassung wird geladen…"
+  inspector_summary_tokens: "{count} Tokens"
+  verify_on_disk_button: "Auf dem Datenträger prüfen"
+  materialize_button: "Bereitstellen"
+  materialize_tooltip: "Die lokale Kopie der nach iCloud ausgelagerten Dateien herunterladen"
 
 settings:
   title: "Einstellungen"

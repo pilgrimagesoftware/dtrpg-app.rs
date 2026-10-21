@@ -63,6 +63,9 @@ pub(super) fn render_inspector_tab_bar(entry_id: Arc<str>, entity: Entity<Librar
                                                                      window, cx);
                              controller.load_inspector_contents(Arc::clone(&click_id), cx);
                          }
+                         if tab == InspectorTab::Summary {
+                             controller.load_inspector_summary(Arc::clone(&click_id), cx);
+                         }
                      });
                  })
                  .child(inspector_tab_label(tab))
@@ -250,6 +253,74 @@ pub(super) fn render_inspector_preview(state: &InspectorPreviewState, entry_id: 
              .into_any_element())
 }
 
+/// Renders the Files tab's "Verify on disk" button, which checks the entry's
+/// files against disk and corrects what the catalog says about them.
+fn render_verify_on_disk(item_id: &Arc<str>, verifying: bool, entity: Entity<LibraryController>)
+                         -> AnyElement {
+    let id = Arc::clone(item_id);
+    div().px(px(20.0))
+         .pb(px(16.0))
+         .child(Button::new("inspector-verify-on-disk").ghost()
+                                                       .outline()
+                                                       .icon(IconName::RefreshCw)
+                                                       .label(t!("detail.verify_on_disk_button").to_string())
+                                                       .disabled(verifying)
+                                                       .loading(verifying)
+                                                       .on_click(move |_, _, cx| {
+                                                           entity.update(cx, |controller, cx| {
+                                                                     controller.verify_item_on_disk(&id, cx);
+                                                                 });
+                                                       }))
+         .into_any_element()
+}
+
+/// Renders the Summary tab: the stored summary with the model that wrote it,
+/// when, and its length, or a line saying there is none.
+fn render_inspector_summary(state: &InspectorSummaryState, colors: &ColorTokens) -> AnyElement {
+    let body: AnyElement = match state {
+        InspectorSummaryState::Loading => {
+            div().text_sm()
+                 .text_color(colors.text_secondary)
+                 .child(t!("detail.inspector_summary_loading").to_string())
+                 .into_any_element()
+        }
+        InspectorSummaryState::Missing => {
+            div().text_sm()
+                 .text_color(colors.text_secondary)
+                 .child(t!("detail.inspector_summary_empty").to_string())
+                 .into_any_element()
+        }
+        InspectorSummaryState::Loaded(summary) => {
+            div().flex()
+                 .flex_col()
+                 .gap(px(8.0))
+                 .child(selectable_text("inspector-summary-text", summary.text.clone())
+                            .text_sm()
+                            .text_color(colors.text_primary))
+                 .child(div().flex()
+                             .items_center()
+                             .gap(px(8.0))
+                             .text_xs()
+                             .text_color(colors.text_tertiary)
+                             .child(summary.model.clone())
+                             .child(format_absolute(summary.created_at))
+                             .child(t!("detail.inspector_summary_tokens",
+                                       count = summary.token_count).to_string()))
+                 .into_any_element()
+        }
+    };
+    div().flex()
+         .flex_col()
+         .gap(px(12.0))
+         .p(px(20.0))
+         .child(div().text_sm()
+                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .text_color(colors.text_primary)
+                     .child(inspector_tab_label(InspectorTab::Summary)))
+         .child(body)
+         .into_any_element()
+}
+
 pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,
                                              context: InspectorRenderContext<'_>)
                                              -> AnyElement {
@@ -257,32 +328,42 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
                           .read(context.cx)
                           .inspector_contents_for(&item.id);
     let content: AnyElement = match tab {
-        InspectorTab::Files => render_item_tier(item,
-                                                 context.storage_root_path,
-                                                 context.entity.clone(),
-                                                 context.tabs,
-                                                 context.colors,
-                                                 context.window,
-                                                 context.cx).into_any_element(),
-        InspectorTab::Collections => render_collections_section(item, context.entity.clone(), context.colors, context.cx)
-            .into_any_element(),
-        InspectorTab::Contents => {
-            let _filter_input = context.entity.read(context.cx).inspector_filter_input_for(&item.id);
-            render_inspector_contents(&contents, &item.id, context.entity.clone(), context.colors, context.cx)
+        InspectorTab::Files => {
+            let verifying = context.entity
+                                   .read(context.cx)
+                                   .is_verifying_downloads(&item.id);
+            div().flex()
+                 .flex_col()
+                 .child(render_item_tier(item,
+                                         context.storage_root_path,
+                                         context.entity.clone(),
+                                         context.tabs,
+                                         context.colors,
+                                         context.window,
+                                         context.cx))
+                 .child(render_verify_on_disk(&item.id, verifying, context.entity.clone()))
+                 .into_any_element()
         }
-        InspectorTab::Summary => div().flex()
-                                      .flex_col()
-                                      .gap(px(12.0))
-                                      .p(px(20.0))
-                                      .child(div().text_sm()
-                                                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                 .text_color(context.colors.text_primary)
-                                                 .child(inspector_tab_label(InspectorTab::Summary)))
-                                      .child(selectable_text("inspector-summary-text",
-                                                             item.desc.to_string())
-                                                 .text_sm()
-                                                 .text_color(context.colors.text_secondary))
-                                      .into_any_element(),
+        InspectorTab::Collections => render_collections_section(item,
+                                                                context.entity.clone(),
+                                                                context.colors,
+                                                                context.cx).into_any_element(),
+        InspectorTab::Contents => {
+            let _filter_input = context.entity
+                                       .read(context.cx)
+                                       .inspector_filter_input_for(&item.id);
+            render_inspector_contents(&contents,
+                                      &item.id,
+                                      context.entity.clone(),
+                                      context.colors,
+                                      context.cx)
+        }
+        InspectorTab::Summary => {
+            let state = context.entity
+                               .read(context.cx)
+                               .inspector_summary_for(&item.id);
+            render_inspector_summary(&state, context.colors)
+        }
         InspectorTab::Overview => div().into_any_element(),
     };
 
