@@ -151,6 +151,7 @@ pub(super) fn render_storage_rules(rules: Vec<PlacementRule>,
                     Button::new(SharedString::from(format!("rule-up-{index}")))
                         .ghost()
                         .icon(IconName::ChevronUp)
+                        .tooltip(t!("settings.storage_rule_move_up_tooltip").to_string())
                         .on_click(move |_, _, cx| {
                             entity_up.update(cx, |ctrl, cx| {
                                 ctrl.move_storage_rule(index, false, cx);
@@ -161,6 +162,7 @@ pub(super) fn render_storage_rules(rules: Vec<PlacementRule>,
                     Button::new(SharedString::from(format!("rule-down-{index}")))
                         .ghost()
                         .icon(IconName::ChevronDown)
+                        .tooltip(t!("settings.storage_rule_move_down_tooltip").to_string())
                         .on_click(move |_, _, cx| {
                             entity_down.update(cx, |ctrl, cx| {
                                 ctrl.move_storage_rule(index, true, cx);
@@ -171,6 +173,7 @@ pub(super) fn render_storage_rules(rules: Vec<PlacementRule>,
                     Button::new(SharedString::from(format!("rule-remove-{index}")))
                         .ghost()
                         .icon(IconName::Close)
+                        .tooltip(t!("settings.storage_rule_remove_tooltip").to_string())
                         .on_click(move |_, _, cx| {
                             entity_remove.update(cx, |ctrl, cx| {
                                 ctrl.remove_storage_rule(index, cx);

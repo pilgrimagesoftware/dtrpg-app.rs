@@ -135,6 +135,7 @@ pub(super) fn render_section_search_suffix(
                         .ghost()
                         .compact()
                         .icon(IconName::Close)
+                        .tooltip(t!("sidebar.search_close_tooltip").to_string())
                         .on_click(move |_, window, cx| {
                             entity_for_close.update(cx, |ctrl, cx| toggle(ctrl, cx));
                             input_for_close.update(cx, |st, cx| st.set_value("", window, cx));

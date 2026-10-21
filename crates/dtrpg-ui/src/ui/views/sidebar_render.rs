@@ -174,6 +174,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                             .ghost()
                             .compact()
                             .icon(IconName::Close)
+                            .tooltip(t!("sidebar.search_close_tooltip").to_string())
                             .on_click(move |_, window, cx| {
                                 entity_for_close.update(cx, |ctrl, cx| {
                                     ctrl.toggle_collection_search(cx);

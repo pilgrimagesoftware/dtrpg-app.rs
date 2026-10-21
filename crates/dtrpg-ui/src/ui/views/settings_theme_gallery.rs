@@ -17,6 +17,7 @@ use gpui::{
 use gpui_kit::component::Icon;
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -177,8 +178,13 @@ fn card_footer(label: &str, active: bool, is_builtin: bool, chrome: &ColorTokens
                                .child(t!("settings.appearance_theme_origin_user").to_string()))
          })
          .when(active, |footer| {
-             footer.child(Icon::new(IconName::CircleCheck).size(px(14.0))
-                                                          .text_color(chrome.accent))
+             footer.child(div().id("theme-active-check")
+                               .tooltip(|window, cx| {
+                                   Tooltip::new(t!("settings.appearance_theme_active_tooltip")
+                                                    .to_string()).build(window, cx)
+                               })
+                               .child(Icon::new(IconName::CircleCheck).size(px(14.0))
+                                                                      .text_color(chrome.accent)))
          })
 }
 
