@@ -21,8 +21,8 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, LibriTheme};
-use crate::util::file_size::format_bytes;
 use crate::view_models::download_sheet::{DownloadSheet, SheetFile, SheetRoot};
+use crate::view_models::storage_display::volume_size_label;
 
 /// Opens the download sheet for `sheet`'s item.
 pub fn open_download_sheet_dialog(window: &mut Window, cx: &mut App,
@@ -57,9 +57,10 @@ pub fn request_download_with_sheet(window: &mut Window, cx: &mut App,
     }
 }
 
-/// Megabytes as the app writes sizes, for example `162.4 MB`.
+/// Megabytes as the app writes sizes: megabytes, then gigabytes, then
+/// terabytes, for example `162.4 MB` or `527.2 GB`.
 fn size_label(mb: f64) -> String {
-    format_bytes((mb.max(0.0) * 1024.0 * 1024.0) as u64)
+    volume_size_label(mb.max(0.0))
 }
 
 fn section_heading(label: String, colors: &ColorTokens) -> impl IntoElement {
@@ -85,18 +86,32 @@ fn render_file_row(file: &SheetFile, selected: bool, colors: &ColorTokens,
                         state.borrow_mut().toggle_file(index);
                         window.refresh();
                     }))
-         .child(div().px(px(6.0))
+         .child(div().flex_none()
+                     .px(px(6.0))
                      .py(px(2.0))
                      .rounded_md()
                      .bg(colors.surface_alt)
                      .text_xs()
                      .text_color(colors.text_secondary)
                      .child(file.format.to_string()))
-         .child(div().flex_1()
+         .child({
+             // A long name is cut off, with the whole name in a tooltip, so the
+             // size beside it is never pushed out of the sheet.
+             let full_name = file.name.to_string();
+             div().id(("download-sheet-name", u64::from(index)))
+                  .flex_1()
+                  .min_w_0()
+                  .truncate()
+                  .text_sm()
+                  .text_color(colors.text_primary)
+                  .tooltip(move |window, cx| {
+                      gpui_kit::component::tooltip::Tooltip::new(full_name.clone()).build(window,
+                                                                                         cx)
+                  })
+                  .child(file.name.to_string())
+         })
+         .child(div().flex_none()
                      .text_sm()
-                     .text_color(colors.text_primary)
-                     .child(file.name.to_string()))
-         .child(div().text_sm()
                      .text_color(colors.text_secondary)
                      .child(size_label(file.size_mb)))
          .when(file.downloaded, |row| {
@@ -137,16 +152,21 @@ fn render_root_card(root: &SheetRoot, chosen: bool, colors: &ColorTokens,
              state.borrow_mut().choose_root(id);
              window.refresh();
          })
-         .child(v_flex().gap(px(2.0))
-                        .child(div().text_sm()
+         .child(v_flex().flex_1()
+                        .min_w_0()
+                        .gap(px(2.0))
+                        .child(div().truncate()
+                                    .text_sm()
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
                                     .text_color(colors.text_primary)
                                     .child(root.name.clone()))
-                        .child(div().text_xs()
+                        .child(div().truncate()
+                                    .text_xs()
                                     .font_family("monospace".to_string())
                                     .text_color(colors.text_secondary)
                                     .child(root.path.clone())))
-         .child(div().text_sm()
+         .child(div().flex_none()
+                     .text_sm()
                      .text_color(colors.text_secondary)
                      .child(free))
 }
@@ -210,13 +230,17 @@ fn render_content(content: DialogContent, cx: &mut App, controller: &Entity<Libr
                             }
                         }));
 
-    let files = v_flex().children(sheet.files.iter().map(|file| {
+    let files = v_flex().w_full()
+                        .min_w_0()
+                        .children(sheet.files.iter().map(|file| {
                                                         render_file_row(file,
                                                            sheet.is_selected(file.index),
                                                            &colors,
                                                            state).into_any_element()
                                                     }));
-    let roots = v_flex().gap(px(8.0))
+    let roots = v_flex().w_full()
+                        .min_w_0()
+                        .gap(px(8.0))
                         .children(sheet.roots.iter().map(|root| {
                                                         render_root_card(root,
                                                                          root.id
@@ -256,7 +280,9 @@ fn render_content(content: DialogContent, cx: &mut App, controller: &Entity<Libr
                                      .child(DialogDescription::new().child(SharedString::from(
                                          t!("download_sheet.subtitle").to_string(),
                                      ))))
-           .child(v_flex().px_4()
+           .child(v_flex().w_full()
+                          .min_w_0()
+                          .px_4()
                           .py_3()
                           .gap(px(16.0))
                           .child(v_flex().gap(px(4.0))
