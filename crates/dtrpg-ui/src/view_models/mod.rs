@@ -1,5 +1,6 @@
 //! View-model layer for Rust baseline app state.
 
+pub mod agent_display;
 pub mod download_sheet;
 pub mod insights_display;
 pub mod inspector;

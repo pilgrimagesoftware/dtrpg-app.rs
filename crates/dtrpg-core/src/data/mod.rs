@@ -12,6 +12,7 @@ pub mod file_openers;
 pub mod filter_value_choices;
 pub mod index;
 pub mod library;
+pub mod mcp_access;
 pub mod native_preferences;
 pub mod notification;
 pub mod paths;

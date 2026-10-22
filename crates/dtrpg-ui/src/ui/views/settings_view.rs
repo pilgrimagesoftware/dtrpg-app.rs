@@ -33,16 +33,18 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
     settings_advanced_view::render_advanced_section,
+    settings_agent_view::render_agent_section,
     settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
+use crate::view_models::agent_display::AgentPageData;
 use crate::view_models::storage_display::StorageDisplay;
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
 /// Openers, Native Integration, Advanced); see [`page_title`] and the `match`
 /// in [`render_settings_panel`]. Sidebar order matches index order.
-const PAGE_COUNT: usize = 5;
+const PAGE_COUNT: usize = 6;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
 /// is out of range (defensive default for a persisted index from a prior app
@@ -52,7 +54,8 @@ fn page_title(ix: usize) -> String {
         1 => t!("settings.appearance_title").to_string(),
         2 => t!("settings.downloads_location").to_string(),
         3 => t!("settings.file_openers_title").to_string(),
-        4 => t!("settings.advanced_title").to_string(),
+        4 => t!("agent.title").to_string(),
+        5 => t!("settings.advanced_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -68,7 +71,7 @@ fn page_title(ix: usize) -> String {
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage_root_path: PathBuf, storage_path_exists: bool,
                              storage_roots: Vec<StorageRoot>, storage_rules: Vec<PlacementRule>,
-                             storage_display: StorageDisplay,
+                             storage_display: StorageDisplay, agent: AgentPageData,
                              publisher_rule_input: Option<Entity<InputState>>,
                              collection_rule_input: Option<Entity<InputState>>,
                              size_rule_input: Option<Entity<InputState>>,
@@ -139,7 +142,12 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        4 => render_advanced_section(entity.clone(),
+        4 => render_agent_section(entity.clone(),
+                                  agent,
+                                  colors,
+                                  &theme.fonts.label_font,
+                                  &theme.fonts.mono_font).into_any_element(),
+        5 => render_advanced_section(entity.clone(),
                                      native,
                                      cache_counts,
                                      colors,

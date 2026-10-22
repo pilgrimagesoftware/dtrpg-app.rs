@@ -14,6 +14,7 @@ use crate::data::theme::LibriTheme;
 use crate::ui::app::save_settings_window_bounds;
 use crate::ui::views::settings_appearance_view::AppearanceFontSelects;
 use crate::ui::views::settings_view::render_settings_panel;
+use crate::view_models::agent_display::AgentPageData;
 use crate::view_models::storage_display::StorageDisplay;
 
 /// Root view for the settings window.
@@ -105,6 +106,8 @@ impl Render for SettingsWindowView {
                                           snap.storage_roots,
                                           snap.storage_rules,
                                           storage_display,
+                                          AgentPageData { settings: snap.mcp.clone(),
+                                                          activity: snap.mcp_activity.clone(), },
                                           snap.publisher_rule_input,
                                           snap.collection_rule_input,
                                           snap.size_rule_input,

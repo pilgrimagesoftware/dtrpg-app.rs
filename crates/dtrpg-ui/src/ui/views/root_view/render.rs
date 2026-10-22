@@ -11,6 +11,7 @@ use crate::ui::views::filters_column::{
 };
 use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
+use crate::view_models::agent_display::exposed_tools;
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
                                cx: &mut Context<LibraryRootView>)
@@ -175,7 +176,11 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                                crate::ui::views::toolbar_view::section_title_for(&filter),
                                                            section_count: matched_count,
                                                            theme_key: theme.id.clone(),
-                                                           current_locale },
+                                                           current_locale,
+                                                           agent_enabled:
+                                                               settings_snap.mcp.enabled,
+                                                           agent_exposed:
+                                                               exposed_tools(&settings_snap.mcp) },
                                        lib_entity.clone(),
                                        ActivityBarData { entity:     activity_entity.clone(),
                                                          snap:       &activity_snap,

@@ -14,6 +14,7 @@ use dtrpg_core::data::avatar::{avatar_cached, fetch_avatar_bytes};
 use dtrpg_core::data::catalog_cache::load_cache_metadata;
 use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use dtrpg_core::data::mcp_access::{AuditEntry, AuditLog, McpSettings, McpSettingsFile};
 use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
 use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use dtrpg_core::data::profile::ProfileConfig;
@@ -177,6 +178,10 @@ pub struct SettingsSnapshot {
     /// The Native Integration switches: whether tags move between the library
     /// and files' tags, and whether that is checked at launch.
     pub native:                         NativePreferencesFile,
+    /// What agents may do through the MCP server.
+    pub mcp:                            McpSettingsFile,
+    /// The latest calls agents made, newest first, as of the last refresh.
+    pub mcp_activity:                   Vec<AuditEntry>,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
@@ -201,6 +206,8 @@ pub struct SettingsController {
     auth_state:                     AuthState,
     storage:                        StorageConfig,
     native:                         NativePreferences,
+    mcp:                            McpSettings,
+    mcp_activity:                   Vec<AuditEntry>,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -336,6 +343,8 @@ impl SettingsController {
                               storage_path_exists: true,
                               storage,
                               native: NativePreferences::load(),
+                              mcp: McpSettings::load(),
+                              mcp_activity: AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -389,6 +398,8 @@ impl SettingsController {
                storage_path_exists: true,
                storage: StorageConfig::for_test(std::env::temp_dir()),
                native: NativePreferences::in_memory(),
+               mcp: McpSettings::in_memory(),
+               mcp_activity: Vec::new(),
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -429,6 +440,9 @@ impl SettingsController {
     /// settings window reopens on the same page next time.
     pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
         self.active_page_ix = ix;
+        if ix == agent::AGENT_PAGE_IX {
+            self.mcp_activity = AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS);
+        }
         self.refresh_page_data();
         dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
@@ -456,6 +470,7 @@ impl SettingsController {
 impl EventEmitter<SettingsChanged> for SettingsController {}
 impl EventEmitter<LogoutRequested> for SettingsController {}
 
+mod agent;
 mod auth;
 mod file_openers;
 mod native;
