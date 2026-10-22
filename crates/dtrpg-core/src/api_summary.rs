@@ -4,7 +4,7 @@ use chrono::Local;
 use thiserror::Error;
 
 use crate::api::LibraryApi;
-use crate::credentials::{CredentialError, load_anthropic_api_key};
+use crate::credentials::{CredentialError, resolve_anthropic_api_key};
 use crate::data::anthropic_summary::AnthropicSummary;
 use crate::data::index::IndexError;
 use crate::data::storage::{StorageConfig, resolved_file_path};
@@ -52,14 +52,14 @@ pub enum SummarizeError {
 /// # Errors
 ///
 /// Returns [`SummarizeError::MissingApiKey`] if the Anthropic provider is
-/// selected and no key is saved, or [`SummarizeError::Credential`] if the
-/// keyring cannot be read.
+/// selected and there is no key in the environment or the keychain, or
+/// [`SummarizeError::Credential`] if the keyring cannot be read.
 pub fn provider_for(settings: &SummarySettingsFile)
                     -> Result<Box<dyn SummaryProvider>, SummarizeError> {
     match settings.provider {
         SummaryProviderKind::Local => Ok(Box::new(LocalExtractiveSummary::default())),
         SummaryProviderKind::Anthropic => {
-            let api_key = load_anthropic_api_key()?.ok_or(SummarizeError::MissingApiKey)?;
+            let api_key = resolve_anthropic_api_key()?.ok_or(SummarizeError::MissingApiKey)?;
             Ok(Box::new(AnthropicSummary::new(api_key, settings.model.clone())))
         }
     }

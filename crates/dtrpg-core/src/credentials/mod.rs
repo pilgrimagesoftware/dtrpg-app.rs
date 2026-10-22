@@ -24,6 +24,9 @@ mod anthropic;
 mod model;
 mod store;
 
-pub use anthropic::{delete_anthropic_api_key, load_anthropic_api_key, save_anthropic_api_key};
+pub use anthropic::{
+    AnthropicKeyStatus, anthropic_key_status, delete_anthropic_api_key, load_anthropic_api_key,
+    resolve_anthropic_api_key, save_anthropic_api_key,
+};
 pub use model::{Credential, CredentialError};
 pub use store::{CredentialStore, KeyringCredentialStore};

@@ -58,13 +58,18 @@ the latest calls it made. It is off until you turn it on. See
 
 ### Summaries
 
-The last section of the page sets how summaries of your titles are written. They
+The first section of the page sets how summaries of your titles are written. They
 are shown in the inspector's Summary tab and searched along with the rest of the
 title's text.
 
-- **Provider** is Anthropic (it needs your own API key, which is kept in the
-  system keychain, never in a settings file) or Local, which picks sentences from
-  the text itself, offline and for free, at a lower quality.
+- **Provider** is Anthropic or Local. Local picks sentences from the text itself,
+  offline and for free, at a lower quality. Anthropic needs your own API key, which
+  you paste into the field beside the provider menu. Libri saves it to the system
+  keychain when you leave the field, and never in a settings file. The field is empty
+  after that, and the hint under the title says a key is saved. To replace the key,
+  paste a new one. A saved key is the one Libri uses. If you have not saved one, Libri
+  uses the `ANTHROPIC_API_KEY` environment variable when it is set, and the hint says
+  which one is in use, and that a saved key takes precedence over the variable.
 - **Model** is the model Anthropic writes new summaries with.
 - **Monthly token ceiling** stops summarizing for the rest of the month once the
   summaries made this month have used that many tokens. The line under it says how

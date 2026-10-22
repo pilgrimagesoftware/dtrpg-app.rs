@@ -1,7 +1,35 @@
 //! What the Summaries settings offer to choose from, and how the month's use is
 //! worded. No window and no I/O, so it can be tested directly.
 
+use dtrpg_core::credentials::AnthropicKeyStatus;
+use gpui::Entity;
+use gpui_kit::component::input::InputState;
 use rust_i18n::t;
+
+/// What the Summaries card needs besides the saved settings, read when the
+/// Agent & MCP page opens.
+#[derive(Clone, Debug, Default)]
+pub struct SummaryPage {
+    /// Tokens the summaries made this calendar month have used.
+    pub tokens_used: u64,
+    /// Where the Anthropic API key can come from.
+    pub key:         AnthropicKeyStatus,
+    /// The field the key is typed into, once the root view attaches it.
+    pub key_input:   Option<Entity<InputState>>,
+}
+
+/// The hint under the provider row about the Anthropic API key. A saved key
+/// wins over the `ANTHROPIC_API_KEY` environment variable, so when both exist
+/// the hint says which one is used.
+#[must_use]
+pub fn key_hint(status: AnthropicKeyStatus) -> String {
+    match (status.saved, status.env_var) {
+        (true, true) => t!("agent.summary_key_saved_and_env").to_string(),
+        (true, false) => t!("agent.summary_key_saved").to_string(),
+        (false, true) => t!("agent.summary_key_env").to_string(),
+        (false, false) => t!("agent.summary_key_missing").to_string(),
+    }
+}
 
 /// The models the Model menu lists, newest family first. The Anthropic provider
 /// accepts any model name; these are the current ones, and a name saved by hand

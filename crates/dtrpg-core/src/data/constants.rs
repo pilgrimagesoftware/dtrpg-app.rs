@@ -113,6 +113,10 @@ pub const KEYRING_ANTHROPIC_SERVICE: &str = "com.pilgrimagesoftware.dtrpg.anthro
 /// Account key for the Anthropic API key credential.
 pub const KEYRING_ANTHROPIC_API_KEY: &str = "api-key";
 
+/// The environment variable that, when set, supplies the Anthropic API key in
+/// place of the one saved in the keychain.
+pub const ANTHROPIC_API_KEY_ENV: &str = "ANTHROPIC_API_KEY";
+
 pub const RECENT_CAP: usize = 25;
 pub const EXPIRY_SECS: u64 = 15;
 pub const ERROR_EXPIRY_SECS: u64 = 120;
