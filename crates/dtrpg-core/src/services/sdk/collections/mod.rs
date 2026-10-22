@@ -5,17 +5,16 @@ mod gateway;
 
 use std::sync::Arc;
 
-use dtrpg_ui::{
-    data::collection::CollectionEntry,
+pub use self::gateway::SdkCollectionsGateway;
+use self::gateway::{HttpSdkCollectionsGateway, UnavailableCollectionsGateway};
+use crate::{
+    data::{collection::CollectionEntry, token_status::TokenStatusHandle},
     services::{
         LoginTokens,
         collections::{CollectionsService, CollectionsServiceError, CollectionsServiceErrorKind},
     },
     util::datetime::parse_rfc3339_to_epoch,
 };
-
-pub use self::gateway::SdkCollectionsGateway;
-use self::gateway::{HttpSdkCollectionsGateway, UnavailableCollectionsGateway};
 
 /// Collections service adapter backed by the Rust SDK.
 pub struct RustSdkCollectionsService {
@@ -44,8 +43,8 @@ impl RustSdkCollectionsService {
     ///
     /// Reads only the API key from the platform keyring. Falls back to
     /// [`UnavailableCollectionsGateway`] when the API key cannot be found.
-    pub fn from_keyring_with_tokens(tokens: LoginTokens) -> Self {
-        match HttpSdkCollectionsGateway::from_keyring_with_tokens(tokens) {
+    pub fn from_keyring_with_tokens(tokens: LoginTokens, token_status: TokenStatusHandle) -> Self {
+        match HttpSdkCollectionsGateway::from_keyring_with_tokens(tokens, token_status) {
             Ok(gateway) => Self::new(Box::new(gateway)),
             Err(error) => Self::new(Box::new(UnavailableCollectionsGateway::new(error))),
         }

@@ -1,50 +1,47 @@
 //! Settings controller: owns open/closed state and file-opener overrides.
+//!
+//! The struct and its constructors live here; its methods are grouped by
+//! concern into sibling files (`auth`, `storage`, `sign_in`, `panel`,
+//! `file_openers`, `snapshot`, `wiring`), each its own `impl
+//! SettingsController` block doing `use super::*;`.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use dtrpg_core::credentials::{Credential, CredentialStore, KeyringCredentialStore};
+use dtrpg_core::data::avatar::fetch_avatar_bytes;
+use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
+use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use dtrpg_core::data::mcp_access::{AuditEntry, AuditLog, McpSettings, McpSettingsFile};
+use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
+use dtrpg_core::data::paths::app_cache_dir;
+use dtrpg_core::data::profile::ProfileConfig;
+use dtrpg_core::data::storage::placement::PlacementRule;
+use dtrpg_core::data::storage::roots::StorageRoot;
+use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
+use dtrpg_core::data::summary_settings::{SummarySettings, SummarySettingsFile};
+use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
+use dtrpg_core::services::LoginService;
 use gpui::{Context, Entity, EventEmitter};
-use gpui_kit::component::input::InputState;
-use gpui_kit::component::select::SelectState;
+use gpui_kit::component::input::{EditorState, InputState};
 use rust_i18n::t;
 
-use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
-use crate::data::avatar::{avatar_cached, fetch_avatar_bytes};
-use crate::data::catalog_cache::load_cache_metadata;
-use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::events::{
-    CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun,
-    StartupAuthFailed,
+    AgentAccessChanged, CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded,
+    StartupAuthBegun, StartupAuthFailed,
 };
-use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
-use crate::data::paths::{app_cache_dir, cache_dir, covers_dir};
-use crate::data::profile::ProfileConfig;
-use crate::data::storage::{StorageConfig, StorageError, validate_writable};
-use crate::services::LoginService;
+use crate::data::token_status_global::TokenStatusGlobal;
+pub use crate::view_models::rule_editor::{RuleEditor, RuleEditorType};
+use crate::view_models::summary_display::SummaryPage;
 
-/// State for one Appearance-page font picker: a searchable list of every
-/// font name installed on the user's system (see
-/// `cx.text_system().all_font_names()`), not a curated list.
-pub type FontSelectState = Entity<SelectState<Vec<String>>>;
-
-/// Per-type counts of regenerable app cache data, computed from disk and
-/// cached on the controller — see [`SettingsController::refresh_cache_counts`].
-#[derive(Clone, Copy, Default)]
-pub struct CacheCounts {
-    /// Number of items in the cached catalog/collections metadata.
-    pub metadata_items:             usize,
-    /// Number of cached cover thumbnail files.
-    pub cover_thumbnails:           usize,
-    /// `true` if an avatar image is currently cached.
-    pub avatar_cached:              bool,
-    /// Unix timestamp (seconds) when the catalog/collections metadata cache
-    /// was last written. `None` when no cache metadata exists yet.
-    pub metadata_saved_at_secs:     Option<i64>,
-    /// Unix timestamp (seconds) of the last per-item availability check
-    /// batch (manual or automatic). `None` when no batch has run yet, or
-    /// predates the field being tracked.
-    pub last_item_check_batch_secs: Option<i64>,
-}
+/// Index of the File Openers page of the settings window, for opening the
+/// settings on it.
+pub const FILE_OPENERS_PAGE_IX: usize = 3;
+/// Index of the Storage page.
+pub const STORAGE_PAGE_IX: usize = 2;
+/// Index of the Advanced page.
+pub const ADVANCED_PAGE_IX: usize = 5;
 
 // ── AuthState
 // ─────────────────────────────────────────────────────────────────
@@ -79,6 +76,9 @@ pub struct AuthStateSnapshot {
     pub avatar_bytes:    Option<Arc<Vec<u8>>>,
     /// Masked API key hint (first 4 + bullets + last 1), set at sign-in time.
     pub api_key_hint:    Option<String>,
+    /// When the current access token was acquired and when it expires, or
+    /// `None` when signed out or no token has been issued yet.
+    pub token_status:    Option<TokenStatus>,
 }
 
 // ── SettingsController
@@ -92,6 +92,20 @@ pub struct SettingsSnapshot {
     pub is_authenticated:               bool,
     /// Resolved storage root path (override or platform default).
     pub storage_root_path:              PathBuf,
+    /// Configured download roots, including the immutable default root.
+    pub storage_roots:                  Vec<StorageRoot>,
+    /// Ordered placement rules used for future downloads.
+    pub storage_rules:                  Vec<PlacementRule>,
+    /// The location downloads go to when no placement rule matches.
+    pub default_root_id:                u32,
+    /// Free and total space by location id, in megabytes.
+    pub root_volumes:                   HashMap<u32, (Option<f64>, Option<f64>)>,
+    /// The placement rule editor: adding a rule or changing one.
+    pub rule_editor:                    RuleEditor,
+    /// The editor showing the active theme's file, once attached.
+    pub theme_editor_input:             Option<Entity<EditorState>>,
+    /// Why the last attempt to save the theme file failed, if it did.
+    pub theme_editor_error:             Option<String>,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -121,9 +135,6 @@ pub struct SettingsSnapshot {
     pub pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     pub active_page_ix:                 usize,
-    /// Current per-type counts of cached data, for the Advanced section's
-    /// "Cache details" area.
-    pub cache_counts:                   CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
     pub max_concurrent_downloads:       usize,
     /// Shared input state for the "Max concurrent downloads" number field in
@@ -133,19 +144,30 @@ pub struct SettingsSnapshot {
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
     pub create_collections:             bool,
+    /// `true` when a download that would not fit is refused.
+    pub check_free_space:               bool,
+    /// The Native Integration switches: whether tags move between the library
+    /// and files' tags, and whether that is checked at launch.
+    pub native:                         NativePreferencesFile,
+    /// What agents may do through the MCP server.
+    pub mcp:                            McpSettingsFile,
+    /// The latest calls agents made, newest first, as of the last refresh.
+    pub mcp_activity:                   Vec<AuditEntry>,
+    /// The full path of the MCP server program, for the agent's config.
+    pub mcp_command_path:               String,
+    /// Where the log of agent calls is kept.
+    pub mcp_log_path:                   String,
+    /// How summaries are made: provider, model, ceiling, and whether on
+    /// download.
+    pub summaries:                      SummarySettingsFile,
+    /// What the Summaries card reads besides the settings, as of the last time
+    /// the Agent page was opened.
+    pub summary_page:                   SummaryPage,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
     /// the Advanced tab.
     pub recently_updated_window_input:  Option<Entity<InputState>>,
-    /// Font picker state for the Appearance page's body-font row.
-    pub body_font_select:               Option<FontSelectState>,
-    /// Font picker state for the Appearance page's value-font row.
-    pub value_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's label-font row.
-    pub label_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's monospace-font row.
-    pub mono_font_select:               Option<FontSelectState>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -156,6 +178,13 @@ pub struct SettingsController {
     is_authenticated:               bool,
     auth_state:                     AuthState,
     storage:                        StorageConfig,
+    native:                         NativePreferences,
+    mcp:                            McpSettings,
+    mcp_activity:                   Vec<AuditEntry>,
+    mcp_command_path:               String,
+    mcp_log_path:                   String,
+    summaries:                      SummarySettings,
+    summary_page:                   SummaryPage,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -177,24 +206,26 @@ pub struct SettingsController {
     /// Masked API key hint computed at sign-in time (first 4 + bullets + last
     /// 1).
     api_key_hint:                   Option<String>,
+    /// Shared slot the SDK services publish the current access token's timing
+    /// into; read when the Account page renders.
+    token_status:                   TokenStatusHandle,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
     pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     ///
-    /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
-    /// reopens on the same page it was closed on, rather than always
+    /// Persisted to [`dtrpg_core::data::ui_state::UiState`] so the settings
+    /// window reopens on the same page it was closed on, rather than always
     /// resetting to the first page — gpui-kit's `Settings` widget
     /// tracks page selection in its own per-window state with no way to read
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
     active_page_ix:                 usize,
-    /// Cached per-type cache counts for the Advanced page. Refreshed on the
-    /// panel-open, page-change, and cache-clear paths — see
-    /// [`Self::refresh_cache_counts`] — rather than recomputed on every
-    /// render pass, so rendering performs no disk I/O.
-    cache_counts:                   CacheCounts,
+    /// Free and total space of each storage root's volume, by root id, for
+    /// the Storage page. Refreshed with the cache counts, so rendering does
+    /// no disk I/O.
+    root_volumes:                   HashMap<u32, (Option<f64>, Option<f64>)>,
     /// `true` when the email input should be focused on the settings
     /// window's next render pass. Set by
     /// [`Self::request_email_focus_on_account_tab`] and consumed (cleared)
@@ -206,18 +237,9 @@ pub struct SettingsController {
     /// Input state for the "Max concurrent downloads" number field; set by
     /// the root view after creation.
     max_concurrent_downloads_input: Option<Entity<InputState>>,
-    /// Font picker state for the Appearance page's body-font row; set by the
-    /// root view after creation.
-    body_font_select:               Option<FontSelectState>,
-    /// Font picker state for the Appearance page's value-font row; set by the
-    /// root view after creation.
-    value_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's label-font row; set by the
-    /// root view after creation.
-    label_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's monospace-font row; set by
-    /// the root view after creation.
-    mono_font_select:               Option<FontSelectState>,
+    rule_editor:                    RuleEditor,
+    theme_editor_input:             Option<Entity<EditorState>>,
+    theme_editor_error:             Option<String>,
 }
 
 impl SettingsController {
@@ -278,6 +300,13 @@ impl SettingsController {
                               auth_state: AuthState::LoggedOut,
                               storage_path_exists: true,
                               storage,
+                              native: NativePreferences::load(),
+                              mcp: McpSettings::load(),
+                              mcp_activity: AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS),
+                              mcp_command_path: agent::mcp_command_path(),
+                              mcp_log_path: AuditLog::open().path().display().to_string(),
+                              summaries: SummarySettings::load(),
+                              summary_page: summaries::read_summary_page(None),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -289,20 +318,22 @@ impl SettingsController {
                               storage_path_draft,
                               storage_path_input: None,
                               api_key_hint: None,
+                              token_status: cx.try_global::<TokenStatusGlobal>()
+                                              .map(|g| g.0.clone())
+                                              .unwrap_or_default(),
                               pending_file_opener: None,
                               active_page_ix:
-                                  crate::data::ui_state::UiState::load().settings_page_ix()
-                                                                        .unwrap_or(0),
-                              cache_counts: CacheCounts::default(),
+                                  dtrpg_core::data::ui_state::UiState::load().settings_page_ix()
+                                                                             .unwrap_or(0),
+                              root_volumes: HashMap::new(),
                               focus_email_pending: false,
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
-                              body_font_select: None,
-                              value_font_select: None,
-                              label_font_select: None,
-                              mono_font_select: None };
+                              rule_editor: RuleEditor::default(),
+                              theme_editor_input: None,
+                              theme_editor_error: None };
         ctrl.check_storage_path_exists(initial_path, cx);
-        ctrl.refresh_cache_counts();
+        ctrl.refresh_page_data();
         ctrl
     }
 
@@ -321,6 +352,13 @@ impl SettingsController {
                auth_state: AuthState::LoggedOut,
                storage_path_exists: true,
                storage: StorageConfig::for_test(std::env::temp_dir()),
+               native: NativePreferences::in_memory(),
+               mcp: McpSettings::in_memory(),
+               mcp_activity: Vec::new(),
+               mcp_command_path: String::new(),
+               mcp_log_path: String::new(),
+               summaries: SummarySettings::in_memory(),
+               summary_page: SummaryPage::default(),
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -332,64 +370,16 @@ impl SettingsController {
                storage_path_draft: String::new(),
                storage_path_input: None,
                api_key_hint: None,
+               token_status: TokenStatusHandle::default(),
                pending_file_opener: None,
                active_page_ix: 0,
-               cache_counts: CacheCounts::default(),
+               root_volumes: HashMap::new(),
                focus_email_pending: false,
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
-               body_font_select: None,
-               value_font_select: None,
-               label_font_select: None,
-               mono_font_select: None }
-    }
-
-    /// Attaches the email input state entity created by the root view.
-    pub fn set_email_input(&mut self, input: Entity<InputState>) {
-        self.email_input = Some(input);
-    }
-
-    /// Attaches the password input state entity created by the root view.
-    pub fn set_password_input(&mut self, input: Entity<InputState>) {
-        self.password_input = Some(input);
-    }
-
-    /// Attaches the storage path input state entity created by the root view.
-    pub fn set_storage_path_input(&mut self, input: Entity<InputState>) {
-        self.storage_path_input = Some(input);
-    }
-
-    /// Attaches the "Recently Updated window" number input state entity
-    /// created by the root view.
-    pub fn set_recently_updated_window_input(&mut self, input: Entity<InputState>) {
-        self.recently_updated_window_input = Some(input);
-    }
-
-    /// Attaches the "Max concurrent downloads" number input state entity
-    /// created by the root view.
-    pub fn set_max_concurrent_downloads_input(&mut self, input: Entity<InputState>) {
-        self.max_concurrent_downloads_input = Some(input);
-    }
-
-    /// Attaches the body-font picker state entity created by the root view.
-    pub fn set_body_font_select(&mut self, state: FontSelectState) {
-        self.body_font_select = Some(state);
-    }
-
-    /// Attaches the value-font picker state entity created by the root view.
-    pub fn set_value_font_select(&mut self, state: FontSelectState) {
-        self.value_font_select = Some(state);
-    }
-
-    /// Attaches the label-font picker state entity created by the root view.
-    pub fn set_label_font_select(&mut self, state: FontSelectState) {
-        self.label_font_select = Some(state);
-    }
-
-    /// Attaches the monospace-font picker state entity created by the root
-    /// view.
-    pub fn set_mono_font_select(&mut self, state: FontSelectState) {
-        self.mono_font_select = Some(state);
+               rule_editor: RuleEditor::default(),
+               theme_editor_input: None,
+               theme_editor_error: None }
     }
 
     /// Updates the storage path draft field.
@@ -402,8 +392,12 @@ impl SettingsController {
     /// settings window reopens on the same page next time.
     pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
         self.active_page_ix = ix;
-        self.refresh_cache_counts();
-        crate::data::ui_state::UiState::load().save_settings_page_ix(ix);
+        if ix == agent::AGENT_PAGE_IX {
+            self.mcp_activity = AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS);
+            self.summary_page = summaries::read_summary_page(self.summary_page.key_input.take());
+        }
+        self.refresh_page_data();
+        dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
     }
 
@@ -426,592 +420,22 @@ impl SettingsController {
     }
 }
 
-impl SettingsController {
-    // ── Auth state
-    // ────────────────────────────────────────────────────────────
-
-    /// Marks the user as signed in.
-    ///
-    /// When `email` is `Some`, spawns a background task to fetch the Gravatar
-    /// avatar. Emits [`SettingsChanged`] immediately and again once avatar
-    /// bytes arrive (if applicable).
-    pub fn set_logged_in(&mut self, email: Option<String>, api_key: Option<&str>,
-                         cx: &mut Context<Self>) {
-        self.is_authenticated = true;
-        self.auth_state = AuthState::LoggedIn { email:        email.clone(),
-                                                avatar_bytes: None, };
-        self.api_key_hint = api_key.map(mask_api_key);
-        cx.emit(SettingsChanged);
-
-        if let Some(addr) = email {
-            cx.spawn(async move |this, async_cx| {
-                  let bytes = async_cx.background_executor()
-                                      .spawn(async move { fetch_avatar_bytes(addr) })
-                                      .await;
-                  this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx))
-                      .ok();
-              })
-              .detach();
-        }
-    }
-
-    /// Stores fetched avatar bytes and re-renders.
-    ///
-    /// No-op if the user is not currently signed in.
-    pub fn set_avatar_bytes(&mut self, bytes: Option<Vec<u8>>, cx: &mut Context<Self>) {
-        if let AuthState::LoggedIn { avatar_bytes, .. } = &mut self.auth_state {
-            *avatar_bytes = bytes.map(Arc::new);
-            cx.emit(SettingsChanged);
-        }
-    }
-
-    /// Clears the auth state and triggers the full logout flow.
-    ///
-    /// Emits [`SettingsChanged`] to update the UI, then [`LogoutRequested`] to
-    /// prompt the root view to delete credentials and open the login window.
-    pub fn logout(&mut self, cx: &mut Context<Self>) {
-        self.is_authenticated = false;
-        self.auth_state = AuthState::LoggedOut;
-        self.api_key_hint = None;
-        cx.emit(SettingsChanged);
-        cx.emit(LogoutRequested);
-    }
-
-    // ── Storage
-    // ───────────────────────────────────────────────────────────────
-
-    /// Returns the resolved storage root path.
-    pub fn storage_root_path(&self) -> PathBuf {
-        self.storage.root_path()
-    }
-
-    /// Validates `path` for writability and saves it as the new storage root.
-    ///
-    /// Emits [`SettingsChanged`] on success. Returns the validation error on
-    /// failure so the caller can surface it to the user.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`StorageError`] if `path` is missing, unwritable, or on an
-    /// unavailable volume.
-    pub fn apply_storage_path(&mut self, path: PathBuf, cx: &mut Context<Self>)
-                              -> Result<(), StorageError> {
-        validate_writable(&path)?;
-        self.storage.set_root_path(path.clone());
-        self.storage_unavailable = false;
-        self.check_storage_path_exists(path, cx);
-        cx.emit(SettingsChanged);
-        Ok(())
-    }
-
-    /// Saves `n` as the new shared thumbnail/download concurrency limit.
-    ///
-    /// Emits [`SettingsChanged`] so the library controller picks up the new
-    /// limit on its next drain.
-    pub fn set_max_concurrent_downloads(&mut self, n: usize, cx: &mut Context<Self>) {
-        self.storage.set_max_concurrent_downloads(n);
-        cx.emit(SettingsChanged);
-    }
-
-    /// Saves `enabled` as the new "Create collections" storage setting.
-    ///
-    /// Emits [`SettingsChanged`] so the library controller picks up the new
-    /// setting on its next download completion.
-    pub fn set_create_collections(&mut self, enabled: bool, cx: &mut Context<Self>) {
-        self.storage.set_create_collections(enabled);
-        cx.emit(SettingsChanged);
-    }
-
-    /// Saves `days` (clamped to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
-    /// RECENTLY_UPDATED_WINDOW_MAX_DAYS]`) as the new "Recently Updated
-    /// window", returning the clamped value actually stored.
-    ///
-    /// Emits [`SettingsChanged`] so the library controller picks up the new
-    /// window immediately. Callers driving an editable number field (see
-    /// `root_view.rs`) use the returned value to write the clamped result
-    /// back into the field's own displayed text, since the field's typed
-    /// text isn't otherwise corrected when a value outside the bounds is
-    /// committed before the field loses focus.
-    pub fn set_recently_updated_window_days(&mut self, days: u32, cx: &mut Context<Self>) -> u32 {
-        self.storage.set_recently_updated_window_days(days);
-        cx.emit(SettingsChanged);
-        self.storage.recently_updated_window_days()
-    }
-
-    /// Spawns a background task to check whether `path` exists on disk.
-    ///
-    /// Writes the result back to `storage_path_exists` and notifies the UI.
-    fn check_storage_path_exists(&mut self, path: PathBuf, cx: &mut Context<Self>) {
-        cx.spawn(async move |this, async_cx| {
-              let exists = async_cx.background_executor()
-                                   .spawn(async move { path.exists() })
-                                   .await;
-              this.update(async_cx, |ctrl, cx| {
-                      ctrl.storage_path_exists = exists;
-                      cx.notify();
-                  })
-                  .ok();
-          })
-          .detach();
-    }
-
-    /// Opens the OS file manager at the configured storage root, creating the
-    /// directory first if it does not exist.
-    pub fn reveal_storage_location(&self) {
-        let path = self.storage.root_path();
-        if !path.exists() {
-            let _ = std::fs::create_dir_all(&path);
-        }
-        if let Err(e) = crate::util::reveal::reveal_in_file_manager(&path) {
-            tracing::warn!("reveal_in_file_manager failed: {e}");
-        }
-    }
-
-    /// Deletes all regenerable app cache data (catalog/collections metadata
-    /// cache and the cached avatar image) from disk, then emits
-    /// [`CacheCleared`] so the library view drops its in-memory catalog and
-    /// re-fetches live.
-    ///
-    /// Does not touch downloaded content, credentials, or preferences.
-    pub fn clear_cache(&mut self, cx: &mut Context<Self>) {
-        let dir = app_cache_dir();
-        if let Err(e) = std::fs::remove_dir_all(&dir)
-           && e.kind() != std::io::ErrorKind::NotFound
-        {
-            tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
-        }
-        self.refresh_cache_counts();
-        cx.emit(CacheCleared);
-    }
-
-    /// Recomputes the per-type [`CacheCounts`] shown on the Advanced page and
-    /// stores them for subsequent [`snapshot`](Self::snapshot) calls.
-    ///
-    /// The computation touches disk: a cache-metadata sidecar read (no full
-    /// catalog parse), one `read_dir` of the covers directory, and one avatar
-    /// `exists()` check. It runs on the panel-open, page-change, and
-    /// cache-clear paths rather than once per render pass, so the render path
-    /// itself performs no disk I/O.
-    pub fn refresh_cache_counts(&mut self) {
-        self.cache_counts = compute_cache_counts();
-    }
-
-    /// Opens the OS file manager at the app cache directory, creating it
-    /// first if it does not exist (a fresh install may have no cache yet).
-    pub fn open_cache_folder(&self) {
-        let dir = app_cache_dir();
-        if !dir.exists() {
-            let _ = std::fs::create_dir_all(&dir);
-        }
-        if let Err(e) = crate::util::reveal::reveal_in_file_manager(&dir) {
-            tracing::warn!("reveal_in_file_manager failed: {e}");
-        }
-    }
-
-    // ── Panel visibility
-    // ──────────────────────────────────────────────────────
-
-    /// Returns `true` when the settings panel is visible.
-    pub fn is_open(&self) -> bool {
-        self.is_open
-    }
-
-    // ── Sign-in
-    // ───────────────────────────────────────────────────────────────
-
-    /// Returns the current email draft value.
-    pub fn email_draft(&self) -> &str {
-        &self.email_draft
-    }
-
-    /// Updates the email draft field and clears any prior sign-in error.
-    pub fn set_email_draft(&mut self, value: String, cx: &mut Context<Self>) {
-        self.email_draft = value;
-        self.sign_in_error = None;
-        cx.emit(SettingsChanged);
-    }
-
-    /// Updates the password draft field and clears any prior sign-in error.
-    pub fn set_password_draft(&mut self, value: String, cx: &mut Context<Self>) {
-        self.password_draft = value;
-        self.sign_in_error = None;
-        cx.emit(SettingsChanged);
-    }
-
-    /// Authenticates silently at startup using a stored API key.
-    ///
-    /// Emits [`StartupAuthBegun`] immediately, then runs authentication on a
-    /// background thread. On success, emits [`SignInSucceeded`] so the root
-    /// view can replace the library service. On failure, emits
-    /// [`StartupAuthFailed`] and logs a warning.
-    pub fn startup_auth(&mut self, api_key: String, cx: &mut Context<Self>) {
-        let email = {
-            let trimmed = self.email_draft.trim();
-            if trimmed.is_empty() {
-                None
-            }
-            else {
-                Some(trimmed.to_owned())
-            }
-        };
-        let svc = self.login_service.clone();
-
-        cx.emit(StartupAuthBegun);
-
-        cx.spawn(async move |this, async_cx| {
-              let api_key_hint = api_key.clone();
-              let result = async_cx.background_executor()
-                                   .spawn(async move { svc.authenticate(&api_key) })
-                                   .await;
-
-              this.update(async_cx, |ctrl, cx| match result {
-                      Ok(tokens) => {
-                          ctrl.set_logged_in(email, Some(api_key_hint.as_str()), cx);
-                          cx.emit(SignInSucceeded(tokens));
-                      }
-                      Err(e) => {
-                          tracing::warn!("startup re-authentication failed: {e}");
-                          cx.emit(StartupAuthFailed);
-                      }
-                  })
-                  .ok();
-          })
-          .detach();
-    }
-
-    /// Signs in using the current `email_draft` and `password_draft`.
-    ///
-    /// First exchanges the email/password pair for an application key via
-    /// the SDK credential exchange, then exchanges that key for session tokens
-    /// via the existing authentication call. On success, stores the credential
-    /// to the keyring and emits [`SignInSucceeded`]. On failure at either step,
-    /// sets `sign_in_error` with a message identifying which step failed.
-    pub fn sign_in(&mut self, cx: &mut Context<Self>) {
-        let email = self.email_draft.trim().to_owned();
-        let password = self.password_draft.trim().to_owned();
-        if self.sign_in_in_progress || email.is_empty() || password.is_empty() {
-            return;
-        }
-        self.sign_in_in_progress = true;
-        self.sign_in_error = None;
-        cx.emit(SettingsChanged);
-
-        let svc = self.login_service.clone();
-
-        cx.spawn(async move |this, async_cx| {
-              // Step 1: exchange email + password for application key.
-              let credential_result = async_cx.background_executor()
-                                              .spawn({
-                                                  let email = email.clone();
-                                                  let password = password.clone();
-                                                  async move {
-                                                      svc.login_with_credentials(&email, &password)
-                                                         .map(|key| (svc, key))
-                                                  }
-                                              })
-                                              .await;
-
-              let (svc, api_key) = match credential_result {
-                  Ok(pair) => pair,
-                  Err(e) => {
-                      this.update(async_cx, |ctrl, cx| {
-                              ctrl.sign_in_in_progress = false;
-                              ctrl.sign_in_error = Some(e.0);
-                              cx.emit(SettingsChanged);
-                          })
-                          .ok();
-                      return;
-                  }
-              };
-
-              // Step 2: exchange application key for session tokens.
-              let auth_result = async_cx.background_executor()
-                                        .spawn({
-                                            let key = api_key.clone();
-                                            async move { svc.authenticate(&key).map(|t| (key, t)) }
-                                        })
-                                        .await;
-
-              this.update(async_cx, |ctrl, cx| {
-                      ctrl.sign_in_in_progress = false;
-                      match auth_result {
-                          Ok((key, tokens)) => {
-                              let store =
-                                  KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
-                              if let Err(e) =
-                                  store.store(&Credential { service: KEYRING_SERVICE.into(),
-                                                            account: KEYRING_API_KEY.into(),
-                                                            secret:  key.clone(),
-                                                            email:   Some(email.clone()), })
-                              {
-                                  tracing::warn!("failed to save credential to keyring: {e}");
-                              }
-                              ProfileConfig::save(Some(&email));
-                              ctrl.password_draft.clear();
-                              ctrl.set_logged_in(Some(email), Some(key.as_str()), cx);
-                              cx.emit(SignInSucceeded(tokens));
-                          }
-                          Err(e) => {
-                              ctrl.sign_in_error =
-                                  Some(format!("{}: {}", t!("activity.session_setup_failed"), e.0));
-                              cx.emit(SettingsChanged);
-                          }
-                      }
-                  })
-                  .ok();
-          })
-          .detach();
-    }
-
-    // ── Panel visibility
-    // ──────────────────────────────────────────────────────
-
-    /// Opens the settings panel.
-    pub fn open(&mut self, cx: &mut Context<Self>) {
-        if !self.is_open {
-            self.is_open = true;
-            self.refresh_cache_counts();
-            cx.emit(SettingsChanged);
-        }
-    }
-
-    /// Closes the settings panel.
-    pub fn close(&mut self, cx: &mut Context<Self>) {
-        if self.is_open {
-            self.is_open = false;
-            cx.emit(SettingsChanged);
-        }
-    }
-
-    /// Toggles the settings panel open/closed.
-    pub fn toggle(&mut self, cx: &mut Context<Self>) {
-        self.is_open = !self.is_open;
-        cx.emit(SettingsChanged);
-    }
-
-    // ── File-opener overrides
-    // ─────────────────────────────────────────────────
-
-    /// Returns a shared reference to the file-opener config.
-    pub fn file_openers(&self) -> &FileOpenerConfig {
-        &self.file_openers
-    }
-
-    /// Adds or replaces a file-opener entry and persists the change.
-    pub fn add_file_opener(&mut self, entry: FileOpenerEntry, cx: &mut Context<Self>)
-                           -> AddOutcome {
-        let outcome = self.file_openers.add(entry);
-        self.file_openers.save();
-        cx.emit(SettingsChanged);
-        outcome
-    }
-
-    /// Removes the file-opener entry for `extension` and persists the change.
-    pub fn remove_file_opener(&mut self, extension: &str, cx: &mut Context<Self>) {
-        self.file_openers.remove(extension);
-        self.file_openers.save();
-        cx.emit(SettingsChanged);
-    }
-
-    /// Begins an in-place "add file opener" flow after the user has picked an
-    /// application via the native file dialog.
-    ///
-    /// The extension is entered inline in the File Openers list rather than in
-    /// a separate modal; the list renders a pending row for `app_path`
-    /// until the flow is committed or cancelled.
-    pub fn begin_add_file_opener(&mut self, app_path: PathBuf, cx: &mut Context<Self>) {
-        self.pending_file_opener = Some(app_path);
-        cx.emit(SettingsChanged);
-    }
-
-    /// Cancels an in-progress "add file opener" flow without persisting
-    /// anything.
-    pub fn cancel_pending_file_opener(&mut self, cx: &mut Context<Self>) {
-        if self.pending_file_opener.take().is_some() {
-            cx.emit(SettingsChanged);
-        }
-    }
-
-    /// Commits the in-progress "add file opener" flow using `extension`.
-    ///
-    /// No-op if no add is in progress or `extension` is empty after trimming
-    /// (the caller should
-    /// [`cancel_pending_file_opener`](Self::cancel_pending_file_opener)
-    /// explicitly in that case, e.g. on blur).
-    pub fn commit_pending_file_opener(&mut self, extension: &str, cx: &mut Context<Self>) {
-        let trimmed = extension.trim();
-        if trimmed.is_empty() {
-            return;
-        }
-        let Some(app_path) = self.pending_file_opener.take()
-        else {
-            return;
-        };
-        self.add_file_opener(FileOpenerEntry { extension: trimmed.to_string(),
-                                               app_path },
-                             cx);
-    }
-
-    // ── Snapshot
-    // ──────────────────────────────────────────────────────────────
-
-    /// Returns all data needed by the views for one render pass.
-    pub fn snapshot(&self) -> SettingsSnapshot {
-        let auth = match &self.auth_state {
-            AuthState::LoggedOut => AuthStateSnapshot { is_logged_in:    false,
-                                                        email:           None,
-                                                        display_initial: None,
-                                                        avatar_bytes:    None,
-                                                        api_key_hint:    None, },
-            AuthState::LoggedIn { email,
-                                  avatar_bytes, } => {
-                AuthStateSnapshot { is_logged_in:    true,
-                                    display_initial: email.as_deref()
-                                                          .and_then(|s| s.trim().chars().next())
-                                                          .map(|c| c.to_ascii_uppercase()),
-                                    email:           email.clone(),
-                                    avatar_bytes:    avatar_bytes.clone(),
-                                    api_key_hint:    self.api_key_hint.clone(), }
-            }
-        };
-
-        SettingsSnapshot { is_open: self.is_open,
-                           file_openers: self.file_openers.entries().to_vec(),
-                           is_authenticated: self.is_authenticated,
-                           storage_root_path: self.storage.root_path(),
-                           storage_unavailable: self.storage_unavailable,
-                           storage_path_exists: self.storage_path_exists,
-                           auth,
-                           email_draft: self.email_draft.clone(),
-                           password_draft: self.password_draft.clone(),
-                           sign_in_in_progress: self.sign_in_in_progress,
-                           sign_in_error: self.sign_in_error.clone(),
-                           email_input: self.email_input.clone(),
-                           password_input: self.password_input.clone(),
-                           storage_path_draft: self.storage_path_draft.clone(),
-                           storage_path_input: self.storage_path_input.clone(),
-                           pending_file_opener: self.pending_file_opener.clone(),
-                           active_page_ix: self.active_page_ix,
-                           cache_counts: self.cache_counts,
-                           max_concurrent_downloads: self.storage.max_concurrent_downloads(),
-                           max_concurrent_downloads_input: self.max_concurrent_downloads_input
-                                                               .clone(),
-                           create_collections: self.storage.create_collections(),
-                           recently_updated_window_days: self.storage
-                                                             .recently_updated_window_days(),
-                           recently_updated_window_input: self.recently_updated_window_input
-                                                              .clone(),
-                           body_font_select: self.body_font_select.clone(),
-                           value_font_select: self.value_font_select.clone(),
-                           label_font_select: self.label_font_select.clone(),
-                           mono_font_select: self.mono_font_select.clone() }
-    }
-}
-
 impl EventEmitter<SettingsChanged> for SettingsController {}
 impl EventEmitter<LogoutRequested> for SettingsController {}
 
-// ── Helpers
-// ───────────────────────────────────────────────────────────────────
-
-/// Reads the current per-type cache counts from disk.
-///
-/// Kept free of `SettingsController` so its disk-I/O cost is obvious at the
-/// call site and it stays trivially unit-testable — see
-/// [`SettingsController::refresh_cache_counts`], its only production caller.
-fn compute_cache_counts() -> CacheCounts {
-    let metadata = load_cache_metadata(&cache_dir());
-    let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
-    let metadata_saved_at_secs =
-        metadata.as_ref()
-                .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
-    let last_item_check_batch_secs = metadata.as_ref()
-                                             .and_then(|m| m.last_item_check_batch_secs)
-                                             .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
-    let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
-                                                          .unwrap_or(0);
-    CacheCounts { metadata_items,
-                  cover_thumbnails,
-                  avatar_cached: avatar_cached(),
-                  metadata_saved_at_secs,
-                  last_item_check_batch_secs }
-}
-
-/// Returns a masked representation of an API key: first 4 chars + bullets +
-/// last 1 char. For keys 5 characters or shorter, returns only bullets.
-fn mask_api_key(key: &str) -> String {
-    if key.len() > 5 {
-        format!("{}••••••••{}", &key[..4], &key[key.len() - 1..])
-    }
-    else {
-        "••••••••".to_string()
-    }
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
+mod agent;
+mod auth;
+mod file_openers;
+mod native;
+mod panel;
+mod rule_editor;
+mod sign_in;
+mod snapshot;
+mod storage;
+mod summaries;
+mod wiring;
 
 #[cfg(test)]
-mod tests {
-    use gpui::{AppContext, TestAppContext};
-
-    use super::*;
-    use crate::services::{LoginError, LoginTokens};
-
-    #[test]
-    fn mask_api_key_long_key() {
-        assert_eq!(mask_api_key("abcdefghij1"), "abcd••••••••1");
-    }
-
-    #[test]
-    fn mask_api_key_short_key() {
-        assert_eq!(mask_api_key("abc"), "••••••••");
-    }
-
-    #[test]
-    fn mask_api_key_exactly_five() {
-        assert_eq!(mask_api_key("abcde"), "••••••••");
-    }
-
-    /// Never invoked by the tests below — `request_email_focus_on_account_tab`
-    /// and `take_focus_email_pending` don't touch the login flow.
-    struct UnusedLoginService;
-
-    impl LoginService for UnusedLoginService {
-        fn login_with_credentials(&self, _email: &str, _password: &str)
-                                  -> Result<String, LoginError> {
-            unimplemented!("not exercised by this test")
-        }
-
-        fn authenticate(&self, _api_key: &str) -> Result<LoginTokens, LoginError> {
-            unimplemented!("not exercised by this test")
-        }
-    }
-
-    #[gpui::test]
-    fn request_email_focus_sets_account_tab_and_pending_flag(cx: &mut TestAppContext) {
-        let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
-
-        ctrl.update(cx, |ctrl, cx| {
-                ctrl.set_active_page_ix(4, cx);
-                ctrl.request_email_focus_on_account_tab(cx);
-            });
-
-        ctrl.read_with(cx, |ctrl, _| {
-                assert_eq!(ctrl.active_page_ix, 0);
-                assert!(ctrl.focus_email_pending);
-            });
-    }
-
-    #[gpui::test]
-    fn take_focus_email_pending_clears_flag_after_reading_it(cx: &mut TestAppContext) {
-        let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
-
-        ctrl.update(cx, |ctrl, cx| ctrl.request_email_focus_on_account_tab(cx));
-
-        let first_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
-        assert!(first_read);
-
-        let second_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
-        assert!(!second_read);
-    }
-}
+mod tests;
+#[cfg(test)]
+mod tests_rule_editor;

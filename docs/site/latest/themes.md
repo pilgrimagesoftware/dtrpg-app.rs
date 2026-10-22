@@ -12,7 +12,7 @@ Appearance.
 
 ## Color themes
 
-Three light, three dark:
+Four light, two dark:
 
 | Theme | Mode | Character |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Three light, three dark:
 | Sage | Light | Cool forest green |
 | Ink | Dark | Warm brown-black |
 | Moss | Dark | Cool forest green-black |
-| Rosewood | Dark | Warm burgundy/wine |
+| Rosewood | Light | Warm burgundy/wine |
 
 ## Density
 
@@ -29,10 +29,12 @@ Three light, three dark:
 - **Compact** - tighter spacing throughout the catalog, detail, and settings
   views.
 
+Choose one in Settings > Appearance, on the **Density** row (row height and cover
+size). It applies at once, and Libri remembers it for the next launch.
+
 ## Fonts
 
-Four roles, each independently selectable from any font installed on your
-system:
+A theme sets four font roles:
 
 - **Body** - the catalog and detail view's primary text.
 - **Value** - data values (e.g. the Advanced settings page's cache details),
@@ -40,5 +42,101 @@ system:
 - **Label** - field and row labels, sans-serif by default.
 - **Monospace** - fixed-width content such as the masked API key hint.
 
+There are no font pickers in Settings; the fonts come from the theme file.
+Set them with these optional keys, using any font installed on your computer:
+
+```toml
+body_font = "Inter"
+value_font = "Inter"
+label_font = "Inter"
+mono_font = "Menlo"
+```
+
+A role the file leaves out uses the built-in default.
+
 A separate "Text Scale" control adjusts the shared UI text size, scaling
 every size-aware element in the window together, like zooming a page.
+
+## Theme data files
+
+Each built-in theme ships as a TOML file under `assets/themes/` in the
+repository. The app loads these at startup and falls back to compiled
+defaults if a file is missing or malformed. The format is a flat palette of
+hex colors, with optional alpha appended after a space:
+
+```toml
+name = "Parchment"
+mode = "light"
+
+desktop_bg = "#C5B99D"
+surface = "#FCF9F3"
+surface_alt = "#F2ECDF"
+hover = "#EDE6D6"
+text_primary = "#26211A"
+text_secondary = "#5B5346"
+text_tertiary = "#8C8270"
+border = "#E7DFCD"
+border_strong = "#DBD1BB"
+accent = "#8C4A22"
+accent_soft = "#8C4A22 0.13"
+accent_on = "#FCF9F3"
+shadow = "#3A2E1A 0.18"
+scrim = "#1E160A 0.26"
+```
+
+`mode` is `light` or `dark`; it selects the fixed semantic state colors and
+the fallback base for any palette field the file omits. Fields left out fall
+back to a built-in base of the same mode, so a partially specified theme file
+still loads.
+
+### User themes
+
+Drop your own `*.toml` theme files into the app's themes directory (created
+on first launch):
+
+- macOS: `~/Library/Application Support/com.pilgrimagesoftware.dtrpg/themes/`
+- Linux: `~/.local/share/dtrpg/themes/`
+
+Each file's stem becomes the theme's id (used for persistence), and its
+`name` field is what Settings > Appearance and the status-bar theme picker
+show. The same flat palette format applies; built-in ids are reserved, so a
+file named `parchment.toml` is ignored in favor of the built-in. The
+directory is read at startup and watched while the app runs: adding,
+editing, or removing a theme file updates the pickers and, if the active
+theme's file changed, its live colors - no restart needed.
+
+A malformed file (no `name`, unparseable TOML) is skipped; a theme that loads
+but omits palette fields falls back per-key as described above.
+
+Settings > Appearance shows every theme as a card with a miniature preview of
+its palette; clicking a card selects that theme. User themes carry a "user"
+tag. Below the grid:
+
+- **Duplicate & edit** copies the active theme into the themes directory as
+  `<id>-copy.toml`, names it `<name> copy`, selects the copy, and reveals it in
+  your file manager so you can edit it. Edits apply live.
+- **Import…** copies a theme file you pick into the themes directory,
+  uniquifying the id if the name is already taken, and selects it. The file is
+  validated before it is copied.
+- **Reveal themes folder** opens the themes directory, creating it if needed.
+- **Reload** re-reads the themes directory immediately instead of waiting for
+  the file watcher.
+
+### Editing a theme in Settings
+
+Below the gallery, **Theme file** shows the active theme's file as text. A user
+theme can be edited there: **Save** checks the text and, if it is a valid theme,
+writes the file and applies it at once; **Revert** discards your edits. A color
+that is not written like `"#1B1812"` is refused, with the key named. A built-in
+theme is shown read-only; use **Duplicate & edit** to get a copy you can change.
+
+A duplicated or imported file re-serializes the palette without the original's
+comments and key order; the source file is untouched.
+
+### Semantic state colors are not themeable
+
+The error and warning colors are deliberately **not** part of the themeable
+palette. They are fixed by `mode` at compile time so a theme file cannot make
+a failed download look healthy or an error state indistinguishable from a
+success state. Any `error`, `warning_bg`, or `warning_text` keys in a theme
+file are ignored.

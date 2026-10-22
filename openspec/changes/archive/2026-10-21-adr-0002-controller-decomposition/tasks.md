@@ -1,0 +1,10 @@
+- [x] Create issue pilgrimagesoftware/dtrpg-app.rs#364.
+- [x] Write OpenSpec proposal/design.
+- [x] Slice 1: Extract core `Library` skeleton (move index, queue, network monitor, cover fetcher).
+- [x] Slice 2: Move catalog load/refresh state machine into `Library`.
+- [x] Slice 3: Move filtered/grouped queries and caches into `Library`.
+- [x] Slice 4: Move download/check/thumbnail job orchestration into `Library`.
+- [x] Slice 5: Move catalog mutations into `Library` (item status, disk-presence reconciliation, tag-edit scope, collection-membership edits).
+- [x] Follow-up: move the collections list, the tag-read generation guard, and `verifying_downloads` into `Library`. The `CollectionsService` handle stays on the controller as an adapter (its calls run on gpui's executors).
+- [x] Update `NOTES.md` ADR 0002 section when slices are merged.
+- [x] Archive this OpenSpec change after merge.

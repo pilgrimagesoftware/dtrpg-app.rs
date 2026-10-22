@@ -4,18 +4,25 @@
 //! rule. Hosts the account button and its menu (user info, settings,
 //! sign out), relocated here from the toolbar per
 //! `shared-main-window-structure`.
+//!
+//! On macOS the window's traffic lights and native menu bar sit around it. On
+//! Windows and Linux the bar is gpui-kit's `TitleBar`, which draws the
+//! minimize, maximize and close buttons and moves the window, with the
+//! in-window menu bar on its left.
 
 use std::sync::Arc;
 
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ParentElement, Styled,
     div, px,
 };
-use gpui_kit::component::Sizable;
 use gpui_kit::component::avatar::Avatar;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::{Sizable, TitleBar};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -25,19 +32,39 @@ use crate::ui::actions::{ReportFeatureBug, ShowSettings};
 /// Renders the title bar: app title on the left, a drag region, and the
 /// account button on the right, separated from the content below by a
 /// horizontal rule.
+///
+/// `menu_bar` is the in-window menu bar for Windows and Linux; macOS passes
+/// `None` and has the native one.
 pub fn render_title_bar(auth: &AuthStateSnapshot, settings: Entity<SettingsController>,
-                        colors: &ColorTokens, cx: &App)
-                        -> impl IntoElement + 'static + use<> {
+                        colors: &ColorTokens, menu_bar: Option<Entity<AppMenuBar>>, cx: &App)
+                        -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
     let text_primary = colors.text_primary;
+    let wordmark = div().text_color(text_primary)
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .child(t!("sidebar.app_name").to_string());
+
+    if let Some(menu_bar) = menu_bar {
+        return TitleBar::new().h(px(44.0))
+                              .bg(surface)
+                              .border_color(border)
+                              .child(menu_bar)
+                              .child(div().flex()
+                                          .items_center()
+                                          .gap(px(8.0))
+                                          .pr(px(12.0))
+                                          .child(wordmark)
+                                          .child(render_account_button(auth, settings, colors, cx)))
+                              .into_any_element();
+    }
 
     // Reserve clearance for the macOS traffic light buttons, which overlay the
     // top-left of the window when the titlebar renders with
     // `appears_transparent: true`. The wordmark sits immediately after this
     // clearance — it is the app's only wordmark; `sidebar_view::build_header`
     // no longer repeats it.
-    let leading_inset = if cfg!(target_os = "macos") {
+    let leading_inset = if Platform.kind() == PlatformKind::MacOs {
         px(78.0)
     }
     else {
@@ -54,9 +81,7 @@ pub fn render_title_bar(auth: &AuthStateSnapshot, settings: Entity<SettingsContr
          .border_b_1()
          .border_color(border)
          .bg(surface)
-         .child(div().text_color(text_primary)
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .child(t!("sidebar.app_name").to_string()))
+         .child(wordmark)
          .child(div().id("title-bar-drag-region")
                      .flex_1()
                      .h_full()
@@ -64,6 +89,7 @@ pub fn render_title_bar(auth: &AuthStateSnapshot, settings: Entity<SettingsContr
                          window.start_window_move();
                      }))
          .child(render_account_button(auth, settings, colors, cx))
+         .into_any_element()
 }
 
 fn detect_image_format(bytes: &[u8]) -> ImageFormat {

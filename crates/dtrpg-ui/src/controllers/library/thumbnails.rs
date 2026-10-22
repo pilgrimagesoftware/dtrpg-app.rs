@@ -1,4 +1,12 @@
 //! Cover-thumbnail queueing, fetching, caching, and detail-cover refresh.
+//!
+//! Fetches run as jobs on the core work queue; `Library` owns their
+//! submission and bookkeeping (ADR 0002 Slice 4). This module reacts to the
+//! queue's events with what only the UI can do: writing decoded bytes into
+//! `CoverCache` (holds `gpui::Image`, so it can never move into `Library`)
+//! and driving `ActivityController`.
+
+use dtrpg_core::work::{JobId, Outcome, Priority};
 
 use super::*;
 
@@ -35,248 +43,148 @@ impl LibraryController {
                  })
                  .collect()
         };
-        for (id, url) in &to_enqueue {
-            cx.global_mut::<CoverCache>().mark_in_flight(Arc::clone(id));
-            self.thumbnail_queue
-                .push_back((Arc::clone(id), Arc::clone(url), false));
-        }
-        self.drain_thumbnail_queue(cx);
-    }
-
-    /// Dispatches thumbnail fetches for as many queued URLs as there are free
-    /// concurrency slots (see [`Self::available_slots`]).
-    pub(super) fn drain_thumbnail_queue(&mut self, cx: &mut Context<Self>) {
-        while self.available_slots() > 0 {
-            let Some((item_id, url, force_network)) = self.thumbnail_queue.pop_front()
-            else {
-                break;
-            };
-            self.active_thumbnail_fetches += 1;
-            self.dispatch_thumbnail_fetch(item_id, url, force_network, cx);
+        for (id, url) in to_enqueue {
+            self.submit_thumbnail(id, url, false, Priority::Background, cx);
         }
     }
 
-    /// Starts a single thumbnail fetch task. Assumes the caller has already
-    /// reserved a concurrency slot by incrementing `active_thumbnail_fetches`.
-    pub(super) fn dispatch_thumbnail_fetch(&mut self, item_id: Arc<str>, url: Arc<str>,
-                                           force_network: bool, cx: &mut Context<Self>) {
-        let activity_id = if let Some(id) = self.thumbnail_activity_id {
-            id
+    /// Queues the covers of the stored catalog that are not already loaded.
+    ///
+    /// A catalog kept between runs arrives with no new items to react to, so
+    /// without this its covers would wait for a full fetch to finish, which may
+    /// never happen (offline, not signed in yet).
+    pub(super) fn enqueue_stored_thumbnails(&mut self, cx: &mut Context<Self>) {
+        let items = self.all_items();
+        self.enqueue_thumbnails(&items, cx);
+    }
+
+    /// Submits one cover fetch via `Library` and marks it in flight in
+    /// `CoverCache`.
+    ///
+    /// Any fetch for the same cache key that has not started is replaced, so a
+    /// key is never queued twice. `force_network` skips the disk cache and
+    /// always re-fetches — set for manual "Load Thumbnail"/"Refresh
+    /// Thumbnails" actions, which exist specifically to bypass a stale cached
+    /// image; left `false` for automatic background loads.
+    fn submit_thumbnail(&mut self, key: Arc<str>, url: Arc<str>, force_network: bool,
+                        priority: Priority, cx: &mut Context<Self>) {
+        cx.global_mut::<CoverCache>()
+          .mark_in_flight(Arc::clone(&key));
+        self.library
+            .submit_thumbnail(key, url, force_network, priority);
+    }
+
+    /// Cancels every fetch that has not started and clears its in-flight
+    /// marker, so the cover can be requested again later. Fetches already
+    /// running are left to finish.
+    pub(super) fn cancel_pending_thumbnails(&mut self, cx: &mut Context<Self>) {
+        for (key, _id) in self.library.cancel_pending_thumbnails() {
+            cx.global_mut::<CoverCache>().in_flight.remove(&key);
+        }
+    }
+
+    /// Starts the aggregated "loading thumbnails" activity entry when the
+    /// first fetch of a batch begins.
+    pub(super) fn thumbnail_started(&mut self, id: JobId, cx: &mut Context<Self>) {
+        if !self.library.thumbnail_started(id) || self.thumbnail_activity_id.is_some() {
+            return;
+        }
+        let label = if self.thumbnail_refresh_active {
+            t!("activity.refreshing_thumbnails")
         }
         else {
-            let label = if self.thumbnail_refresh_active {
-                t!("activity.refreshing_thumbnails")
-            }
-            else {
-                t!("activity.loading_thumbnails")
-            };
-            let id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
-            self.thumbnail_activity_id = Some(id);
-            self.thumbnail_processed = 0;
-            id
+            t!("activity.loading_thumbnails")
         };
-
-        let weak_activity = self.activity.downgrade();
-        let url_str = url.to_string();
-        let network_monitor = Arc::clone(&self.network_monitor);
-
-        cx.spawn(async move |this, async_cx| {
-              // gpui's executors are not a Tokio runtime, and `dtrpg-ui` does
-              // not depend on `tokio` directly, so the async
-              // `reqwest::get(...).await` used here previously
-              // had no reactor to run on and always failed. `reqwest::blocking`
-              // manages its own internal runtime per call and
-              // works from a plain OS thread, matching the
-              // pattern the SDK gateway already uses
-              // (`tokio::runtime::Runtime::block_on`) to
-              // run network calls from these same background-executor threads.
-              //
-              // Disk-cache-first: the in-memory `CoverCache` is always empty at
-              // startup, so without a persistent disk cache every
-              // launch would re-download every cover
-              // from the network. Check disk before hitting the network, and
-              // persist a fresh network fetch to disk so the next
-              // launch is a cache hit.
-              let fetch_url = url_str.clone();
-              let disk_key = Arc::clone(&item_id);
-              let cancel = std::sync::atomic::AtomicBool::new(false);
-              let retry_url = fetch_url.clone();
-              let result: Result<Vec<u8>, ThumbnailFetchError> = async_cx
-                .background_executor()
-                .spawn(async move {
-                    let covers_root = covers_dir();
-                    if !force_network
-                        && let Some(bytes) = load_cached_cover(&covers_root, &disk_key)
-                    {
-                        return Ok(bytes);
-                    }
-                    if !network_monitor.check_endpoint(crate::data::constants::DTRPG_API_HOST) {
-                        return Err(ThumbnailFetchError {
-                            message: "DriveThruRPG API endpoint unreachable".to_string(),
-                            retry_after: None,
-                        });
-                    }
-                    let config = retry::RetryConfig {
-                        max_attempts: crate::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
-                        base_secs: crate::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
-                        max_secs: crate::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
-                    };
-                    let mut on_retry =
-                        |attempt: u32, delay: std::time::Duration, reason: &ThumbnailFetchError| {
-                            tracing::debug!(
-                                url = %retry_url,
-                                attempt,
-                                delay_secs = delay.as_secs(),
-                                reason = %reason,
-                                "cover thumbnail fetch retrying"
-                            );
-                        };
-                    let bytes = retry::retry_with_backoff(
-                        config,
-                        &cancel,
-                        || -> Result<Vec<u8>, ThumbnailFetchError> {
-                            let resp = reqwest::blocking::get(&fetch_url).map_err(|e| {
-                                ThumbnailFetchError {
-                                    message: e.to_string(),
-                                    retry_after: None,
-                                }
-                            })?;
-                            if resp.status().as_u16() == 429 {
-                                let retry_after = resp
-                                    .headers()
-                                    .get(reqwest::header::RETRY_AFTER)
-                                    .and_then(|v| v.to_str().ok())
-                                    .and_then(|v| v.trim().parse::<u64>().ok())
-                                    .map(std::time::Duration::from_secs);
-                                return Err(ThumbnailFetchError {
-                                    message: "rate limited (HTTP 429)".to_string(),
-                                    retry_after,
-                                });
-                            }
-                            Ok(resp
-                                .bytes()
-                                .map_err(|e| ThumbnailFetchError {
-                                    message: e.to_string(),
-                                    retry_after: None,
-                                })?
-                                .to_vec())
-                        },
-                        |_| true,
-                        |e: &ThumbnailFetchError| e.retry_after,
-                        || ThumbnailFetchError {
-                            message: "cover thumbnail fetch cancelled".to_string(),
-                            retry_after: None,
-                        },
-                        Some(&mut on_retry),
-                    )?;
-                    save_cached_cover(&covers_root, &disk_key, &bytes);
-                    Ok(bytes)
-                })
-                .await;
-
-              match result {
-                  Ok(bytes) => {
-                      this.update(async_cx, |ctrl, cx| {
-                              cx.global_mut::<CoverCache>()
-                                .insert(Arc::clone(&item_id), bytes);
-                              if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id)
-                              {
-                                  item.thumbnail_last_attempted =
-                                      Some(std::time::SystemTime::now());
-                              }
-                              ctrl.invalidate_cache();
-                              ctrl.active_thumbnail_fetches =
-                                  ctrl.active_thumbnail_fetches.saturating_sub(1);
-                              ctrl.record_refresh_result(&item_id, false, cx);
-                              cx.emit(LibraryChanged);
-                              ctrl.drain_thumbnail_queue(cx);
-                          })
-                          .ok();
-                  }
-                  Err(e) => {
-                      tracing::warn!(url = %url_str, error = %e, "thumbnail fetch failed");
-                      this.update(async_cx, |ctrl, cx| {
-                              cx.global_mut::<CoverCache>().in_flight.remove(&item_id);
-                              if let Some(item) = ctrl.catalog.iter_mut().find(|i| i.id == item_id)
-                              {
-                                  item.thumbnail_last_attempted =
-                                      Some(std::time::SystemTime::now());
-                              }
-                              ctrl.invalidate_cache();
-                              ctrl.active_thumbnail_fetches =
-                                  ctrl.active_thumbnail_fetches.saturating_sub(1);
-                              ctrl.record_refresh_result(&item_id, true, cx);
-                              ctrl.drain_thumbnail_queue(cx);
-                          })
-                          .ok();
-                  }
-              }
-
-              // Count this attempt (success or failure) toward the batch total
-              // so the progress bar reflects real throughput
-              // instead of sitting indeterminate.
-              let (processed, remaining, refresh_active) = this.update(async_cx, |ctrl, _cx| {
-                                                                   ctrl.thumbnail_processed += 1;
-                                                                   (ctrl.thumbnail_processed,
-                                                                    ctrl.thumbnail_queue.len(),
-                                                                    ctrl.thumbnail_refresh_active)
-                                                               })
-                                                               .unwrap_or((0, 0, false));
-
-              if remaining == 0 {
-                  weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
-                               .ok();
-                  this.update(async_cx, |ctrl, _cx| {
-                          ctrl.thumbnail_activity_id = None;
-                          ctrl.thumbnail_processed = 0;
-                      })
-                      .ok();
-              }
-              else {
-                  let label = if refresh_active {
-                      t!("activity.refreshing_thumbnails_remaining",
-                         remaining = remaining).to_string()
-                  }
-                  else {
-                      t!("activity.loading_thumbnails_remaining",
-                         remaining = remaining).to_string()
-                  };
-                  let total = (processed + remaining) as f32;
-                  let progress = if total > 0.0 {
-                      processed as f32 / total
-                  }
-                  else {
-                      0.0
-                  };
-                  weak_activity.update(async_cx, |a, cx| {
-                                   a.update_label(activity_id, label, cx);
-                                   a.update_progress(activity_id, progress, cx);
-                               })
-                               .ok();
-              }
-          })
-          .detach();
+        let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
+        self.thumbnail_activity_id = Some(activity_id);
+        self.thumbnail_processed = 0;
     }
 
-    /// Enqueues a single cover URL at the front of the thumbnail queue and
-    /// starts the drain loop.  Used by the per-item "Load Thumbnail"
-    /// context menu action.
+    /// Applies a finished fetch: caches the image (or records the failure),
+    /// then advances the batch's progress.
+    pub(super) fn thumbnail_finished(&mut self, id: JobId, outcome: Outcome,
+                                     cx: &mut Context<Self>) {
+        let Some(job) = self.library.thumbnail_finished(id)
+        else {
+            // Cancelled before it started, and already forgotten.
+            return;
+        };
+        let bytes = match outcome {
+            Outcome::Succeeded => job.bytes.take(),
+            Outcome::Failed(ref message) => {
+                tracing::warn!(url = %job.url, error = %message, "thumbnail fetch failed");
+                None
+            }
+            Outcome::Cancelled => None,
+        };
+
+        self.note_thumbnail_attempt(&job.key, std::time::SystemTime::now());
+        match bytes {
+            Some(bytes) => {
+                cx.global_mut::<CoverCache>()
+                  .insert(Arc::clone(&job.key), bytes);
+                self.record_refresh_result(&job.key, false, cx);
+                cx.emit(LibraryChanged);
+            }
+            None => {
+                cx.global_mut::<CoverCache>().in_flight.remove(&job.key);
+                self.record_refresh_result(&job.key, true, cx);
+            }
+        }
+        self.advance_thumbnail_progress(cx);
+    }
+
+    /// Counts one more attempt (success or failure) toward the batch total so
+    /// the progress bar reflects real throughput instead of sitting
+    /// indeterminate, and completes the activity entry once every fetch in the
+    /// batch has finished.
+    fn advance_thumbnail_progress(&mut self, cx: &mut Context<Self>) {
+        self.thumbnail_processed += 1;
+        let Some(activity_id) = self.thumbnail_activity_id
+        else {
+            return;
+        };
+
+        let processed = self.thumbnail_processed;
+        let remaining = self.library.thumbnail_jobs_outstanding();
+        if remaining == 0 {
+            self.activity
+                .update(cx, |a, cx| a.complete(activity_id, cx));
+            self.thumbnail_activity_id = None;
+            self.thumbnail_processed = 0;
+            return;
+        }
+
+        let label = if self.thumbnail_refresh_active {
+            t!("activity.refreshing_thumbnails_remaining",
+               remaining = remaining).to_string()
+        }
+        else {
+            t!("activity.loading_thumbnails_remaining",
+               remaining = remaining).to_string()
+        };
+        let total = (processed + remaining) as f32;
+        let progress = processed as f32 / total;
+        self.activity.update(cx, |a, cx| {
+                         a.update_label(activity_id, label, cx);
+                         a.update_progress(activity_id, progress, cx);
+                     });
+    }
+
+    /// Enqueues a single cover URL ahead of any background thumbnail work.
+    /// Used by the per-item "Load Thumbnail" context menu action.
     ///
     /// Forces a network re-fetch bypassing both the in-memory and on-disk
     /// caches — this action exists specifically to retry or refresh a
     /// cover, not to redundantly reload whatever is already cached.
     pub fn load_thumbnail(&mut self, cover_url: Arc<str>, cx: &mut Context<Self>) {
-        let item_id = self.catalog
-                          .iter()
+        let item_id = self.all_items()
+                          .into_iter()
                           .find(|i| i.cover_url.as_deref() == Some(&*cover_url))
-                          .map(|i| Arc::clone(&i.id));
+                          .map(|i| i.id);
 
         if let Some(id) = item_id {
-            self.thumbnail_queue.retain(|(i, _, _)| i != &id);
-            cx.global_mut::<CoverCache>()
-              .mark_in_flight(Arc::clone(&id));
-            self.thumbnail_queue.push_front((id, cover_url, true));
-            self.drain_thumbnail_queue(cx);
+            self.submit_thumbnail(id, cover_url, true, Priority::Interactive, cx);
         }
     }
 
@@ -289,10 +197,7 @@ impl LibraryController {
     /// never opened in the detail panel, so eagerly downloading a full-size
     /// or WebP image for all of them would waste bandwidth and disk space.
     pub fn ensure_detail_cover(&mut self, item_id: &Arc<str>, cx: &mut Context<Self>) {
-        let Some(url) = self.catalog
-                            .iter()
-                            .find(|i| i.id == *item_id)
-                            .and_then(|i| i.detail_cover_url.clone())
+        let Some(url) = self.item_by_id(item_id).and_then(|i| i.detail_cover_url)
         else {
             return;
         };
@@ -306,10 +211,7 @@ impl LibraryController {
             cx.global_mut::<CoverCache>().insert(cache_key, bytes);
             return;
         }
-        cx.global_mut::<CoverCache>()
-          .mark_in_flight(Arc::clone(&cache_key));
-        self.thumbnail_queue.push_front((cache_key, url, false));
-        self.drain_thumbnail_queue(cx);
+        self.submit_thumbnail(cache_key, url, false, Priority::Interactive, cx);
     }
 
     /// Force re-fetches the large-context detail cover for `item_id`,
@@ -317,19 +219,15 @@ impl LibraryController {
     /// action. Falls back to refreshing the small-context `cover_url` when
     /// the item has no `detail_cover_url`.
     pub fn refresh_detail_cover(&mut self, item_id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(item) = self.catalog.iter().find(|i| i.id == item_id)
+        let Some(item) = self.item_by_id(&item_id)
         else {
             return;
         };
-        if let Some(url) = item.detail_cover_url.clone() {
+        if let Some(url) = item.detail_cover_url {
             let cache_key = detail_cache_key(&item_id);
-            self.thumbnail_queue.retain(|(i, _, _)| *i != cache_key);
-            cx.global_mut::<CoverCache>()
-              .mark_in_flight(Arc::clone(&cache_key));
-            self.thumbnail_queue.push_front((cache_key, url, true));
-            self.drain_thumbnail_queue(cx);
+            self.submit_thumbnail(cache_key, url, true, Priority::Interactive, cx);
         }
-        else if let Some(url) = item.cover_url.clone() {
+        else if let Some(url) = item.cover_url {
             self.load_thumbnail(url, cx);
         }
     }
@@ -342,13 +240,10 @@ impl LibraryController {
     /// skip items already present in the cache — every eligible item is
     /// re-queued with a forced network re-fetch.
     pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
-        let to_enqueue: Vec<(Arc<str>, Arc<str>, bool)> =
-            self.catalog
-                .iter()
-                .filter_map(|item| {
-                    let url = item.cover_url.as_ref()?;
-                    Some((Arc::clone(&item.id), Arc::clone(url), true))
-                })
+        let to_enqueue: Vec<(Arc<str>, Arc<str>)> =
+            self.all_items()
+                .into_iter()
+                .filter_map(|item| item.cover_url.map(|url| (item.id, url)))
                 .collect();
 
         if to_enqueue.is_empty() {
@@ -356,24 +251,20 @@ impl LibraryController {
             return;
         }
 
-        self.thumbnail_queue.clear();
+        self.cancel_pending_thumbnails(cx);
         // This forces a fresh full re-fetch batch — reset the processed counter
         // so the progress bar denominator isn't skewed by whatever
         // fraction of a prior batch had already completed before this
         // action was invoked.
         self.thumbnail_processed = 0;
         self.thumbnail_refresh_active = true;
-        self.thumbnail_refresh_pending =
-            to_enqueue.iter().map(|(id, _, _)| Arc::clone(id)).collect();
+        self.thumbnail_refresh_pending = to_enqueue.iter().map(|(id, _)| Arc::clone(id)).collect();
         self.thumbnail_refresh_succeeded = 0;
         self.thumbnail_refresh_failed = 0;
-        let cache = cx.global_mut::<CoverCache>();
-        for (id, _, _) in &to_enqueue {
-            cache.mark_in_flight(Arc::clone(id));
-        }
         cx.emit(ThumbnailRefreshStarted { count: to_enqueue.len(), });
-        self.thumbnail_queue.extend(to_enqueue);
-        self.drain_thumbnail_queue(cx);
+        for (id, url) in to_enqueue {
+            self.submit_thumbnail(id, url, true, Priority::Background, cx);
+        }
     }
 
     /// Records a refresh-batch fetch result for `item_id`, if it belongs to the
@@ -405,11 +296,5 @@ impl LibraryController {
             let failed = std::mem::take(&mut self.thumbnail_refresh_failed);
             cx.emit(ThumbnailRefreshCompleted { succeeded, failed });
         }
-    }
-}
-
-impl std::fmt::Display for ThumbnailFetchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
     }
 }

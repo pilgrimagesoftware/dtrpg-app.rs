@@ -1,8 +1,9 @@
 //! Small reusable rendering helpers shared across views.
 
-use gpui::{ElementId, SharedString};
+use gpui::{ElementId, SharedString, Styled as _};
 use gpui_kit::component::text::TextView;
 
+use crate::data::theme::ColorTokens;
 use crate::util::text::escape_markdown;
 
 /// Renders `text` as selectable, copyable plain text via `gpui-kit`'s
@@ -25,4 +26,13 @@ pub fn selectable_text(id: impl Into<ElementId>, text: impl Into<SharedString>) 
 /// a value" visual distinction without that defect.
 pub fn small_caps_text(text: impl Into<SharedString>) -> String {
     text.into().to_uppercase()
+}
+
+/// A small, secondary-colored note under a setting, which can be selected and
+/// copied. `id` must be unique among its siblings.
+pub fn selectable_note(id: impl Into<ElementId>, text: impl Into<SharedString>,
+                       colors: &ColorTokens)
+                       -> TextView {
+    selectable_text(id, text).text_xs()
+                             .text_color(colors.text_secondary)
 }

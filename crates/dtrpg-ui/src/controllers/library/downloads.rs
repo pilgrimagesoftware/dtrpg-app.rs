@@ -1,5 +1,6 @@
 //! Download queue management and request entry points.
 
+use super::collection_links::{link_into_collection, root_of};
 use super::*;
 
 impl LibraryController {
@@ -15,15 +16,9 @@ impl LibraryController {
     /// `LibraryItem::recompute_status`): every file's `downloaded` flag is
     /// cleared first, then the entry status is re-derived.
     pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
-        if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id)
-           && item.status == ItemStatus::Downloaded
-        {
-            for file in &mut item.files {
-                file.downloaded = false;
-            }
-            item.recompute_status();
-            self.section_counts =
-                section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+        if self.library.clear_item_downloads(id) {
+            self.refresh_root_title_counts();
+            self.refresh_section_counts();
             self.invalidate_cache();
             self.file_info_cache
                 .retain(|(entry_id, _), _| entry_id.as_ref() != id);
@@ -41,9 +36,7 @@ impl LibraryController {
     /// queued/in flight — see [`Self::enqueue_item_download`].
     pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(indices) = self.catalog
-                                .iter()
-                                .find(|i| i.id.as_ref() == id)
+        let Some(indices) = self.item_by_id(id)
                                 .map(|item| missing_file_indices(&item.files))
         else {
             return;
@@ -61,12 +54,14 @@ impl LibraryController {
     /// items. Already-downloaded, already-queued, and already-active
     /// items/files are left untouched — see [`Self::enqueue_download`].
     pub fn download_all_for_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        let collections = self.library.collections();
+        let Some(collection) = collections.iter().find(|c| c.id == collection_id)
         else {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
-        let targets = collection_download_targets(&self.catalog, &member_ids);
+        let all = self.all_items();
+        let targets = collection_download_targets(&all, &member_ids);
         for (id, title) in targets {
             self.enqueue_download(&id, title.to_string(), cx);
         }
@@ -79,7 +74,8 @@ impl LibraryController {
     /// Already-downloaded, already-queued, and already-active items/files
     /// are left untouched — see [`Self::enqueue_download`].
     pub fn download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
-        let targets = publisher_download_targets(&self.catalog, publisher);
+        let all = self.all_items();
+        let targets = publisher_download_targets(&all, publisher);
         for (id, title) in targets {
             self.enqueue_download(&id, title.to_string(), cx);
         }
@@ -95,7 +91,8 @@ impl LibraryController {
     /// already-queued, and already-active items/files are left untouched —
     /// see [`Self::enqueue_download`].
     pub fn download_all_for_filter(&mut self, filter: &SidebarFilter, cx: &mut Context<Self>) {
-        let targets = filter_download_targets(&self.catalog,
+        let all = self.all_items();
+        let targets = filter_download_targets(&all,
                                               filter,
                                               &self.collection_members,
                                               now_secs(),
@@ -112,45 +109,36 @@ impl LibraryController {
     /// downloaded, or that specific file is already queued/in flight.
     pub fn enqueue_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
-        let Some(item_id) = self.catalog
-                                .iter()
-                                .find(|i| {
-                                    i.id.as_ref() == id
-                                    && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
-                                })
-                                .map(|i| Arc::clone(&i.id))
+        let Some(item) = self.item_by_id(id).filter(|item| {
+                                                item.files
+                                                    .get(index as usize)
+                                                    .is_some_and(|f| !f.downloaded)
+                                            })
         else {
             return;
         };
-        let key = (Arc::clone(&item_id), index);
-        let already_pending = self.download_queue
-                                  .iter()
-                                  .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
-                              || self.download_activity_ids.contains_key(&key);
-        if already_pending {
+        if self.library.is_file_queued_or_active(id, index) {
             return;
         }
-        self.download_queue
-            .push_back((item_id, index, title.into()));
-        self.drain_download_queue(cx);
+        self.submit_download(item, index, title.into());
+        cx.emit(LibraryChanged);
     }
 
     /// Gates [`Self::enqueue_download`] behind a free-disk-space check.
     ///
     /// Computes the entry's aggregate missing-file size and compares it to
-    /// [`crate::data::storage::available_space_mb`]. If space is sufficient
-    /// or can't be determined, queues immediately; otherwise stashes the
-    /// request and emits [`LowDiskSpaceWarning`] instead of queuing anything.
+    /// [`dtrpg_core::data::storage::available_space_mb`]. If space is
+    /// sufficient or can't be determined, queues immediately; otherwise
+    /// stashes the request and emits [`LowDiskSpaceWarning`] instead of
+    /// queuing anything.
     pub fn request_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(needed_mb) = self.catalog
-                                  .iter()
-                                  .find(|i| i.id.as_ref() == id)
-                                  .map(|item| missing_files_size_mb(&item.files))
+        let Some(item) = self.item_by_id(id)
         else {
             return;
         };
-        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+        let needed_mb = missing_files_size_mb(&item.files);
+        if let Some(free_mb) = self.warn_if_insufficient_space_for_item(&item, needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::Item { id: Arc::from(id),
                                                                         title });
             cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
@@ -165,16 +153,18 @@ impl LibraryController {
     pub fn request_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(needed_mb) = self.catalog
-                                  .iter()
-                                  .find(|i| i.id.as_ref() == id)
-                                  .and_then(|item| item.files.get(index as usize))
+        let Some(item) = self.item_by_id(id)
+        else {
+            return;
+        };
+        let Some(needed_mb) = item.files
+                                  .get(index as usize)
                                   .filter(|f| !f.downloaded)
                                   .map(|f| f.size_mb)
         else {
             return;
         };
-        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+        if let Some(free_mb) = self.warn_if_insufficient_space_for_item(&item, needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::ItemFile { id: Arc::from(id),
                                                                             index,
                                                                             title });
@@ -191,14 +181,16 @@ impl LibraryController {
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_collection(&mut self, collection_id: u64,
                                                cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        let collections = self.library.collections();
+        let Some(collection) = collections.iter().find(|c| c.id == collection_id)
         else {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
-        let targets = collection_download_targets(&self.catalog, &member_ids);
-        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
-                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        let all = self.all_items();
+        let targets = collection_download_targets(&all, &member_ids);
+        let needed_mb =
+            missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
         if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::Collection { collection_id });
             cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
@@ -213,9 +205,10 @@ impl LibraryController {
     /// The check is evaluated once as an aggregate across every matching
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
-        let targets = publisher_download_targets(&self.catalog, publisher);
-        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
-                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        let all = self.all_items();
+        let targets = publisher_download_targets(&all, publisher);
+        let needed_mb =
+            missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
         if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
             self.pending_download =
                 Some(PendingDownloadRequest::Publisher { publisher: Arc::from(publisher), });
@@ -232,13 +225,14 @@ impl LibraryController {
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_filter(&mut self, filter: SidebarFilter,
                                            cx: &mut Context<Self>) {
-        let targets = filter_download_targets(&self.catalog,
+        let all = self.all_items();
+        let targets = filter_download_targets(&all,
                                               &filter,
                                               &self.collection_members,
                                               now_secs(),
                                               self.recently_updated_window_days);
-        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
-                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        let needed_mb =
+            missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
         if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::Filter { filter });
             cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
@@ -248,10 +242,29 @@ impl LibraryController {
     }
 
     /// Returns `Some(free_mb)` if `needed_mb` exceeds the free space at the
-    /// storage root; `None` if space is sufficient or can't be determined
-    /// (fail open — see `download-disk-space-check`).
+    /// storage root; `None` if space is sufficient, can't be determined, or the
+    /// "Check free space" setting is off (fail open — see
+    /// `download-disk-space-check`).
     pub(super) fn warn_if_insufficient_space(needed_mb: f64) -> Option<f64> {
-        let free_mb = crate::data::storage::available_space_mb()?;
+        if !StorageConfig::load().check_free_space() {
+            return None;
+        }
+        let free_mb = dtrpg_core::data::storage::available_space_mb()?;
+        (needed_mb > free_mb).then_some(free_mb)
+    }
+
+    /// Applies the same free-space check to the root selected by placement
+    /// rules for `item`. Bulk requests retain their aggregate default-root
+    /// check; single-item requests can safely use the exact destination root.
+    pub(super) fn warn_if_insufficient_space_for_item(&self, item: &LibraryItem, needed_mb: f64)
+                                                      -> Option<f64> {
+        let storage = StorageConfig::load();
+        if !storage.check_free_space() {
+            return None;
+        }
+        let collection_ids = collection_ids_for_item(item, &self.library.collections());
+        let root = storage.resolve_root_for(&item.publisher, &collection_ids, item.size_mb);
+        let free_mb = available_space_mb_at(&root.path)?;
         (needed_mb > free_mb).then_some(free_mb)
     }
 
@@ -289,32 +302,32 @@ impl LibraryController {
 
     /// Cancels a single file's download that has not yet completed.
     ///
-    /// If `(id, index)` is still waiting in `download_queue`, removes it —
-    /// no activity entry existed yet for a queued item. If it is actively
-    /// fetching (holds a concurrency slot), signals its cancellation flag
-    /// and removes its activity panel entry immediately; the in-flight
-    /// task observes the flag at its next checkpoint, skips marking the
-    /// file `downloaded`, and frees the slot itself (see
-    /// [`Self::dispatch_download`]) — `active_downloads` is only ever
-    /// decremented there, never here, to avoid double-counting the slot.
-    /// Other files queued or in flight for the same entry are unaffected.
+    /// A download still waiting in the work queue is removed and never
+    /// starts; no activity entry existed yet for it. One that is running has
+    /// its job cancelled and its activity panel entry removed immediately; the
+    /// job observes the cancellation at its next checkpoint, so the file is
+    /// not marked `downloaded`, and the queue frees its slot. Other files
+    /// queued or in flight for the same entry are unaffected.
     ///
     /// No-op if `(id, index)` is not queued or in flight.
     pub fn cancel_download(&mut self, id: &str, index: u32, cx: &mut Context<Self>) {
-        if dequeue_file(&mut self.download_queue, id, index) {
-            return;
-        }
-
         let key = (Arc::<str>::from(id), index);
-        let Some(flag) = self.download_cancel_flags.remove(&key)
+        let Some((_job_id, activity_id)) = self.library.cancel_download(&key)
         else {
             return;
         };
-        flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        if let Some(activity_id) = self.download_activity_ids.remove(&key) {
+        if let Some(activity_id) = activity_id {
             self.activity
                 .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
         }
+        cx.emit(LibraryChanged);
+    }
+
+    /// Returns `true` if any file of catalog entry `id` is currently queued or
+    /// actively downloading.
+    #[must_use]
+    pub fn is_downloading(&self, id: &str) -> bool {
+        self.library.is_downloading(id)
     }
 
     /// Returns `true` if the file at `(id, index)` is currently queued or
@@ -324,12 +337,7 @@ impl LibraryController {
     /// indicator on a row instead of its download/downloaded affordance.
     #[must_use]
     pub fn is_file_queued_or_active(&self, id: &str, index: u32) -> bool {
-        self.download_queue
-            .iter()
-            .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
-        || self.download_activity_ids
-               .keys()
-               .any(|(aid, aidx)| aid.as_ref() == id && *aidx == index)
+        self.library.is_file_queued_or_active(id, index)
     }
 }
 
@@ -339,25 +347,10 @@ pub(crate) fn create_collections_symlinks(dest: &Path, order_product_id: u64, pr
     if !storage.create_collections() {
         return;
     }
-    let Some(file_name) = dest.file_name()
-    else {
-        return;
-    };
-    let root = storage.root_path();
+    let root = root_of(dest).unwrap_or_else(|| storage.root_path());
     for collection in collections {
-        if !member_ids_contain(&collection.member_ids, order_product_id, product_id) {
-            continue;
-        }
-        let link_dir = crate::data::storage::collection_dir(&root, &collection.name);
-        if let Err(e) = std::fs::create_dir_all(&link_dir) {
-            tracing::warn!(dir = %link_dir.display(), error = %e,
-                           "failed to create collections symlink directory");
-            continue;
-        }
-        let link = link_dir.join(file_name);
-        if let Err(e) = crate::util::symlink::ensure_symlink(dest, &link) {
-            tracing::warn!(target = %dest.display(), link = %link.display(), error = %e,
-                           "failed to create collections symlink");
+        if member_ids_contain(&collection.member_ids, order_product_id, product_id) {
+            link_into_collection(dest, &root, &collection.name);
         }
     }
 }

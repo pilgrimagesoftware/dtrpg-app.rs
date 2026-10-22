@@ -4,10 +4,10 @@
 use std::error::Error as StdError;
 
 use dtrpg_sdk::{ClientError, SdkError};
-use dtrpg_ui::services::{LibraryServiceError, LibraryServiceErrorKind};
 
 use super::super::connection::ConnectionError;
 use crate::constants::{ACCESS_TOKEN_ENV, APPLICATION_KEY_ENV};
+use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
 pub(super) fn map_client_error(error: ClientError) -> LibraryServiceError {
     match error {

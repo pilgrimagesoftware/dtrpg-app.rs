@@ -8,10 +8,12 @@
 //! the active page to the first one every time the settings window is closed
 //! and reopened (a new window has its own state). Driving the active page
 //! from `SettingsController::active_page_ix` instead lets it persist across
-//! close/reopen (see `crate::data::ui_state::UiState`).
+//! close/reopen (see `dtrpg_core::data::ui_state::UiState`).
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::file_openers::FileOpenerEntry;
+use dtrpg_core::data::native_preferences::NativePreferencesFile;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, FocusHandle, IntoElement, MouseButton, ParentElement, Styled, div, px,
@@ -21,21 +23,23 @@ use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
-use crate::controllers::library::LibraryController;
-use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
-use crate::data::file_openers::FileOpenerEntry;
+use crate::controllers::library::{FilterValueSection, LibraryController};
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
-    settings_advanced_view::{render_about_section, render_advanced_section},
-    settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
+    settings_advanced_view::render_advanced_section,
+    settings_agent_view::render_agent_section,
+    settings_appearance_view::render_appearance_section,
     settings_file_openers_view::render_file_openers_section,
-    settings_storage_view::render_storage_section,
+    settings_storage_view::{StoragePageData, render_storage_section},
+    settings_theme_editor::ThemeEditorData,
 };
+use crate::view_models::agent_display::AgentPageData;
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
-/// Openers, Advanced, About); see [`page_title`] and the `match` in
-/// [`render_settings_panel`]. Sidebar order matches index order.
+/// Openers, Native Integration, Advanced); see [`page_title`] and the `match`
+/// in [`render_settings_panel`]. Sidebar order matches index order.
 const PAGE_COUNT: usize = 6;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
@@ -46,8 +50,8 @@ fn page_title(ix: usize) -> String {
         1 => t!("settings.appearance_title").to_string(),
         2 => t!("settings.downloads_location").to_string(),
         3 => t!("settings.file_openers_title").to_string(),
-        4 => t!("settings.advanced_title").to_string(),
-        5 => t!("settings.about_title").to_string(),
+        4 => t!("agent.title").to_string(),
+        5 => t!("settings.advanced_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -61,22 +65,20 @@ fn page_title(ix: usize) -> String {
 /// the window via [`SettingsController::close`].
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
-                             storage_root_path: PathBuf, storage_path_exists: bool,
-                             entity: Entity<SettingsController>,
+                             storage: StoragePageData, agent: AgentPageData,
+                             theme_editor: ThemeEditorData, entity: Entity<SettingsController>,
                              library: Entity<LibraryController>, focus_handle: &FocusHandle,
                              colors: &ColorTokens, theme: &LibriTheme,
                              email_input: Option<Entity<InputState>>,
                              password_input: Option<Entity<InputState>>,
                              sign_in_in_progress: bool, sign_in_enabled: bool,
                              sign_in_error: Option<String>,
-                             storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
-                             cache_counts: CacheCounts, max_concurrent_downloads: usize,
-                             max_concurrent_downloads_input: Option<Entity<InputState>>,
-                             create_collections: bool, recently_updated_window_days: u32,
+                             recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
-                             font_selects: AppearanceFontSelects)
+                             native: NativePreferencesFile,
+                             filter_values: Vec<FilterValueSection>)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -103,28 +105,26 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                   .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
-        1 => render_appearance_section(library, colors, theme, font_selects).into_any_element(),
-        2 => render_storage_section(storage_root_path,
-                                    storage_path_exists,
-                                    entity.clone(),
-                                    colors,
-                                    storage_path_input,
-                                    max_concurrent_downloads,
-                                    max_concurrent_downloads_input,
-                                    create_collections).into_any_element(),
+        1 => render_appearance_section(library, colors, theme, theme_editor).into_any_element(),
+        2 => render_storage_section(entity.clone(), colors, storage).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        4 => render_advanced_section(entity.clone(),
-                                     cache_counts,
+        4 => render_agent_section(entity.clone(),
+                                  agent,
+                                  colors,
+                                  &theme.fonts.label_font,
+                                  &theme.fonts.mono_font).into_any_element(),
+        5 => render_advanced_section(entity.clone(),
+                                     native,
                                      colors,
                                      &theme.fonts.label_font,
-                                     &theme.fonts.value_font,
                                      recently_updated_window_days,
-                                     recently_updated_window_input).into_any_element(),
-        5 => render_about_section(colors).into_any_element(),
+                                     recently_updated_window_input,
+                                     &filter_values,
+                                     &library).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),
                                     colors,
@@ -133,7 +133,6 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     sign_in_in_progress,
                                     sign_in_enabled,
                                     sign_in_error,
-                                    &theme.fonts.label_font,
                                     &theme.fonts.mono_font),
     };
 
@@ -193,4 +192,18 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                                           .overflow_y_scrollbar()
                                                                           .child(content))))
          .into_any_element()
+}
+
+#[cfg(test)]
+mod page_tests {
+    use rust_i18n::t;
+
+    use super::page_title;
+    use crate::controllers::settings::FILE_OPENERS_PAGE_IX;
+
+    #[test]
+    fn the_file_openers_page_index_is_the_file_openers_page() {
+        assert_eq!(page_title(FILE_OPENERS_PAGE_IX),
+                   t!("settings.file_openers_title"));
+    }
 }

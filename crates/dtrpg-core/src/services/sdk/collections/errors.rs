@@ -2,10 +2,10 @@
 //! [`CollectionsServiceError`].
 
 use dtrpg_sdk::{ClientError, SdkError};
-use dtrpg_ui::services::collections::{CollectionsServiceError, CollectionsServiceErrorKind};
 
 use super::super::connection::ConnectionError;
 use crate::constants::{ACCESS_TOKEN_ENV, APPLICATION_KEY_ENV};
+use crate::services::collections::{CollectionsServiceError, CollectionsServiceErrorKind};
 
 pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
     match error {

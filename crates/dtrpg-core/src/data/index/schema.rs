@@ -1,0 +1,188 @@
+//! DDL for the library index. See
+//! `docs/adr/0003-sqlite-library-index.md`.
+
+use rusqlite::Connection;
+
+/// Bump whenever the schema changes in a way that requires existing
+/// databases to be rebuilt, mirroring `catalog_cache.rs`'s
+/// `CACHE_SCHEMA_VERSION` convention for the JSON cache it replaces.
+pub(super) const SCHEMA_VERSION: i64 = 4;
+
+/// Creates every table, index, and the FTS5 virtual table if they don't
+/// already exist, then records (or checks) the schema version via SQLite's
+/// `user_version` pragma.
+///
+/// # Errors
+///
+/// Returns a [`rusqlite::Error`] if any DDL statement fails.
+pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
+    let previous_version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    conn.execute_batch(
+                       "
+        CREATE TABLE IF NOT EXISTS items (
+            id                TEXT PRIMARY KEY,
+            numeric_id        INTEGER NOT NULL,
+            order_product_id  INTEGER NOT NULL,
+            product_id        INTEGER NOT NULL,
+            title             TEXT NOT NULL,
+            publisher         TEXT NOT NULL,
+            line              TEXT NOT NULL,
+            kind              TEXT NOT NULL,
+            format            TEXT NOT NULL,
+            pages             INTEGER NOT NULL,
+            size_mb           REAL NOT NULL,
+            year              INTEGER NOT NULL,
+            added_order       INTEGER NOT NULL,
+            status            TEXT NOT NULL,
+            color             TEXT NOT NULL,
+            description       TEXT NOT NULL,
+            cover_url         TEXT,
+            detail_cover_url  TEXT,
+            date_added        INTEGER,
+            date_updated      INTEGER,
+            is_available      INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS files (
+            item_id    TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            file_id    TEXT NOT NULL,
+            file_index INTEGER NOT NULL,
+            name       TEXT NOT NULL,
+            format     TEXT NOT NULL,
+            size_mb    REAL NOT NULL,
+            downloaded INTEGER NOT NULL DEFAULT 0,
+            offloaded INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (item_id, file_id, name)
+        );
+        CREATE INDEX IF NOT EXISTS files_by_item ON files(item_id);
+
+        CREATE TABLE IF NOT EXISTS item_filters (
+            item_id   TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            filter_id INTEGER NOT NULL,
+            parent_id INTEGER NOT NULL,
+            category  TEXT NOT NULL,
+            name      TEXT NOT NULL,
+            PRIMARY KEY (item_id, filter_id)
+        );
+        CREATE INDEX IF NOT EXISTS item_filters_by_category ON item_filters(category, name);
+
+        CREATE TABLE IF NOT EXISTS collections (
+            id         INTEGER PRIMARY KEY,
+            name       TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS collection_membership (
+            collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+            member_id     INTEGER NOT NULL,
+            PRIMARY KEY (collection_id, member_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS tags (
+            id    INTEGER PRIMARY KEY,
+            name  TEXT NOT NULL UNIQUE,
+            color TEXT
+        );
+
+        -- No foreign key on item_id: the catalog is rewritten in full, and
+        -- deleting its rows must not delete the user's tags with them (the
+        -- catalog is saved in checkpoints while pages are still loading).
+        CREATE TABLE IF NOT EXISTS item_tags (
+            item_id TEXT NOT NULL,
+            tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (item_id, tag_id)
+        );
+
+        -- When an item's tags last changed in the index, in Unix seconds. It
+        -- settles which side wins when a file's tags and the index's both
+        -- changed since they were last in step.
+        CREATE TABLE IF NOT EXISTS item_tags_changed (
+            item_id    TEXT PRIMARY KEY,
+            changed_at INTEGER NOT NULL
+        );
+
+        -- The tags (names, one per line) the index and a file last agreed on,
+        -- which tells a change made in the index from one made to the file.
+        CREATE TABLE IF NOT EXISTS file_tag_sync (
+            path      TEXT PRIMARY KEY,
+            item_id   TEXT NOT NULL,
+            tags      TEXT NOT NULL,
+            synced_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS storage_roots (
+            id   INTEGER PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE
+        );
+
+        CREATE TABLE IF NOT EXISTS item_placement (
+            item_id        TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            storage_root_id INTEGER NOT NULL REFERENCES storage_roots(id) ON DELETE CASCADE,
+            PRIMARY KEY (item_id, storage_root_id)
+        );
+
+        -- Which storage location each downloaded file was put in, by the
+        -- location's name. It is not tied to `items`, whose rows are replaced
+        -- whenever an item is written, so the record survives a catalog sync.
+        CREATE TABLE IF NOT EXISTS file_locations (
+            item_id   TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            location  TEXT NOT NULL,
+            PRIMARY KEY (item_id, file_name)
+        );
+
+        CREATE TABLE IF NOT EXISTS summaries (
+            item_id    TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+            text       TEXT NOT NULL,
+            model      TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            token_count INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id     INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts     INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            detail TEXT NOT NULL
+        );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+            item_id UNINDEXED,
+            title,
+            publisher,
+            authors,
+            description,
+            tags,
+            file_names,
+            summary_text
+        );
+        ",
+    )?;
+    if previous_version == 1 {
+        conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0",
+                     [])?;
+    }
+    if (1..3).contains(&previous_version) {
+        // Version 3 dropped the foreign key from `item_tags.item_id`. SQLite
+        // cannot drop a constraint, so the table is rebuilt.
+        conn.execute_batch(
+                           "
+            CREATE TABLE item_tags_new (
+                item_id TEXT NOT NULL,
+                tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (item_id, tag_id)
+            );
+            INSERT INTO item_tags_new (item_id, tag_id) SELECT item_id, tag_id FROM item_tags;
+            DROP TABLE item_tags;
+            ALTER TABLE item_tags_new RENAME TO item_tags;
+            ",
+        )?;
+    }
+    if (1..4).contains(&previous_version) {
+        // Version 4 added a color to tags. The two tables it added are created
+        // above, empty: nothing is out of step until a file has been synced.
+        conn.execute("ALTER TABLE tags ADD COLUMN color TEXT", [])?;
+    }
+    conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    Ok(())
+}

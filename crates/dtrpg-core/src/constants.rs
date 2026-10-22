@@ -38,3 +38,6 @@ pub const MAX_DOWNLOAD_ATTEMPTS: u32 = 4;
 pub const DOWNLOAD_RETRY_BASE_DELAY_SECS: u64 = 2;
 /// Maximum delay in seconds any single download retry will wait.
 pub const DOWNLOAD_RETRY_MAX_DELAY_SECS: u64 = 30;
+
+/// How many matching titles the smart collection editor lists as a preview.
+pub const SMART_PREVIEW_TITLE_LIMIT: usize = 50;

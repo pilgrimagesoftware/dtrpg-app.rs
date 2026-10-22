@@ -20,6 +20,7 @@ actions!(libri, [Minimize, Zoom, ToggleFullscreen]);
 // Catalog menu actions
 actions!(libri,
          [AddCollection,
+          NewSmartCollection,
           ReloadCatalog,
           RefreshThumbnails,
           CheckItemAvailability]);
@@ -55,9 +56,5 @@ actions!(libri,
           SortAscending,
           SortDescending,
           ToggleGroupByPublisher,
+          ToggleGroupByTag,
           FocusSearch,]);
-
-// Window menu tab-selection actions
-actions!(libri,
-         [SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5, SelectTab6,
-          SelectTab7, SelectTab8, SelectTab9,]);

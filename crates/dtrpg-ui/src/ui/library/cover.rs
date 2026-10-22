@@ -3,11 +3,10 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::util::hash::fnv1a_32;
+use dtrpg_core::util::image_format::{ImageKind, sniff};
 use gpui::{Hsla, Image, ImageFormat, IntoElement, ParentElement, Styled, div, px, rgb};
-
-use crate::data::library::LibraryItem;
-use crate::util::hash::fnv1a_32;
-use crate::util::image_format::{ImageKind, sniff};
 
 // ── CoverCache
 // ────────────────────────────────────────────────────────────────
@@ -246,9 +245,10 @@ pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32, rend
 
 #[cfg(test)]
 mod tests {
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::services::stub_catalog::stub_catalog;
+
     use super::*;
-    use crate::data::enums::ItemStatus;
-    use crate::util::stubs::*;
 
     fn make_item(id: &str, title: &str, color: &str) -> LibraryItem {
         LibraryItem { id:                        id.into(),
@@ -274,7 +274,10 @@ mod tests {
                       thumbnail_last_attempted:  None,
                       is_available:              true,
                       availability_last_checked: None,
-                      files:                     Vec::new(), }
+                      files:                     Vec::new(),
+                      filters:                   Vec::new(),
+                      locations:                 Vec::new(),
+                      collections:               Vec::new(), }
     }
 
     #[test]

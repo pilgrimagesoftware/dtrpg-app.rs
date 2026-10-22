@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use dtrpg_core::util::matching::member_ids_contain;
 use gpui::prelude::*;
 use gpui::{App, Entity, Window, div, px};
 use gpui_kit::component::button::Button;
@@ -23,7 +24,6 @@ use crate::data::events::{
     CollectionCreateFailed, CollectionMemberAddFailed, CollectionMemberRemoveFailed,
 };
 use crate::data::theme::LibriTheme;
-use crate::util::matching::member_ids_contain;
 
 /// Transient state shared by the dialog's closures for one open session.
 struct ManageCollectionsState {
@@ -115,7 +115,7 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                   member_id: u64, product_id: u64)
                   -> DialogContent {
     let colors = cx.global::<LibriTheme>().colors.clone();
-    let collections = controller.read(cx).collections.clone();
+    let collections = controller.read(cx).collections().to_vec();
     let error = state.borrow().error.clone();
 
     let mut rows = v_flex().gap_2();

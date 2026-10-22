@@ -1,5 +1,6 @@
 //! Collection CRUD, membership changes, and the collections service swap.
 
+use super::collection_links::{link_item_into_collection, unlink_item_from_collection};
 use super::*;
 
 impl LibraryController {
@@ -64,6 +65,14 @@ impl LibraryController {
           .detach();
     }
 
+    /// Brings what depends on which items are in which collections up to date:
+    /// the smart collections' counts and members, and the catalog, since a
+    /// `collection:` search reads the membership.
+    pub(super) fn membership_changed(&mut self) {
+        self.refresh_smart_collections();
+        self.invalidate_cache();
+    }
+
     /// Stores the fetched collections and emits a change event.
     pub(super) fn apply_collections(&mut self, mut collections: Vec<CollectionEntry>,
                                     cx: &mut Context<Self>) {
@@ -72,25 +81,40 @@ impl LibraryController {
                          self.collection_sort,
                          self.collection_sort_direction,
                          &catalog_ids);
-        self.collections = collections;
-        self.collections_loaded = true;
+        self.library.set_collections(collections);
+        self.refresh_collection_cloud();
         // Refresh collection_members if the current filter is a Collection
         // filter, in case the filter was set before the collections
         // loaded.
         if let SidebarFilter::Collection(id, _) = &self.filter {
-            let id = *id;
-            self.collection_members = self.collections
-                                          .iter()
-                                          .find(|c| c.id == id)
-                                          .map(|c| c.member_ids.iter().copied().collect())
-                                          .unwrap_or_default();
+            self.collection_members = self.library.collection_member_ids(*id);
         }
+        self.membership_changed();
         cx.emit(LibraryChanged);
+    }
+
+    /// The collections as they are now, for the views and for work started
+    /// from them. A cheap `Arc` clone; edits go through `Library`.
+    #[must_use]
+    pub fn collections(&self) -> Arc<Vec<CollectionEntry>> {
+        self.library.collections()
     }
 
     /// Returns the current pane state from the service layer.
     pub fn pane_state(&self) -> &LibraryPaneState {
         self.vm.pane_state()
+    }
+
+    /// Forgets the stored library, its collections and the selection, so that
+    /// whoever signs in next does not see this account's titles. Called when
+    /// the user signs out.
+    pub fn forget_library(&mut self, cx: &mut Context<Self>) {
+        self.library.clear_catalog();
+        self.library.clear_collections();
+        self.collection_members.clear();
+        self.selection = Selection::default();
+        self.invalidate_cache();
+        cx.emit(LibraryChanged);
     }
 
     /// Replaces the backing services and triggers a fresh catalog and
@@ -99,32 +123,41 @@ impl LibraryController {
     /// Clears the activity panel so stale error messages from the previous
     /// (unauthenticated) service do not persist after sign-in.
     ///
-    /// Sets `catalog_loading` before clearing the catalog so the catalog view
-    /// shows its loading spinner instead of the "library empty" state for the
-    /// gap between this clear and `start_load` repopulating it — otherwise a
-    /// catalog already populated from disk cache (e.g. during startup's
-    /// silent re-authentication) flashes empty before reappearing.
+    /// Sets `catalog_loading` so the catalog view shows that it is loading
+    /// while `start_load` checks the library against the service.
+    ///
+    /// The catalog is kept. It is the on-disk copy of the library, which the
+    /// load reads first (to skip or shorten the fetch) and which has to
+    /// survive a quit or a crash part way through a load. Clearing it here
+    /// threw away everything fetched so far on each launch, because the quiet
+    /// sign-in at startup comes through this method. Signing out is what
+    /// forgets the library (see [`forget_library`](Self::forget_library)).
     pub fn replace_service(&mut self, service: Box<dyn LibraryService>,
                            collections_service: Box<dyn CollectionsService>,
                            cx: &mut Context<Self>) {
+        self.install_services(service, collections_service, cx);
+        // Collections are loaded as the first stage of `start_load`, sharing
+        // its single activity item rather than starting a separate one.
+        self.start_load(cx);
+    }
+
+    /// Installs the new services and resets what depended on the old ones,
+    /// without starting a load. [`replace_service`](Self::replace_service)
+    /// is this followed by the load; tests call this alone, so that they do
+    /// not start a background load that outlives them.
+    pub(super) fn install_services(&mut self, service: Box<dyn LibraryService>,
+                                   collections_service: Box<dyn CollectionsService>,
+                                   cx: &mut Context<Self>) {
         tracing::debug!("replace_service: installing authenticated services");
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
-        self.catalog.clear();
-        self.section_counts =
-            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&self.catalog);
-        self.collections.clear();
-        self.collections_loaded = false;
+        self.library.clear_collections();
         self.collection_members.clear();
         self.selection = Selection::default();
         self.invalidate_cache();
         self.activity.update(cx, |a, cx| a.clear(cx));
         cx.emit(LibraryChanged);
-        // Collections are loaded as the first stage of `start_load`, sharing
-        // its single activity item rather than starting a separate one.
-        self.start_load(cx);
     }
 
     /// Starts a background task to create a new collection with the given name.
@@ -134,6 +167,14 @@ impl LibraryController {
     /// [`CollectionCreateFailed`] is emitted so the window can push an
     /// error notification.
     pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
+        self.create_collection_then(name, |_| {}, cx);
+    }
+
+    /// As [`Self::create_collection`], and calls `done` with the new entry, or
+    /// the reason it could not be made, once the create call has finished.
+    pub fn create_collection_then(&mut self, name: String,
+                                  done: impl FnOnce(Result<CollectionEntry, String>) + 'static,
+                                  cx: &mut Context<Self>) {
         let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
@@ -146,13 +187,15 @@ impl LibraryController {
 
               match result {
                   Ok(entry) => {
+                      let created = entry.clone();
                       this.update(async_cx, |ctrl, cx| {
-                              ctrl.collections.push(entry);
+                              ctrl.library.push_collection(entry);
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
                           })
                           .ok();
+                      done(Ok(created));
                   }
                   Err(e) => {
                       this.update(async_cx, |ctrl, cx| {
@@ -162,6 +205,7 @@ impl LibraryController {
                               cx.emit(CollectionCreateFailed { message: e.message.clone(), });
                           })
                           .ok();
+                      done(Err(e.message));
                   }
               }
           })
@@ -195,7 +239,7 @@ impl LibraryController {
                   Ok(entry) => {
                       let collection_id = entry.id;
                       this.update(async_cx, |ctrl, cx| {
-                              ctrl.collections.push(entry);
+                              ctrl.library.push_collection(entry);
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
@@ -233,13 +277,14 @@ impl LibraryController {
               match result {
                   Ok(()) => {
                       this.update(async_cx, |ctrl, cx| {
-                              ctrl.collections.retain(|c| c.id != id);
+                              ctrl.library.remove_collection(id);
                               if let SidebarFilter::Collection(cid, _) = &ctrl.filter
                                  && *cid == id
                               {
                                   ctrl.filter = SidebarFilter::default();
                                   ctrl.collection_members.clear();
                               }
+                              ctrl.membership_changed();
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
@@ -258,175 +303,7 @@ impl LibraryController {
           })
           .detach();
     }
-
-    /// Adds `item_id` (an item's `order_product_id`/`product_id`) as a member
-    /// of the collection with `collection_id`.
-    ///
-    /// `item_id` drives the local optimistic `member_ids`/`collection_members`
-    /// update and its rollback-on-failure branch, matching the id space
-    /// `CollectionEntry::member_ids` already uses. `product_id` is the item's
-    /// catalog `product_id`, sent as the network add call's product
-    /// identifier — the API's `product_list_items` endpoint rejects
-    /// `order_product_id` values with an invalid-product-id error.
-    ///
-    /// Updates `member_ids` (and `collection_members`, if that collection is
-    /// the active filter) immediately, then confirms the change via the
-    /// service. On failure the optimistic update is rolled back and
-    /// [`CollectionMemberAddFailed`] is emitted so the window can show an
-    /// error notification.
-    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64, product_id: u64,
-                                  cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
-        else {
-            return;
-        };
-        if member_ids_contain(&collection.member_ids, item_id, product_id) {
-            return;
-        }
-        let collection_name = collection.name.clone();
-        let mut member_ids: Vec<u64> = collection.member_ids.iter().copied().collect();
-        member_ids.push(item_id);
-        collection.member_ids = Arc::from(member_ids.as_slice());
-
-        if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
-            self.collection_members.insert(item_id);
-        }
-        cx.emit(LibraryChanged);
-
-        let collections_service = Arc::clone(&self.collections_service);
-        cx.spawn(async move |this, async_cx| {
-              let result = async_cx.background_executor()
-                                   .spawn(async move {
-                                       collections_service.add_member(collection_id, product_id)
-                                   })
-                                   .await;
-              if let Err(e) = result {
-                  // A conflict means the item is already a member server-side: the
-                  // optimistic local update already matches reality, so it is left
-                  // in place rather than rolled back, and this is surfaced as a
-                  // low-severity notice instead of a hard failure.
-                  if e.kind == CollectionsServiceErrorKind::Conflict {
-                      this.update(async_cx, |_ctrl, cx| {
-                              cx.emit(CollectionMemberAlreadyPresent { message: e.message.clone(), });
-                          })
-                          .ok();
-                      return;
-                  }
-                  this.update(async_cx, |ctrl, cx| {
-                          if let Some(collection) =
-                              ctrl.collections.iter_mut().find(|c| c.id == collection_id)
-                          {
-                              let member_ids: Vec<u64> = collection.member_ids
-                                                                   .iter()
-                                                                   .copied()
-                                                                   .filter(|id| *id != item_id)
-                                                                   .collect();
-                              collection.member_ids = Arc::from(member_ids.as_slice());
-                          }
-                          if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
-                          {
-                              ctrl.collection_members.remove(&item_id);
-                          }
-                          cx.emit(LibraryChanged);
-                          ctrl.activity.update(cx, |a, cx| {
-                                           a.log_alert(format!(
-                                               "Add to collection '{collection_name}'"
-                                           ),
-                                                       e.message.clone(),
-                                                       cx);
-                                       });
-                          cx.emit(CollectionMemberAddFailed { message: e.message.clone(), });
-                      })
-                      .ok();
-              }
-          })
-          .detach();
-    }
-
-    /// Removes `item_id` (an item's `order_product_id`/`product_id`) as a
-    /// member of the collection with `collection_id`.
-    ///
-    /// `item_id` drives matching against the local optimistic `member_ids`/
-    /// `collection_members` cache, which may hold either id depending on how
-    /// the entry was populated (server data is `product_id`-keyed; a locally
-    /// added entry may still carry `item_id`). `product_id` is the item's
-    /// catalog `product_id`, sent as the network removal call's product
-    /// identifier — the API's server-side lookup that resolves the removal
-    /// target matches by `product_id`, never `order_product_id`, so sending
-    /// the wrong one causes the item to silently not be found.
-    ///
-    /// Updates `member_ids` (and `collection_members`, if that collection is
-    /// the active filter) immediately, then confirms the change via the
-    /// service. On failure the optimistic update is rolled back and
-    /// [`CollectionMemberRemoveFailed`] is emitted so the window can show an
-    /// error notification.
-    pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
-                                       product_id: u64, cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
-        else {
-            return;
-        };
-        if !member_ids_contain(&collection.member_ids, item_id, product_id) {
-            return;
-        }
-        let collection_name = collection.name.clone();
-        // Remove whichever id(s) are actually present, and remember them so a
-        // failed removal restores exactly what was there before rather than
-        // introducing an id that was never actually cached.
-        let removed_ids: Vec<u64> = collection.member_ids
-                                              .iter()
-                                              .copied()
-                                              .filter(|id| *id == item_id || *id == product_id)
-                                              .collect();
-        let member_ids: Vec<u64> = collection.member_ids
-                                             .iter()
-                                             .copied()
-                                             .filter(|id| *id != item_id && *id != product_id)
-                                             .collect();
-        collection.member_ids = Arc::from(member_ids.as_slice());
-
-        if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
-            self.collection_members.remove(&item_id);
-            self.collection_members.remove(&product_id);
-        }
-        cx.emit(LibraryChanged);
-
-        let collections_service = Arc::clone(&self.collections_service);
-        cx.spawn(async move |this, async_cx| {
-              let result = async_cx.background_executor()
-                                   .spawn(async move {
-                                       collections_service.remove_member(collection_id, product_id)
-                                   })
-                                   .await;
-              if let Err(e) = result {
-                  this.update(async_cx, |ctrl, cx| {
-                          if let Some(collection) =
-                              ctrl.collections.iter_mut().find(|c| c.id == collection_id)
-                          {
-                              let mut member_ids: Vec<u64> = collection.member_ids
-                                                                       .iter()
-                                                                       .copied()
-                                                                       .collect();
-                              member_ids.extend(&removed_ids);
-                              collection.member_ids = Arc::from(member_ids.as_slice());
-                          }
-                          if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
-                          {
-                              ctrl.collection_members.extend(&removed_ids);
-                          }
-                          cx.emit(LibraryChanged);
-                          ctrl.activity.update(cx, |a, cx| {
-                                           a.log_alert(format!(
-                                               "Remove from collection '{collection_name}'"
-                                           ),
-                                                       e.message.clone(),
-                                                       cx);
-                                       });
-                          cx.emit(CollectionMemberRemoveFailed { message: e.message.clone(), });
-                      })
-                      .ok();
-              }
-          })
-          .detach();
-    }
 }
+
+#[path = "collection_membership.rs"]
+mod collection_membership;

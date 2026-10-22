@@ -1,8 +1,11 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout
 //! switcher.
 
+use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
+use dtrpg_core::util::filter::*;
+use dtrpg_core::util::sort::*;
 use gpui::prelude::*;
-use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
+use gpui::{AnyElement, Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
 use gpui_kit::component::Icon;
 use gpui_kit::component::Selectable;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -13,10 +16,8 @@ use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
-use crate::data::{enums::CatalogPresentation, theme::ColorTokens};
-use crate::util::filter::*;
+use crate::data::theme::ColorTokens;
 use crate::util::pluralize::pluralize;
-use crate::util::sort::*;
 
 /// Human-readable title for a sidebar filter, used by both the catalog tab
 /// header and the status bar's active-tab summary.
@@ -26,12 +27,15 @@ pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
         SidebarFilter::RecentlyUpdated => t!("sidebar.recently_updated").to_string(),
         SidebarFilter::OnDevice => t!("sidebar.on_this_device").to_string(),
         SidebarFilter::InCloud => t!("sidebar.in_the_cloud").to_string(),
+        SidebarFilter::NeedsAttention => t!("sidebar.needs_attention").to_string(),
+        SidebarFilter::Insights => t!("sidebar.insights").to_string(),
         SidebarFilter::Publisher(name) => {
             t!("toolbar.filter_title_publisher", name = name).to_string()
         }
-        SidebarFilter::Collection(_, name) => {
+        SidebarFilter::Collection(_, name) | SidebarFilter::SmartCollection(_, name) => {
             t!("toolbar.filter_title_collection", name = name).to_string()
         }
+        SidebarFilter::Tag { name, .. } => t!("toolbar.filter_title_tag", name = name).to_string(),
     }
 }
 
@@ -80,9 +84,10 @@ fn count_label_for(filter: &SidebarFilter, filter_count: usize, matched_count: u
 #[allow(clippy::too_many_arguments)]
 pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count: usize,
                       total_count: usize, search_query: &str, search_input: Entity<InputState>,
-                      sort: SortMethod, sort_direction: SortDirection, grouped: bool,
+                      sort: SortMethod, sort_direction: SortDirection, group_by: GroupBy,
                       presentation: CatalogPresentation, selection_mode: bool,
-                      entity: Entity<LibraryController>, colors: &ColorTokens)
+                      entity: Entity<LibraryController>, filters_toggle: AnyElement,
+                      colors: &ColorTokens)
                       -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
@@ -129,7 +134,8 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
                      .items_center()
                      .gap(px(10.0))
                      .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
-                     .child(render_sort_selector(sort, sort_direction, grouped, entity.clone()))
+                     .child(filters_toggle)
+                     .child(render_sort_selector(sort, sort_direction, group_by, entity.clone()))
                      .child(render_layout_switcher(presentation, entity.clone()))
                      .child(render_selection_mode_toggle(selection_mode, entity)))
 }
@@ -137,7 +143,7 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
 // ── Sort selector
 // ─────────────────────────────────────────────────────────────
 
-fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: bool,
+fn render_sort_selector(current: SortMethod, direction: SortDirection, group_by: GroupBy,
                         entity: Entity<LibraryController>)
                         -> impl IntoElement + 'static {
     let label = match current {
@@ -163,6 +169,7 @@ fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: 
                                     let e5 = entity.clone();
                                     let e6 = entity.clone();
                                     let e7 = entity.clone();
+                                    let e8 = entity.clone();
                                     let mut m = menu
                 .item(
                     PopupMenuItem::new(t!("toolbar.sort_title"))
@@ -221,9 +228,18 @@ fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: 
                 .separator()
                 .item(
                     PopupMenuItem::new(t!("toolbar.group_by_publisher"))
-                        .checked(grouped)
+                        .checked(group_by == GroupBy::Publisher)
                         .on_click(move |_, _, cx| {
-                            e7.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
+                            e7.update(cx, |ctrl, cx| {
+                                ctrl.toggle_group_by(GroupBy::Publisher, cx);
+                            });
+                        }),
+                )
+                .item(
+                    PopupMenuItem::new(t!("toolbar.group_by_tag"))
+                        .checked(group_by == GroupBy::Tag)
+                        .on_click(move |_, _, cx| {
+                            e8.update(cx, |ctrl, cx| ctrl.toggle_group_by(GroupBy::Tag, cx));
                         }),
                 )
                                 })
@@ -291,8 +307,9 @@ fn render_layout_switcher(current: CatalogPresentation, entity: Entity<LibraryCo
 
 #[cfg(test)]
 mod tests {
+    use dtrpg_core::util::filter::SidebarFilter;
+
     use super::*;
-    use crate::util::filter::SidebarFilter;
 
     #[test]
     fn publisher_filter_includes_name() {

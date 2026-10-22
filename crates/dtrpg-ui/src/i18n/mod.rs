@@ -6,7 +6,7 @@
 //! # Supported locales
 //! `en` (authoritative), `fr` (stub), `de` (stub). The system locale is
 //! detected at startup via `sys-locale`; unrecognized locales fall back to
-//! `en`. A persisted user selection (see [`crate::data::ui_preferences`])
+//! `en`. A persisted user selection (see [`dtrpg_core::data::ui_preferences`])
 //! takes precedence over both.
 
 const SUPPORTED: [&str; 3] = ["en", "fr", "de"];
@@ -58,8 +58,8 @@ impl Locale {
 ///
 /// Must be called before any `t!()` macro is evaluated.
 pub fn init() {
-    let persisted = crate::data::ui_preferences::UiPreferences::load().locale()
-                                                                      .map(str::to_owned);
+    let persisted = dtrpg_core::data::ui_preferences::UiPreferences::load().locale()
+                                                                           .map(str::to_owned);
 
     let chosen = resolve_locale(persisted.as_deref(), &detect_os_locale());
 
@@ -94,6 +94,26 @@ fn detect_os_locale() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A placeholder is written `%{name}`. A bare `{name}` is printed as it is,
+    /// braces and all, so no text may have one.
+    #[test]
+    fn every_placeholder_in_every_language_file_uses_the_percent_form() {
+        let files = [("en", include_str!("../../i18n/en.yaml")),
+                     ("de", include_str!("../../i18n/de.yaml")),
+                     ("fr", include_str!("../../i18n/fr.yaml"))];
+        for (locale, text) in files {
+            for (line_number, line) in text.lines().enumerate() {
+                let bytes = line.as_bytes();
+                for (ix, byte) in bytes.iter().enumerate() {
+                    let bare_brace = *byte == b'{' && (ix == 0 || bytes[ix - 1] != b'%');
+                    assert!(!bare_brace,
+                            "{locale}.yaml line {}: `{{` is not a placeholder; write `%{{name}}`: {line}",
+                            line_number + 1);
+                }
+            }
+        }
+    }
 
     #[test]
     fn locale_code_and_label_round_trip() {

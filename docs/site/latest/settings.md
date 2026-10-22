@@ -13,32 +13,110 @@ you can keep working in the catalog while it's open.
 
 Sign in with your DriveThruRPG email and password, see who you're signed in
 as, and log out. Signing in is what populates your catalog in the first
-place.
+place. When you are signed in, the page shows your avatar and account with a
+**Log Out** button, and a **Session** card with the API key hint and the token
+times.
+
+While signed in, the page also shows when your current access token was
+acquired and when it expires. The app renews an expired token on its own the
+next time it talks to DriveThruRPG, so the expiry time can be in the past
+without anything being wrong; the acquired time then moves forward after the
+renewal. You never need to sign out just to refresh a token.
 
 ## Appearance
 
-Pick one of six color themes, a comfortable or compact density, and a font
-for each of four independent roles (body, value, label, monospace) from any
-font installed on your system. A shared text-scale stepper zooms every
-size-aware element in the window together. See
+The **Text & density** card has the text-scale stepper, which zooms every
+size-aware element in the window together, and the comfortable or compact
+density. Below it, pick a color theme from the gallery. Fonts are part of a
+theme, so they are changed by editing the theme, not on this page. See
 [Themes and appearance]({{ '/latest/themes/' | relative_url }}) for the full
 theme list.
 
-## Downloads
+## Storage
 
-Where files save to, how many download (and thumbnail-load) operations run
-at once, whether collections get mirrored into a `collections/` folder of
-symlinks, and how many days an item stays in the sidebar's Recently Updated
-section. See [Downloads]({{ '/latest/downloads/' | relative_url }}).
+Locations (each with its free space and how many titles it holds), the
+placement rules that choose between them, and behavior: checking free space
+before a download, mirroring collections as folders of symlinks, and how many
+download (and thumbnail-load) operations run at once. See
+[Storage roots]({{ '/latest/storage/' | relative_url }}) and
+[Downloads]({{ '/latest/downloads/' | relative_url }}).
 
 ## File Openers
 
 Override which application opens a given file extension, instead of
-relying on your system's default. Add, edit, or remove per-extension
-overrides here.
+relying on your system's default. Each override is a card showing the
+application, its extension and where the application is; an application that
+has been moved or removed is flagged. **Add file opener...** asks for an
+application and then for the extension. The trash button removes an override.
+
+## Agent & MCP
+
+Whether an AI agent may use Libri, and what it may do: three scopes (read, change,
+download and spend), a switch for each tool, the config to copy into the agent, and
+the latest calls it made. It is off until you turn it on. See
+[Using Libri from an AI agent]({{ '/latest/mcp/' | relative_url }}).
+
+### Summaries
+
+The first section of the page sets how summaries of your titles are written. They
+are shown in the inspector's Summary tab and searched along with the rest of the
+title's text.
+
+- **Provider** is Anthropic or Local. Local picks sentences from the text itself,
+  offline and for free, at a lower quality. Anthropic needs your own API key, which
+  you paste into the field beside the provider menu. Libri saves it to the system
+  keychain when you leave the field, and never in a settings file. The field is empty
+  after that, and the hint under the title says a key is saved. To replace the key,
+  paste a new one. A saved key is the one Libri uses. If you have not saved one, Libri
+  uses the `ANTHROPIC_API_KEY` environment variable when it is set, and the hint says
+  which one is in use, and that a saved key takes precedence over the variable.
+- **Model** is the model Anthropic writes new summaries with.
+- **Monthly token ceiling** stops summarizing for the rest of the month once the
+  summaries made this month have used that many tokens. The line under it says how
+  many have been used. Summaries you already have are kept.
+- **Summarize automatically on download** writes a summary of a title when its
+  last file finishes downloading, if it has none yet. It is off until you turn it
+  on, because every summary costs tokens (the Local provider costs none). A summary
+  that cannot be made, for example when the key is missing or the ceiling has been
+  reached, is skipped without a message.
 
 ## Advanced
 
-Cache details (size and location on disk) and maintenance actions:
-opening the cache folder directly, or clearing it. This section also hosts
-the About page - app name, version, and description.
+The cache maintenance actions: opening the cache folder directly, or clearing it.
+What the cache holds, and the timing Libri keeps it by, is shown in
+[Insights]({{ '/latest/insights/' | relative_url }}).
+
+### Operating system
+
+Libri works with your operating system where it can. On macOS and Linux, three
+switches control whether tags move between Libri and your files' tags, and
+whether that is checked at launch. On Windows and Linux a switch reopens
+windows (such as an item's own window) where you left them; macOS follows its
+own setting. At the bottom, **Platform abilities** lists what your system can do
+(cloud file state, on-demand download, file tags, showing a file in the file
+manager). See [Tags]({{ '/latest/tags/' | relative_url }}).
+
+### Filter values
+
+DriveThruRPG puts filters on every product, such as its format and genre, and some of the
+values are useful to you while others are not. The **Filter values** section lists every
+format, genre and product type your library has as a chip, so you choose which ones the
+[filters column]({{ '/latest/catalog/' | relative_url }}#filtering-with-the-filters-column) lists.
+
+- A lit chip is shown. Ghosted chips are hidden and listed after the lit ones. Each group is in
+  alphabetical order.
+- Click a chip to move it to the other group.
+- A hidden value is only left out of the filters column. It still works if you type it into the
+  search, such as `format:"creation method"`, and it still shows as a chip under the toolbar while
+  it is applied.
+- Libri starts with a short list of values it hides, such as `Human-Created Without AI` under
+  Format, because they say little about a title. Show one by clicking it. Libri keeps only what you
+  change, so a value you never touched follows Libri's own list, even when that list improves
+  in a later version.
+
+The section appears once your library has been loaded with filters.
+
+The app name, version, and build details are in the About window (the app
+menu's "About Libri"), not in Settings.
+
+The settings window remembers its size and position.

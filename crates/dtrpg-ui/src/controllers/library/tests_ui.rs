@@ -1,38 +1,6 @@
 //! Tests for the library controller, grouped by concern.
 
 #[cfg(test)]
-mod advanced_details_tests {
-    use std::collections::HashMap;
-
-    use super::super::toggle_bool_flag;
-
-    #[test]
-    fn missing_entry_defaults_to_false() {
-        let map: HashMap<&str, bool> = HashMap::new();
-        assert!(!map.get("entry-a").copied().unwrap_or(false));
-    }
-
-    #[test]
-    fn toggle_flips_repeatedly_for_same_key() {
-        let mut map: HashMap<&str, bool> = HashMap::new();
-
-        assert!(toggle_bool_flag(&mut map, "entry-a"));
-        assert!(!toggle_bool_flag(&mut map, "entry-a"));
-        assert!(toggle_bool_flag(&mut map, "entry-a"));
-    }
-
-    #[test]
-    fn toggle_does_not_affect_other_keys() {
-        let mut map: HashMap<&str, bool> = HashMap::new();
-
-        toggle_bool_flag(&mut map, "entry-a");
-
-        assert!(map.get("entry-a").copied().unwrap_or(false));
-        assert!(!map.get("entry-b").copied().unwrap_or(false));
-    }
-}
-
-#[cfg(test)]
 mod item_row_selection_tests {
     use std::collections::HashMap;
 
@@ -85,11 +53,9 @@ mod item_row_selection_tests {
 
 #[cfg(test)]
 mod download_queue_tests {
-    use std::collections::VecDeque;
-    use std::sync::Arc;
+    use dtrpg_core::data::library::LibraryItemFile;
 
-    use super::super::{dequeue_file, missing_file_indices};
-    use crate::data::library::LibraryItemFile;
+    use super::super::missing_file_indices;
 
     fn file(downloaded: bool) -> LibraryItemFile {
         LibraryItemFile { id: "f".into(),
@@ -97,7 +63,8 @@ mod download_queue_tests {
                           name: "File".into(),
                           format: "PDF".into(),
                           size_mb: 1.0,
-                          downloaded }
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]
@@ -120,49 +87,14 @@ mod download_queue_tests {
 
         assert!(missing_file_indices(&files).is_empty());
     }
-
-    #[test]
-    fn dequeue_file_removes_only_the_matching_entry() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> =
-            VecDeque::from([(Arc::from("entry-a"), 0, "File 0".to_string()),
-                            (Arc::from("entry-a"), 1, "File 1".to_string())]);
-
-        let removed = dequeue_file(&mut queue, "entry-a", 0);
-
-        assert!(removed);
-        assert_eq!(queue.len(), 1);
-        assert_eq!(queue[0].1, 1);
-    }
-
-    #[test]
-    fn dequeue_file_leaves_other_entries_untouched() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> =
-            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string()),
-                            (Arc::from("entry-b"), 0, "B".to_string())]);
-
-        dequeue_file(&mut queue, "entry-a", 0);
-
-        assert_eq!(queue.len(), 1);
-        assert_eq!(queue[0].0.as_ref(), "entry-b");
-    }
-
-    #[test]
-    fn dequeue_file_returns_false_when_nothing_matches() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> =
-            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string())]);
-
-        let removed = dequeue_file(&mut queue, "entry-a", 5);
-
-        assert!(!removed);
-        assert_eq!(queue.len(), 1);
-    }
 }
 
 #[cfg(test)]
 mod disk_space_check_tests {
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+
     use super::super::{missing_files_size_mb, missing_files_size_mb_for_items};
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::{LibraryItem, LibraryItemFile};
 
     fn file(size_mb: f64, downloaded: bool) -> LibraryItemFile {
         LibraryItemFile { id: "f".into(),
@@ -170,7 +102,8 @@ mod disk_space_check_tests {
                           name: "File".into(),
                           format: "PDF".into(),
                           size_mb,
-                          downloaded }
+                          downloaded,
+                          offloaded: false }
     }
 
     fn item(id: &str, files: Vec<LibraryItemFile>) -> LibraryItem {
@@ -300,12 +233,13 @@ mod bulk_download_target_tests {
     use std::collections::HashSet;
     use std::sync::Arc;
 
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::LibraryItem;
+    use dtrpg_core::util::filter::SidebarFilter;
+
     use super::super::{
         collection_download_targets, filter_download_targets, publisher_download_targets,
     };
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
-    use crate::util::filter::SidebarFilter;
 
     fn item(id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64)
             -> LibraryItem {

@@ -1,13 +1,20 @@
 [workspace]
-default-members = ["crates/dtrpg-core", "crates/dtrpg-ui"]
+default-members = [
+    "crates/dtrpg-core",
+    "crates/dtrpg-ui",
+    "crates/dtrpg-desktop",
+    "crates/dtrpg-mcp",
+]
 members = [
     "crates/dtrpg-core",
     "crates/dtrpg-ui",
+    "crates/dtrpg-desktop",
+    "crates/dtrpg-mcp",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.4.1"
+version = "1.0.0"
 edition = "2024"
 description = "DriveThruRPG desktop frontend in Rust"
 license = "MIT"
@@ -22,7 +29,7 @@ expect_used = "deny"
 unwrap_used = "deny"
 
 [workspace.dependencies]
-dtrpg-sdk = "1.0"
+dtrpg-sdk = "1.2"
 schemars = "1.2"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
@@ -31,9 +38,13 @@ dirs = "7"
 rfd = "0.17"
 keyring = { version = "3", features = ["apple-native", "sync-secret-service"] }
 thiserror = "2"
+rmcp = { version = "3.5.1", features = ["server", "macros", "transport-io", "schemars"] }
 tracing = "0.1"
+dtrpg-core = { path = "crates/dtrpg-core" }
 dtrpg-ui = { path = "crates/dtrpg-ui" }
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "io-util", "time"] }
+interprocess = { version = "2", features = ["tokio"] }
+uuid = { version = "1", features = ["v4"] }
 # gpui-kit forks zed-industries/zed's gpui under its own package family
 # (gpui-pre, gpui-pre-platform, gpui-pre-macros) — pinned to the exact
 # version gpui-kit 0.7.3 itself depends on, so our Context/Window/App/Global
@@ -43,19 +54,31 @@ gpui = { package = "gpui-pre", version = "=0.3.9" }
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["font-kit", "wayland", "x11"] }
 gpui-kit = "0.7"
 cocoa = "=0.27.0"
-cocoa-foundation = "=0.2.0"
+cocoa-foundation = "=0.2.1"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.6.1", features = ["metal"] }
 metal = "0.33"
 md5 = "0.8"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 rust-i18n = "4"
 chrono = "0.4"
+base64 = "0.23"
 sys-locale = "0.3"
 open = "5"
 rust-embed = "8.11"
 sentry = { version = "0.49", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls"] }
 sentry-tracing = "0.49"
+tar = "0.4.46"
+flate2 = "1.1.10"
+bzip2 = "0.6.1"
+xz2 = "0.1.7"
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+lopdf = { version = "0.45.0", default-features = false }
+tempfile = "3.27.0"
+# File-system tags: extended attributes (macOS and Linux) and the binary
+# property list macOS stores user tags in.
+xattr = "1.6"
+plist = "1"

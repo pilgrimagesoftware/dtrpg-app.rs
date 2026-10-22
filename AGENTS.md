@@ -23,6 +23,13 @@ gpui-kit's fork in one change, not file-by-file.
 
 ## UI Policy
 
+- Every control, button or label that is only an image (an icon, or a glyph such as `✓`, `☁` or `×`) MUST have
+  a tooltip saying what it does or means, and the text goes through `rust_i18n::t!` like any other. A purely
+  decorative image next to text that already says the same thing does not need one.
+- Use a pre-made control (from `gpui_kit`, or an existing Libri one) rather than rolling your own, unless there
+  is no alternative. When you do roll your own, say why in a comment at the definition: what the pre-made
+  control cannot do. `CollectionsSection` is the example: the sidebar's menu item has no drop hook, and
+  collections must accept dragged items.
 - Preserve the separation between UI rendering, interaction state, and service adapters.
 - Keep code structured so stubs can be replaced by SDK adapters without rewriting views.
 
@@ -88,24 +95,18 @@ process: `docs/adr/README.md`. `/adr "<title>"` scaffolds a new record from
 - Constants live in a single `consts.rs` per crate.
 - Errors: `thiserror` enums per crate (`GitError`, `DiscoveryError`, core
   `Error`), re-exported with a crate `Result` alias.
-- User-facing text goes through `knot_core::l10n::t`; tests assert the key
-  resolves, never the English copy.
+- User-facing text goes through `rust_i18n::t!`, backed by
+  `crates/dtrpg-ui/i18n/{en,de,fr}.yaml`; tests assert the key resolves,
+  never the English copy.
 - Keep functions to <= 5-6 args; group related args in a struct.
 - Closed vocabularies are enums with `Display`/`FromStr`, not `String` matched
-  with a `_ => default` arm. An open one (`agent_type`) keeps its `String` and
-  gets one roster - `knot_core::agent_type` - that every crate reads.
-- Locks are `parking_lot::Mutex`: no poisoning, so no `.unwrap()` or
-  `if let Ok(..)` around a guard. `tokio::sync::Mutex` only where a guard is
-  held across an `.await` (`knot-acp`'s transport).
-- No I/O on the render path - GPUI re-renders per keystroke. Diff stats go
-  through `knot/src/diff_stats.rs`, which has caught this three times.
+  with a `_ => default` arm.
+- Locks are `std::sync::Mutex`: this app has no poisoning hazard across an
+  `.await` boundary to design around, so no extra crate is pulled in for it.
+  `tokio::sync::Mutex` only where a guard is held across an `.await`.
+- No I/O on the render path - GPUI re-renders per keystroke.
 - Off-thread results have to reach a frame. A new cache, dirty flag or
-  `spawn_blocking` result belongs in `repaint_poll_tick`'s `if` chain, and a
-  clearing read (`take_changed`, `take_dirty`) must not be reachable on a path
-  that discards it. Four separate breaks of that chain are named in
-  `.claude/rules/rust-structure.md`; none of them failed a test.
+  `spawn_blocking` result belongs on a poll tick that the view checks each
+  frame, and a clearing read (`take_changed`, `take_dirty`) must not be
+  reachable on a path that discards it.
 - No statement-hugging brace style; format with nightly `rustfmt`.
-
-`.claude/rules/rust-structure.md` has the reasoning behind each of these, with
-the defect that produced it. Read it before a refactor; every rule names the
-cost of breaking it, so you can tell when it genuinely does not apply.

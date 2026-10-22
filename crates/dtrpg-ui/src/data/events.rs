@@ -1,13 +1,14 @@
 //! Controller events emitted when state changes.
 
+use dtrpg_core::services::LoginTokens;
 use gpui::EventEmitter;
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::auth_state::AuthStateController;
+use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::controllers::tabs::TabsController;
-use crate::services::LoginTokens;
+use crate::view_models::inspector::InspectorTab;
 
 // ── LibraryChanged
 // ────────────────────────────────────────────────────────────
@@ -49,6 +50,29 @@ pub struct DownloadError {
 }
 
 impl EventEmitter<DownloadError> for ActivityController {}
+
+// ── PlacementRulesChanged
+// ───────────────────────────────────────────────────
+
+/// Emitted by `LibraryController` after it changes the storage settings'
+/// placement rules itself (the download sheet's "Remember this choice"), so the
+/// settings controller reloads them rather than keeping, and later saving over
+/// them, a stale copy.
+pub struct PlacementRulesChanged;
+
+impl EventEmitter<PlacementRulesChanged> for LibraryController {}
+
+// ── AgentAccessChanged
+// ─────────────────────────────────────────────────────
+
+/// Emitted when the person turns agent access on or off, so the library
+/// controller starts or stops listening for the agent's requests.
+pub struct AgentAccessChanged {
+    /// Whether agents may use Libri now.
+    pub enabled: bool,
+}
+
+impl EventEmitter<AgentAccessChanged> for SettingsController {}
 
 // ── SettingsChanged
 // ───────────────────────────────────────────────────────────
@@ -243,10 +267,36 @@ pub struct LowDiskSpaceWarning {
 
 impl EventEmitter<LowDiskSpaceWarning> for LibraryController {}
 
-// ── TabsChanged
-// ───────────────────────────────────────────────────────────────
+// ── Inspector requests
+// ───────────────────────────────────────────────────────
 
-/// Emitted when the open tab list or the active tab changes.
-pub struct TabsChanged;
+/// Emitted when the user asks to move an item's inspector out of the docked
+/// pane and into its own window.
+pub struct InspectorPopOutRequested {
+    /// Id of the catalog item whose inspector should pop out.
+    pub item_id: std::sync::Arc<str>,
+}
 
-impl EventEmitter<TabsChanged> for TabsController {}
+impl EventEmitter<InspectorPopOutRequested> for InspectorController {}
+
+/// Emitted by a popped-out inspector window when the user asks to put its item
+/// back in the docked pane.
+pub struct InspectorPopBackRequested;
+
+impl EventEmitter<InspectorPopBackRequested> for InspectorController {}
+
+/// Emitted when something asks for an item to be shown in the docked pane, on
+/// a given tab, opening the pane if it is closed.
+pub struct InspectorShowRequested {
+    /// Id of the catalog item to show.
+    pub item_id: std::sync::Arc<str>,
+    /// The inspector tab to show it on.
+    pub tab:     InspectorTab,
+}
+
+impl EventEmitter<InspectorShowRequested> for InspectorController {}
+
+/// Emitted when the user asks to close the docked pane.
+pub struct InspectorCloseRequested;
+
+impl EventEmitter<InspectorCloseRequested> for InspectorController {}
