@@ -23,9 +23,9 @@ renewal. You never need to sign out just to refresh a token.
 
 ## Appearance
 
-Pick one of six color themes, a comfortable or compact density, and a font
-for each of four independent roles (body, value, label, monospace) from any
-font installed on your system. A shared text-scale stepper zooms every
+Pick a color theme and a comfortable or compact density. Fonts are part of a
+theme, so they are changed by editing the theme, not on this page. A shared
+text-scale stepper zooms every
 size-aware element in the window together. See
 [Themes and appearance]({{ '/latest/themes/' | relative_url }}) for the full
 theme list.

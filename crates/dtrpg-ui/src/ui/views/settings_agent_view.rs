@@ -3,7 +3,8 @@
 
 use dtrpg_core::data::mcp_access::{McpScope, McpTool};
 use gpui::prelude::*;
-use gpui::{ClipboardItem, Entity, SharedString, div, px};
+use gpui::{ClipboardItem, Entity, Hsla, SharedString, div, px};
+use gpui_kit::component::Icon;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
@@ -16,7 +17,7 @@ use crate::data::theme::ColorTokens;
 use crate::ui::views::settings_native_view::switch_row;
 use crate::ui::widgets::{selectable_note, selectable_text, small_caps_text};
 use crate::view_models::agent_display::{
-    AGENT_CONFIG_JSON, AgentPageData, exposed_tools, scope_label, summary_label, time_label,
+    AgentPageData, agent_config_json, exposed_tools, scope_label, summary_label, time_label,
     tool_description,
 };
 
@@ -41,15 +42,34 @@ const SCOPES: [ScopeText; 3] = [ScopeText { scope: McpScope::Read,
                                             note:  "agent.scope_spend_note",
                                             risk:  "agent.risk_high", }];
 
-/// The risk badge beside a scope's title: green, amber or red, so a wider
-/// scope reads as the riskier choice.
-fn risk_badge(scope: McpScope, label: String) -> Tag {
-    let tag = match scope {
-        McpScope::Read => Tag::success(),
-        McpScope::Change => Tag::warning(),
-        McpScope::DownloadAndSpend => Tag::danger(),
+/// The colors of a scope's badge, as text and background: green for read,
+/// amber for change, red for download and spend, so a wider scope reads as the
+/// riskier choice. They are fixed, not taken from the theme (as the other state
+/// colors are), and lighter on a dark page so they stay readable there.
+fn risk_colors(scope: McpScope, colors: &ColorTokens) -> (Hsla, Hsla) {
+    let dark = colors.surface.l < 0.5;
+    let (light_text, dark_text) = match scope {
+        McpScope::Read => (0x3F_7A_44, 0x7F_C2_83),
+        McpScope::Change => (0x93_66_12, 0xE6_B6_55),
+        McpScope::DownloadAndSpend => (0xB0_3A_30, 0xFF_7A_70),
     };
-    tag.outline().child(label)
+    let text: Hsla = gpui::rgb(if dark { dark_text } else { light_text }).into();
+    (text, Hsla { a: 0.16, ..text })
+}
+
+/// The risk badge beside a scope's title, and beside each call in the log.
+fn risk_badge(scope: McpScope, label: String, colors: &ColorTokens) -> impl IntoElement {
+    let (text, background) = risk_colors(scope, colors);
+    div().px(px(6.0))
+         .py(px(1.0))
+         .rounded(px(4.0))
+         .border_1()
+         .border_color(Hsla { a: 0.45, ..text })
+         .bg(background)
+         .text_xs()
+         .font_weight(gpui::FontWeight::SEMIBOLD)
+         .text_color(text)
+         .child(label)
 }
 
 /// A section heading in the page's small-caps label style.
@@ -89,7 +109,7 @@ fn scope_rows(entity: &Entity<SettingsController>, data: &AgentPageData, colors:
                                                       .font_weight(gpui::FontWeight::SEMIBOLD)
                                                       .text_color(colors.text_primary)
                                                       .child(t!(text.title).to_string()))
-                                          .child(risk_badge(scope, t!(text.risk).to_string())))
+                                          .child(risk_badge(scope, t!(text.risk).to_string(), colors)))
                               .child(Switch::new(SharedString::from(format!("agent-scope-{scope}")))
                                          .checked(checked)
                                          .on_click(move |checked, _, cx| {
@@ -104,28 +124,50 @@ fn scope_rows(entity: &Entity<SettingsController>, data: &AgentPageData, colors:
                                 }))
 }
 
+/// The widths of the tools table's fixed columns, in pixels. The description
+/// takes whatever is left.
+const TOOL_COLUMN_WIDTH: f32 = 190.0;
+const SCOPE_COLUMN_WIDTH: f32 = 92.0;
+const ON_COLUMN_WIDTH: f32 = 64.0;
+
 /// The tools: each with its scope, what it does, and a switch.
 fn tools_table(entity: &Entity<SettingsController>, data: &AgentPageData, colors: &ColorTokens)
                -> impl IntoElement {
     let head = |label: &str| TableHead::new().child(small_caps_text(t!(label).to_string()));
-    let header = TableHeader::new().child(TableRow::new().child(head("agent.col_tool"))
-                                                         .child(head("agent.col_scope"))
+    let header = TableHeader::new().child(TableRow::new().child(head("agent.col_tool")
+                                                                    .w(px(TOOL_COLUMN_WIDTH))
+                                                                    .flex_none())
+                                                         .child(head("agent.col_scope")
+                                                                    .w(px(SCOPE_COLUMN_WIDTH))
+                                                                    .flex_none())
                                                          .child(head("agent.col_what"))
-                                                         .child(head("agent.col_on")));
+                                                         .child(head("agent.col_on")
+                                                                    .w(px(ON_COLUMN_WIDTH))
+                                                                    .flex_none()));
     let rows = McpTool::ALL.into_iter().map(|tool| {
         let entity = entity.clone();
         let on = !data.settings.disabled_tools.contains(tool.name());
         let tooltip = t!("agent.tool_toggle_tooltip", tool = tool.name()).to_string();
-        TableRow::new().child(TableCell::new().child(div().font_family("monospace")
+        let (scope_text, _) = risk_colors(tool.scope(), colors);
+        TableRow::new().child(TableCell::new().w(px(TOOL_COLUMN_WIDTH))
+                                              .flex_none()
+                                              .child(div().font_family("monospace")
                                                           .text_sm()
                                                           .text_color(colors.text_primary)
                                                           .child(tool.name())))
-                       .child(TableCell::new().child(Tag::secondary().outline()
-                                                                     .child(scope_label(tool.scope()))))
-                       .child(TableCell::new().child(div().text_sm()
+                       .child(TableCell::new().w(px(SCOPE_COLUMN_WIDTH))
+                                              .flex_none()
+                                              .child(div().text_xs()
+                                                          .font_weight(gpui::FontWeight::SEMIBOLD)
+                                                          .text_color(scope_text)
+                                                          .child(scope_label(tool.scope()))))
+                       .child(TableCell::new().child(div().min_w_0()
+                                                          .text_sm()
                                                           .text_color(colors.text_secondary)
                                                           .child(tool_description(tool))))
-                       .child(TableCell::new().child(
+                       .child(TableCell::new().w(px(ON_COLUMN_WIDTH))
+                                              .flex_none()
+                                              .child(
             div().id(SharedString::from(format!("agent-tool-{}", tool.name())))
                  .tooltip(move |window, cx| Tooltip::new(tooltip.clone()).build(window, cx))
                  .child(Switch::new(SharedString::from(format!("agent-tool-switch-{}",
@@ -142,26 +184,47 @@ fn tools_table(entity: &Entity<SettingsController>, data: &AgentPageData, colors
                 .child(TableBody::new().children(rows))
 }
 
-/// The config an agent needs, in a box, with a button that copies it.
-fn connect_block(colors: &ColorTokens, mono_font: &str) -> impl IntoElement {
+/// The config an agent needs, in a box, with an icon button inside it that
+/// copies it.
+fn connect_block(command_path: &str, colors: &ColorTokens, mono_font: &str) -> impl IntoElement {
+    let config = agent_config_json(command_path);
+    let copied = config.clone();
     div().flex()
          .flex_col()
          .gap(px(8.0))
          .child(selectable_note("agent-connect-note", t!("agent.connect_note").to_string(), colors))
-         .child(div().p(px(12.0))
+         .child(div().relative()
+                     .p(px(12.0))
+                     .pr(px(48.0))
                      .rounded(px(6.0))
                      .border_1()
                      .border_color(colors.border)
                      .bg(colors.surface_alt)
                      .font_family(mono_font.to_string())
-                     .child(selectable_text("agent-config", AGENT_CONFIG_JSON).text_xs()
-                                                                               .text_color(colors.text_primary)))
-         .child(div().flex().child(Button::new("agent-copy-config")
-                                       .outline()
-                                       .label(t!("agent.copy_config").to_string())
-                                       .on_click(|_, _, cx| {
-                                           cx.write_to_clipboard(ClipboardItem::new_string(AGENT_CONFIG_JSON.to_owned()));
-                                       })))
+                     .child(selectable_text("agent-config", config).text_xs()
+                                                                   .text_color(colors.text_primary))
+                     .child(div().absolute()
+                                 .top(px(6.0))
+                                 .right(px(6.0))
+                                 .child(Button::new("agent-copy-config")
+                                            .ghost()
+                                            .icon(Icon::empty().path("icons/copy.svg"))
+                                            .tooltip(t!("agent.copy_config").to_string())
+                                            .on_click(move |_, _, cx| {
+                                                cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()));
+                                            }))))
+}
+
+/// Where the log is kept, so a person can open it.
+fn log_location(log_path: &str, colors: &ColorTokens) -> impl IntoElement {
+    div().flex()
+         .flex_col()
+         .gap(px(2.0))
+         .child(div().text_xs()
+                     .text_color(colors.text_secondary)
+                     .child(t!("agent.log_location").to_string()))
+         .child(selectable_text("agent-log-path", log_path.to_owned()).text_xs()
+                                                                      .text_color(colors.text_primary))
 }
 
 /// The latest calls, newest first.
@@ -194,7 +257,8 @@ fn activity_rows(data: &AgentPageData, colors: &ColorTokens) -> impl IntoElement
                                                                         })
                                                             .child(summary_label(entry)))
                                                 .child(risk_badge(entry.scope,
-                                                                  scope_label(entry.scope)))
+                                                                  scope_label(entry.scope),
+                                                                  colors))
                                        }))
          .into_any_element()
 }
@@ -238,18 +302,20 @@ pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageD
          .child(heading(t!("agent.tools_heading").to_string(), colors, label_font))
          .child(tools_table(&entity, &data, colors))
          .child(heading(t!("agent.connect_heading").to_string(), colors, label_font))
-         .child(connect_block(colors, mono_font))
+         .child(connect_block(&data.command_path, colors, mono_font))
          .child(div().flex()
                      .items_center()
                      .justify_between()
                      .child(heading(t!("agent.activity_heading").to_string(), colors, label_font))
                      .child(Button::new("agent-refresh-activity")
                                 .ghost()
-                                .label(t!("agent.activity_refresh").to_string())
+                                .icon(Icon::empty().path("icons/refresh-cw.svg"))
+                                .tooltip(t!("agent.activity_refresh").to_string())
                                 .on_click(move |_, _, cx| {
                                     refresh_entity.update(cx, |ctrl, cx| {
                                                       ctrl.refresh_mcp_activity(cx);
                                                   });
                                 })))
          .child(activity_rows(&data, colors))
+         .child(log_location(&data.log_path, colors))
 }

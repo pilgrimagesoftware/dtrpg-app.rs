@@ -10,11 +10,9 @@ use super::*;
 /// read, subscribes each to push its value into the `settings` controller,
 /// and attaches it via the matching `SettingsController::set_*` call — so
 /// these survive the settings window closing and reopening within the
-/// session (see the font-picker section below for why that matters there
-/// too).
+/// session.
 pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<LibraryRootView>,
-                                   settings: &Entity<SettingsController>,
-                                   controller: &Entity<LibraryController>) {
+                                   settings: &Entity<SettingsController>) {
     let email_initial = settings.read(cx).email_draft().to_owned();
     let email_input = cx.new(|cx| {
                             let mut state = InputState::new(window, cx)
@@ -174,98 +172,6 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
                 ctrl.set_collection_rule_input(collection_rule_input);
                 ctrl.set_size_rule_input(size_rule_input);
             });
-
-    // ── Appearance page font pickers ─────────────────────────────────────
-    //
-    // Built once here (like the inputs above) rather than in
-    // `SettingsWindowView`, so the picker state — and any installed-font
-    // enumeration cost — survives the settings window closing and
-    // reopening within the session. Any font actually installed on the
-    // user's system is selectable, not a curated list — see
-    // `settings_appearance_view`.
-    let mut installed_fonts = cx.text_system().all_font_names();
-    installed_fonts.sort();
-    installed_fonts.dedup();
-
-    let current_fonts = cx.global::<LibriTheme>().fonts.clone();
-
-    let body_selected = installed_fonts.position(&current_fonts.body_font.to_string());
-    let body_font_select =
-        cx.new(|cx| {
-              SelectState::new(installed_fonts.clone(), body_selected, window, cx).searchable(true)
-          });
-    let controller_for_body_font = controller.clone();
-    cx.subscribe(&body_font_select,
-                 move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
-                     let SelectEvent::Confirm(Some(name)) = event
-                     else {
-                         return;
-                     };
-                     controller_for_body_font.update(cx, |ctrl, cx| {
-                         ctrl.set_body_font(SharedString::from(name.clone()), cx);
-                     });
-                 })
-      .detach();
-    settings.update(cx, |ctrl, _cx| ctrl.set_body_font_select(body_font_select));
-
-    let value_selected = installed_fonts.position(&current_fonts.value_font.to_string());
-    let value_font_select =
-        cx.new(|cx| {
-              SelectState::new(installed_fonts.clone(), value_selected, window, cx).searchable(true)
-          });
-    let controller_for_value_font = controller.clone();
-    cx.subscribe(&value_font_select,
-                 move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
-                     let SelectEvent::Confirm(Some(name)) = event
-                     else {
-                         return;
-                     };
-                     controller_for_value_font.update(cx, |ctrl, cx| {
-                         ctrl.set_value_font(SharedString::from(name.clone()), cx);
-                     });
-                 })
-      .detach();
-    settings.update(cx, |ctrl, _cx| {
-                ctrl.set_value_font_select(value_font_select)
-            });
-
-    let label_selected = installed_fonts.position(&current_fonts.label_font.to_string());
-    let label_font_select =
-        cx.new(|cx| {
-              SelectState::new(installed_fonts.clone(), label_selected, window, cx).searchable(true)
-          });
-    let controller_for_label_font = controller.clone();
-    cx.subscribe(&label_font_select,
-                 move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
-                     let SelectEvent::Confirm(Some(name)) = event
-                     else {
-                         return;
-                     };
-                     controller_for_label_font.update(cx, |ctrl, cx| {
-                         ctrl.set_label_font(SharedString::from(name.clone()), cx);
-                     });
-                 })
-      .detach();
-    settings.update(cx, |ctrl, _cx| {
-                ctrl.set_label_font_select(label_font_select)
-            });
-
-    let mono_selected = installed_fonts.position(&current_fonts.mono_font.to_string());
-    let mono_font_select =
-        cx.new(|cx| SelectState::new(installed_fonts, mono_selected, window, cx).searchable(true));
-    let controller_for_mono_font = controller.clone();
-    cx.subscribe(&mono_font_select,
-                 move |_this, _state, event: &SelectEvent<Vec<String>>, cx| {
-                     let SelectEvent::Confirm(Some(name)) = event
-                     else {
-                         return;
-                     };
-                     controller_for_mono_font.update(cx, |ctrl, cx| {
-                         ctrl.set_mono_font(SharedString::from(name.clone()), cx);
-                     });
-                 })
-      .detach();
-    settings.update(cx, |ctrl, _cx| ctrl.set_mono_font_select(mono_font_select));
 }
 
 /// Inputs owned by the main window itself (not the Settings window) that

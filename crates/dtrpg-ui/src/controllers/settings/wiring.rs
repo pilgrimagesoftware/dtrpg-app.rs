@@ -44,25 +44,4 @@ impl SettingsController {
     pub fn set_size_rule_input(&mut self, input: Entity<InputState>) {
         self.size_rule_input = Some(input);
     }
-
-    /// Attaches the body-font picker state entity created by the root view.
-    pub fn set_body_font_select(&mut self, state: FontSelectState) {
-        self.body_font_select = Some(state);
-    }
-
-    /// Attaches the value-font picker state entity created by the root view.
-    pub fn set_value_font_select(&mut self, state: FontSelectState) {
-        self.value_font_select = Some(state);
-    }
-
-    /// Attaches the label-font picker state entity created by the root view.
-    pub fn set_label_font_select(&mut self, state: FontSelectState) {
-        self.label_font_select = Some(state);
-    }
-
-    /// Attaches the monospace-font picker state entity created by the root
-    /// view.
-    pub fn set_mono_font_select(&mut self, state: FontSelectState) {
-        self.mono_font_select = Some(state);
-    }
 }

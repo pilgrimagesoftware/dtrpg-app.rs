@@ -47,6 +47,12 @@ impl AuditLog {
         Self { path: path.into() }
     }
 
+    /// Where the log file is.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Adds `entry` to the end of the log, and drops the oldest entries if the
     /// log has grown too long. A failure is logged and otherwise ignored: a
     /// call is not worth refusing because its record could not be written.

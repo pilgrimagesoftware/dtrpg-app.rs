@@ -9,10 +9,9 @@ use gpui::{
 use gpui_kit::component::input::InputState;
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::SettingsController;
+use crate::controllers::settings::{ADVANCED_PAGE_IX, STORAGE_PAGE_IX, SettingsController};
 use crate::data::theme::LibriTheme;
 use crate::ui::app::save_settings_window_bounds_soon;
-use crate::ui::views::settings_appearance_view::AppearanceFontSelects;
 use crate::ui::views::settings_view::render_settings_panel;
 use crate::util::debounce::Debounce;
 use crate::view_models::agent_display::AgentPageData;
@@ -93,16 +92,32 @@ impl Render for SettingsWindowView {
         let sign_in_enabled = !snap.sign_in_in_progress
                               && !snap.email_draft.trim().is_empty()
                               && !snap.password_draft.trim().is_empty();
-        let font_selects = AppearanceFontSelects { body:  snap.body_font_select,
-                                                   value: snap.value_font_select,
-                                                   label: snap.label_font_select,
-                                                   mono:  snap.mono_font_select, };
 
-        let storage_display =
+        // Only the page on show needs its library-derived data; building the
+        // rest on every frame is what made scrolling sluggish.
+        let on_storage = snap.active_page_ix == STORAGE_PAGE_IX;
+        let on_advanced = snap.active_page_ix == ADVANCED_PAGE_IX;
+        let storage_display = if on_storage {
             StorageDisplay { default_root_id:  snap.default_root_id,
                              volumes:          snap.root_volumes.clone(),
                              title_counts:     self.library.read(cx).root_title_counts().clone(),
-                             collection_names: self.library.read(cx).collection_names(), };
+                             collection_names: self.library.read(cx).collection_names(), }
+        }
+        else {
+            StorageDisplay::default()
+        };
+        let publisher_names = if on_storage {
+            self.library.read(cx).publisher_names()
+        }
+        else {
+            Vec::new()
+        };
+        let filter_value_sections = if on_advanced {
+            self.library.read(cx).filter_value_sections()
+        }
+        else {
+            Vec::new()
+        };
         let panel = render_settings_panel(&snap.file_openers,
                                           snap.auth,
                                           snap.storage_root_path,
@@ -110,13 +125,16 @@ impl Render for SettingsWindowView {
                                           snap.storage_roots,
                                           snap.storage_rules,
                                           storage_display,
-                                          AgentPageData { settings: snap.mcp.clone(),
-                                                          activity: snap.mcp_activity.clone(), },
+                                          AgentPageData { settings:     snap.mcp.clone(),
+                                                          activity:     snap.mcp_activity.clone(),
+                                                          command_path: snap.mcp_command_path
+                                                                            .clone(),
+                                                          log_path:     snap.mcp_log_path.clone(), },
                                           snap.publisher_rule_input,
                                           snap.collection_rule_input,
                                           snap.size_rule_input,
                                           snap.rule_target_root_id,
-                                          self.library.read(cx).publisher_names(),
+                                          publisher_names,
                                           snap.rule_editor_type,
                                           self.settings.clone(),
                                           self.library.clone(),
@@ -138,9 +156,8 @@ impl Render for SettingsWindowView {
                                           snap.create_collections,
                                           snap.recently_updated_window_days,
                                           snap.recently_updated_window_input,
-                                          font_selects,
                                           snap.native,
-                                          self.library.read(cx).filter_value_sections());
+                                          filter_value_sections);
 
         div().size_full().child(panel)
     }

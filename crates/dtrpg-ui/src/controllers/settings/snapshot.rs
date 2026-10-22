@@ -59,13 +59,11 @@ impl SettingsController {
                            native: self.native.snapshot(),
                            mcp: self.mcp.snapshot(),
                            mcp_activity: self.mcp_activity.clone(),
+                           mcp_command_path: self.mcp_command_path.clone(),
+                           mcp_log_path: self.mcp_log_path.clone(),
                            recently_updated_window_days: self.storage
                                                              .recently_updated_window_days(),
                            recently_updated_window_input: self.recently_updated_window_input
-                                                              .clone(),
-                           body_font_select: self.body_font_select.clone(),
-                           value_font_select: self.value_font_select.clone(),
-                           label_font_select: self.label_font_select.clone(),
-                           mono_font_select: self.mono_font_select.clone() }
+                                                              .clone() }
     }
 }
