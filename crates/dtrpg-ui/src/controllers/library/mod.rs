@@ -62,6 +62,7 @@ mod file_tags;
 mod filter_values;
 mod filtering;
 mod helpers;
+mod insights;
 mod inspector_actions;
 mod lifecycle;
 mod preferences;
@@ -86,6 +87,8 @@ mod tests_downloads;
 mod tests_file_tags;
 #[cfg(test)]
 mod tests_filter_values;
+#[cfg(test)]
+mod tests_insights;
 #[cfg(test)]
 mod tests_inspector;
 #[cfg(test)]
@@ -112,6 +115,7 @@ mod tests_view_cache;
 pub(crate) use self::downloads::create_collections_symlinks;
 pub use self::filter_values::{CHOOSABLE_FILTER_FIELDS, FilterValueSection};
 pub(crate) use self::helpers::*;
+pub use self::insights::LiveAvailability;
 
 /// A collapsible section of the sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,6 +255,10 @@ pub struct LibraryController {
     /// Ids of the items whose last download failed, for the Needs Attention
     /// section. Kept for the session; a download that succeeds clears its item.
     failed_downloads:              HashSet<Arc<str>>,
+    /// The aggregates the Insights page shows, once they have been worked out.
+    insights:                      Option<Arc<dtrpg_core::library::insights::Insights>>,
+    /// True while the aggregates are being worked out off the main thread.
+    insights_computing:            bool,
     /// For each collection, how many of its titles are only in the cloud.
     collection_cloud:              Arc<HashMap<u64, usize>>,
     /// How many downloaded titles each storage location holds, by location id.

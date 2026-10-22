@@ -46,7 +46,7 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
                            collection_members: &HashSet<u64>, now_secs: i64, window_days: u32)
                            -> bool {
     match filter {
-        SidebarFilter::AllTitles => true,
+        SidebarFilter::AllTitles | SidebarFilter::Insights => true,
         SidebarFilter::RecentlyUpdated => item_recently_updated(item, now_secs, window_days),
         SidebarFilter::OnDevice => item.status == ItemStatus::Downloaded,
         SidebarFilter::InCloud => item.status == ItemStatus::Cloud,

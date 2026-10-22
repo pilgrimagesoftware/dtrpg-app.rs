@@ -100,6 +100,7 @@ impl CatalogViewPrefs {
             SidebarFilter::Collection(..)
             | SidebarFilter::SmartCollection(..)
             | SidebarFilter::NeedsAttention
+            | SidebarFilter::Insights
             | SidebarFilter::Tag { .. } => (None, None),
         };
         Self { sort: Some(match sort {

@@ -2,12 +2,14 @@
 //! content, and status bar from the controllers' snapshots, and wires the
 //! window-level menu/keyboard actions.
 
+use dtrpg_core::util::filter::SidebarFilter;
 use gpui_kit::component::Selectable as _;
 
 use super::*;
 use crate::ui::views::filters_column::{
     render_filter_chips, render_filters_column, without_hidden_values,
 };
+use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
@@ -206,6 +208,14 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let surface = colors.surface;
     let text_primary = colors.text_primary;
 
+    // The Insights page takes the place of the catalog and its toolbar.
+    let page: AnyElement = if filter == SidebarFilter::Insights {
+        render_insights(&lib_entity, colors, cx).into_any_element()
+    }
+    else {
+        catalog_content.into_any_element()
+    };
+
     // Settings renders in its own window (see `settings_window_view`), not
     // as an overlay here, so the main content area no longer
     // branches on `settings_snap.is_open`.
@@ -215,7 +225,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                             .flex_col()
                             .relative()
                             .bg(surface)
-                            .child(catalog_content);
+                            .child(page);
 
     let sidebar_col = div().size_full().relative().child(sidebar);
 

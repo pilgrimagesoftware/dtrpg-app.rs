@@ -28,6 +28,7 @@ pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
         SidebarFilter::OnDevice => t!("sidebar.on_this_device").to_string(),
         SidebarFilter::InCloud => t!("sidebar.in_the_cloud").to_string(),
         SidebarFilter::NeedsAttention => t!("sidebar.needs_attention").to_string(),
+        SidebarFilter::Insights => t!("sidebar.insights").to_string(),
         SidebarFilter::Publisher(name) => {
             t!("toolbar.filter_title_publisher", name = name).to_string()
         }
