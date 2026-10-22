@@ -34,6 +34,7 @@ use crate::data::events::{
 };
 use crate::data::token_status_global::TokenStatusGlobal;
 pub use crate::view_models::rule_editor::{RuleEditor, RuleEditorType};
+use crate::view_models::summary_display::SummaryPage;
 
 /// Index of the File Openers page of the settings window, for opening the
 /// settings on it.
@@ -182,9 +183,9 @@ pub struct SettingsSnapshot {
     /// How summaries are made: provider, model, ceiling, and whether on
     /// download.
     pub summaries:                      SummarySettingsFile,
-    /// Tokens the summaries made this calendar month have used, as of the
-    /// last time the Agent page was opened.
-    pub summary_tokens_used:            u64,
+    /// What the Summaries card reads besides the settings, as of the last time
+    /// the Agent page was opened.
+    pub summary_page:                   SummaryPage,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
@@ -206,7 +207,7 @@ pub struct SettingsController {
     mcp_command_path:               String,
     mcp_log_path:                   String,
     summaries:                      SummarySettings,
-    summary_tokens_used:            u64,
+    summary_page:                   SummaryPage,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -333,7 +334,7 @@ impl SettingsController {
                               mcp_command_path: agent::mcp_command_path(),
                               mcp_log_path: AuditLog::open().path().display().to_string(),
                               summaries: SummarySettings::load(),
-                              summary_tokens_used: summaries::tokens_used_this_month(),
+                              summary_page: summaries::read_summary_page(None),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -386,7 +387,7 @@ impl SettingsController {
                mcp_command_path: String::new(),
                mcp_log_path: String::new(),
                summaries: SummarySettings::in_memory(),
-               summary_tokens_used: 0,
+               summary_page: SummaryPage::default(),
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -423,7 +424,7 @@ impl SettingsController {
         self.active_page_ix = ix;
         if ix == agent::AGENT_PAGE_IX {
             self.mcp_activity = AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS);
-            self.summary_tokens_used = summaries::tokens_used_this_month();
+            self.summary_page = summaries::read_summary_page(self.summary_page.key_input.take());
         }
         self.refresh_page_data();
         dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);

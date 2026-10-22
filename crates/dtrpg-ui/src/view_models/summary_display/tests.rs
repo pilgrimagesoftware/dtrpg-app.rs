@@ -37,3 +37,27 @@ fn counts_are_grouped_and_shortened() {
 fn the_ceiling_note_resolves() {
     assert_ne!(ceiling_note(18_400, 500_000), "agent.summary_ceiling_note");
 }
+
+#[test]
+fn the_key_hint_says_where_the_key_comes_from_and_the_saved_key_comes_first() {
+    let hint = |env_var, saved| key_hint(AnthropicKeyStatus { env_var, saved });
+
+    let hints = [hint(false, false),
+                 hint(false, true),
+                 hint(true, false),
+                 hint(true, true)];
+
+    for (index, one) in hints.iter().enumerate() {
+        for other in &hints[index + 1..] {
+            assert_ne!(one, other);
+        }
+    }
+    for key in ["agent.summary_key_missing",
+                "agent.summary_key_saved",
+                "agent.summary_key_env",
+                "agent.summary_key_saved_and_env",
+                "agent.summary_key_placeholder"]
+    {
+        assert_ne!(t!(key).to_string(), key, "{key} has no text");
+    }
+}
