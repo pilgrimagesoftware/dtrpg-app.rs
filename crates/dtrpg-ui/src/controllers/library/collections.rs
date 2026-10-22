@@ -65,6 +65,14 @@ impl LibraryController {
           .detach();
     }
 
+    /// Brings what depends on which items are in which collections up to date:
+    /// the smart collections' counts and members, and the catalog, since a
+    /// `collection:` search reads the membership.
+    pub(super) fn membership_changed(&mut self) {
+        self.refresh_smart_collections();
+        self.invalidate_cache();
+    }
+
     /// Stores the fetched collections and emits a change event.
     pub(super) fn apply_collections(&mut self, mut collections: Vec<CollectionEntry>,
                                     cx: &mut Context<Self>) {
@@ -81,6 +89,7 @@ impl LibraryController {
         if let SidebarFilter::Collection(id, _) = &self.filter {
             self.collection_members = self.library.collection_member_ids(*id);
         }
+        self.membership_changed();
         cx.emit(LibraryChanged);
     }
 
@@ -275,6 +284,7 @@ impl LibraryController {
                                   ctrl.filter = SidebarFilter::default();
                                   ctrl.collection_members.clear();
                               }
+                              ctrl.membership_changed();
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);

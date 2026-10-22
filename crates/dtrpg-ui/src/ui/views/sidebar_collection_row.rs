@@ -88,7 +88,7 @@ pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow
                                open_smart_collection_editor(window,
                                                             cx,
                                                             entity.clone(),
-                                                            SmartCollectionDraft::named(&name));
+                                                            SmartCollectionDraft::from_manual_collection(&name));
                            }
                        }))
                  .item(PopupMenuItem::new(t!("collections.delete")).on_click({

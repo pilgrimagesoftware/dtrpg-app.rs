@@ -61,7 +61,7 @@ pub(in crate::data::index) fn facet_counts(conn: &Connection, filter: &ItemFilte
                      GROUP BY ulower(fl.location) \
                      ORDER BY COUNT(DISTINCT fl.item_id) DESC, ulower(MIN(fl.location))")
         }
-        Field::Publisher => return Ok(Vec::new()),
+        Field::Publisher | Field::Collection => return Ok(Vec::new()),
     };
     let mut stmt = conn.prepare(&sql)?;
     let counts = stmt.query_map(params_from_iter(args.iter().map(AsRef::as_ref)), |row| {

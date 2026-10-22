@@ -699,6 +699,7 @@ smart_collections:
     field_type: "type"
     field_availability: "disponibilité"
     field_location: "Emplacement"
+    field_collection: "collection"
     op_is: "est"
     op_is_not: "n’est pas"
     value_placeholder: "Valeur"

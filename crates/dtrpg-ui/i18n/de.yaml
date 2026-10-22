@@ -699,6 +699,7 @@ smart_collections:
     field_type: "Typ"
     field_availability: "Verfügbarkeit"
     field_location: "Speicherort"
+    field_collection: "Sammlung"
     op_is: "ist"
     op_is_not: "ist nicht"
     value_placeholder: "Wert"

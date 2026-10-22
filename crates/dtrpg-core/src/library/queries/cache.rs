@@ -1,7 +1,7 @@
 //! `Library::invalidate_cache` and the render-path accessors that read what
 //! it computed.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::{Arc, PoisonError};
 
@@ -16,9 +16,11 @@ use crate::util::search::{Field, SearchQuery};
 impl Library {
     /// Builds an `ItemFilter` representing `view`'s sidebar filter, before
     /// the search query is applied.
-    fn item_filter<'a>(view: &'a ViewState, now_secs: i64) -> ItemFilter<'a> {
+    fn item_filter<'a>(view: &'a ViewState, now_secs: i64,
+                       collection_ids: &'a HashMap<String, Vec<u64>>)
+                       -> ItemFilter<'a> {
         use crate::util::filter::SidebarFilter;
-        match &view.filter {
+        let filter = match &view.filter {
             SidebarFilter::AllTitles | SidebarFilter::Insights => ItemFilter::default(),
             SidebarFilter::Tag { name, .. } => ItemFilter { tag_name: Some(name),
                                                             ..Default::default() },
@@ -41,7 +43,9 @@ impl Library {
             | SidebarFilter::NeedsAttention => ItemFilter { collection_member_ids:
                                                                 Some(&view.collection_members),
                                                             ..Default::default() },
-        }
+        };
+        ItemFilter { collection_ids: Some(collection_ids),
+                     ..filter }
     }
 
     /// Recomputes the filtered, sorted item cache (and its grouped view, the
@@ -59,14 +63,15 @@ impl Library {
         // ignored," so the count runs before `search` joins the filter. A
         // failed count keeps the previous number — the same
         // keep-stale-on-failure policy as the facet refresh.
-        let base_filter = Self::item_filter(view, now_secs);
+        let collection_ids = self.collection_ids_by_name();
+        let base_filter = Self::item_filter(view, now_secs, &collection_ids);
         let count = self.index
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
                         .count_items_filtered(&base_filter);
 
         let query = SearchQuery::parse(&view.search_query);
-        let mut search_filter = Self::item_filter(view, now_secs);
+        let mut search_filter = Self::item_filter(view, now_secs, &collection_ids);
         search_filter.search = Some(&query);
         let matched = self.index
                           .lock()
@@ -94,9 +99,9 @@ impl Library {
         drop(cache);
 
         let items = self.overlaid_items(matched);
-        let grouped = self.build_grouped_cache(view, now_secs, untagged_label);
+        let grouped = self.build_grouped_cache(view, now_secs, untagged_label, &collection_ids);
         let catalog_ids = self.compute_catalog_ids();
-        let facets = Arc::new(self.count_facets(view, now_secs, &query));
+        let facets = Arc::new(self.count_facets(view, now_secs, &query, &collection_ids));
 
         let mut cache = self.query_cache
                             .lock()
@@ -114,7 +119,9 @@ impl Library {
     /// others. Tags all have to hold, so their counts keep the tag choices and
     /// show what narrowing further would leave. A facet that cannot be counted
     /// shows no values, and the failure is logged.
-    fn count_facets(&self, view: &ViewState, now_secs: i64, query: &SearchQuery) -> Facets {
+    fn count_facets(&self, view: &ViewState, now_secs: i64, query: &SearchQuery,
+                    collection_ids: &HashMap<String, Vec<u64>>)
+                    -> Facets {
         let index = self.index.lock().unwrap_or_else(PoisonError::into_inner);
         let count = |field: Field| {
             let scoped = if field == Field::Tag {
@@ -123,7 +130,7 @@ impl Library {
             else {
                 query.without_field(field)
             };
-            let mut filter = Self::item_filter(view, now_secs);
+            let mut filter = Self::item_filter(view, now_secs, collection_ids);
             filter.search = Some(&scoped);
             index.facet_counts(&filter, field)
                  .inspect_err(|error| tracing::warn!(%error, ?field, "could not count a facet"))
@@ -141,9 +148,10 @@ impl Library {
     /// Builds the grouped-items cache for `view.group_by`, or `None` when
     /// grouping is disabled. Queries the index so grouping shares the same
     /// source-of-truth as filtering and search.
-    fn build_grouped_cache(&self, view: &ViewState, now_secs: i64, untagged_label: &str)
+    fn build_grouped_cache(&self, view: &ViewState, now_secs: i64, untagged_label: &str,
+                           collection_ids: &HashMap<String, Vec<u64>>)
                            -> Option<Arc<Vec<ItemGroup>>> {
-        let mut filter = Self::item_filter(view, now_secs);
+        let mut filter = Self::item_filter(view, now_secs, collection_ids);
         let query = SearchQuery::parse(&view.search_query);
         filter.search = Some(&query);
         let index = self.index.lock().unwrap_or_else(PoisonError::into_inner);
