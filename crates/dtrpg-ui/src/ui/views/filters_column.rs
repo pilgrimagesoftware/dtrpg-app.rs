@@ -60,7 +60,7 @@ fn facet_label(field: Field, count: &FacetCount) -> SharedString {
 }
 
 /// The counts of `field` in `facets`.
-/// Publishers have no facet; they are chosen in the sidebar.
+/// Publishers and collections have no facet; they are chosen in the sidebar.
 fn counts_for(facets: &Facets, field: Field) -> &[FacetCount] {
     match field {
         Field::Availability => &facets.availability,
@@ -70,7 +70,7 @@ fn counts_for(facets: &Facets, field: Field) -> &[FacetCount] {
         Field::System => &facets.systems,
         Field::Location => &facets.locations,
         Field::Tag => &facets.tags,
-        Field::Publisher => &[],
+        Field::Publisher | Field::Collection => &[],
     }
 }
 

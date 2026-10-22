@@ -5,7 +5,7 @@
 //! exactly — see `openspec/changes/search-box-semantics-sql/design.md` for
 //! why `instr(ulower(col), ?)` and not `LIKE`, FTS5 `MATCH`, or trigrams.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use rusqlite::ToSql;
 
@@ -42,6 +42,9 @@ pub struct ItemFilter<'a> {
     /// `field:value` terms required (`-field:value` forbidden). Parsing itself
     /// never moves into SQL.
     pub search:                Option<&'a SearchQuery>,
+    /// The member ids of each manual collection, by lower-cased name, for the
+    /// `collection:` search term. A name that is not a key holds for no item.
+    pub collection_ids:        Option<&'a HashMap<String, Vec<u64>>>,
 }
 
 /// One item's `EXISTS`/`NOT EXISTS` over a tag name, bound at parameter `n`
@@ -63,13 +66,31 @@ fn filter_exists_clause(negated: bool, category_n: usize, name_n: usize) -> Stri
     format!("{prefix}{exists}{category_n} AND ulower(f.name) = ?{name_n})")
 }
 
+/// The clause for a `collection:` term whose collection has the member ids
+/// `ids`: the item is one of them, or is not. A collection with no members
+/// (or no such collection) holds for no item, so a positive term keeps none
+/// and a negated one keeps all.
+fn collection_clause(negated: bool, ids: &[u64], args: &mut Vec<Box<dyn ToSql>>) -> Option<String> {
+    if ids.is_empty() {
+        return (!negated).then(|| "1 = 0".to_owned());
+    }
+    let placeholders = (0..ids.len()).map(|i| format!("?{}", args.len() + 1 + i))
+                                     .collect::<Vec<_>>()
+                                     .join(", ");
+    args.extend(ids.iter().map(|id| Box::new(*id as i64) as Box<dyn ToSql>));
+    let operator = if negated { "NOT IN" } else { "IN" };
+    Some(format!("order_product_id {operator} ({placeholders})"))
+}
+
 /// The clause for one search term, or `None` when the term keeps every item.
 /// Pushes the term's argument, so the clause's `?n` matches its position.
 ///
 /// Values are lower cased already, and `ulower` folds the columns the same
 /// way. An availability value that names no state holds for no item, so a
 /// positive term keeps none and a negated one keeps all.
-fn term_clause(term: &Term, args: &mut Vec<Box<dyn ToSql>>) -> Option<String> {
+fn term_clause(term: &Term, collection_ids: Option<&HashMap<String, Vec<u64>>>,
+               args: &mut Vec<Box<dyn ToSql>>)
+               -> Option<String> {
     let column = match term.field {
         Field::Tag => {
             let n = args.len() + 1;
@@ -92,6 +113,12 @@ fn term_clause(term: &Term, args: &mut Vec<Box<dyn ToSql>>) -> Option<String> {
             let prefix = if term.negated { "NOT " } else { "" };
             return Some(format!("{prefix}EXISTS (SELECT 1 FROM file_locations fl \
                                  WHERE fl.item_id = items.id AND ulower(fl.location) = ?{n})"));
+        }
+        Field::Collection => {
+            let ids = collection_ids.and_then(|by_name| by_name.get(&term.value))
+                                    .map(Vec::as_slice)
+                                    .unwrap_or_default();
+            return collection_clause(term.negated, ids, args);
         }
         Field::Publisher => "publisher",
         Field::System | Field::Type | Field::Format | Field::Genre => {
@@ -187,14 +214,14 @@ pub(super) fn build_where(filter: &ItemFilter<'_>) -> (String, Vec<Box<dyn ToSql
                          .iter()
                          .filter(|term| term.negated || term.field == Field::Tag)
         {
-            clauses.extend(term_clause(term, &mut args));
+            clauses.extend(term_clause(term, filter.collection_ids, &mut args));
         }
         for field in Field::ALL.into_iter().filter(|field| *field != Field::Tag) {
             let alternatives: Vec<String> =
                 query.terms()
                      .iter()
                      .filter(|term| !term.negated && term.field == field)
-                     .filter_map(|term| term_clause(term, &mut args))
+                     .filter_map(|term| term_clause(term, filter.collection_ids, &mut args))
                      .collect();
             if !alternatives.is_empty() {
                 clauses.push(format!("({})", alternatives.join(" OR ")));

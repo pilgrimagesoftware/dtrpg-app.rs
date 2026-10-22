@@ -359,3 +359,22 @@ fn an_item_with_no_files_is_in_no_location() {
     assert!(!matches("location:vault", &moria, &[]));
     assert!(matches("-location:vault", &moria, &[]));
 }
+
+#[test]
+fn a_collection_term_is_held_by_an_item_in_that_collection() {
+    let mut moria = item("Moria", "Free League", "The One Ring");
+    moria.collections = vec!["Solo Play".into()];
+
+    assert!(matches("collection:\"solo play\"", &moria, &[]));
+    assert!(!matches("collection:horror", &moria, &[]));
+    assert!(!matches("-collection:\"SOLO PLAY\"", &moria, &[]));
+    assert!(matches("-collection:horror", &moria, &[]));
+}
+
+#[test]
+fn an_item_in_no_collection_is_held_by_no_collection_term() {
+    let moria = item("Moria", "Free League", "The One Ring");
+
+    assert!(!matches("collection:\"solo play\"", &moria, &[]));
+    assert!(matches("-collection:\"solo play\"", &moria, &[]));
+}

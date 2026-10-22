@@ -236,3 +236,33 @@ fn a_collection_counts_the_members_that_are_only_in_the_cloud() {
 
     assert_eq!(counts.get(&7), Some(&1));
 }
+
+#[test]
+fn a_collection_search_finds_the_members_and_an_item_lists_its_collections() {
+    use crate::data::collection::CollectionEntry;
+
+    let library = open_library();
+    let mut member = item("a", "Paizo");
+    member.order_product_id = 11;
+    let mut other = item("b", "Paizo");
+    other.order_product_id = 12;
+    library.index
+           .lock()
+           .unwrap()
+           .replace_all_items(&[member, other])
+           .unwrap();
+    library.set_collections(vec![CollectionEntry { id:         7,
+                                                   name:       "Solo Play".into(),
+                                                   member_ids: Arc::from([11]),
+                                                   created_at: 0, }]);
+    let view = ViewState { search_query: "collection:\"solo play\"".to_owned(),
+                           ..ViewState::default() };
+
+    library.invalidate_cache(&view, 0, "Untagged");
+    let found = library.visible_items();
+
+    assert_eq!(found.len(), 1);
+    assert_eq!(&*found[0].id, "a");
+    assert_eq!(found[0].collections, ["Solo Play".into()]);
+    assert!(library.item_by_id("b").unwrap().collections.is_empty());
+}

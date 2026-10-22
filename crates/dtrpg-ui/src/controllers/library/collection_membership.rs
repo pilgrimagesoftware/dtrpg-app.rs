@@ -92,6 +92,7 @@ impl LibraryController {
         if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
             self.collection_members.insert(item_id);
         }
+        self.membership_changed();
         cx.emit(LibraryChanged);
 
         let collections_service = Arc::clone(&self.collections_service);
@@ -132,6 +133,7 @@ impl LibraryController {
                           {
                               ctrl.collection_members.remove(&item_id);
                           }
+                          ctrl.membership_changed();
                           cx.emit(LibraryChanged);
                           ctrl.activity.update(cx, |a, cx| {
                                            a.log_alert(format!(
@@ -183,6 +185,7 @@ impl LibraryController {
             self.collection_members.remove(&item_id);
             self.collection_members.remove(&product_id);
         }
+        self.membership_changed();
         cx.emit(LibraryChanged);
 
         let collections_service = Arc::clone(&self.collections_service);
@@ -210,6 +213,7 @@ impl LibraryController {
                           {
                               ctrl.collection_members.extend(&removed_ids);
                           }
+                          ctrl.membership_changed();
                           cx.emit(LibraryChanged);
                           ctrl.activity.update(cx, |a, cx| {
                                            a.log_alert(format!(

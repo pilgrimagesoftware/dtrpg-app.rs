@@ -1,5 +1,7 @@
 //! Counting items by facet value, with and without a filter.
 
+use std::collections::HashMap;
+
 use super::super::LibraryIndex;
 use super::clause::ItemFilter;
 use super::facets::FacetCount;
@@ -230,4 +232,41 @@ fn a_location_term_keeps_the_items_with_files_there_and_a_negated_one_the_rest()
     assert_eq!(ids("location:vault"), ["a", "b"]);
     assert_eq!(ids("location:VAULT location:local"), ["a", "b", "c"]);
     assert_eq!(ids("-location:vault"), ["c", "d"]);
+}
+
+#[test]
+fn a_collection_term_keeps_the_members_of_that_collection_and_a_negated_one_the_rest() {
+    let mut index = LibraryIndex::open_in_memory().unwrap();
+    let mut items = [item("a", "", "", ItemStatus::Cloud),
+                     item("b", "", "", ItemStatus::Cloud),
+                     item("c", "", "", ItemStatus::Cloud)];
+    for (item, order_product_id) in items.iter_mut().zip([11, 12, 13]) {
+        item.order_product_id = order_product_id;
+    }
+    index.replace_all_items(&items).unwrap();
+    let by_name: HashMap<String, Vec<u64>> = HashMap::from([("solo play".to_owned(),
+                                                             vec![11, 12]),
+                                                            ("empty".to_owned(), Vec::new())]);
+    let ids = |text: &str| -> Vec<String> {
+        let query = SearchQuery::parse(text);
+        let filter = ItemFilter { search: Some(&query),
+                                  collection_ids: Some(&by_name),
+                                  ..ItemFilter::default() };
+        let mut ids: Vec<String> =
+            index.list_items_filtered(&filter,
+                                      crate::util::sort::SortMethod::Title,
+                                      crate::util::sort::SortDirection::Ascending)
+                 .unwrap()
+                 .into_iter()
+                 .map(|item| item.id.to_string())
+                 .collect();
+        ids.sort();
+        ids
+    };
+
+    assert_eq!(ids("collection:\"solo play\""), ["a", "b"]);
+    assert_eq!(ids("-collection:\"solo play\""), ["c"]);
+    assert!(ids("collection:empty").is_empty());
+    assert!(ids("collection:nothing").is_empty());
+    assert_eq!(ids("-collection:empty"), ["a", "b", "c"]);
 }
