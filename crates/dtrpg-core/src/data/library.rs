@@ -96,6 +96,11 @@ pub struct LibraryItem {
     /// before this field existed, until the next full load.
     #[serde(default)]
     pub filters:                   Vec<ProductFilter>,
+    /// The names of the storage locations the item's downloaded files are in.
+    /// Filled in from the index when the item is read, not stored with the
+    /// item, so it is empty on an item built any other way.
+    #[serde(skip)]
+    pub locations:                 Vec<Arc<str>>,
 }
 
 impl LibraryItem {
@@ -128,7 +133,8 @@ impl LibraryItem {
                is_available: true,
                availability_last_checked: None,
                files: Vec::new(),
-               filters: Vec::new() }
+               filters: Vec::new(),
+               locations: Vec::new() }
     }
 
     /// The item with one more filter, in `category`, named `name`, for building

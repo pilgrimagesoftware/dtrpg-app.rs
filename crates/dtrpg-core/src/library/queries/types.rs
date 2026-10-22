@@ -45,6 +45,8 @@ pub struct Facets {
     pub formats:      Vec<FacetCount>,
     /// Items by genre.
     pub genres:       Vec<FacetCount>,
+    /// Items by the storage location their downloaded files are in.
+    pub locations:    Vec<FacetCount>,
     /// Items by tag.
     pub tags:         Vec<FacetCount>,
 }

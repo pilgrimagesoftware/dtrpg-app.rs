@@ -19,9 +19,16 @@ impl Library {
         item.availability_last_checked = ephemeral.availability_checks.get(&item.id).copied();
     }
 
+    /// Overlays the ephemeral state and the file locations on `items`.
     pub(super) fn overlaid_items(&self, mut items: Vec<LibraryItem>) -> Vec<LibraryItem> {
+        let mut locations = self.file_locations_by_item();
         for item in &mut items {
             self.overlay_ephemeral_state(item);
+            item.locations = locations.remove(&item.id)
+                                      .unwrap_or_default()
+                                      .into_iter()
+                                      .map(Arc::from)
+                                      .collect();
         }
         items
     }
@@ -54,6 +61,15 @@ impl Library {
                            .ok()
                            .flatten()?;
         self.overlay_ephemeral_state(&mut item);
+        item.locations = self.index
+                             .lock()
+                             .unwrap_or_else(PoisonError::into_inner)
+                             .file_locations_of(id)
+                             .map_err(|e| tracing::warn!(error = %e, "library index query failed"))
+                             .unwrap_or_default()
+                             .into_iter()
+                             .map(Arc::from)
+                             .collect();
         Some(item)
     }
 

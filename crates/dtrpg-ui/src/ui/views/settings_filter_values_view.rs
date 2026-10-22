@@ -34,7 +34,7 @@ fn field_heading(field: Field) -> String {
         Field::Format => t!("settings.filter_values_format"),
         Field::Genre => t!("settings.filter_values_genre"),
         Field::Type => t!("settings.filter_values_type"),
-        Field::Tag | Field::Publisher | Field::System | Field::Availability => {
+        Field::Tag | Field::Publisher | Field::System | Field::Availability | Field::Location => {
             return field.keyword().to_owned();
         }
     }.to_string()

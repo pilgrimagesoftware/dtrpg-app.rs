@@ -54,6 +54,13 @@ pub(in crate::data::index) fn facet_counts(conn: &Connection, filter: &ItemFilte
                      GROUP BY ulower(tg.name) \
                      ORDER BY COUNT(DISTINCT it.item_id) DESC, ulower(MIN(tg.name))")
         }
+        Field::Location => {
+            format!("SELECT MIN(fl.location), COUNT(DISTINCT fl.item_id) \
+                     FROM file_locations fl \
+                     WHERE fl.item_id IN (SELECT id FROM items {where_clause}) \
+                     GROUP BY ulower(fl.location) \
+                     ORDER BY COUNT(DISTINCT fl.item_id) DESC, ulower(MIN(fl.location))")
+        }
         Field::Publisher => return Ok(Vec::new()),
     };
     let mut stmt = conn.prepare(&sql)?;

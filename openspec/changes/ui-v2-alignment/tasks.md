@@ -5,9 +5,9 @@
 - [x] File an issue per slice (#382 to #392).
 - [ ] Set issue type, project, milestone, size and effort on #382 to #392.
 - [ ] Recapture `upgrade-a-collection.png` in `dtrpg-design` (it duplicates the smart-collection sheet).
-- [x] #382 Slice 1: Domain foundations. Per-file location is now recorded (`file_locations`); the Location facet and the `location:` token still need to be built on it.
+- [x] #382 Slice 1: Domain foundations. Per-file location is now recorded (`file_locations`); the Location facet and the `location:` token are built on it.
 - [x] #383 Slice 2: Query language (shared parser).
-- [x] #384 Slice 3: Library chrome. Still open: the Location facet (needs per-file location) and the status bar's per-location usage meters.
+- [x] #384 Slice 3: Library chrome (the Location facet is in).
 - [ ] #385 Slice 4: Inspector parity.
 - [ ] #386 Slice 5: Download sheet.
 - [x] #387 Slice 6: Smart collections. Still open: on-match actions, Preview (#426), seeding from a manual collection.

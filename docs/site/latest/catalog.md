@@ -73,10 +73,11 @@ spaces in quotes.
 | `format` | formats include the value | `format:pdf` |
 | `genre` | genres include the value | `genre:horror` |
 | `availability` | download state is `downloaded` or `cloud` | `-availability:cloud` |
+| `location` | downloaded files are in the storage location of that name | `location:"archive vault"` |
 
 Combine terms with each other and with ordinary words: `type:adventure -tag:solo moria`. An item has to meet
 every term, except that several terms for the same field (`type:adventure type:core`) are alternatives: an
-item needs only one of them. Tag terms and terms with a minus sign must all hold. A word before a colon that is not one of these fields, such as `location:cloud`, is searched
+item needs only one of them. Tag terms and terms with a minus sign must all hold. A word before a colon that is not one of these fields, such as `colour:cloud`, is searched
 for as ordinary text.
 
 `system`, `type`, `format` and `genre` read the filters DriveThruRPG puts on each product (its

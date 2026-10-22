@@ -86,6 +86,13 @@ fn term_clause(term: &Term, args: &mut Vec<Box<dyn ToSql>>) -> Option<String> {
             let operator = if term.negated { "<>" } else { "=" };
             return Some(format!("status {operator} ?{n}"));
         }
+        Field::Location => {
+            let n = args.len() + 1;
+            args.push(Box::new(term.value.clone()));
+            let prefix = if term.negated { "NOT " } else { "" };
+            return Some(format!("{prefix}EXISTS (SELECT 1 FROM file_locations fl \
+                                 WHERE fl.item_id = items.id AND ulower(fl.location) = ?{n})"));
+        }
         Field::Publisher => "publisher",
         Field::System | Field::Type | Field::Format | Field::Genre => {
             let category = term.field.category().unwrap_or_default().to_lowercase();
