@@ -3,21 +3,24 @@
 //! place of a rule's row, changes that rule.
 //!
 //! While a name is typed, the publishers or collections that match it are
-//! listed under the row; picking one fills the value.
+//! offered in a popup under the value field. The popup floats over what is
+//! below it, so nothing moves; it shows six names and scrolls to the rest.
 
 use gpui::prelude::*;
-use gpui::{AnyElement, ClickEvent, Window, div, px};
+use gpui::{AnyElement, ClickEvent, Window, deferred, div, px};
+use gpui_kit::component::Disableable;
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{Disableable, v_flex};
 use rust_i18n::t;
 
 use super::storage_rules_view::RulesData;
 use super::*;
 use crate::ui::views::settings_card::card_row;
-use crate::view_models::rule_editor::{RuleEditorType, condition_from_text, suggestions};
+use crate::view_models::rule_editor::{
+    RuleEditorType, VISIBLE_SUGGESTIONS, condition_from_text, suggestions,
+};
 
 /// How the kind of rule reads on the type menu.
 pub(super) fn kind_label(kind: RuleEditorType) -> String {
@@ -51,13 +54,17 @@ pub(super) fn rule_editor_row(data: &RulesData, entity: &Entity<SettingsControll
               .as_ref()
               .map_or_else(|| div().into_any_element(),
                            |input| Input::new(input).appearance(true).into_any_element());
-    let row = card_row(false, colors).child(kind_menu(data, entity))
-                                     .child(div().flex_1().min_w_0().child(value))
-                                     .child(target_menu(data, entity))
-                                     .child(save_button(can_save, data, entity))
-                                     .child(cancel_button(entity));
-    v_flex().child(row)
-            .children((!matches.is_empty()).then(|| suggestion_list(matches, data, colors)))
+    let field =
+        div().relative()
+             .flex_1()
+             .min_w_0()
+             .child(value)
+             .children((!matches.is_empty()).then(|| suggestion_popup(matches, data, colors)));
+    card_row(false, colors).child(kind_menu(data, entity))
+                           .child(field)
+                           .child(target_menu(data, entity))
+                           .child(save_button(can_save, data, entity))
+                           .child(cancel_button(entity))
 }
 
 /// The menu that picks the kind of rule. Changing the kind empties the value
@@ -149,27 +156,53 @@ fn cancel_button(entity: &Entity<SettingsController>) -> impl IntoElement {
                                      })
 }
 
-/// The names that match what is typed; picking one fills the value field.
-fn suggestion_list(matches: Vec<String>, data: &RulesData, colors: &ColorTokens)
-                   -> impl IntoElement {
+/// How tall one name in the popup is, in pixels.
+const SUGGESTION_HEIGHT: f32 = 30.0;
+
+/// The popup of names that match what is typed; picking one fills the value
+/// field. It is placed under the field without taking room in the layout, and
+/// drawn over what is below it. It is as tall as [`VISIBLE_SUGGESTIONS`] names
+/// and scrolls to the others.
+///
+/// This is not a pre-made control: gpui-kit's completion popup belongs to its
+/// code editor, and its menus take focus from the field, so the field could not
+/// be typed in while one was open.
+fn suggestion_popup(matches: Vec<String>, data: &RulesData, colors: &ColorTokens)
+                    -> impl IntoElement {
     let input = data.editor.input.clone();
-    v_flex().border_t_1()
-            .border_color(colors.border)
-            .children(matches.into_iter().enumerate().map(|(index, name)| {
-                let input = input.clone();
-                let picked = name.clone();
-                div().id(("rule-editor-suggestion", index))
-                     .px(px(16.0))
-                     .py(px(6.0))
-                     .text_sm()
-                     .text_color(colors.text_primary)
-                     .cursor_pointer()
-                     .hover(|row| row.bg(colors.surface_alt))
-                     .on_click(move |_, window, cx| {
-                         if let Some(input) = input.clone() {
-                             input.update(cx, |state, cx| state.set_value(picked.clone(), window, cx));
-                         }
-                     })
-                     .child(name)
-            }))
+    deferred(div().id("rule-editor-suggestions")
+                  .absolute()
+                  .top_full()
+                  .left_0()
+                  .w_full()
+                  .mt(px(4.0))
+                  .max_h(px(SUGGESTION_HEIGHT * VISIBLE_SUGGESTIONS as f32))
+                  .overflow_y_scroll()
+                  .occlude()
+                  .rounded(px(8.0))
+                  .border_1()
+                  .border_color(colors.border)
+                  .bg(colors.surface)
+                  .shadow_md()
+                  .children(matches.into_iter().enumerate().map(|(index, name)| {
+                      let input = input.clone();
+                      let picked = name.clone();
+                      div().id(("rule-editor-suggestion", index))
+                           .h(px(SUGGESTION_HEIGHT))
+                           .flex()
+                           .items_center()
+                           .px(px(12.0))
+                           .text_sm()
+                           .text_color(colors.text_primary)
+                           .cursor_pointer()
+                           .hover(|row| row.bg(colors.surface_alt))
+                           .on_click(move |_, window, cx| {
+                               if let Some(input) = input.clone() {
+                                   input.update(cx, |state, cx| {
+                                             state.set_value(picked.clone(), window, cx);
+                                         });
+                               }
+                           })
+                           .child(name)
+                  })))
 }

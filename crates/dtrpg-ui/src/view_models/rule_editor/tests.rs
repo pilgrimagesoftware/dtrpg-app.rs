@@ -87,3 +87,18 @@ fn collection_suggestions_are_the_collection_names() {
 
     assert_eq!(names, ["Horror", "Solo Play"]);
 }
+
+#[test]
+fn twenty_suggestions_are_kept_for_the_popup_to_scroll() {
+    let publishers: Vec<String> = (0..30).map(|n| format!("Press {n:02}")).collect();
+
+    let names = suggestions(RuleEditorType::Publisher,
+                            "press",
+                            &publishers,
+                            &collections());
+
+    assert_eq!(names.len(), MAX_SUGGESTIONS);
+    assert_eq!(VISIBLE_SUGGESTIONS, 6);
+    assert_eq!(MAX_SUGGESTIONS, 20);
+    assert_eq!(names.first().map(String::as_str), Some("Press 00"));
+}
