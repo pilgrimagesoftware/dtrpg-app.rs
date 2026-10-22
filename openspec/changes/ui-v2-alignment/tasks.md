@@ -5,14 +5,14 @@
 - [x] File an issue per slice (#382 to #392).
 - [ ] Set issue type, project, milestone, size and effort on #382 to #392.
 - [ ] Recapture `upgrade-a-collection.png` in `dtrpg-design` (it duplicates the smart-collection sheet).
-- [ ] #382 Slice 1: Domain foundations (availability states, per-file location, System/Type, facet queries).
-- [ ] #383 Slice 2: Query language (shared parser).
-- [ ] #384 Slice 3: Library chrome (Filters button and facet column, token chips, sidebar, status bar).
+- [x] #382 Slice 1: Domain foundations. Per-file location is not recorded yet, so the Location facet is waiting on it.
+- [x] #383 Slice 2: Query language (shared parser).
+- [x] #384 Slice 3: Library chrome. Still open: the Location facet (needs per-file location) and the status bar's per-location usage meters.
 - [ ] #385 Slice 4: Inspector parity.
 - [ ] #386 Slice 5: Download sheet.
-- [ ] #387 Slice 6: Smart collections.
-- [ ] #388 Slice 7: Insights.
-- [ ] #389 Slice 8: Settings parity (Agent & MCP, Storage, Native, Appearance check).
-- [ ] #390 Slice 9: MCP completion (tools, scopes, audit log).
+- [x] #387 Slice 6: Smart collections. Still open: on-match actions, Preview (#426), seeding from a manual collection.
+- [x] #388 Slice 7: Insights.
+- [x] #389 Slice 8: Settings parity. Still open: Storage behaviour toggles and cloud-placeholder toggles (nothing backs them yet), Summaries (#437), Appearance gaps (#439).
+- [x] #390 Slice 9: MCP completion. Still open: `create_collection`, `add_to_collection`, `download_item` (#436).
 - [ ] #391 Slice 10: Windows and Linux chrome.
 - [ ] #392 Slice 11: Empty and loading states.
