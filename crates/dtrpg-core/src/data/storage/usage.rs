@@ -1,6 +1,7 @@
-//! How many titles each storage root holds.
+//! Which storage root holds each title, and how many titles each root holds.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::StorageConfig;
 use crate::data::collection::CollectionEntry;
@@ -28,4 +29,21 @@ pub fn titles_per_root(storage: &StorageConfig, items: &[LibraryItem],
         *counts.entry(root.id).or_insert(0) += 1;
     }
     counts
+}
+
+/// The name of the root each downloaded title is in, by item id, going by the
+/// placement rules as [`titles_per_root`] does. A title that is only in the
+/// cloud is not in the map.
+#[must_use]
+pub fn locations_of_titles(storage: &StorageConfig, items: &[LibraryItem],
+                           collections: &[CollectionEntry])
+                           -> HashMap<Arc<str>, String> {
+    items.iter()
+         .filter(|item| item.status == ItemStatus::Downloaded)
+         .map(|item| {
+             let collection_ids = collection_ids_for_item(item, collections);
+             let root = storage.resolve_root_for(&item.publisher, &collection_ids, item.size_mb);
+             (Arc::clone(&item.id), root.name)
+         })
+         .collect()
 }

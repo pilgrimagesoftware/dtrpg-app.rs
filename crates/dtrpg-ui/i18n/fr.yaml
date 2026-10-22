@@ -212,6 +212,7 @@ detail:
   opens_with_settings_link: "Réglages > Applications d'ouverture"
   field_system: "Système"
   field_category: "Type"
+  field_location: "Emplacement"
   field_format: "Format"
   field_pages: "Pages"
   field_file_size: "Taille du fichier"

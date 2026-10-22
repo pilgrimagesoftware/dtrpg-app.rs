@@ -98,6 +98,7 @@ impl LibraryController {
                           root_usage: Arc::new(Vec::new()),
                           collection_cloud: Arc::new(HashMap::new()),
                           root_title_counts: HashMap::new(),
+                          item_locations: HashMap::new(),
                           library,
                           thumbnail_activity_id: None,
                           thumbnail_processed: 0,

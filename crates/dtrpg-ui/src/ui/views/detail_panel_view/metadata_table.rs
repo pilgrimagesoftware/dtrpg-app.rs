@@ -77,11 +77,12 @@ pub(super) fn value_or_dash(value: &str) -> String {
 const DETAILS_LABEL_WIDTH: f32 = 110.0;
 
 /// Renders the details table: plain labels on the left, values on the right,
-/// in the order System, Type, Format, Pages, Size, Released, Added, Updated.
-/// Rows the catalog has nothing for are left out.
-pub(super) fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path,
-                                    colors: &ColorTokens, label_font_family: &str,
-                                    value_font_family: &str)
+/// in the order System, Type, Format, Pages, Size, Released, Added, Updated,
+/// Location. Rows the catalog has nothing for are left out; `location` is the
+/// name of the storage location holding a downloaded title.
+pub(super) fn render_metadata_table(item: &LibraryItem, location: Option<String>,
+                                    storage_root_path: &Path, colors: &ColorTokens,
+                                    label_font_family: &str, value_font_family: &str)
                                     -> impl IntoElement + 'static + use<> {
     let file_size_label = if item.files.len() > 1 {
         t!("detail.field_total_file_size").to_string()
@@ -166,6 +167,10 @@ pub(super) fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path
     if let Some(ts) = item.date_updated {
         rows.push((t!("detail.field_updated").to_string(),
                    render_relative_date_value(&item.id, "updated", ts, value_font_family)));
+    }
+    if let Some(location) = location {
+        rows.push((t!("detail.field_location").to_string(),
+                   text_value("detail-field-location", location)));
     }
 
     let label_color = colors.text_secondary;

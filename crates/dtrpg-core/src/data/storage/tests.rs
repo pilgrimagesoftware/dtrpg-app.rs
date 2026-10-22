@@ -443,3 +443,28 @@ fn titles_are_counted_for_the_root_the_rules_send_them_to() {
                2,
                "a title that is only in the cloud is held by no root");
 }
+
+#[test]
+fn each_downloaded_title_is_named_for_the_root_the_rules_send_it_to() {
+    use super::locations_of_titles;
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::LibraryItem;
+
+    let item = |id: &str, publisher: &str, status| {
+        LibraryItem::new(id, id, publisher, "", "", "PDF", 1, 1.0, 2024, 0, status, "#000000", "",
+                         None)
+    };
+    let mut cfg = two_root_config();
+    cfg.rules = vec![PlacementRule { condition:
+                                         PlacementCondition::Publisher("Paizo".to_owned()),
+                                     target_root_id: 1, }];
+    let items = [item("a", "Paizo", ItemStatus::Downloaded),
+                 item("b", "Other", ItemStatus::Downloaded),
+                 item("c", "Paizo", ItemStatus::Cloud)];
+
+    let locations = locations_of_titles(&cfg, &items, &[]);
+
+    assert_eq!(locations.get("a").map(String::as_str), Some("Vault"));
+    assert_eq!(locations.get("b"), Some(&cfg.default_root().name));
+    assert_eq!(locations.get("c"), None);
+}

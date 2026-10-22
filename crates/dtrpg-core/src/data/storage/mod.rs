@@ -20,4 +20,4 @@ pub use paths::{
     sanitize_path_component, validate_writable,
 };
 pub use roots::{RootHealth, RootKind};
-pub use usage::titles_per_root;
+pub use usage::{locations_of_titles, titles_per_root};
