@@ -178,11 +178,19 @@ impl LibraryService for RustSdkLibraryService {
                                           archived:           Some(false),
                                           updated_date_after: None, };
 
-        Some(self.gateway.list_order_products(params).map(|response| {
-                                                         last_page_from_links(&response.links)
-                .map(|last_page| last_page as usize)
-                .unwrap_or(response.data.len())
-                                                     }))
+        Some(self.gateway
+                 .list_order_products(params)
+                 .and_then(|response| match last_page_from_links(&response.links) {
+                     Some(last_page) => Ok(last_page as usize),
+                     // No last page and no next page: this was the only page.
+                     None if response.links.next.is_none() => Ok(response.data.len()),
+                     // More pages exist but the total was not given. Counting the
+                     // one item on this page would report a library of one.
+                     // `NotFound` rather than `Network` so the caller does not retry
+                     // a request that would answer the same way.
+                     None => Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound,
+                                                          "the library size was not reported")),
+                 }))
     }
 
     fn list_items_updated_since(&self, since_iso8601: &str,
