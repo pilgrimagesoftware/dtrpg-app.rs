@@ -18,18 +18,16 @@ pub struct SummaryPage {
     pub key_input:   Option<Entity<InputState>>,
 }
 
-/// The hint under the provider row about the Anthropic API key: the
-/// environment variable wins over a saved key, so it is said first.
+/// The hint under the provider row about the Anthropic API key. A saved key
+/// wins over the `ANTHROPIC_API_KEY` environment variable, so when both exist
+/// the hint says which one is used.
 #[must_use]
 pub fn key_hint(status: AnthropicKeyStatus) -> String {
-    if status.env_var {
-        t!("agent.summary_key_env").to_string()
-    }
-    else if status.saved {
-        t!("agent.summary_key_saved").to_string()
-    }
-    else {
-        t!("agent.summary_key_missing").to_string()
+    match (status.saved, status.env_var) {
+        (true, true) => t!("agent.summary_key_saved_and_env").to_string(),
+        (true, false) => t!("agent.summary_key_saved").to_string(),
+        (false, true) => t!("agent.summary_key_env").to_string(),
+        (false, false) => t!("agent.summary_key_missing").to_string(),
     }
 }
 

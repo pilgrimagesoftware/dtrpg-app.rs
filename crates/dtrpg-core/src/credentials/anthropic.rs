@@ -60,18 +60,15 @@ fn key_from_env() -> Option<String> {
                                         .filter(|key| !key.is_empty())
 }
 
-/// The key to use: the one in the environment if it is set, otherwise the one
-/// saved in the keychain, or `None` if there is neither.
+/// The key to use: the one saved in the keychain if there is one, otherwise
+/// the one in the environment, or `None` if there is neither. A key the person
+/// saved in Libri wins over the environment variable.
 ///
 /// # Errors
 ///
-/// Returns [`CredentialError`] if the environment has no key and the platform
-/// keyring cannot be read.
+/// Returns [`CredentialError`] if the platform keyring cannot be read.
 pub fn resolve_anthropic_api_key() -> Result<Option<String>, CredentialError> {
-    match key_from_env() {
-        Some(key) => Ok(Some(key)),
-        None => load_anthropic_api_key(),
-    }
+    Ok(load_anthropic_api_key()?.or_else(key_from_env))
 }
 
 /// Where a key can come from, for the settings page to say so. A keychain that

@@ -39,22 +39,23 @@ fn the_ceiling_note_resolves() {
 }
 
 #[test]
-fn the_key_hint_says_where_the_key_comes_from_and_the_environment_comes_first() {
-    let none = key_hint(AnthropicKeyStatus { env_var: false,
-                                             saved:   false, });
-    let saved = key_hint(AnthropicKeyStatus { env_var: false,
-                                              saved:   true, });
-    let env = key_hint(AnthropicKeyStatus { env_var: true,
-                                            saved:   false, });
-    let both = key_hint(AnthropicKeyStatus { env_var: true,
-                                             saved:   true, });
+fn the_key_hint_says_where_the_key_comes_from_and_the_saved_key_comes_first() {
+    let hint = |env_var, saved| key_hint(AnthropicKeyStatus { env_var, saved });
 
-    assert_ne!(none, saved);
-    assert_ne!(saved, env);
-    assert_eq!(env, both);
+    let hints = [hint(false, false),
+                 hint(false, true),
+                 hint(true, false),
+                 hint(true, true)];
+
+    for (index, one) in hints.iter().enumerate() {
+        for other in &hints[index + 1..] {
+            assert_ne!(one, other);
+        }
+    }
     for key in ["agent.summary_key_missing",
                 "agent.summary_key_saved",
                 "agent.summary_key_env",
+                "agent.summary_key_saved_and_env",
                 "agent.summary_key_placeholder"]
     {
         assert_ne!(t!(key).to_string(), key, "{key} has no text");

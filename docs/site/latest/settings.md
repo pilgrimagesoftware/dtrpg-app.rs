@@ -63,8 +63,9 @@ title's text.
   you paste into the field beside the provider menu. Libri saves it to the system
   keychain when you leave the field, and never in a settings file. The field is empty
   after that, and the hint under the title says a key is saved. To replace the key,
-  paste a new one. If the `ANTHROPIC_API_KEY` environment variable is set, Libri uses
-  it instead of a saved key, and the hint says so.
+  paste a new one. A saved key is the one Libri uses. If you have not saved one, Libri
+  uses the `ANTHROPIC_API_KEY` environment variable when it is set, and the hint says
+  which one is in use, and that a saved key takes precedence over the variable.
 - **Model** is the model Anthropic writes new summaries with.
 - **Monthly token ceiling** stops summarizing for the rest of the month once the
   summaries made this month have used that many tokens. The line under it says how
