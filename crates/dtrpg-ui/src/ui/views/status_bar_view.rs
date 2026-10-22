@@ -279,10 +279,10 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
              .gap(px(6.0))
              .px(px(8.0))
              .tooltip(move |window, cx| Tooltip::new(agent_tooltip.clone()).build(window, cx))
+             .child(div().size(px(8.0)).rounded_full().bg(agent_dot))
              .child(Icon::empty().path("icons/bot.svg")
                                  .with_size(Size::Small)
                                  .text_color(colors.text_secondary))
-             .child(div().size(px(8.0)).rounded_full().bg(agent_dot))
              .child(div().text_xs()
                          .text_color(colors.text_secondary)
                          .child(t!("status_bar.agent").to_string()));

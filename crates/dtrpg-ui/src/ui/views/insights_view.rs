@@ -17,6 +17,20 @@ use crate::ui::views::insights_cards::{
     type_card,
 };
 
+/// The widest the page's content gets, in pixels.
+const CONTENT_MAX_WIDTH: f32 = 1100.0;
+
+/// The gap between cards, in pixels.
+const CARD_GAP: f32 = 16.0;
+
+/// The narrowest a chart card is before it moves to the next row, in pixels.
+const CARD_MIN_WIDTH: f32 = 300.0;
+
+/// The widest a chart card grows, in pixels: a third of the content width, so
+/// three fit a row at full width and a lone card on the last row stays the
+/// same size as the others.
+const CARD_MAX_WIDTH: f32 = (CONTENT_MAX_WIDTH - 2.0 * CARD_GAP) / 3.0;
+
 /// Renders the Insights page for `library`'s current aggregates.
 pub fn render_insights(library: &Entity<LibraryController>, colors: &ColorTokens, cx: &gpui::App)
                        -> impl IntoElement + use<> {
@@ -71,29 +85,35 @@ pub fn render_insights(library: &Entity<LibraryController>, colors: &ColorTokens
 
     let body = match insights {
         Some(insights) if insights.titles > 0 => {
+            // The content is kept to a readable width and centered, so the
+            // charts do not stretch across a very wide window.
             div().flex()
-                 .flex_col()
-                 .gap(px(16.0))
+                 .justify_center()
                  .p(px(24.0))
-                 .child(glance_card(&insights, colors))
                  .child(div().flex()
-                             .flex_wrap()
+                             .flex_col()
                              .gap(px(16.0))
-                             .child(top_card("insights-publishers",
-                                             "insights.publisher_title",
-                                             None,
-                                             &insights.by_publisher,
-                                             colors))
-                             .child(top_card("insights-systems",
-                                             "insights.system_title",
-                                             Some(t!("insights.system_note").to_string()),
-                                             &insights.by_system,
-                                             colors))
-                             .child(type_card(&insights, colors)))
-                 .child(availability_card(&insights, live, colors))
-                 .child(disk_card(&insights, colors))
-                 .child(time_card(&insights.added_by_month, colors))
-                 .child(roots_card(&insights.roots, colors))
+                             .w_full()
+                             .max_w(px(CONTENT_MAX_WIDTH))
+                             .child(glance_card(&insights, colors))
+                             .child(div().flex()
+                                         .flex_wrap()
+                                         .gap(px(CARD_GAP))
+                                         .child(tile(top_card("insights-publishers",
+                                                              "insights.publisher_title",
+                                                              None,
+                                                              &insights.by_publisher,
+                                                              colors)))
+                                         .child(tile(top_card("insights-systems",
+                                                              "insights.system_title",
+                                                              Some(t!("insights.system_note").to_string()),
+                                                              &insights.by_system,
+                                                              colors)))
+                                         .child(tile(type_card(&insights, colors)))
+                                         .child(tile(availability_card(&insights, live, colors))))
+                             .child(disk_card(&insights, colors))
+                             .child(time_card(&insights.added_by_month, colors))
+                             .child(roots_card(&insights.roots, colors)))
                  .into_any_element()
         }
         Some(_) => message(t!("insights.empty").to_string(), colors),
@@ -123,4 +143,15 @@ fn message(text: String, colors: &ColorTokens) -> gpui::AnyElement {
          .text_color(colors.text_secondary)
          .child(text)
          .into_any_element()
+}
+
+/// Wraps a chart card so that the cards share a row, wrap to the next when the
+/// window is narrow, and stop growing at [`CARD_MAX_WIDTH`].
+fn tile(card: impl IntoElement) -> gpui::Div {
+    div().flex()
+         .flex_col()
+         .flex_1()
+         .min_w(px(CARD_MIN_WIDTH))
+         .max_w(px(CARD_MAX_WIDTH))
+         .child(card)
 }
