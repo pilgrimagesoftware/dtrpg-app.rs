@@ -29,6 +29,9 @@ Four light, two dark:
 - **Compact** - tighter spacing throughout the catalog, detail, and settings
   views.
 
+Choose one in Settings > Appearance, on the **Density** row (row height and cover
+size). It applies at once, and Libri remembers it for the next launch.
+
 ## Fonts
 
 A theme sets four font roles:

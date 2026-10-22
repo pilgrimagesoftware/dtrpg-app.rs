@@ -131,6 +131,36 @@ pub enum Density {
     Compact,
 }
 
+impl Density {
+    /// Every density, in the order the Appearance page lists them.
+    pub const ALL: [Self; 2] = [Self::Comfortable, Self::Compact];
+
+    /// The density's name as it is stored in the preferences file.
+    #[must_use]
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Comfortable => "comfortable",
+            Self::Compact => "compact",
+        }
+    }
+}
+
+impl std::fmt::Display for Density {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.key())
+    }
+}
+
+impl std::str::FromStr for Density {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::ALL.into_iter()
+                 .find(|density| density.key() == text)
+                 .ok_or_else(|| format!("unknown density {text:?}"))
+    }
+}
+
 /// Layout constants that vary with density.
 #[derive(Debug, Clone)]
 pub struct DensityConstants {
@@ -286,3 +316,20 @@ pub(crate) use palette::{
     hex, ink_colors, moss_colors, parchment_colors, rosewood_colors, sage_colors, slate_colors,
 };
 pub use theme_sync::{apply_theme_colors, install_theme};
+
+#[cfg(test)]
+mod density_tests {
+    use super::Density;
+
+    #[test]
+    fn every_density_key_round_trips() {
+        for density in Density::ALL {
+            assert_eq!(density.key().parse::<Density>(), Ok(density));
+        }
+    }
+
+    #[test]
+    fn an_unknown_density_is_an_error() {
+        assert!("roomy".parse::<Density>().is_err());
+    }
+}

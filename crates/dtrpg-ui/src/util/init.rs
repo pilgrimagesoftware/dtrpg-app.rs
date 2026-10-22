@@ -56,5 +56,9 @@ fn initial_theme() -> LibriTheme {
     // The families come from the theme; `LibriTheme::new` fills them in.
     let fonts = FontSelections { ui_text_size,
                                  ..FontSelections::default() };
-    LibriTheme::new(id, Density::default(), fonts)
+    // A density that is missing or not recognized falls back to the default.
+    let density = prefs.density()
+                       .and_then(|key| key.parse::<Density>().ok())
+                       .unwrap_or_default();
+    LibriTheme::new(id, density, fonts)
 }

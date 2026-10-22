@@ -450,6 +450,10 @@ settings:
   appearance_text_size_label: "Échelle du texte"
   appearance_text_size_decrement_tooltip: "Réduire"
   appearance_text_size_increment_tooltip: "Agrandir"
+  appearance_density_label: "Densité"
+  appearance_density_comfortable: "Confortable"
+  appearance_density_compact: "Compacte"
+  appearance_density_note: "Hauteur des lignes et taille des couvertures"
 
 collections:
   add_tooltip: "Nouvelle collection"

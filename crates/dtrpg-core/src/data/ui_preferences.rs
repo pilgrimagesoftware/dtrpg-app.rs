@@ -30,6 +30,9 @@ pub struct UiPreferencesFile {
     /// text scale — the same value shown and adjusted in Settings >
     /// Appearance, not a derived absolute pixel size.
     pub text_scale:                Option<f32>,
+    /// Persisted layout density (`"comfortable"` or `"compact"`). `None`
+    /// before this preference existed, or if never changed from the default.
+    pub density:                   Option<String>,
     /// Persisted sidebar Collections sort method (`CollectionSortMethod`'s
     /// variant name: `"name"`, `"date_created"`, or `"item_count"`).
     pub collection_sort:           Option<String>,
@@ -145,6 +148,17 @@ impl UiPreferences {
         self.flush();
     }
 
+    /// Persisted layout density key, or `None` if never saved.
+    pub fn density(&self) -> Option<&str> {
+        self.data.density.as_deref()
+    }
+
+    /// Persist the layout density key (`"comfortable"` or `"compact"`).
+    pub fn save_density(&mut self, key: &str) {
+        self.data.density = Some(key.to_owned());
+        self.flush();
+    }
+
     /// Sidebar Collections sort method (defaults to `Name`).
     pub fn collection_sort(&self) -> CollectionSortMethod {
         match self.data.collection_sort.as_deref() {
@@ -211,4 +225,23 @@ impl UiPreferences {
 
 fn preferences_path() -> std::path::PathBuf {
     app_preferences_dir().join("ui.toml")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_density_is_kept_in_the_file_and_older_files_without_it_still_load() {
+        let file = UiPreferencesFile { density: Some("compact".to_owned()),
+                                       ..UiPreferencesFile::default() };
+
+        let text = toml::to_string(&file).unwrap_or_default();
+        let read: Option<UiPreferencesFile> = toml::from_str(&text).ok();
+        let older: Option<UiPreferencesFile> = toml::from_str("theme_key = \"parchment\"").ok();
+
+        assert_eq!(read.and_then(|file| file.density).as_deref(),
+                   Some("compact"));
+        assert!(older.is_some_and(|file| file.density.is_none()));
+    }
 }
