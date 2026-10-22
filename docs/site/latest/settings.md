@@ -13,7 +13,9 @@ you can keep working in the catalog while it's open.
 
 Sign in with your DriveThruRPG email and password, see who you're signed in
 as, and log out. Signing in is what populates your catalog in the first
-place.
+place. When you are signed in, the page shows your avatar and account with a
+**Log Out** button, and a **Session** card with the API key hint and the token
+times.
 
 While signed in, the page also shows when your current access token was
 acquired and when it expires. The app renews an expired token on its own the
@@ -23,10 +25,10 @@ renewal. You never need to sign out just to refresh a token.
 
 ## Appearance
 
-Pick a color theme and a comfortable or compact density. Fonts are part of a
-theme, so they are changed by editing the theme, not on this page. A shared
-text-scale stepper zooms every
-size-aware element in the window together. See
+The **Text & density** card has the text-scale stepper, which zooms every
+size-aware element in the window together, and the comfortable or compact
+density. Below it, pick a color theme from the gallery. Fonts are part of a
+theme, so they are changed by editing the theme, not on this page. See
 [Themes and appearance]({{ '/latest/themes/' | relative_url }}) for the full
 theme list.
 
@@ -42,8 +44,10 @@ download (and thumbnail-load) operations run at once. See
 ## File Openers
 
 Override which application opens a given file extension, instead of
-relying on your system's default. Add, edit, or remove per-extension
-overrides here.
+relying on your system's default. Each override is a card showing the
+application, its extension and where the application is; an application that
+has been moved or removed is flagged. **Add file opener...** asks for an
+application and then for the extension. The trash button removes an override.
 
 ## Agent & MCP
 
