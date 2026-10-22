@@ -42,6 +42,9 @@ up to date.
 - Filter the catalog with the filters column or the search box, then press
   **Save as smart collection** beside the filter chips. Each `field:value` term becomes
   a rule. Ordinary words in the search are not turned into a rule.
+- Right-click a manual collection in the sidebar and choose **Make a smart
+  collection...**. The editor opens with the collection's name filled in and one empty
+  rule to fill in. The manual collection is left as it is.
 
 The editor has a name, a list of rules and a line that says how many titles match
 right now, for example "Matches 17 of 18 titles right now". It changes as you type.

@@ -463,6 +463,7 @@ collections:
   name_placeholder: "Name der Sammlung…"
   download_all: "Alle herunterladen"
   reload: "Neu laden"
+  make_smart: "Intelligente Sammlung erstellen …"
   delete: "Löschen"
   delete_confirm_title: "„%{name}“ löschen?"
   delete_confirm_description: "Diese Sammlung wird endgültig gelöscht. Dies kann nicht rückgängig gemacht werden."

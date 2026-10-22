@@ -1,9 +1,11 @@
 //! Collection row rendering.
 
 use super::*;
+use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// Renders a single collection nav row: click to filter, right-click to
-/// download all/reload/delete, and drop target for [`DraggedLibraryItem`]
+/// download all/reload/make a smart collection/delete, and drop target for [`DraggedLibraryItem`]
 /// (adds the dragged catalog item as a member of this collection).
 pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                          entity: Entity<LibraryController>, cx: &mut App)
@@ -14,9 +16,11 @@ pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow
     let download_entity = entity.clone();
     let reload_entity = entity.clone();
     let delete_entity = entity.clone();
+    let smart_entity = entity.clone();
     let drop_entity = entity;
     let col_id = row.id;
     let row_name_for_delete = row.name.to_string();
+    let row_name_for_smart = row.name.to_string();
 
     div().id(id.into())
          .w_full()
@@ -75,6 +79,16 @@ pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow
                            let entity = reload_entity.clone();
                            move |_, _, cx| {
                                entity.update(cx, |ctrl, cx| ctrl.load_collections(cx));
+                           }
+                       }))
+                 .item(PopupMenuItem::new(t!("collections.make_smart")).on_click({
+                           let entity = smart_entity.clone();
+                           let name = row_name_for_smart.clone();
+                           move |_, window, cx| {
+                               open_smart_collection_editor(window,
+                                                            cx,
+                                                            entity.clone(),
+                                                            SmartCollectionDraft::named(&name));
                            }
                        }))
                  .item(PopupMenuItem::new(t!("collections.delete")).on_click({

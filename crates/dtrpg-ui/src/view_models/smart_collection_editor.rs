@@ -34,6 +34,26 @@ impl SmartCollectionDraft {
         draft
     }
 
+    /// A draft for a new collection called `name`, with one empty rule to
+    /// start on. Used to make a smart collection from a manual one, which
+    /// keeps the manual collection's name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_ui::view_models::smart_collection_editor::SmartCollectionDraft;
+    ///
+    /// let draft = SmartCollectionDraft::named("Solo play");
+    /// assert_eq!(draft.name(), "Solo play");
+    /// assert_eq!(draft.rules().len(), 1);
+    /// ```
+    #[must_use]
+    pub fn named(name: &str) -> Self {
+        let mut draft = Self::new();
+        draft.set_name(name);
+        draft
+    }
+
     /// A draft for changing `collection`.
     #[must_use]
     pub fn editing(collection: SmartCollection) -> Self {

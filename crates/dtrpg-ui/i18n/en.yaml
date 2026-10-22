@@ -481,6 +481,7 @@ collections:
   name_placeholder: "Collection name…"
   download_all: "Download All"
   reload: "Reload"
+  make_smart: "Make a smart collection…"
   delete: "Delete"
   delete_confirm_title: "Delete \"%{name}\"?"
   delete_confirm_description: "This collection will be permanently deleted. This cannot be undone."

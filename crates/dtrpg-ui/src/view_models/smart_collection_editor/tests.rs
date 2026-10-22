@@ -94,3 +94,12 @@ fn the_saved_collection_has_a_trimmed_name() {
 
     assert_eq!(draft.into_collection().name, "Adventures");
 }
+
+#[test]
+fn a_draft_made_from_a_manual_collection_keeps_its_name_and_has_one_empty_rule() {
+    let draft = SmartCollectionDraft::named("Solo play");
+
+    assert_eq!(draft.name(), "Solo play");
+    assert_eq!(draft.rules().len(), 1);
+    assert!(!draft.can_save());
+}
