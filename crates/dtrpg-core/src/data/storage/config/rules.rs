@@ -17,6 +17,30 @@ impl StorageConfig {
         self.save();
     }
 
+    /// Changes the rule at `index` to send what `condition` matches to
+    /// `target_root_id`, keeping its place in the evaluation order. A no-op if
+    /// there is no rule at `index`.
+    pub fn replace_rule(&mut self, index: usize, condition: PlacementCondition,
+                        target_root_id: u32) {
+        if self.set_rule(index, condition, target_root_id) {
+            self.save();
+        }
+    }
+
+    /// Makes the change [`Self::replace_rule`] describes, without saving it.
+    /// Returns whether there was a rule to change.
+    pub(in crate::data::storage) fn set_rule(&mut self, index: usize,
+                                             condition: PlacementCondition, target_root_id: u32)
+                                             -> bool {
+        let Some(rule) = self.rules.get_mut(index)
+        else {
+            return false;
+        };
+        *rule = PlacementRule { condition,
+                                target_root_id };
+        true
+    }
+
     /// Sends every title from `publisher` to the root `root_id` from now on.
     ///
     /// The rule goes first in the evaluation order so the user's explicit

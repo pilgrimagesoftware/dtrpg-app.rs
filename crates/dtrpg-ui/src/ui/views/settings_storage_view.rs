@@ -7,12 +7,11 @@ use dtrpg_core::data::storage::validate_writable;
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use gpui::{Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit::component::IconName;
-use gpui_kit::component::Selectable;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::InputState;
 use rust_i18n::t;
 
-use crate::controllers::settings::{RuleEditorType, SettingsController};
+use crate::controllers::settings::{RuleEditor, SettingsController};
 use crate::data::theme::ColorTokens;
 use crate::view_models::storage_display::StorageDisplay;
 
@@ -20,12 +19,14 @@ use crate::view_models::storage_display::StorageDisplay;
 mod storage_behavior_view;
 #[path = "storage_roots_view.rs"]
 mod storage_roots_view;
+#[path = "storage_rule_editor_view.rs"]
+mod storage_rule_editor_view;
 #[path = "storage_rules_view.rs"]
 mod storage_rules_view;
 
 use storage_behavior_view::{BehaviorData, render_storage_behavior};
 use storage_roots_view::render_storage_roots;
-use storage_rules_view::{RuleInputs, RulesData, render_storage_rules};
+use storage_rules_view::{RulesData, render_storage_rules};
 
 /// Lower bound for the concurrency field: 0 would mean thumbnails and
 /// downloads never start.
@@ -53,20 +54,10 @@ pub struct StoragePageData {
     pub max_concurrent_downloads: usize,
     /// The field that edits `max_concurrent_downloads`, once attached.
     pub max_concurrent_input:     Option<Entity<InputState>>,
-    /// The "Add rule…" value field for a publisher rule.
-    pub publisher_rule_input:     Option<Entity<InputState>>,
-    /// The value field for a collection rule.
-    pub collection_rule_input:    Option<Entity<InputState>>,
-    /// The value field for a size rule.
-    pub size_rule_input:          Option<Entity<InputState>>,
-    /// The location a new rule will send downloads to.
-    pub rule_target_root_id:      u32,
-    /// Publisher names offered as suggestions for a new rule.
+    /// Publisher names offered as suggestions for a rule's value.
     pub publisher_names:          Vec<String>,
-    /// The kind of rule the editor is adding.
-    pub rule_editor_type:         RuleEditorType,
-    /// Whether the "Add rule…" editor is showing.
-    pub rule_editor_open:         bool,
+    /// The placement rule editor: adding a rule or changing one.
+    pub rule_editor:              RuleEditor,
 }
 
 /// Renders the Storage page: the Locations, Placement rules and Behavior
@@ -86,13 +77,8 @@ pub fn render_storage_section(entity: Entity<SettingsController>, colors: &Color
     let rules = RulesData { rules:           page.rules,
                             roots:           page.roots.clone(),
                             display:         page.display.clone(),
-                            editor_open:     page.rule_editor_open,
-                            editor_type:     page.rule_editor_type,
-                            target_root_id:  page.rule_target_root_id,
-                            publisher_names: page.publisher_names,
-                            inputs:          RuleInputs { publisher:  page.publisher_rule_input,
-                                                          collection: page.collection_rule_input,
-                                                          size:       page.size_rule_input, }, };
+                            editor:          page.rule_editor,
+                            publisher_names: page.publisher_names, };
     let behavior = BehaviorData { check_free_space:         page.check_free_space,
                                   create_collections:       page.create_collections,
                                   max_concurrent_downloads: page.max_concurrent_downloads,

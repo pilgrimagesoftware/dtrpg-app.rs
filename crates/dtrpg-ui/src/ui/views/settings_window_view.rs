@@ -147,13 +147,8 @@ impl Render for SettingsWindowView {
                                         max_concurrent_downloads: snap.max_concurrent_downloads,
                                         max_concurrent_input:
                                             snap.max_concurrent_downloads_input,
-                                        publisher_rule_input: snap.publisher_rule_input,
-                                        collection_rule_input: snap.collection_rule_input,
-                                        size_rule_input: snap.size_rule_input,
-                                        rule_target_root_id: snap.rule_target_root_id,
                                         publisher_names,
-                                        rule_editor_type: snap.rule_editor_type,
-                                        rule_editor_open: snap.rule_editor_open };
+                                        rule_editor: snap.rule_editor };
         let theme_editor = ThemeEditorData { input:    snap.theme_editor_input.clone(),
                                              error:    snap.theme_editor_error.clone(),
                                              settings: self.settings.clone(), };

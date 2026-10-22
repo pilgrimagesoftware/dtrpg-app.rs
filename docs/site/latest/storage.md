@@ -32,8 +32,16 @@ adds another.
 
 **Placement rules** holds the **Default location**, a menu that picks where
 downloads go when no rule matches, and the rules, which read in plain words,
-such as `Paizo → Archive Vault`. Each rule has a delete button, and arrows to
-move it earlier or later. **Add rule…** opens a small editor for a new one.
+such as `Paizo → Archive Vault`. Each rule has an edit button, a delete button, and
+arrows to move it earlier or later.
+
+**Add rule…** and a rule's edit button open the same editor: one row with the kind of
+rule (publisher, collection or size), its value, where it sends downloads, a save
+button and a cancel button. Editing shows the row in place of the rule, and adding
+shows it at the end of the list. As you type a publisher or collection name, the
+names that match are listed under the row; click one to fill it in. A collection can
+be given by name or by number, and a size is a number of megabytes. The save button
+stays off until the value makes a rule.
 
 **Behavior** has the switches that govern how files are stored. Libri does not
 yet move files when a rule changes, or keep a manifest in each location.

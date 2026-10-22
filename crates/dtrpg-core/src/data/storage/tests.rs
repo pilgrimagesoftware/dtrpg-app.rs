@@ -356,6 +356,31 @@ fn remembering_a_publisher_root_again_replaces_its_rule() {
     assert_eq!(cfg.resolve_root_for("Free League", &[], 1.0).id, 2);
 }
 
+#[test]
+fn a_replaced_rule_keeps_its_place_in_the_order() {
+    let first = PlacementRule { condition:
+                                    PlacementCondition::Publisher("Chaosium".to_owned()),
+                                target_root_id: 1, };
+    let second = PlacementRule { condition:      PlacementCondition::SizeAtLeastMb(100.0),
+                                 target_root_id: 2, };
+    let mut cfg = config_with(vec![extra_root(1, "External"), extra_root(2, "Vault")],
+                              vec![first, second]);
+
+    let changed = cfg.set_rule(0,
+                               PlacementCondition::Publisher("Free League".to_owned()),
+                               2);
+    let missing = cfg.set_rule(5, PlacementCondition::SizeAtLeastMb(1.0), 1);
+
+    assert!(changed);
+    assert!(!missing);
+    assert_eq!(cfg.rules().len(), 2);
+    assert_eq!(cfg.rules()[0].condition,
+               PlacementCondition::Publisher("Free League".to_owned()));
+    assert_eq!(cfg.rules()[0].target_root_id, 2);
+    assert_eq!(cfg.rules()[1].condition,
+               PlacementCondition::SizeAtLeastMb(100.0));
+}
+
 // ── Root kinds, the chosen default root, and per-root title counts ──
 
 #[test]
