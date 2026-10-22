@@ -5,6 +5,7 @@ use dtrpg_core::data::summary_settings::{SummaryProviderKind, SummarySettingsFil
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, SharedString, div, px};
 use gpui_kit::component::button::Button;
+use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use rust_i18n::t;
 
@@ -12,23 +13,25 @@ use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::settings_card::{card, card_row, section_heading};
 use crate::ui::views::settings_native_view::switch_row;
-use crate::view_models::summary_display::{ceiling_choices, ceiling_note, grouped, model_choices};
+use crate::view_models::summary_display::{
+    SummaryPage, ceiling_choices, ceiling_note, grouped, key_hint, model_choices,
+};
 
 /// Renders the Summaries heading and its card: provider, model, monthly token
 /// ceiling and the switch for summarizing on download.
 pub fn render_summaries(entity: &Entity<SettingsController>, settings: &SummarySettingsFile,
-                        tokens_used: u64, colors: &ColorTokens)
+                        page: &SummaryPage, colors: &ColorTokens)
                         -> impl IntoElement + 'static + use<> {
     let auto_entity = entity.clone();
     div().flex()
          .flex_col()
          .gap(px(10.0))
          .child(section_heading(t!("agent.summaries_heading").to_string(), colors))
-         .child(card(colors).child(provider_row(entity, settings.provider, colors))
+         .child(card(colors).child(provider_row(entity, settings.provider, page, colors))
                             .child(model_row(entity, &settings.model, colors))
                             .child(ceiling_row(entity,
                                                settings.monthly_token_ceiling,
-                                               tokens_used,
+                                               page.tokens_used,
                                                colors))
                             .child(card_row(false, colors).child(div().flex_1().child(switch_row(
                                 "summary-auto",
@@ -70,8 +73,11 @@ fn provider_label(provider: SummaryProviderKind) -> String {
     }
 }
 
+/// The width of the API key field.
+const KEY_FIELD_WIDTH: f32 = 220.0;
+
 fn provider_row(entity: &Entity<SettingsController>, current: SummaryProviderKind,
-                colors: &ColorTokens)
+                page: &SummaryPage, colors: &ColorTokens)
                 -> impl IntoElement {
     let entity = entity.clone();
     let menu = Button::new("summary-provider").outline()
@@ -91,10 +97,29 @@ fn provider_row(entity: &Entity<SettingsController>, current: SummaryProviderKin
                                                                     }))
                                                   })
                                               });
+    // The key is only asked for when Anthropic writes the summaries. It sits to
+    // the left of the chooser, and the hint under the title says where the key
+    // comes from.
+    let anthropic = current == SummaryProviderKind::Anthropic;
+    let key_input = page.key_input.as_ref().filter(|_| anthropic);
+    let note = if anthropic {
+        format!("{} {}",
+                t!("agent.summary_provider_note"),
+                key_hint(page.key))
+    }
+    else {
+        t!("agent.summary_provider_note").to_string()
+    };
+    let control =
+        div().flex()
+             .items_center()
+             .gap(px(8.0))
+             .children(key_input.map(|input| div().w(px(KEY_FIELD_WIDTH)).child(Input::new(input))))
+             .child(menu);
     setting_row(true,
                 t!("agent.summary_provider_title").to_string(),
-                t!("agent.summary_provider_note").to_string(),
-                menu.into_any_element(),
+                note,
+                control.into_any_element(),
                 colors)
 }
 

@@ -287,6 +287,7 @@ pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageD
                      .text_color(colors.text_primary)
                      .child(t!("agent.title").to_string()))
          .child(selectable_note("agent-intro", t!("agent.intro").to_string(), colors))
+         .child(render_summaries(&entity, &data.summaries, &data.summary_page, colors))
          .child(switch_row("agent-enabled",
                            t!("agent.enable_title").to_string(),
                            enable_note,
@@ -319,5 +320,4 @@ pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageD
                                 })))
          .child(activity_rows(&data, colors))
          .child(log_location(&data.log_path, colors))
-         .child(render_summaries(&entity, &data.summaries, data.tokens_used, colors))
 }
