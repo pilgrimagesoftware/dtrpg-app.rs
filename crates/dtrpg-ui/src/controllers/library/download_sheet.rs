@@ -31,6 +31,7 @@ impl LibraryController {
         };
         if let Some(root_id) = plan.remember_root_id {
             StorageConfig::load().remember_publisher_root(&item.publisher, root_id);
+            cx.emit(PlacementRulesChanged);
         }
         let title = item.title.to_string();
         for &index in &plan.file_indexes {
