@@ -15,6 +15,7 @@ impl SettingsController {
     /// Saves whether agents may use Libri at all.
     pub fn set_mcp_enabled(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.mcp.save_enabled(enabled);
+        cx.emit(AgentAccessChanged { enabled });
         cx.notify();
     }
 

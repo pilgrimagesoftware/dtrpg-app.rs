@@ -11,9 +11,11 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 mod audit;
+mod ipc;
 mod settings;
 
 pub use audit::{AuditEntry, AuditLog};
+pub use ipc::{AppReply, AppRequest, Incoming, IpcEndpoint, IpcError, IpcListener, send_request};
 pub use settings::{Denial, McpSettings, McpSettingsFile};
 
 /// A group of tools that an agent is trusted with as one, from the least to

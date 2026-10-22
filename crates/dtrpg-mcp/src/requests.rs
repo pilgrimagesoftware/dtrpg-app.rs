@@ -47,6 +47,21 @@ pub struct SetTagsRequest {
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
+pub struct CreateCollectionRequest {
+    /// The new collection's name.
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct AddToCollectionRequest {
+    /// The collection's id, or its name, ignoring case, as `list_collections`
+    /// gives them.
+    pub collection: String,
+    /// The item's id, as `list_items` gives it.
+    pub id:         String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
 pub struct SetTagColorRequest {
     /// The tag's name, ignoring case.
     pub tag:   String,

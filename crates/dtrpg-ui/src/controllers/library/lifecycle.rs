@@ -31,6 +31,7 @@ impl LibraryController {
         ctrl.refresh_root_usage(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
+        ctrl.start_agent_request_pump(cx);
         ctrl
     }
 
@@ -100,6 +101,7 @@ impl LibraryController {
                           root_title_counts: HashMap::new(),
                           item_locations: HashMap::new(),
                           library,
+                          agent_link: None,
                           thumbnail_activity_id: None,
                           thumbnail_processed: 0,
                           thumbnail_refresh_active: false,

@@ -193,6 +193,18 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                  })
       .detach();
 
+    // Agents' requests are only listened for while agent access is on.
+    let agent_access = settings.read(cx).snapshot().mcp.enabled;
+    controller.update(cx, |ctrl, _| ctrl.set_agent_access(agent_access));
+    let controller_for_agent = controller.clone();
+    cx.subscribe(settings,
+                 move |_this, _ctrl, event: &AgentAccessChanged, cx| {
+                     controller_for_agent.update(cx, |ctrl, _| {
+                                             ctrl.set_agent_access(event.enabled)
+                                         });
+                 })
+      .detach();
+
     // The download sheet's "Remember this choice" writes a placement rule
     // behind the settings controller's back; have it read the rules again.
     let settings_for_rules = settings.clone();
