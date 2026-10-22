@@ -173,14 +173,19 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
                 ctrl.set_max_concurrent_downloads_input(max_concurrent_downloads_input)
             });
 
-    let publisher_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
-    let collection_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
-    let size_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
-    settings.update(cx, |ctrl, _cx| {
-                ctrl.set_publisher_rule_input(publisher_rule_input);
-                ctrl.set_collection_rule_input(collection_rule_input);
-                ctrl.set_size_rule_input(size_rule_input);
-            });
+    // One value field serves every kind of placement rule. Its text is kept in
+    // the controller as it is typed, so the page can suggest names from it.
+    let rule_value_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
+    let settings_for_rule = settings.clone();
+    cx.subscribe(&rule_value_input,
+                 move |_this, input_entity, event: &InputEvent, cx| {
+                     if matches!(event, InputEvent::Change) {
+                         let value = input_entity.read(cx).value().to_string();
+                         settings_for_rule.update(cx, |ctrl, cx| ctrl.set_rule_value(value, cx));
+                     }
+                 })
+      .detach();
+    settings.update(cx, |ctrl, _cx| ctrl.set_rule_editor_input(rule_value_input));
 }
 
 /// Inputs owned by the main window itself (not the Settings window) that

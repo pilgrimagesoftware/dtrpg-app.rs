@@ -17,7 +17,6 @@ use dtrpg_core::data::mcp_access::{AuditEntry, AuditLog, McpSettings, McpSetting
 use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
 use dtrpg_core::data::paths::app_cache_dir;
 use dtrpg_core::data::profile::ProfileConfig;
-use dtrpg_core::data::storage::placement::PlacementCondition;
 use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
@@ -33,6 +32,7 @@ use crate::data::events::{
     StartupAuthBegun, StartupAuthFailed,
 };
 use crate::data::token_status_global::TokenStatusGlobal;
+pub use crate::view_models::rule_editor::{RuleEditor, RuleEditorType};
 
 /// Index of the File Openers page of the settings window, for opening the
 /// settings on it.
@@ -41,14 +41,6 @@ pub const FILE_OPENERS_PAGE_IX: usize = 3;
 pub const STORAGE_PAGE_IX: usize = 2;
 /// Index of the Advanced page.
 pub const ADVANCED_PAGE_IX: usize = 5;
-
-/// Placement rule condition currently being edited in Downloads settings.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum RuleEditorType {
-    Publisher,
-    Collection,
-    Size,
-}
 
 // ── AuthState
 // ─────────────────────────────────────────────────────────────────
@@ -107,14 +99,8 @@ pub struct SettingsSnapshot {
     pub default_root_id:                u32,
     /// Free and total space by location id, in megabytes.
     pub root_volumes:                   HashMap<u32, (Option<f64>, Option<f64>)>,
-    /// Input state for a new publisher placement rule.
-    pub publisher_rule_input:           Option<Entity<InputState>>,
-    pub collection_rule_input:          Option<Entity<InputState>>,
-    pub size_rule_input:                Option<Entity<InputState>>,
-    pub rule_target_root_id:            u32,
-    pub rule_editor_type:               RuleEditorType,
-    /// `true` while the "Add rule…" editor is open.
-    pub rule_editor_open:               bool,
+    /// The placement rule editor: adding a rule or changing one.
+    pub rule_editor:                    RuleEditor,
     /// The editor showing the active theme's file, once attached.
     pub theme_editor_input:             Option<Entity<EditorState>>,
     /// Why the last attempt to save the theme file failed, if it did.
@@ -250,12 +236,7 @@ pub struct SettingsController {
     /// Input state for the "Max concurrent downloads" number field; set by
     /// the root view after creation.
     max_concurrent_downloads_input: Option<Entity<InputState>>,
-    publisher_rule_input:           Option<Entity<InputState>>,
-    collection_rule_input:          Option<Entity<InputState>>,
-    size_rule_input:                Option<Entity<InputState>>,
-    rule_target_root_id:            u32,
-    rule_editor_type:               RuleEditorType,
-    rule_editor_open:               bool,
+    rule_editor:                    RuleEditor,
     theme_editor_input:             Option<Entity<EditorState>>,
     theme_editor_error:             Option<String>,
 }
@@ -347,12 +328,7 @@ impl SettingsController {
                               focus_email_pending: false,
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
-                              publisher_rule_input: None,
-                              collection_rule_input: None,
-                              size_rule_input: None,
-                              rule_target_root_id: 0,
-                              rule_editor_type: RuleEditorType::Publisher,
-                              rule_editor_open: false,
+                              rule_editor: RuleEditor::default(),
                               theme_editor_input: None,
                               theme_editor_error: None };
         ctrl.check_storage_path_exists(initial_path, cx);
@@ -400,12 +376,7 @@ impl SettingsController {
                focus_email_pending: false,
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
-               publisher_rule_input: None,
-               collection_rule_input: None,
-               size_rule_input: None,
-               rule_target_root_id: 0,
-               rule_editor_type: RuleEditorType::Publisher,
-               rule_editor_open: false,
+               rule_editor: RuleEditor::default(),
                theme_editor_input: None,
                theme_editor_error: None }
     }
@@ -456,6 +427,7 @@ mod auth;
 mod file_openers;
 mod native;
 mod panel;
+mod rule_editor;
 mod sign_in;
 mod snapshot;
 mod storage;
@@ -464,3 +436,5 @@ mod wiring;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_rule_editor;

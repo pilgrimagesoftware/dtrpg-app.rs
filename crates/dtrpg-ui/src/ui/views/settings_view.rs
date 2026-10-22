@@ -133,7 +133,6 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     sign_in_in_progress,
                                     sign_in_enabled,
                                     sign_in_error,
-                                    &theme.fonts.label_font,
                                     &theme.fonts.mono_font),
     };
 

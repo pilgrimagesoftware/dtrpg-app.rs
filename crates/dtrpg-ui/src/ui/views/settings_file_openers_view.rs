@@ -1,312 +1,202 @@
-//! File Openers settings section: CRUD for extension → application overrides.
+//! File Openers settings section: extension → application overrides, laid out
+//! like the Storage page's Locations: a card for each override, and a button
+//! that adds another.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dtrpg_core::data::file_openers::FileOpenerEntry;
 use gpui::prelude::*;
-use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use gpui_kit::component::WindowExt as _;
+use gpui::{
+    AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px,
+};
+use gpui_kit::component::Disableable as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::tag::Tag;
+use gpui_kit::component::{Icon, IconName, WindowExt as _};
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
+use crate::ui::views::settings_card::section_heading;
 use crate::ui::widgets::{selectable_note, selectable_text};
 
 /// Renders the File Openers settings section.
 ///
 /// `pending_file_opener`, when `Some`, is the application path picked via the
-/// native file dialog and awaiting an extension; a pending row renders in its
-/// place in the list with `extension_input` focused for inline entry.
+/// native file dialog and awaiting an extension; a pending card renders at the
+/// end of the list with `extension_input` focused for inline entry.
 pub fn render_file_openers_section(file_openers: &[FileOpenerEntry],
                                    entity: Entity<SettingsController>, colors: &ColorTokens,
                                    extension_input: Entity<InputState>,
                                    pending_file_opener: Option<PathBuf>)
                                    -> impl IntoElement + 'static + use<> {
-    let text_primary = colors.text_primary;
-    let text_tertiary = colors.text_tertiary;
-    let border = colors.border;
-    let accent = colors.accent;
-    let accent_on = colors.accent_on;
-
-    // Collect extensions whose app path no longer exists on disk.
-    let stale_extensions: Vec<String> = file_openers.iter()
-                                                    .filter(|e| !e.app_path.exists())
-                                                    .map(|e| e.extension.clone())
-                                                    .collect();
-
     let is_pending = pending_file_opener.is_some();
-
-    let mut col =
-        div().flex()
-             .flex_col()
-             .gap(px(24.0))
-             .p(px(24.0))
-             // ── Header row ────────────────────────────────────────────────────
-             .child(div().flex()
-                         .items_center()
-                         .justify_between()
-                         .child(div().flex()
-                                     .flex_col()
-                                     .gap(px(2.0))
-                                     .child(div().text_sm()
-                                                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                 .text_color(text_primary)
-                                                 .child(t!("settings.file_openers_title")))
-                                     .child(selectable_note("file-openers-description",
-                                                            t!("settings.file_openers_description").to_string(),
-                                                            colors)))
-                         .child(render_add_button(entity.clone(),
-                                                  extension_input.clone(),
-                                                  accent,
-                                                  accent_on,
-                                                  is_pending)))
-             // ── Divider ───────────────────────────────────────────────────────
-             .child(div().h(px(1.0)).bg(border));
-
-    if let Some(app_path) = pending_file_opener {
-        col = col.child(render_pending_row(&app_path, extension_input, entity.clone(), colors));
-    }
-
-    if file_openers.is_empty() && !is_pending {
-        col = col.child(render_empty_state(text_tertiary));
-    }
-    else {
-        for entry in file_openers {
-            let is_stale = stale_extensions.contains(&entry.extension);
-            col = col.child(render_entry_row(entry, is_stale, entity.clone(), colors));
-        }
-    }
-
-    col
+    let empty = file_openers.is_empty() && !is_pending;
+    div().flex()
+         .flex_col()
+         .gap(px(24.0))
+         .p(px(24.0))
+         .child(div().flex()
+                     .flex_col()
+                     .gap(px(2.0))
+                     .child(div().text_sm()
+                                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                                 .text_color(colors.text_primary)
+                                 .child(t!("settings.file_openers_title")))
+                     .child(selectable_note("file-openers-description",
+                                            t!("settings.file_openers_description").to_string(),
+                                            colors)))
+         .child(div().flex()
+                     .flex_col()
+                     .gap(px(10.0))
+                     .child(section_heading(t!("settings.file_openers_section").to_string(),
+                                            colors))
+                     .children(empty.then(|| render_empty_state(colors)))
+                     .children(file_openers.iter()
+                                           .map(|entry| render_entry_card(entry, &entity, colors)))
+                     .children(pending_file_opener.map(|app_path| {
+                                                      render_pending_card(&app_path,
+                                                                          extension_input.clone(),
+                                                                          entity.clone(),
+                                                                          colors)
+                                                  }))
+                     .child(div().flex()
+                                 .child(add_button(entity, extension_input, is_pending))))
 }
 
-// ── Empty state
-// ───────────────────────────────────────────────────────────────
-
-fn render_empty_state(text_tertiary: gpui::Hsla) -> impl IntoElement + 'static {
+fn render_empty_state(colors: &ColorTokens) -> impl IntoElement + 'static {
     div().flex()
          .items_center()
          .justify_center()
-         .py(px(32.0))
+         .py(px(24.0))
          .child(div().text_sm()
-                     .text_color(text_tertiary)
+                     .text_color(colors.text_tertiary)
                      .child(t!("settings.file_openers_empty")))
 }
 
-// ── Pending row (inline add)
-// ───────────────────────────────────────────────────
+/// A bordered card with an application icon at its left, like a location.
+fn card_shell(id: impl Into<gpui::ElementId>, colors: &ColorTokens) -> gpui::Stateful<gpui::Div> {
+    div().id(id)
+         .flex()
+         .items_center()
+         .gap(px(12.0))
+         .px(px(16.0))
+         .py(px(12.0))
+         .rounded(px(8.0))
+         .border_1()
+         .border_color(colors.border)
+         .child(Icon::empty().path("icons/app-window.svg")
+                             .text_color(colors.text_secondary))
+}
 
-/// Renders the in-progress "add file opener" row: app name plus an editable,
-/// focused extension input, in place of the static extension badge used by
-/// committed entries.
+/// The in-progress "add file opener" card: an editable, focused extension
+/// input and the application's name, in place of the extension tag a saved
+/// override has.
 ///
 /// Escape cancels the pending add without persisting anything, and stops the
 /// keystroke from bubbling to the settings panel's own Escape-to-close handler.
-fn render_pending_row(app_path: &std::path::Path, extension_input: Entity<InputState>,
-                      entity: Entity<SettingsController>, colors: &ColorTokens)
-                      -> AnyElement {
-    let text_secondary = colors.text_secondary;
-    let text_tertiary = colors.text_tertiary;
-    let border = colors.border;
-    let app_name = app_name_from_path(app_path);
-
-    let entity_cancel = entity.clone();
-
-    div()
-        .id("file-opener-pending-row")
-        .flex()
-        .items_center()
-        .gap(px(12.0))
-        .py(px(8.0))
-        .border_b_1()
-        .border_color(border)
+fn render_pending_card(app_path: &Path, extension_input: Entity<InputState>,
+                       entity: Entity<SettingsController>, colors: &ColorTokens)
+                       -> AnyElement {
+    let entity_escape = entity.clone();
+    card_shell("file-opener-pending-row", colors)
         .on_key_down(move |event, _window, cx| {
             if event.keystroke.key == "escape" {
                 cx.stop_propagation();
-                entity_cancel.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
+                entity_escape.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
             }
         })
-        // ── Extension input ───────────────────────────────────────────────
-        .child(div().w(px(90.0)).child(Input::new(&extension_input)))
-        // ── App name ──────────────────────────────────────────────────────
-        .child(
-            div().flex_1().min_w_0().child(
-                selectable_text("file-opener-pending-app-name", app_name)
-                    .text_sm()
-                    .text_color(text_secondary)
-                    .truncate(),
-            ),
-        )
-        // ── Cancel button ─────────────────────────────────────────────────
-        .child(
-            div()
-                .id("cancel-pending-file-opener")
-                .size(px(28.0))
-                .rounded(px(6.0))
-                .border_1()
-                .border_color(border)
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .tooltip(|window, cx| {
-                    Tooltip::new(t!("settings.file_opener_add_cancel").to_string())
-                        .build(window, cx)
-                })
-                .on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.cancel_pending_file_opener(cx));
-                })
-                .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")),
-        )
+        .child(div().w(px(110.0)).child(Input::new(&extension_input)))
+        .child(div().flex_1().min_w_0().child(
+            selectable_text("file-opener-pending-app-name", app_name_from_path(app_path))
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .truncate(),
+        ))
+        .child(Button::new("cancel-pending-file-opener").ghost()
+                                                        .icon(IconName::Close)
+                                                        .tooltip(t!("settings.file_opener_add_cancel").to_string())
+                                                        .on_click(move |_, _, cx| {
+                                                            entity.update(cx, |ctrl, cx| {
+                                                                      ctrl.cancel_pending_file_opener(cx);
+                                                                  });
+                                                        }))
         .into_any_element()
 }
 
-// ── Entry row
-// ─────────────────────────────────────────────────────────────────
-
-fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<SettingsController>,
-                    colors: &ColorTokens)
-                    -> AnyElement {
-    let text_primary = colors.text_primary;
-    let text_secondary = colors.text_secondary;
-    let text_tertiary = colors.text_tertiary;
-    let border = colors.border;
-
+/// One override: its extension and application, where the application is, and
+/// a button to remove it. An application that is no longer there is flagged.
+fn render_entry_card(entry: &FileOpenerEntry, entity: &Entity<SettingsController>,
+                     colors: &ColorTokens)
+                     -> AnyElement {
     let extension = entry.extension.clone();
-    let app_name = app_name_from_path(&entry.app_path);
-    let ext_label = format!(".{extension}");
-
-    let entity_remove = entity.clone();
-    let extension_for_remove = extension.clone();
-
-    div()
-        .id(format!("file-opener-row-{extension}"))
-        .flex()
-        .items_center()
-        .gap(px(12.0))
-        .py(px(8.0))
-        .border_b_1()
-        .border_color(border)
-        // ── Extension badge ───────────────────────────────────────────────
-        .child(
-            div()
-                .px(px(8.0))
-                .py(px(3.0))
-                .rounded(px(6.0))
-                .border_1()
-                .border_color(border)
-                .text_xs()
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .text_color(text_primary)
-                .child(ext_label),
-        )
-        // ── App name ──────────────────────────────────────────────────────
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .flex()
-                .items_center()
-                .gap(px(6.0))
-                .child(
-                    selectable_text(format!("file-opener-app-name-{extension}"), app_name)
-                        .text_sm()
-                        .text_color(text_secondary)
-                        .truncate(),
-                )
-                .when(is_stale, |el| {
-                    el.child(
-                        div()
-                            .text_xs()
-                            .text_color(colors.warning_text)
-                            .child(format!("⚠ {}", t!("settings.file_opener_app_not_found"))),
-                    )
-                }),
-        )
-        // ── Remove button ─────────────────────────────────────────────────
-        .child(
-            div()
-                .id(format!("remove-opener-{extension}"))
-                .size(px(28.0))
-                .rounded(px(6.0))
-                .border_1()
-                .border_color(border)
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .tooltip(|window, cx| {
-                    Tooltip::new(t!("settings.file_opener_remove_tooltip").to_string())
-                        .build(window, cx)
-                })
-                .on_click(move |_, window, cx| {
-                    let ext = extension_for_remove.clone();
-                    let entity = entity_remove.clone();
-                    window.open_alert_dialog(cx, move |alert, _, _| {
-                        let ext2 = ext.clone();
-                        let entity2 = entity.clone();
-                        alert
-                            .confirm()
-                            .title(
-                                t!("settings.file_opener_remove_confirm_title", ext = ext)
-                                    .to_string(),
-                            )
-                            .description(
-                                t!("settings.file_opener_remove_confirm_description").to_string(),
-                            )
-                            .on_ok(move |_, _window, cx| {
-                                entity2.update(cx, |ctrl, cx| {
-                                    ctrl.remove_file_opener(&ext2, cx);
-                                });
-                                true
-                            })
-                    });
-                })
-                .child(div().text_xs().text_color(text_tertiary).child("\u{00d7}")),
-        )
+    let missing = !entry.app_path.exists();
+    let remove_entity = entity.clone();
+    let remove_extension = extension.clone();
+    card_shell(format!("file-opener-row-{extension}"), colors)
+        .child(div().flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.0))
+                    .child(div().flex()
+                                .items_center()
+                                .gap(px(6.0))
+                                .child(selectable_text(format!("file-opener-app-name-{extension}"),
+                                                       app_name_from_path(&entry.app_path))
+                                           .text_sm()
+                                           .font_weight(gpui::FontWeight::SEMIBOLD)
+                                           .text_color(colors.text_primary)
+                                           .truncate())
+                                .child(Tag::secondary().outline().child(format!(".{extension}")))
+                                .children(missing.then(|| {
+                                              div().text_xs()
+                                                   .text_color(colors.warning_text)
+                                                   .child(format!("⚠ {}", t!("settings.file_opener_app_not_found")))
+                                          })))
+                    .child(div().text_xs()
+                                .font_family("monospace")
+                                .text_color(colors.text_secondary)
+                                .truncate()
+                                .child(entry.app_path.to_string_lossy().into_owned())))
+        .child(Button::new(SharedString::from(format!("remove-opener-{extension}"))).ghost()
+                                                                                    .icon(Icon::empty().path("icons/trash-2.svg"))
+                                                                                    .tooltip(t!("settings.file_opener_remove_tooltip").to_string())
+                                                                                    .on_click(move |_, window, cx| {
+                                                                                        confirm_remove(&remove_entity, &remove_extension, window, cx);
+                                                                                    }))
         .into_any_element()
 }
 
-// ── Add button
-// ────────────────────────────────────────────────────────────────
+/// Asks for confirmation, then removes the override for `extension`.
+fn confirm_remove(entity: &Entity<SettingsController>, extension: &str, window: &mut Window,
+                  cx: &mut App) {
+    let (entity, ext) = (entity.clone(), extension.to_owned());
+    window.open_alert_dialog(cx, move |alert, _, _| {
+              let (entity, ext_for_ok) = (entity.clone(), ext.clone());
+              alert.confirm()
+                   .title(t!("settings.file_opener_remove_confirm_title", ext = ext).to_string())
+                   .description(t!("settings.file_opener_remove_confirm_description").to_string())
+                   .on_ok(move |_, _window, cx| {
+                       entity.update(cx, |ctrl, cx| ctrl.remove_file_opener(&ext_for_ok, cx));
+                       true
+                   })
+          });
+}
 
-fn render_add_button(entity: Entity<SettingsController>, extension_input: Entity<InputState>,
-                     accent: gpui::Hsla, accent_on: gpui::Hsla, is_pending: bool)
-                     -> impl IntoElement + 'static {
-    // Disabled (dimmed, inert) while an add is already in progress, so a second
-    // click can't start a new pending row and orphan the first one.
-    let bg = if is_pending {
-        accent.opacity(0.4)
-    }
-    else {
-        accent
-    };
-
-    let mut btn =
-        div().id("add-file-opener")
-             .size(px(30.0))
-             .rounded(px(8.0))
-             .bg(bg)
-             .flex()
-             .items_center()
-             .justify_center()
-             .tooltip(|window, cx| {
-                 Tooltip::new(t!("settings.file_opener_add_tooltip").to_string()).build(window, cx)
-             })
-             .child(div().text_sm()
-                         .font_weight(gpui::FontWeight::MEDIUM)
-                         .text_color(accent_on)
-                         .child("+"));
-
-    if !is_pending {
-        btn = btn.cursor_pointer().on_click(move |_, window, cx| {
+/// The "Add file opener…" button. Off while an add is already in progress, so a
+/// second click cannot start a new pending card and orphan the first.
+fn add_button(entity: Entity<SettingsController>, extension_input: Entity<InputState>,
+              is_pending: bool)
+              -> impl IntoElement + 'static {
+    Button::new("add-file-opener").outline()
+                                  .icon(IconName::Plus)
+                                  .label(t!("settings.file_opener_add").to_string())
+                                  .disabled(is_pending)
+                                  .on_click(move |_, window, cx| {
                                       pick_app_and_begin_add(&entity, &extension_input, window, cx);
-                                  });
-    }
-
-    btn
+                                  })
 }
 
 /// Runs the native application picker and, if an app was chosen, starts the
@@ -366,7 +256,7 @@ fn pick_app_and_begin_add(entity: &Entity<SettingsController>,
 // ───────────────────────────────────────────────────────────────────
 
 /// Derives a display-friendly application name from the path.
-fn app_name_from_path(path: &std::path::Path) -> String {
+fn app_name_from_path(path: &Path) -> String {
     path.file_stem()
         .and_then(|s| s.to_str())
         .map(str::to_owned)
