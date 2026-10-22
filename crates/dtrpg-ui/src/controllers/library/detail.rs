@@ -1,4 +1,4 @@
-//! Detail-panel state: ZIP previews, per-file other-details disclosure, panel
+//! Detail-panel state: ZIP previews, panel
 //! width.
 
 use super::*;
@@ -315,7 +315,7 @@ impl LibraryController {
                           .await;
               this.update(async_cx, |controller, cx| {
                       let state = match result {
-                          Ok(entries) => InspectorContentsState::Loaded(entries),
+                          Ok(entries) => InspectorContentsState::Loaded(Arc::new(entries)),
                           Err(_) => InspectorContentsState::Unavailable,
                       };
                       controller.inspector_contents.insert(entry_id, state);
@@ -354,33 +354,5 @@ impl LibraryController {
                          downloaded,
                          &path,
                          &format)
-    }
-
-    // ── Per-file other details disclosure ────────────────────────────────────
-
-    /// Returns whether a single file's "Other details" section is expanded
-    /// within a multi-item entry's item tier.
-    ///
-    /// `key` is `"{entry_id}:{row_ix}"` (built by `file_other_details_key` in
-    /// `ui::views::detail_panel_view`). Defaults to `false` (collapsed) for
-    /// any key not yet toggled.
-    #[must_use]
-    pub fn is_file_other_details_open(&self, key: &str) -> bool {
-        self.file_other_details_open
-            .get(key)
-            .copied()
-            .unwrap_or(false)
-    }
-
-    /// Flips a single file's "Other details" open/collapsed state within a
-    /// multi-item entry's item tier.
-    ///
-    /// Ephemeral — never persisted, and independent per `"{entry_id}:{row_ix}"`
-    /// key.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn toggle_file_other_details(&mut self, key: Arc<str>, cx: &mut Context<Self>) {
-        toggle_bool_flag(&mut self.file_other_details_open, key);
-        cx.emit(LibraryChanged);
     }
 }

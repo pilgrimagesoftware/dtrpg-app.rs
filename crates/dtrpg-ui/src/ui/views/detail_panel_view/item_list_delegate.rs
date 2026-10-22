@@ -12,17 +12,17 @@ pub(crate) fn item_list_columns() -> Vec<Column> {
     vec![Column::new("name", t!("detail.item_list_column_name")).width(240.)
                                                                 .min_width(120.)
                                                                 .resizable(true),
-         Column::new("type", t!("detail.item_list_column_type")).width(90.)
+         Column::new("type", t!("detail.item_list_column_type")).width(70.)
+                                                                .min_width(50.)
+                                                                .resizable(true),
+         Column::new("size", t!("detail.item_list_column_size")).width(80.)
                                                                 .min_width(60.)
                                                                 .resizable(true),
-         Column::new("size", t!("detail.item_list_column_size")).width(90.)
+         Column::new("info", t!("detail.item_list_column_info")).width(90.)
                                                                 .min_width(60.)
                                                                 .resizable(true),
-         Column::new("info", t!("detail.item_list_column_info")).width(100.)
-                                                                .min_width(60.)
-                                                                .resizable(true),
-         Column::new("status", t!("detail.item_list_column_status")).width(90.)
-                                                                    .min_width(60.)
+         Column::new("status", t!("detail.item_list_column_status")).width(56.)
+                                                                    .min_width(44.)
                                                                     .resizable(true),]
 }
 

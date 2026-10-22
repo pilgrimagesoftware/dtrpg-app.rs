@@ -1,38 +1,6 @@
 //! Tests for the library controller, grouped by concern.
 
 #[cfg(test)]
-mod advanced_details_tests {
-    use std::collections::HashMap;
-
-    use super::super::toggle_bool_flag;
-
-    #[test]
-    fn missing_entry_defaults_to_false() {
-        let map: HashMap<&str, bool> = HashMap::new();
-        assert!(!map.get("entry-a").copied().unwrap_or(false));
-    }
-
-    #[test]
-    fn toggle_flips_repeatedly_for_same_key() {
-        let mut map: HashMap<&str, bool> = HashMap::new();
-
-        assert!(toggle_bool_flag(&mut map, "entry-a"));
-        assert!(!toggle_bool_flag(&mut map, "entry-a"));
-        assert!(toggle_bool_flag(&mut map, "entry-a"));
-    }
-
-    #[test]
-    fn toggle_does_not_affect_other_keys() {
-        let mut map: HashMap<&str, bool> = HashMap::new();
-
-        toggle_bool_flag(&mut map, "entry-a");
-
-        assert!(map.get("entry-a").copied().unwrap_or(false));
-        assert!(!map.get("entry-b").copied().unwrap_or(false));
-    }
-}
-
-#[cfg(test)]
 mod item_row_selection_tests {
     use std::collections::HashMap;
 

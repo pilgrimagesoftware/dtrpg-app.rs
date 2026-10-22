@@ -65,27 +65,26 @@ pub(super) fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                                                              file,
                                                              ix,
                                                              storage_root_path,
-                                                             entity.clone(),
                                                              colors,
                                                              cx).into_any_element(),
                     None => div().into_any_element(),
                 })
 }
 
-/// Renders the metadata area for a single selected item within a multi-item
-/// entry: name, type, format, file size, the entry's download state
-/// (individual files share the entry's on-disk download state today; see
-/// `define-rust-catalog-entry-detail-view`'s open questions for future
-/// per-file tracking), and a per-file "Other details" disclosure (file id,
-/// download location).
+/// Renders the details of a single selected item within a multi-item entry,
+/// laid out like the Info tab's Details: name, format, file size, file id and
+/// download location, as label and value rows under a heading.
+///
+/// The download location is the entry's shared item folder: per-file paths are
+/// not tracked separately (see `LibraryItemFile`), so every file in a bundle
+/// reports the same one.
 ///
 /// `row_ix` is the file's position within the entry's `files` list — used to
-/// key element ids and disclosure state, since the API has been observed to
+/// key element ids, since the API has been observed to
 /// reuse the same download id across genuinely distinct files within a
 /// bundle (see `LibraryItem::dedupe_files`).
 pub(super) fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usize,
-                                   storage_root_path: &Path, entity: Entity<LibraryController>,
-                                   colors: &ColorTokens, cx: &App)
+                                   storage_root_path: &Path, colors: &ColorTokens, cx: &App)
                                    -> impl IntoElement + 'static {
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
     let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
@@ -103,144 +102,28 @@ pub(super) fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, r
                                                     on_disk)
     };
 
-    let metadata = DescriptionList::vertical()
-        .columns(2)
-        .bordered(false)
-        .child(DescriptionItem::new(styled_label(t!("detail.item_list_column_name").to_string(),
-                                                 &label_font_family))
-                   .value(name_value)
-                   .span(2))
-        .child(DescriptionItem::new(styled_label(t!("detail.field_format").to_string(),
-                                                 &label_font_family))
-                   .value(styled_value(file.format.to_string(), &value_font_family)))
-        .child(DescriptionItem::new(styled_label(t!("detail.field_file_size").to_string(),
-                                                 &label_font_family))
-                   .value(styled_value(file_size_value, &value_font_family)))
-        // .child(DescriptionItem::new(t!("detail.field_status").to_string())
-        //            .value(if item.status == ItemStatus::Downloaded {
-        //                t!("detail.status_on_device").to_string()
-        //            } else {
-        //                t!("detail.status_in_cloud").to_string()
-        //            })
-        //            .span(2))
-    ;
-
-    div().flex()
-         .flex_col()
-         .gap(px(12.0))
-         .child(metadata)
-         .child(render_file_other_details(FileOtherDetailsContext { entry_id: &item.id,
-                                                                    publisher: &item.publisher,
-                                                                    row_ix,
-                                                                    is_downloaded:
-                                                                        file.downloaded,
-                                                                    storage_root_path },
-                                          file,
-                                          entity,
-                                          colors,
-                                          cx))
-}
-
-/// Builds the shared toggle-state key for a single file's "Other details"
-/// disclosure within a multi-item entry's item tier.
-pub(super) fn file_other_details_key(entry_id: &str, row_ix: usize) -> Arc<str> {
-    Arc::from(format!("{entry_id}:{row_ix}"))
-}
-
-/// Grouped context for [`render_file_other_details`], kept below Rust's
-/// preferred argument count.
-pub(super) struct FileOtherDetailsContext<'a> {
-    entry_id:          &'a str,
-    publisher:         &'a str,
-    row_ix:            usize,
-    is_downloaded:     bool,
-    storage_root_path: &'a Path,
-}
-
-/// Renders a single file's "Other details" disclosure section: a
-/// clickable header that toggles a collapsed-by-default panel showing the
-/// file's id and its on-disk download location.
-///
-/// The download location is the entry's shared item folder — per-file paths
-/// aren't tracked separately (see `LibraryItemFile`), so every file in a
-/// bundle reports the same location.
-pub(super) fn render_file_other_details(ctx: FileOtherDetailsContext<'_>,
-                                        file: &LibraryItemFile,
-                                        entity: Entity<LibraryController>, colors: &ColorTokens,
-                                        cx: &App)
-                                        -> impl IntoElement + 'static {
-    let FileOtherDetailsContext { entry_id,
-                                  publisher,
-                                  row_ix,
-                                  is_downloaded,
-                                  storage_root_path, } = ctx;
-    let toggle_key = file_other_details_key(entry_id, row_ix);
-    let open = entity.read(cx).is_file_other_details_open(&toggle_key);
-    let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
-    let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
-
-    let toggle_entity = entity;
-    let toggle_key_for_click = Arc::clone(&toggle_key);
-
-    let header = div().id(SharedString::from(format!("file-other-details-header-{toggle_key}")))
-                      .flex()
-                      .items_center()
-                      .gap(px(6.0))
-                      .cursor_pointer()
-                      .text_sm()
-                      .font_weight(gpui::FontWeight::SEMIBOLD)
-                      .text_color(colors.text_primary)
-                      .on_click(move |_, _, cx| {
-                          toggle_entity.update(cx, |ctrl, cx| {
-                              ctrl.toggle_file_other_details(Arc::clone(&toggle_key_for_click), cx);
-                          });
-                      })
-                      .child(Icon::new(if open {
-                                           IconName::ChevronUp
-                                       }
-                                       else {
-                                           IconName::ChevronDown
-                                       }).text_color(colors.text_secondary))
-                      .child(t!("detail.other_details_heading").to_string());
-
-    let path_value = if is_downloaded {
-        dtrpg_core::data::storage::publisher_dir(storage_root_path, publisher).display()
-                                                                              .to_string()
+    let path_value = if file.downloaded {
+        dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher).display()
+                                                                                    .to_string()
     }
     else {
         value_or_dash("")
     };
-
-    let content = DescriptionList::vertical()
-        .columns(2)
-        .bordered(false)
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_file_id").to_string(),
-                &label_font_family,
-            ))
-            .value(copyable_value(
-                SharedString::from(format!("file-id-{toggle_key}")),
-                file.id.to_string(),
-                &value_font_family,
-            ))
-            .span(2),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_download_location").to_string(),
-                &label_font_family,
-            ))
-            .value(copyable_value(
-                SharedString::from(format!("file-path-{toggle_key}")),
-                path_value,
-                &value_font_family,
-            ))
-            .span(2),
-        );
-
-    Collapsible::new().gap(px(8.0))
-                      .open(open)
-                      .child(header)
-                      .content(content)
+    let rows = vec![(t!("detail.item_list_column_name").to_string(), name_value),
+                    (t!("detail.field_format").to_string(),
+                     styled_value(file.format.to_string(), &value_font_family)),
+                    (t!("detail.field_file_size").to_string(),
+                     styled_value(file_size_value, &value_font_family)),
+                    (t!("detail.field_file_id").to_string(),
+                     copyable_value(SharedString::from(format!("file-id-{row_ix}")),
+                                    file.id.to_string(),
+                                    &value_font_family)),
+                    (t!("detail.field_download_location").to_string(),
+                     copyable_value(SharedString::from(format!("file-path-{row_ix}")),
+                                    path_value,
+                                    &value_font_family))];
+    render_section(t!("detail.file_details_heading").to_string(),
+                   render_detail_rows(rows, colors, &label_font_family),
+                   colors,
+                   &label_font_family)
 }

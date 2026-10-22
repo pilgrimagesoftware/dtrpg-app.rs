@@ -36,16 +36,7 @@ pub(super) fn copyable_value(field_id: SharedString, value: impl Into<SharedStri
         .into_any_element()
 }
 
-/// Renders a `DescriptionList` label in the app's dedicated label font and in
-/// small caps, distinguishing field names from their values (rendered in the
-/// dedicated value font — see [`styled_value`]).
-pub(super) fn styled_label(label: impl Into<SharedString>, label_font_family: &str) -> AnyElement {
-    div().font_family(label_font_family.to_string())
-         .child(small_caps_text(label))
-         .into_any_element()
-}
-
-/// Renders a `DescriptionList` value in the app's dedicated value font, for
+/// Renders a value in the app's dedicated value font, for
 /// plain text values that don't need [`copyable_value`]'s copy button.
 pub(super) fn styled_value(value: impl Into<SharedString>, value_font_family: &str) -> AnyElement {
     div().font_family(value_font_family.to_string())

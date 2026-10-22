@@ -356,12 +356,6 @@ pub struct LibraryController {
     inspector_preview:             HashMap<Arc<str>, InspectorPreviewState>,
     inspector_collapsed_dirs:      HashMap<Arc<str>, HashSet<String>>,
     inspector_filter_inputs:       HashMap<Arc<str>, Entity<InputState>>,
-    /// Whether a per-file "Other details" disclosure is expanded within a
-    /// multi-item entry's item tier, keyed by `"{entry_id}:{row_ix}"`. Keyed
-    /// by row position rather than file id for the same reason as
-    /// `selected_item_file`. Ephemeral — never persisted, and defaults to
-    /// collapsed.
-    file_other_details_open:       HashMap<Arc<str>, bool>,
     /// Per-file Info column metadata (PDF page count, container entry count,
     /// image dimensions), keyed by `(entry_id, row_ix)` and computed once
     /// on first access — see [`Self::file_info`]. Evicted per-entry
