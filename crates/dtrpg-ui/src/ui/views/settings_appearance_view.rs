@@ -16,12 +16,13 @@ use gpui::{
     Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
+use gpui_kit::component::tab::{Tab, TabBar};
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
-use crate::data::theme::LibriTheme;
+use crate::data::theme::{Density, LibriTheme};
 use crate::ui::views::settings_theme_editor::{ThemeEditorData, render_theme_editor};
 use crate::ui::views::settings_theme_gallery::render_theme_gallery;
 use crate::ui::widgets::small_caps_text;
@@ -125,6 +126,43 @@ fn text_scale_row(scale: f32, entity: Entity<LibraryController>, colors: &ColorT
                                              .child("+"))))
 }
 
+/// The label of `density` on the density selector.
+fn density_label(density: Density) -> String {
+    match density {
+        Density::Comfortable => t!("settings.appearance_density_comfortable"),
+        Density::Compact => t!("settings.appearance_density_compact"),
+    }.to_string()
+}
+
+/// Renders the density row: a two-way selector for how tall rows are and how
+/// large covers are, with a note saying so.
+fn density_row(current: Density, entity: Entity<LibraryController>, colors: &ColorTokens,
+               label_font_family: &str)
+               -> impl IntoElement + 'static {
+    let selected = Density::ALL.iter()
+                               .position(|d| *d == current)
+                               .unwrap_or_default();
+    let tabs =
+        Density::ALL.into_iter()
+                    .fold(TabBar::new("appearance-density").segmented()
+                                                           .selected_index(selected),
+                          |bar, density| bar.child(Tab::new().label(density_label(density))));
+    div().flex()
+         .items_center()
+         .gap(px(12.0))
+         .child(row_label(t!("settings.appearance_density_label"),
+                          colors,
+                          label_font_family))
+         .child(tabs.on_click(move |ix, _, cx| {
+                        if let Some(density) = Density::ALL.get(*ix).copied() {
+                            entity.update(cx, |ctrl, cx| ctrl.set_density(density, cx));
+                        }
+                    }))
+         .child(div().text_xs()
+                     .text_color(colors.text_secondary)
+                     .child(t!("settings.appearance_density_note").to_string()))
+}
+
 /// Renders the Appearance settings section: a shared text-scale stepper and the
 /// theme gallery. Fonts are part of a theme, so they are set by editing it.
 pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &ColorTokens,
@@ -136,6 +174,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
     let scale = theme.fonts.ui_text_size.as_f32() / DEFAULT_UI_TEXT_SIZE;
     let label_font_family = theme.fonts.label_font.to_string();
 
+    let entity_density = entity.clone();
     let entity_gallery = entity.clone();
     let entity_editor = entity.clone();
 
@@ -149,6 +188,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
                      .child(t!("settings.appearance_title")))
          .child(div().h(px(1.0)).bg(border))
          .child(text_scale_row(scale, entity, colors, &label_font_family))
+         .child(density_row(theme.density, entity_density, colors, &label_font_family))
          .child(div().h(px(1.0)).bg(border))
          .child(render_theme_gallery(entity_gallery, colors, &theme_id, &label_font_family))
          .child(render_theme_editor(theme_editor, entity_editor, &theme_id, colors))

@@ -36,11 +36,13 @@ impl LibraryController {
         cx.notify();
     }
 
-    /// Applies a new density (updates the GPUI global).
+    /// Applies a new density (updates the GPUI global) and persists it via
+    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
     pub fn set_density(&self, density: Density, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
         let new_theme = LibriTheme::new(current.id.clone(), density, current.fonts.clone());
         cx.set_global(new_theme);
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_density(density.key());
         cx.notify();
     }
 

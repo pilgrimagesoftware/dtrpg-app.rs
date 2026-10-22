@@ -468,6 +468,10 @@ settings:
   appearance_text_size_label: "Text Scale"
   appearance_text_size_decrement_tooltip: "Decrease"
   appearance_text_size_increment_tooltip: "Increase"
+  appearance_density_label: "Density"
+  appearance_density_comfortable: "Comfortable"
+  appearance_density_compact: "Compact"
+  appearance_density_note: "Row height and cover size"
 
 collections:
   add_tooltip: "New collection"
