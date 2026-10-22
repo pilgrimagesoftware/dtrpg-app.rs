@@ -28,6 +28,7 @@ impl LibraryController {
         // titles.
         ctrl.show_stored_catalog();
         ctrl.start_load(cx);
+        ctrl.refresh_root_usage(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
         ctrl
@@ -94,6 +95,7 @@ impl LibraryController {
                           failed_downloads: HashSet::new(),
                           insights: None,
                           insights_computing: false,
+                          root_usage: Arc::new(Vec::new()),
                           collection_cloud: Arc::new(HashMap::new()),
                           root_title_counts: HashMap::new(),
                           library,

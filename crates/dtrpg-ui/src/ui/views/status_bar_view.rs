@@ -13,15 +13,18 @@
 //! overlays) so they always appear next to the button that opens them,
 //! regardless of window width or future status bar layout changes.
 
+use std::sync::Arc;
+
 use dtrpg_core::data::activity::{ActivitySnapshot, AlertHistorySnapshot};
 use dtrpg_core::data::mcp_access::McpTool;
+use dtrpg_core::library::insights::RootUsage;
 use gpui::prelude::*;
 use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::popover::Popover;
-use gpui_kit::component::progress::ProgressCircle;
+use gpui_kit::component::progress::{Progress, ProgressCircle};
 use gpui_kit::component::separator::Separator;
 use gpui_kit::component::status_bar::StatusBar;
 use gpui_kit::component::tooltip::Tooltip;
@@ -37,6 +40,7 @@ use crate::ui::views::activity_panel_view::render_activity_panel;
 use crate::ui::views::alert_history_view::render_alert_history_panel;
 use crate::util::pluralize::pluralize;
 use crate::util::size::size_format;
+use crate::view_models::storage_display::volume_size_label;
 
 /// The color of the Agent dot when agents may use Libri: a green that stays the
 /// same in every theme, so "on" never looks like "off".
@@ -60,6 +64,8 @@ pub struct StatusBarSnapshot {
     pub agent_enabled:  bool,
     /// How many tools an agent can call right now.
     pub agent_exposed:  usize,
+    /// What Libri uses on each storage location.
+    pub roots:          Arc<Vec<RootUsage>>,
 }
 
 /// Activity and alert history state needed to render the status bar's
@@ -278,16 +284,55 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                          .text_color(colors.text_secondary)
                          .child(t!("status_bar.agent").to_string()));
 
-    StatusBar::new().left(library_summary)
-                    .left(Separator::vertical().h_5())
-                    .left(active_tab_summary)
-                    .right(agent_indicator)
-                    .right(Separator::vertical().h_5())
-                    .right(language_picker)
-                    .right(Separator::vertical().h_5())
-                    .right(theme_picker)
-                    .right(Separator::vertical().h_5())
-                    .right(activity_panel)
-                    .right(Separator::vertical().h_5())
-                    .right(notification_panel)
+    let mut bar = StatusBar::new().left(library_summary)
+                                  .left(Separator::vertical().h_5())
+                                  .left(active_tab_summary);
+    for (index, root) in snap.roots.iter().enumerate() {
+        bar = bar.left(Separator::vertical().h_5())
+                 .left(root_meter(index, root, colors));
+    }
+    bar.right(agent_indicator)
+       .right(Separator::vertical().h_5())
+       .right(language_picker)
+       .right(Separator::vertical().h_5())
+       .right(theme_picker)
+       .right(Separator::vertical().h_5())
+       .right(activity_panel)
+       .right(Separator::vertical().h_5())
+       .right(notification_panel)
+}
+
+/// The width of a storage location's meter, in pixels.
+const ROOT_METER_WIDTH: f32 = 48.0;
+
+/// A storage location's name and a small meter of how much of its volume Libri
+/// fills. The tooltip gives the figures. A location whose volume could not be
+/// measured shows its name alone.
+fn root_meter(index: usize, root: &RootUsage, colors: &ColorTokens) -> impl IntoElement {
+    let fraction = match (root.used_mb, root.total_mb) {
+        (Some(used), Some(total)) if total > 0.0 => Some(used / total),
+        _ => None,
+    };
+    let tooltip = match (root.used_mb, root.available_mb) {
+        (Some(used), Some(free)) => t!("status_bar.root_tooltip",
+                                       name = root.name,
+                                       used = volume_size_label(used),
+                                       free = volume_size_label(free)).to_string(),
+        _ => root.name.clone(),
+    };
+    div().id(("status-bar-root", index))
+         .flex()
+         .items_center()
+         .gap(px(6.0))
+         .px(px(8.0))
+         .tooltip(move |window, cx| Tooltip::new(tooltip.clone()).build(window, cx))
+         .child(div().text_xs()
+                     .text_color(colors.text_secondary)
+                     .child(root.name.clone()))
+         .children(fraction.map(|fraction| {
+                               div().w(px(ROOT_METER_WIDTH))
+                            .child(Progress::new(("status-bar-root-meter", index))
+                                       .value((fraction * 100.0).clamp(1.0, 100.0) as f32)
+                                       .color(colors.accent))
+                           }))
 }

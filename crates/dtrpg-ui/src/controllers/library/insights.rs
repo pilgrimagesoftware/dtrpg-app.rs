@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use dtrpg_core::data::storage::StorageConfig;
-use dtrpg_core::library::insights::Insights;
+use dtrpg_core::library::insights::{Insights, RootUsage, root_usages};
 
 use super::*;
 
@@ -97,6 +97,33 @@ impl LibraryController {
                                        Ok(()) => a.complete(activity_id, cx),
                                        Err(error) => a.error(activity_id, error.to_string(), cx),
                                    });
+                  })
+                  .ok();
+          })
+          .detach();
+    }
+}
+
+impl LibraryController {
+    /// What Libri uses on each storage location, as of the last refresh.
+    #[must_use]
+    pub fn root_usage(&self) -> Arc<Vec<RootUsage>> {
+        Arc::clone(&self.root_usage)
+    }
+
+    /// Measures each storage location off the main thread, for the status bar.
+    /// Walking the files takes a while on a large library, so it runs at
+    /// startup, when the locations change, and when the downloads finish, not
+    /// while drawing.
+    pub fn refresh_root_usage(&mut self, cx: &mut Context<Self>) {
+        let roots = StorageConfig::load().roots();
+        cx.spawn(async move |this, async_cx| {
+              let usage = async_cx.background_executor()
+                                  .spawn(async move { root_usages(&roots) })
+                                  .await;
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.root_usage = Arc::new(usage);
+                      cx.emit(LibraryChanged);
                   })
                   .ok();
           })
