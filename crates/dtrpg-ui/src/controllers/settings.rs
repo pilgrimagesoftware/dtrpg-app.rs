@@ -30,8 +30,8 @@ use gpui_kit::component::input::{EditorState, InputState};
 use rust_i18n::t;
 
 use crate::data::events::{
-    CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun,
-    StartupAuthFailed,
+    AgentAccessChanged, CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded,
+    StartupAuthBegun, StartupAuthFailed,
 };
 use crate::data::token_status_global::TokenStatusGlobal;
 

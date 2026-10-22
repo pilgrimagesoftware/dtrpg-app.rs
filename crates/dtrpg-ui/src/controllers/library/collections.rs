@@ -158,6 +158,14 @@ impl LibraryController {
     /// [`CollectionCreateFailed`] is emitted so the window can push an
     /// error notification.
     pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
+        self.create_collection_then(name, |_| {}, cx);
+    }
+
+    /// As [`Self::create_collection`], and calls `done` with the new entry, or
+    /// the reason it could not be made, once the create call has finished.
+    pub fn create_collection_then(&mut self, name: String,
+                                  done: impl FnOnce(Result<CollectionEntry, String>) + 'static,
+                                  cx: &mut Context<Self>) {
         let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
@@ -170,6 +178,7 @@ impl LibraryController {
 
               match result {
                   Ok(entry) => {
+                      let created = entry.clone();
                       this.update(async_cx, |ctrl, cx| {
                               ctrl.library.push_collection(entry);
                               ctrl.activity
@@ -177,6 +186,7 @@ impl LibraryController {
                               cx.emit(LibraryChanged);
                           })
                           .ok();
+                      done(Ok(created));
                   }
                   Err(e) => {
                       this.update(async_cx, |ctrl, cx| {
@@ -186,6 +196,7 @@ impl LibraryController {
                               cx.emit(CollectionCreateFailed { message: e.message.clone(), });
                           })
                           .ok();
+                      done(Err(e.message));
                   }
               }
           })

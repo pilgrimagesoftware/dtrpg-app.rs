@@ -81,8 +81,8 @@ use crate::{
     },
     data::{
         events::{
-            ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
-            CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
+            ActivityChanged, AgentAccessChanged, AuthStateChanged, CacheCleared,
+            CollectionCreateFailed, CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
             CollectionMemberRemoveFailed, DownloadComplete, DownloadError, InspectorCloseRequested,
             InspectorPopOutRequested, InspectorShowRequested, LibraryChanged, LogoutRequested,
             LowDiskSpaceWarning, PlacementRulesChanged, SettingsChanged, SignInSucceeded,

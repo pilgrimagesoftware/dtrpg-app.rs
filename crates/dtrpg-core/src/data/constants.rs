@@ -259,3 +259,7 @@ pub const BULK_ACTION_CONFIRM_THRESHOLD: usize = 20;
 /// The file, in the preferences directory, that holds the user's smart
 /// collections.
 pub const SMART_COLLECTIONS_FILE: &str = "smart_collections.toml";
+
+/// How often, in milliseconds, the app looks for requests an AI agent made
+/// through the MCP server.
+pub const AGENT_REQUEST_POLL_MS: u64 = 250;

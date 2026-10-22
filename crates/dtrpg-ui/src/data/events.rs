@@ -62,6 +62,18 @@ pub struct PlacementRulesChanged;
 
 impl EventEmitter<PlacementRulesChanged> for LibraryController {}
 
+// ── AgentAccessChanged
+// ─────────────────────────────────────────────────────
+
+/// Emitted when the person turns agent access on or off, so the library
+/// controller starts or stops listening for the agent's requests.
+pub struct AgentAccessChanged {
+    /// Whether agents may use Libri now.
+    pub enabled: bool,
+}
+
+impl EventEmitter<AgentAccessChanged> for SettingsController {}
+
 // ── SettingsChanged
 // ───────────────────────────────────────────────────────────
 

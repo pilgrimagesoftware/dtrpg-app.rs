@@ -51,6 +51,11 @@ where the activity log is kept.
   tag that already exists keeps its spelling and its color; a new tag has no color.
 - `set_tag_color` sets a tag's color to gray, green, purple, blue, yellow, red or
   orange, or clears it.
+- `create_collection` makes a collection on your DriveThruRPG account and gives back
+  its id and name.
+- `add_to_collection` puts an item in a collection, given the collection's id or its
+  name (capital letters do not matter). Libri adds it at once and tells you in the
+  window if DriveThruRPG refuses.
 
 A tag it cannot store, such as one containing a comma, or an item that is not in the
 library, is reported as an error and changes nothing.
@@ -59,6 +64,10 @@ library, is reported as an error and changes nothing.
 
 - `summarize_item` writes and saves a summary of a downloaded item, using the provider
   chosen in Libri's settings. It spends tokens against the monthly ceiling set there.
+- `download_item` starts downloading the files of an item that are not downloaded yet,
+  to the location your [storage rules]({{ '/latest/storage/' | relative_url }}) choose.
+  It reports the download as started and carries on in the background. If there is not
+  enough free disk space, it says so and Libri asks you to confirm.
 
 ## The activity log
 
@@ -68,12 +77,17 @@ its scope, and whether it was refused. **Settings > Agent & MCP > Recent activit
 shows the latest ten. The log keeps the newest 1,000 calls in `mcp_audit.jsonl` in
 Libri's data folder.
 
-## Not available yet
+## Tools that need Libri to be running
 
-`create_collection`, `add_to_collection` and `download_item` are in the design but
-are not offered. They need a signed-in session, and this server deliberately holds no
-credentials. They will come when Libri can run them on the agent's behalf from the
-app itself.
+`create_collection`, `add_to_collection` and `download_item` use your signed-in
+DriveThruRPG session. The server holds no credentials, so it asks the running Libri
+to do them. Libri only listens for these requests while **Allow agents to use Libri**
+is on, and checks the scope and the tool's switch again before it acts. If Libri is
+not running, the tool says so and does nothing.
+
+The request goes over a local socket in Libri's data folder (a named pipe on Windows)
+and carries a random token that only your own account can read, so other programs on
+the computer cannot use it. Nothing goes over the network.
 
 ## When a change shows up
 

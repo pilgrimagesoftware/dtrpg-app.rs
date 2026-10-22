@@ -6,12 +6,17 @@ use dtrpg_core::api::LibraryApi;
 use dtrpg_core::data::enums::ItemStatus;
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::library::LibraryItem;
-use dtrpg_core::data::mcp_access::{AuditLog, McpScope, McpSettings, McpTool};
+use dtrpg_core::data::mcp_access::{
+    AppReply, AuditLog, IpcEndpoint, IpcListener, McpScope, McpSettings, McpTool,
+};
 use dtrpg_core::data::summary::ContentSummary;
 use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
 use rmcp::handler::server::wrapper::Parameters;
 
-use crate::requests::{GetItemRequest, SearchLibraryRequest, SetTagColorRequest, SetTagsRequest};
+use crate::requests::{
+    AddToCollectionRequest, CreateCollectionRequest, GetItemRequest, SearchLibraryRequest,
+    SetTagColorRequest, SetTagsRequest,
+};
 use crate::server::{Access, LibriMcpServer, error_json};
 
 /// A server over a library index in a fresh temporary folder, holding items
@@ -54,7 +59,9 @@ fn server_with(name: &str, configure: impl FnOnce(&mut McpSettings)) -> (LibriMc
     let api = LibraryApi::new(Box::new(RustSdkLibraryService::unauthenticated()),
                               Box::new(RustSdkCollectionsService::unauthenticated()),
                               dir.clone());
-    let access = Access::at(settings_path, dir.join("audit.jsonl"));
+    let access = Access::at(settings_path,
+                            dir.join("audit.jsonl"),
+                            IpcEndpoint::at(&dir));
     (LibriMcpServer::new(api, access), dir)
 }
 
@@ -204,6 +211,64 @@ async fn summarizing_refuses_unless_the_download_and_spend_scope_is_on() {
                           .contains("scope is switched off"));
     assert_eq!(json(&server.get_summary(id("a")).await),
                serde_json::Value::Null);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn create_collection(name: &str) -> Parameters<CreateCollectionRequest> {
+    Parameters(CreateCollectionRequest { name: name.to_owned(), })
+}
+
+fn add_to_collection(collection: &str, id: &str) -> Parameters<AddToCollectionRequest> {
+    Parameters(AddToCollectionRequest { collection: collection.to_owned(),
+                                        id:         id.to_owned(), })
+}
+
+#[tokio::test]
+async fn the_tools_that_need_the_app_refuse_unless_their_scope_is_on() {
+    let (server, dir) = server(false, "app_refuse");
+
+    let replies = [json(&server.create_collection(create_collection("Solo")).await),
+                   json(&server.add_to_collection(add_to_collection("Solo", "a"))
+                               .await),
+                   json(&server.download_item(id("a")).await)];
+
+    for reply in replies {
+        assert!(reply["error"].as_str()
+                              .unwrap()
+                              .contains("scope is switched off"));
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn the_tools_that_need_the_app_say_so_when_it_is_not_running() {
+    let (server, dir) = server(true, "app_absent");
+
+    let reply = json(&server.download_item(id("a")).await);
+
+    assert!(reply["error"].as_str().unwrap().contains("not running"));
+    let log = audit(&dir);
+    assert_eq!(log.len(), 1);
+    assert_eq!(log[0].tool, "download_item");
+    assert!(!log[0].denied);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn the_tools_that_need_the_app_reply_with_what_the_app_answers() {
+    let (server, dir) = server(true, "app_answers");
+    let (requests, incoming) = std::sync::mpsc::channel();
+    let _listener = IpcListener::start(&IpcEndpoint::at(&dir), requests).unwrap();
+    std::thread::spawn(move || {
+        while let Ok(request) = incoming.recv() {
+            let data = serde_json::json!({ "asked": request.request.tool().name() });
+            request.reply.send(AppReply::Done { data }).ok();
+        }
+    });
+
+    let reply = json(&server.create_collection(create_collection("Solo")).await);
+
+    assert_eq!(reply, serde_json::json!({ "asked": "create_collection" }));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

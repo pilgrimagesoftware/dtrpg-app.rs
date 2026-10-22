@@ -46,6 +46,7 @@ use crate::view_models::inspector::{
 };
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
+mod agent_requests;
 mod attention;
 mod auto_summary;
 mod bulk_selection;
@@ -97,6 +98,10 @@ mod tests_inspector;
 mod tests_sign_in;
 #[cfg(test)]
 mod tests_smart_collections;
+
+#[cfg(test)]
+#[path = "tests_agent_requests.rs"]
+mod tests_agent_requests;
 #[cfg(test)]
 mod tests_startup;
 #[cfg(test)]
@@ -386,6 +391,8 @@ pub struct LibraryController {
     /// [`Self::confirm_pending_download`] or cleared by
     /// [`Self::cancel_pending_download`].
     pending_download:              Option<PendingDownloadRequest>,
+    /// Listens for what an AI agent asks of the app, while agent access is on.
+    agent_link:                    Option<agent_requests::AgentLink>,
     /// Whether bulk-selection mode is active, toggled from the toolbar (see
     /// `catalog-selection`). When off, `bulk_selected_ids` is always empty.
     bulk_selection_mode:           bool,
