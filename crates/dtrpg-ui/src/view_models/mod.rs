@@ -7,3 +7,4 @@ pub mod inspector;
 pub mod library;
 pub mod smart_collection_editor;
 pub mod storage_display;
+pub mod treemap;

@@ -21,7 +21,9 @@ and it never changes your library.
 - **Availability** - a ring of what is on this machine and what is not: on
   device, not downloaded, downloading now, and failed. A failed title is also
   listed under **Needs Attention**.
-- **Disk usage by publisher** - each publisher's share of the total size.
+- **Disk usage by publisher** - a treemap: each publisher's tile is as large as its
+  share of the total size. The twelve largest get a tile each and the rest are
+  gathered into a grey "Other" tile. Hover a tile for its size.
 - **Titles added over time** - a chart by the month you acquired them.
 - **Storage locations** - for each location, what Libri uses there and how
   much space is free.
@@ -39,5 +41,4 @@ catalog, and the old figures stay on screen until the new ones arrive.
 
 ## Differences from the design
 
-Disk usage is shown as bars rather than a treemap, and there is no "placeholder"
-availability state yet.
+There is no "placeholder" availability state yet.

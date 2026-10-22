@@ -11,9 +11,10 @@ use gpui_kit::component::input::InputState;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::LibriTheme;
-use crate::ui::app::save_settings_window_bounds;
+use crate::ui::app::save_settings_window_bounds_soon;
 use crate::ui::views::settings_appearance_view::AppearanceFontSelects;
 use crate::ui::views::settings_view::render_settings_panel;
+use crate::util::debounce::Debounce;
 use crate::view_models::agent_display::AgentPageData;
 use crate::view_models::storage_display::StorageDisplay;
 
@@ -33,6 +34,8 @@ pub struct SettingsWindowView {
     /// the email/password/storage-path inputs), so it's passed in explicitly.
     file_opener_extension_input: Entity<InputState>,
     focus_handle:                FocusHandle,
+    /// Waits for a move or resize to stop before saving the bounds.
+    bounds_debounce:             Debounce,
 }
 
 impl SettingsWindowView {
@@ -46,14 +49,15 @@ impl SettingsWindowView {
         focus_handle.focus(window, cx);
         // Remember the size and place on every move or resize, as the main
         // window does, so the next opening is the same.
-        cx.observe_window_bounds(window, |_this, window, _cx| {
-              save_settings_window_bounds(window);
+        cx.observe_window_bounds(window, |this, window, cx| {
+              save_settings_window_bounds_soon(window, &this.bounds_debounce, cx);
           })
           .detach();
         Self { settings,
                library,
                file_opener_extension_input,
-               focus_handle }
+               focus_handle,
+               bounds_debounce: Debounce::new() }
     }
 }
 

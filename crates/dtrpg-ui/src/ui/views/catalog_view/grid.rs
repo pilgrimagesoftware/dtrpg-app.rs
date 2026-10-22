@@ -13,7 +13,8 @@ pub(super) fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>
                           item_activity: HashMap<Arc<str>, ItemActivity>, colors: ColorTokens,
                           density: DensityConstants, entity: Entity<LibraryController>,
                           inspector: Entity<InspectorController>, storage_root_path: PathBuf,
-                          window: &Window, selection_mode: bool, selected_ids: HashSet<Arc<str>>)
+                          window: &Window, selection_mode: bool,
+                          selected_ids: HashSet<Arc<str>>, opened_id: Option<Arc<str>>)
                           -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -41,7 +42,8 @@ pub(super) fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>
                                                          is_checking,
                                                          activity,
                                                          selection_mode,
-                                                         is_selected)
+                                                         is_selected,
+                                                         opened_id.as_deref() == Some(&*item.id))
                                     }))
 }
 
@@ -53,7 +55,8 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
                                entity: Entity<LibraryController>,
                                inspector: Entity<InspectorController>,
                                storage_root_path: PathBuf, window: &Window, is_checking: bool,
-                               activity: ItemActivity, selection_mode: bool, selected: bool)
+                               activity: ItemActivity, selection_mode: bool, selected: bool,
+                               opened: bool)
                                -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -147,7 +150,9 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
                            });
     }
 
+    let ring = open_ring(&colors);
     div().id(Arc::clone(&id))
+         .relative()
          .w(px(card_w))
          .flex()
          .flex_col()
@@ -179,6 +184,7 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
                                                       item.is_offloaded(),
                                                       activity,
                                                       &colors))))
+         .when(opened, |this| this.child(ring))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {

@@ -163,6 +163,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             let t = inspector_entity.clone();
             let selection_mode = snap.bulk_selection_mode;
             let selected_ids = snap.bulk_selected_ids.clone();
+            let opened_id = snap.selected_item.as_ref().map(|item| Arc::clone(&item.id));
             root.px(pad_side)
                 .child(
                        div().relative()
@@ -199,7 +200,8 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                               is_checking,
                                               activity,
                                               selection_mode,
-                                              is_selected).into_any_element()
+                                              is_selected,
+                                              opened_id.as_deref() == Some(&*item.id)).into_any_element()
                          })
                          .collect()
                 }).track_scroll(&scroll_handle)
@@ -221,6 +223,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             let item_activity = view.controller.read(cx).item_activity_snapshot();
             let selection_mode = snap.bulk_selection_mode;
             let selected_ids = snap.bulk_selected_ids.clone();
+            let opened_id = snap.selected_item.as_ref().map(|item| Arc::clone(&item.id));
             root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
@@ -233,6 +236,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                         let checking_items = checking_items.clone();
                         let item_activity = item_activity.clone();
                         let selected_ids = selected_ids.clone();
+                        let opened_id = opened_id.clone();
                         // Reborrow as `&Window` (Copy) so the nested
                         // `move` closure can capture it on every
                         // outer iteration without moving `window`.
@@ -263,6 +267,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                     activity,
                                     selection_mode,
                                     is_selected,
+                                    opened_id.as_deref() == Some(&*item.id),
                                 )
                             }))
                     }))
@@ -278,6 +283,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             let t = inspector_entity.clone();
             let selection_mode = snap.bulk_selection_mode;
             let selected_ids = snap.bulk_selected_ids.clone();
+            let opened_id = snap.selected_item.as_ref().map(|item| Arc::clone(&item.id));
             root.px(pad_side)
                     .child(
                            div().relative()
@@ -336,6 +342,8 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                                                         activity,
                                                                         selection_mode,
                                                                         is_selected,
+                                                                        opened_id.as_deref()
+                                                                            == Some(&*item.id),
                                                                     )
                                                                 },
                                                             ),
@@ -362,6 +370,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
             let item_activity = view.controller.read(cx).item_activity_snapshot();
             let selection_mode = snap.bulk_selection_mode;
             let selected_ids = snap.bulk_selected_ids.clone();
+            let opened_id = snap.selected_item.as_ref().map(|item| Arc::clone(&item.id));
             root.overflow_y_scrollbar()
                 .px(pad_side)
                 .children(groups.into_iter().map(|g| {
@@ -390,7 +399,8 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                                                         s,
                                                                         &*window,
                                                                         selection_mode,
-                                                                        sel))
+                                                                        sel,
+                                                                        opened_id.clone()))
                                             }))
                 .into_any_element()
         }

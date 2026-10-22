@@ -5,6 +5,7 @@
 use dtrpg_core::util::filter::SidebarFilter;
 use gpui_kit::component::Selectable as _;
 
+use super::panel_widths::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use super::*;
 use crate::ui::views::filters_column::{
     render_filter_chips, render_filters_column, without_hidden_values,
@@ -366,7 +367,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                             .child(
                                 resizable_panel()
                                     .size(px(sidebar_initial))
-                                    .size_range(px(180.)..px(361.))
+                                    .size_range(px(SIDEBAR_MIN_WIDTH)..px(SIDEBAR_MAX_WIDTH))
                                     .child(sidebar_col),
                             )
                             .child(

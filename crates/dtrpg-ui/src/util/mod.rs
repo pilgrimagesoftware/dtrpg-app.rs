@@ -1,6 +1,7 @@
 pub use dtrpg_core::util::{file_presence, icloud_status};
 
 pub mod datetime;
+pub mod debounce;
 pub mod file_info;
 pub mod file_size;
 pub mod init;
