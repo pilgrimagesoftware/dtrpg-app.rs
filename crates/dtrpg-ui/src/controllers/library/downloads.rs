@@ -241,9 +241,13 @@ impl LibraryController {
     }
 
     /// Returns `Some(free_mb)` if `needed_mb` exceeds the free space at the
-    /// storage root; `None` if space is sufficient or can't be determined
-    /// (fail open — see `download-disk-space-check`).
+    /// storage root; `None` if space is sufficient, can't be determined, or the
+    /// "Check free space" setting is off (fail open — see
+    /// `download-disk-space-check`).
     pub(super) fn warn_if_insufficient_space(needed_mb: f64) -> Option<f64> {
+        if !StorageConfig::load().check_free_space() {
+            return None;
+        }
         let free_mb = dtrpg_core::data::storage::available_space_mb()?;
         (needed_mb > free_mb).then_some(free_mb)
     }
@@ -254,6 +258,9 @@ impl LibraryController {
     pub(super) fn warn_if_insufficient_space_for_item(&self, item: &LibraryItem, needed_mb: f64)
                                                       -> Option<f64> {
         let storage = StorageConfig::load();
+        if !storage.check_free_space() {
+            return None;
+        }
         let collection_ids = collection_ids_for_item(item, &self.library.collections());
         let root = storage.resolve_root_for(&item.publisher, &collection_ids, item.size_mb);
         let free_mb = available_space_mb_at(&root.path)?;

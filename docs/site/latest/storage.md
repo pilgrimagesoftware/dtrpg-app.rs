@@ -7,7 +7,7 @@ slug: storage
 # Storage roots
 
 Libri keeps the original download location as the **Default** storage root.
-Additional roots can be added from **Settings → Downloads**. A root must
+Additional roots can be added from **Settings → Storage**. A root must
 already exist and be writable; Libri does not recreate a missing external
 volume.
 
@@ -22,8 +22,17 @@ volume.
 - how much space is free on its volume, such as `582.0 MB free of 994.0 MB`; and
 - how many downloaded titles it holds, such as `6 titles here`.
 
-**Default location** picks where downloads go when no rule matches. Rules read
-in plain words, such as `Paizo → Archive Vault`.
+Each location has a ⋮ menu to show it in the file manager, to change the
+default location's folder, or to remove any other location. **Add location…**
+adds another.
+
+**Placement rules** holds the **Default location**, a menu that picks where
+downloads go when no rule matches, and the rules, which read in plain words,
+such as `Paizo → Archive Vault`. Each rule has a delete button, and arrows to
+move it earlier or later. **Add rule…** opens a small editor for a new one.
+
+**Behavior** has the switches that govern how files are stored. Libri does not
+yet move files when a rule changes, or keep a manifest in each location.
 
 ## Download placement
 

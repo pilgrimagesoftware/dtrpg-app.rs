@@ -12,6 +12,7 @@ use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{ADVANCED_PAGE_IX, STORAGE_PAGE_IX, SettingsController};
 use crate::data::theme::LibriTheme;
 use crate::ui::app::save_settings_window_bounds_soon;
+use crate::ui::views::settings_storage_view::StoragePageData;
 use crate::ui::views::settings_view::render_settings_panel;
 use crate::util::debounce::Debounce;
 use crate::view_models::agent_display::AgentPageData;
@@ -118,24 +119,30 @@ impl Render for SettingsWindowView {
         else {
             Vec::new()
         };
+        let storage = StoragePageData { roots: snap.storage_roots,
+                                        rules: snap.storage_rules,
+                                        display: storage_display,
+                                        root_path_exists: snap.storage_path_exists,
+                                        check_free_space: snap.check_free_space,
+                                        create_collections: snap.create_collections,
+                                        max_concurrent_downloads: snap.max_concurrent_downloads,
+                                        max_concurrent_input:
+                                            snap.max_concurrent_downloads_input,
+                                        publisher_rule_input: snap.publisher_rule_input,
+                                        collection_rule_input: snap.collection_rule_input,
+                                        size_rule_input: snap.size_rule_input,
+                                        rule_target_root_id: snap.rule_target_root_id,
+                                        publisher_names,
+                                        rule_editor_type: snap.rule_editor_type,
+                                        rule_editor_open: snap.rule_editor_open };
         let panel = render_settings_panel(&snap.file_openers,
                                           snap.auth,
-                                          snap.storage_root_path,
-                                          snap.storage_path_exists,
-                                          snap.storage_roots,
-                                          snap.storage_rules,
-                                          storage_display,
+                                          storage,
                                           AgentPageData { settings:     snap.mcp.clone(),
                                                           activity:     snap.mcp_activity.clone(),
                                                           command_path: snap.mcp_command_path
                                                                             .clone(),
                                                           log_path:     snap.mcp_log_path.clone(), },
-                                          snap.publisher_rule_input,
-                                          snap.collection_rule_input,
-                                          snap.size_rule_input,
-                                          snap.rule_target_root_id,
-                                          publisher_names,
-                                          snap.rule_editor_type,
                                           self.settings.clone(),
                                           self.library.clone(),
                                           &self.focus_handle,
@@ -146,14 +153,10 @@ impl Render for SettingsWindowView {
                                           snap.sign_in_in_progress,
                                           sign_in_enabled,
                                           snap.sign_in_error,
-                                          snap.storage_path_input,
                                           self.file_opener_extension_input.clone(),
                                           snap.pending_file_opener,
                                           snap.active_page_ix,
                                           snap.cache_counts,
-                                          snap.max_concurrent_downloads,
-                                          snap.max_concurrent_downloads_input,
-                                          snap.create_collections,
                                           snap.recently_updated_window_days,
                                           snap.recently_updated_window_input,
                                           snap.native,

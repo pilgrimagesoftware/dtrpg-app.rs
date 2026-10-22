@@ -19,6 +19,7 @@ fn default_path_is_non_empty() {
     let cfg = StorageConfig { override_path:                None,
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -35,6 +36,7 @@ fn override_path_is_returned_when_set() {
     let cfg = StorageConfig { override_path:                Some(custom.clone()),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -48,6 +50,7 @@ fn path_for_publisher_is_under_root() {
     let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -65,6 +68,7 @@ fn path_for_publisher_sanitizes_a_name_containing_a_path_separator() {
     let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -79,6 +83,7 @@ fn path_for_publisher_converts_spaces_to_underscores() {
     let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -113,6 +118,7 @@ fn is_default_true_without_override() {
     let cfg = StorageConfig { override_path:                None,
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -126,6 +132,7 @@ fn is_default_false_with_override() {
     let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/custom-storage")),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -141,6 +148,7 @@ fn ensure_root_exists_creates_missing_directory() {
     let cfg = StorageConfig { override_path:                Some(root.clone()),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -158,6 +166,7 @@ fn ensure_root_exists_is_idempotent_on_existing_directory() {
     let cfg = StorageConfig { override_path:                Some(dir),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -165,61 +174,6 @@ fn ensure_root_exists_is_idempotent_on_existing_directory() {
                               default_root_id:              0, };
     assert!(cfg.ensure_root_exists().is_ok());
     assert!(cfg.ensure_root_exists().is_ok());
-}
-
-#[test]
-fn max_concurrent_downloads_defaults_to_three() {
-    let cfg = StorageConfig { override_path:                None,
-                              max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                              create_collections:           false,
-                              recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
-                              extra_roots:                  Vec::new(),
-                              rules:                        Vec::new(),
-                              next_root_id:                 1,
-                              default_root_id:              0, };
-    assert_eq!(cfg.max_concurrent_downloads(), 3);
-}
-
-#[test]
-fn missing_max_concurrent_downloads_field_deserializes_to_default() {
-    let file: StorageConfigFile = toml::from_str("").unwrap();
-    assert_eq!(file.max_concurrent_downloads,
-               DEFAULT_MAX_CONCURRENT_DOWNLOADS);
-}
-
-#[test]
-fn create_collections_defaults_to_false() {
-    let cfg = StorageConfig { override_path:                None,
-                              max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                              create_collections:           false,
-                              recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
-                              extra_roots:                  Vec::new(),
-                              rules:                        Vec::new(),
-                              next_root_id:                 1,
-                              default_root_id:              0, };
-    assert!(!cfg.create_collections());
-}
-
-#[test]
-fn missing_create_collections_field_deserializes_to_default() {
-    let file: StorageConfigFile = toml::from_str("").unwrap();
-    assert!(!file.create_collections);
-}
-
-#[test]
-fn create_collections_round_trips_through_toml_serialization() {
-    let cfg = StorageConfigFile { root_path:                    None,
-                                  max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-                                  create_collections:           true,
-                                  recently_updated_window_days:
-                                      RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
-                                  extra_roots:                  Vec::new(),
-                                  rules:                        Vec::new(),
-                                  next_root_id:                 1,
-                                  default_root_id:              0, };
-    let text = toml::to_string(&cfg).unwrap();
-    let reloaded: StorageConfigFile = toml::from_str(&text).unwrap();
-    assert!(reloaded.create_collections);
 }
 
 #[test]
@@ -227,6 +181,7 @@ fn path_for_collection_is_under_root() {
     let cfg = StorageConfig { override_path:                Some(PathBuf::from("/tmp/dtrpg")),
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           true,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -254,6 +209,7 @@ fn recently_updated_window_days_defaults_to_thirty() {
     let cfg = StorageConfig { override_path:                None,
                               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                               create_collections:           false,
+                              check_free_space:             true,
                               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                               extra_roots:                  Vec::new(),
                               rules:                        Vec::new(),
@@ -290,6 +246,7 @@ fn config_with(extra_roots: Vec<StorageRoot>, rules: Vec<PlacementRule>) -> Stor
     StorageConfig { override_path: Some(PathBuf::from("/tmp/dtrpg-default")),
                     max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                     create_collections: false,
+                    check_free_space: true,
                     recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                     extra_roots,
                     rules,

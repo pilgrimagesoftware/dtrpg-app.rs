@@ -52,6 +52,10 @@ fn default_max_concurrent_downloads() -> usize {
     DEFAULT_MAX_CONCURRENT_DOWNLOADS
 }
 
+fn default_check_free_space() -> bool {
+    true
+}
+
 fn default_recently_updated_window_days() -> u32 {
     RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS
 }
@@ -70,6 +74,9 @@ pub(crate) struct StorageConfigFile {
     pub(crate) max_concurrent_downloads:     usize,
     #[serde(default)]
     pub(crate) create_collections:           bool,
+    /// Whether to refuse a download that would not fit. On unless turned off.
+    #[serde(default = "default_check_free_space")]
+    pub(crate) check_free_space:             bool,
     #[serde(default = "default_recently_updated_window_days")]
     pub(crate) recently_updated_window_days: u32,
     /// Named storage roots beyond the default (`root_path`). Empty for
@@ -111,6 +118,7 @@ pub struct StorageConfig {
     pub(crate) override_path:                Option<PathBuf>,
     pub(crate) max_concurrent_downloads:     usize,
     pub(crate) create_collections:           bool,
+    pub(crate) check_free_space:             bool,
     pub(crate) recently_updated_window_days: u32,
     /// Named storage roots beyond the default (id [`DEFAULT_ROOT_ID`]).
     pub(crate) extra_roots:                  Vec<StorageRoot>,
@@ -150,6 +158,7 @@ impl StorageConfig {
                     clamp_recently_updated_window_days(cfg.recently_updated_window_days)
                 });
         let create_collections = file.as_ref().is_some_and(|cfg| cfg.create_collections);
+        let check_free_space = file.as_ref().is_none_or(|cfg| cfg.check_free_space);
         let extra_roots = file.as_ref()
                               .map(|cfg| cfg.extra_roots.clone())
                               .unwrap_or_default();
@@ -162,6 +171,7 @@ impl StorageConfig {
         let config = Self { override_path,
                             max_concurrent_downloads,
                             create_collections,
+                            check_free_space,
                             recently_updated_window_days,
                             extra_roots,
                             rules,
@@ -190,6 +200,7 @@ impl StorageConfig {
         Self { override_path:                Some(root),
                max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                create_collections:           false,
+               check_free_space:             true,
                recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                extra_roots:                  Vec::new(),
                rules:                        Vec::new(),
@@ -428,6 +439,18 @@ impl StorageConfig {
         self.save();
     }
 
+    /// Returns `true` when a download that would not fit is refused.
+    #[must_use]
+    pub fn check_free_space(&self) -> bool {
+        self.check_free_space
+    }
+
+    /// Saves `enabled` as the new "Check free space" setting.
+    pub fn set_check_free_space(&mut self, enabled: bool) {
+        self.check_free_space = enabled;
+        self.save();
+    }
+
     /// Returns the configured "Recently Updated window", in days.
     #[must_use]
     pub fn recently_updated_window_days(&self) -> u32 {
@@ -456,6 +479,7 @@ impl StorageConfig {
                                               .map(|p| p.to_string_lossy().into_owned()),
                                       max_concurrent_downloads:     self.max_concurrent_downloads,
                                       create_collections:           self.create_collections,
+                                      check_free_space:             self.check_free_space,
                                       recently_updated_window_days:
                                           self.recently_updated_window_days,
                                       extra_roots:                  self.extra_roots.clone(),

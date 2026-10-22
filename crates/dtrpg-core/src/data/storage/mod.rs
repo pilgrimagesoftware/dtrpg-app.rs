@@ -6,6 +6,8 @@ mod paths;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_settings;
 
 pub mod placement;
 pub mod roots;

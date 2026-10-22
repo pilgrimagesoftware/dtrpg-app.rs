@@ -55,6 +55,13 @@ impl SettingsController {
         self.storage
             .add_rule(PlacementCondition::Publisher(publisher.to_owned()),
                       self.rule_target_root_id);
+        self.rule_editor_open = false;
+        cx.emit(SettingsChanged);
+    }
+
+    /// Opens or closes the "Add rule…" editor.
+    pub fn set_rule_editor_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        self.rule_editor_open = open;
         cx.emit(SettingsChanged);
     }
 
@@ -77,6 +84,7 @@ impl SettingsController {
         if let Ok(id) = value.trim().parse::<u64>() {
             self.storage
                 .add_rule(PlacementCondition::Collection(id), self.rule_target_root_id);
+            self.rule_editor_open = false;
             cx.emit(SettingsChanged);
         }
     }
@@ -89,6 +97,7 @@ impl SettingsController {
             self.storage
                 .add_rule(PlacementCondition::SizeAtLeastMb(size),
                           self.rule_target_root_id);
+            self.rule_editor_open = false;
             cx.emit(SettingsChanged);
         }
     }
@@ -127,6 +136,12 @@ impl SettingsController {
     /// setting on its next download completion.
     pub fn set_create_collections(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.storage.set_create_collections(enabled);
+        cx.emit(SettingsChanged);
+    }
+
+    /// Saves `enabled` as the new "Check free space" storage setting.
+    pub fn set_check_free_space(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.storage.set_check_free_space(enabled);
         cx.emit(SettingsChanged);
     }
 

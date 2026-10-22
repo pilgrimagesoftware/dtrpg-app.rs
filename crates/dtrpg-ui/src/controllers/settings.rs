@@ -132,6 +132,8 @@ pub struct SettingsSnapshot {
     pub size_rule_input:                Option<Entity<InputState>>,
     pub rule_target_root_id:            u32,
     pub rule_editor_type:               RuleEditorType,
+    /// `true` while the "Add rule…" editor is open.
+    pub rule_editor_open:               bool,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -173,6 +175,8 @@ pub struct SettingsSnapshot {
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
     pub create_collections:             bool,
+    /// `true` when a download that would not fit is refused.
+    pub check_free_space:               bool,
     /// The Native Integration switches: whether tags move between the library
     /// and files' tags, and whether that is checked at launch.
     pub native:                         NativePreferencesFile,
@@ -266,6 +270,7 @@ pub struct SettingsController {
     size_rule_input:                Option<Entity<InputState>>,
     rule_target_root_id:            u32,
     rule_editor_type:               RuleEditorType,
+    rule_editor_open:               bool,
 }
 
 impl SettingsController {
@@ -358,7 +363,8 @@ impl SettingsController {
                               collection_rule_input: None,
                               size_rule_input: None,
                               rule_target_root_id: 0,
-                              rule_editor_type: RuleEditorType::Publisher };
+                              rule_editor_type: RuleEditorType::Publisher,
+                              rule_editor_open: false };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl.refresh_page_data();
         ctrl
@@ -407,7 +413,8 @@ impl SettingsController {
                collection_rule_input: None,
                size_rule_input: None,
                rule_target_root_id: 0,
-               rule_editor_type: RuleEditorType::Publisher }
+               rule_editor_type: RuleEditorType::Publisher,
+               rule_editor_open: false }
     }
 
     /// Updates the storage path draft field.

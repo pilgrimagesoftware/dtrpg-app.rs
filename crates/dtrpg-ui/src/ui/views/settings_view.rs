@@ -14,8 +14,6 @@ use std::path::PathBuf;
 
 use dtrpg_core::data::file_openers::FileOpenerEntry;
 use dtrpg_core::data::native_preferences::NativePreferencesFile;
-use dtrpg_core::data::storage::placement::PlacementRule;
-use dtrpg_core::data::storage::roots::StorageRoot;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, FocusHandle, IntoElement, MouseButton, ParentElement, Styled, div, px,
@@ -26,18 +24,17 @@ use gpui_kit::component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::{FilterValueSection, LibraryController};
-use crate::controllers::settings::{
-    AuthStateSnapshot, CacheCounts, RuleEditorType, SettingsController,
-};
+use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
-    settings_account_view::render_account_section, settings_advanced_view::render_advanced_section,
-    settings_agent_view::render_agent_section, settings_appearance_view::render_appearance_section,
+    settings_account_view::render_account_section,
+    settings_advanced_view::render_advanced_section,
+    settings_agent_view::render_agent_section,
+    settings_appearance_view::render_appearance_section,
     settings_file_openers_view::render_file_openers_section,
-    settings_storage_view::render_storage_section,
+    settings_storage_view::{StoragePageData, render_storage_section},
 };
 use crate::view_models::agent_display::AgentPageData;
-use crate::view_models::storage_display::StorageDisplay;
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
 /// Openers, Native Integration, Advanced); see [`page_title`] and the `match`
@@ -67,14 +64,7 @@ fn page_title(ix: usize) -> String {
 /// the window via [`SettingsController::close`].
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
-                             storage_root_path: PathBuf, storage_path_exists: bool,
-                             storage_roots: Vec<StorageRoot>, storage_rules: Vec<PlacementRule>,
-                             storage_display: StorageDisplay, agent: AgentPageData,
-                             publisher_rule_input: Option<Entity<InputState>>,
-                             collection_rule_input: Option<Entity<InputState>>,
-                             size_rule_input: Option<Entity<InputState>>,
-                             rule_target_root_id: u32, publisher_names: Vec<String>,
-                             rule_editor_type: RuleEditorType,
+                             storage: StoragePageData, agent: AgentPageData,
                              entity: Entity<SettingsController>,
                              library: Entity<LibraryController>, focus_handle: &FocusHandle,
                              colors: &ColorTokens, theme: &LibriTheme,
@@ -82,12 +72,9 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              password_input: Option<Entity<InputState>>,
                              sign_in_in_progress: bool, sign_in_enabled: bool,
                              sign_in_error: Option<String>,
-                             storage_path_input: Option<Entity<InputState>>,
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
-                             cache_counts: CacheCounts, max_concurrent_downloads: usize,
-                             max_concurrent_downloads_input: Option<Entity<InputState>>,
-                             create_collections: bool, recently_updated_window_days: u32,
+                             cache_counts: CacheCounts, recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
                              native: NativePreferencesFile,
                              filter_values: Vec<FilterValueSection>)
@@ -118,23 +105,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
 
     let content: AnyElement = match active_page_ix {
         1 => render_appearance_section(library, colors, theme).into_any_element(),
-        2 => render_storage_section(storage_root_path,
-                                    storage_path_exists,
-                                    entity.clone(),
-                                    colors,
-                                    storage_path_input,
-                                    max_concurrent_downloads,
-                                    max_concurrent_downloads_input,
-                                    create_collections,
-                                    storage_roots,
-                                    storage_rules,
-                                    storage_display,
-                                    publisher_rule_input,
-                                    collection_rule_input,
-                                    size_rule_input,
-                                    rule_target_root_id,
-                                    publisher_names,
-                                    rule_editor_type).into_any_element(),
+        2 => render_storage_section(entity.clone(), colors, storage).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,

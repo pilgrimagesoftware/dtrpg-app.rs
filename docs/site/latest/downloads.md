@@ -52,11 +52,14 @@ attempt.
 
 ## Where files go
 
-Downloads save to the folder set in Settings > Downloads' Download
-Location field, shown there with a reveal-in-file-manager action. Changing
-the location doesn't move files you've already downloaded.
+Downloads save to your default location, shown first under Locations in
+Settings > Storage. Open its ⋮ menu to show it in the file manager or to change
+its folder. Changing the folder doesn't move files you've already downloaded.
 
-Settings > Downloads also has a "Create collections" toggle. When it's on,
+Settings > Storage > Behavior has a "Check free space before downloading"
+switch, on by default. When it is on, Libri warns before a download that would
+not fit in the free space of its location. It also has a "Mirror collections as
+folders of symlinks" switch. When it's on,
 downloading an item that belongs to one or more collections also creates a
 symlink for it under a `collections/` subfolder, organized by collection,
 so the same downloaded file is reachable there without duplicating the
@@ -72,7 +75,7 @@ has no effect rather than erroring.
 
 ## Concurrency
 
-Settings > Downloads' "Max concurrent downloads" field is a shared limit
+Settings > Storage > Behavior's "Max concurrent downloads" field is a shared limit
 for both thumbnail loading and file downloads, not file downloads alone.
 Libri dispatches queued files to fill as many of that many concurrency
 slots as are free, rather than downloading everything at once or strictly
