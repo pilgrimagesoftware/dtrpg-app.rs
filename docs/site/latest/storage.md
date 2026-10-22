@@ -38,8 +38,10 @@ arrows to move it earlier or later.
 **Add rule…** and a rule's edit button open the same editor: one row with the kind of
 rule (publisher, collection or size), its value, where it sends downloads, a save
 button and a cancel button. Editing shows the row in place of the rule, and adding
-shows it at the end of the list. As you type a publisher or collection name, the
-names that match are listed under the row; click one to fill it in. A collection can
+shows it at the end of the list. As you type a publisher or collection name, a
+popup under the value field offers the names that match (up to 20, six showing at a
+time, scrolling to the rest). It floats over what is below it, so nothing moves.
+Click a name to fill it in. A collection can
 be given by name or by number, and a size is a number of megabytes. The save button
 stays off until the value makes a rule.
 

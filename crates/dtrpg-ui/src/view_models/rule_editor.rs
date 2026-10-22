@@ -10,8 +10,12 @@ use dtrpg_core::data::storage::placement::PlacementCondition;
 use gpui::Entity;
 use gpui_kit::component::input::InputState;
 
-/// The most suggestions listed under the value field.
-const MAX_SUGGESTIONS: usize = 6;
+/// The most suggestions kept for the popup under the value field. The popup
+/// scrolls, so it holds more than it shows.
+pub const MAX_SUGGESTIONS: usize = 20;
+
+/// How many suggestions the popup shows before it scrolls.
+pub const VISIBLE_SUGGESTIONS: usize = 6;
 
 /// Which kind of condition a rule has.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -139,7 +143,8 @@ pub fn condition_from_text(kind: RuleEditorType, text: &str,
 
 /// The names to offer under the value field for a rule of `kind` while `text`
 /// is typed: the publishers or collections whose name starts with the text,
-/// then those that contain it, each group in alphabetical order. A name that
+/// then those that contain it, each group in alphabetical order, at most
+/// [`MAX_SUGGESTIONS`] of them. A name that
 /// is already exactly the text is not offered, and a size has no suggestions.
 ///
 /// # Examples
