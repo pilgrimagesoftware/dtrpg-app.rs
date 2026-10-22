@@ -52,6 +52,25 @@ download and spend), a switch for each tool, the config to copy into the agent, 
 the latest calls it made. It is off until you turn it on. See
 [Using Libri from an AI agent]({{ '/latest/mcp/' | relative_url }}).
 
+### Summaries
+
+The last section of the page sets how summaries of your titles are written. They
+are shown in the inspector's Summary tab and searched along with the rest of the
+title's text.
+
+- **Provider** is Anthropic (it needs your own API key, which is kept in the
+  system keychain, never in a settings file) or Local, which picks sentences from
+  the text itself, offline and for free, at a lower quality.
+- **Model** is the model Anthropic writes new summaries with.
+- **Monthly token ceiling** stops summarizing for the rest of the month once the
+  summaries made this month have used that many tokens. The line under it says how
+  many have been used. Summaries you already have are kept.
+- **Summarize automatically on download** writes a summary of a title when its
+  last file finishes downloading, if it has none yet. It is off until you turn it
+  on, because every summary costs tokens (the Local provider costs none). A summary
+  that cannot be made, for example when the key is missing or the ceiling has been
+  reached, is skipped without a message.
+
 ## Advanced
 
 Cache details (size and location on disk) and maintenance actions:

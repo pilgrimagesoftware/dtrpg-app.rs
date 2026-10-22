@@ -22,6 +22,7 @@ use dtrpg_core::data::storage::placement::PlacementCondition;
 use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
+use dtrpg_core::data::summary_settings::{SummarySettings, SummarySettingsFile};
 use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
 use dtrpg_core::services::LoginService;
 use gpui::{Context, Entity, EventEmitter};
@@ -192,6 +193,12 @@ pub struct SettingsSnapshot {
     pub mcp_command_path:               String,
     /// Where the log of agent calls is kept.
     pub mcp_log_path:                   String,
+    /// How summaries are made: provider, model, ceiling, and whether on
+    /// download.
+    pub summaries:                      SummarySettingsFile,
+    /// Tokens the summaries made this calendar month have used, as of the
+    /// last time the Agent page was opened.
+    pub summary_tokens_used:            u64,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
@@ -212,6 +219,8 @@ pub struct SettingsController {
     mcp_activity:                   Vec<AuditEntry>,
     mcp_command_path:               String,
     mcp_log_path:                   String,
+    summaries:                      SummarySettings,
+    summary_tokens_used:            u64,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -342,6 +351,8 @@ impl SettingsController {
                               mcp_activity: AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS),
                               mcp_command_path: agent::mcp_command_path(),
                               mcp_log_path: AuditLog::open().path().display().to_string(),
+                              summaries: SummarySettings::load(),
+                              summary_tokens_used: summaries::tokens_used_this_month(),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -398,6 +409,8 @@ impl SettingsController {
                mcp_activity: Vec::new(),
                mcp_command_path: String::new(),
                mcp_log_path: String::new(),
+               summaries: SummarySettings::in_memory(),
+               summary_tokens_used: 0,
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -439,6 +452,7 @@ impl SettingsController {
         self.active_page_ix = ix;
         if ix == agent::AGENT_PAGE_IX {
             self.mcp_activity = AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS);
+            self.summary_tokens_used = summaries::tokens_used_this_month();
         }
         self.refresh_page_data();
         dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);
@@ -475,6 +489,7 @@ mod panel;
 mod sign_in;
 mod snapshot;
 mod storage;
+mod summaries;
 mod wiring;
 
 #[cfg(test)]
