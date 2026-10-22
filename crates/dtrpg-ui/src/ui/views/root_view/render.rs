@@ -128,6 +128,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  collection_search,
                                  tags,
                                  smart_rows,
+                                 snap.collection_cloud.clone(),
                                  snap.sidebar_open);
     let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
     let filters_toggle =

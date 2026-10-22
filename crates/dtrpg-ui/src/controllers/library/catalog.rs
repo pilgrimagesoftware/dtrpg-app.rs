@@ -47,6 +47,7 @@ impl LibraryController {
         self.refresh_known_filter_values();
         self.refresh_root_title_counts();
         self.refresh_smart_collections();
+        self.refresh_collection_cloud();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -59,6 +60,7 @@ impl LibraryController {
         self.refresh_known_filter_values();
         self.refresh_root_title_counts();
         self.refresh_smart_collections();
+        self.refresh_collection_cloud();
         self.invalidate_cache();
     }
 
@@ -225,7 +227,8 @@ impl LibraryController {
         let items = self.visible_items_shared();
         let matched_count = items.len();
         let selected_item = self.selected_item();
-        let counts = self.library.section_counts();
+        let mut counts = self.library.section_counts();
+        counts.needs_attention = self.failed_downloads.len();
         LibrarySnapshot { filter: self.filter.clone(),
                           counts,
                           publishers: self.library.publishers(),
@@ -234,6 +237,7 @@ impl LibraryController {
                           collections_loaded: self.library.collections_loaded(),
                           catalog_ids: self.library.cached_catalog_ids(),
                           total_count: counts.all,
+                          collection_cloud: Arc::clone(&self.collection_cloud),
                           total_mb: self.total_size_mb(),
                           filter_count: self.library.filter_count(),
                           matched_count,
