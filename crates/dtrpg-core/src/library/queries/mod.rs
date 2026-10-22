@@ -25,5 +25,6 @@ mod tags;
 mod tests;
 mod types;
 
+pub use smart::SmartPreview;
 pub(super) use types::{EphemeralOverlay, QueryCache};
 pub use types::{Facets, ViewState};

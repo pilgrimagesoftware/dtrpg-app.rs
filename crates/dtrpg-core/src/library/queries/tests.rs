@@ -176,7 +176,9 @@ fn a_smart_collection_counts_and_lists_the_items_that_match_its_rules() {
                                                           value:    "paizo".to_owned(), }],
                                        ..SmartCollection::default() };
 
-    assert_eq!(library.smart_collection_match_count(&collection), (1, 2));
+    let preview = library.smart_collection_preview(&collection);
+    assert_eq!((preview.matching, preview.total), (1, 2));
+    assert_eq!(preview.titles.len(), 1);
     let ids = library.smart_collection_member_ids(&collection);
     assert_eq!(ids, [11, 21].into_iter().collect());
 }

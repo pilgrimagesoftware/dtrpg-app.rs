@@ -45,6 +45,8 @@ up to date.
 
 The editor has a name, a list of rules and a line that says how many titles match
 right now, for example "Matches 17 of 18 titles right now". It changes as you type.
+Under the count, the matching titles are listed alphabetically, up to 50 of them, in a
+box that scrolls. When more match, the last line says how many are not shown.
 
 Each rule has a field (tag, publisher, system, type, format, genre or availability), "is" or "is
 not", and a value. Capital letters do not matter. A rule with no value is ignored while

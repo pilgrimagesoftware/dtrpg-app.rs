@@ -2,6 +2,7 @@
 //! showing one in the catalog.
 
 use dtrpg_core::data::smart_collection::SmartCollection;
+use dtrpg_core::library::SmartPreview;
 use dtrpg_core::util::filter::SidebarFilter;
 
 use super::*;
@@ -20,12 +21,12 @@ impl LibraryController {
         self.smart_counts.get(&id).copied().unwrap_or_default()
     }
 
-    /// How many items match `collection`, of how many there are, for the
-    /// editor's live count. Reads the whole catalog, so call it when the
-    /// collection changes, not while drawing.
+    /// What `collection` matches, for the editor's live count and title list.
+    /// Reads the whole catalog, so call it when the collection changes, not
+    /// while drawing.
     #[must_use]
-    pub fn smart_collection_preview(&self, collection: &SmartCollection) -> (usize, usize) {
-        self.library.smart_collection_match_count(collection)
+    pub fn smart_collection_preview(&self, collection: &SmartCollection) -> SmartPreview {
+        self.library.smart_collection_preview(collection)
     }
 
     /// Adds `collection` and returns its id. The collection is kept in

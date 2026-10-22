@@ -687,6 +687,7 @@ smart_collections:
     add_rule: "Regel hinzufügen"
     remove_rule_tooltip: "Diese Regel entfernen"
     preview: "%{matching} von %{total} Titeln passen im Moment"
+    preview_more: "…und %{count} weitere"
     on_match_heading: "Bei Treffer"
     download_new: "Neue Treffer automatisch herunterladen"
     mirror: "In einem Ordner mit Symlinks auf der Festplatte spiegeln"
