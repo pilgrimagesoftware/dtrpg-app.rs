@@ -3,7 +3,7 @@
 //! window-level menu/keyboard actions.
 
 use dtrpg_core::util::filter::SidebarFilter;
-use gpui_kit::component::Selectable as _;
+use gpui_kit::component::{ActiveTheme as _, Selectable as _};
 
 use super::panel_widths::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use super::*;
@@ -11,6 +11,7 @@ use crate::ui::views::filters_column::{
     render_filter_chips, render_filters_column, without_hidden_values,
 };
 use crate::ui::views::insights_view::render_insights;
+use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
 use crate::view_models::agent_display::exposed_tools;
 
@@ -182,12 +183,41 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                                settings_snap.mcp.enabled,
                                                            agent_exposed:
                                                                exposed_tools(&settings_snap.mcp),
-                                                           roots: snap.root_usage.clone() },
+                                                           roots: snap.root_usage.clone(),
+                                                           downloading:
+                                                               view.controller
+                                                                   .read(cx)
+                                                                   .live_availability()
+                                                                   .downloading },
                                        lib_entity.clone(),
                                        ActivityBarData { entity:     activity_entity.clone(),
                                                          snap:       &activity_snap,
                                                          alert_snap: &alert_snap, },
                                        colors);
+
+    // The footer under the sidebar is as wide as the sidebar is now (it can be
+    // dragged), and level with the status bar beside it.
+    let sidebar_width = view.resize_state
+                            .read(cx)
+                            .sizes()
+                            .first()
+                            .map_or(view.sidebar_width, |size| size.as_f32());
+    let sidebar_footer = render_sidebar_footer(&SidebarFooterData { titles: total_count,
+                                                                    total_mb,
+                                                                    pages: snap.total_pages,
+                                                                    locations: snap.root_usage
+                                                                                   .len() },
+                                               colors).w(px(sidebar_width))
+                                                      .flex_none()
+                                                      .bg(cx.theme().sidebar)
+                                                      .border_t_1()
+                                                      .border_r_1()
+                                                      .border_color(colors.border);
+    let bottom_row = div().flex().child(sidebar_footer).child(div().flex_1()
+                                                                   .min_w_0()
+                                                                   .flex()
+                                                                   .items_center()
+                                                                   .child(status_bar));
 
     let catalog_content =
         div().flex_1()
@@ -385,7 +415,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                             ),
                     ),
                 )
-                .child(status_bar),
+                .child(bottom_row),
         )
 }
 

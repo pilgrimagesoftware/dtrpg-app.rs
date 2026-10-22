@@ -240,6 +240,7 @@ impl LibraryController {
                           root_usage: Arc::clone(&self.root_usage),
                           collection_cloud: Arc::clone(&self.collection_cloud),
                           total_mb: self.total_size_mb(),
+                          total_pages: self.library.total_pages(),
                           filter_count: self.library.filter_count(),
                           matched_count,
                           search_query: self.search_query.clone(),

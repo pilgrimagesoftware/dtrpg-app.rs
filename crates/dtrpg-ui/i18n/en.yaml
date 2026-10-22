@@ -94,6 +94,8 @@ insights:
   empty: "Nothing to analyze yet. Sign in and load your library first."
   computing: "Working it out…"
 sidebar:
+  footer_totals: "%{titles} · %{size}"
+  footer_pages: "%{pages} pages across %{locations}"
   section_hide: "Hide this section"
   section_show: "Show this section"
   smart_collections: "Smart collections"
@@ -163,6 +165,8 @@ toolbar:
   bulk_confirm_description: "You're about to run \"%{action}\" on a large selection. This may take a while or strain system resources."
 
 count:
+  location: "location"
+  locations: "locations"
   title: "title"
   titles: "titles"
   item: "item"
@@ -614,6 +618,8 @@ report:
   submit: "Report"
 
 status_bar:
+  titles_of: "%{shown} of %{total}"
+  downloading: "%{n} downloading"
   root_tooltip: "%{name}: %{used} used by Libri, %{free} free"
   agent: "Agent"
   agent_on_tooltip: "Agents may use Libri: %{exposed} of %{all} tools are available"
