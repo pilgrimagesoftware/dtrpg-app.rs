@@ -2,17 +2,6 @@
 
 use super::*;
 
-/// Flips a per-key boolean flag in `map`, treating a missing entry as `false`.
-///
-/// Used by per-entry ephemeral UI toggles (e.g. the "Other details"
-/// disclosure) that default to a collapsed/off state until first toggled.
-pub(crate) fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, bool>, key: K)
-                                                        -> bool {
-    let flag = map.entry(key).or_insert(false);
-    *flag = !*flag;
-    *flag
-}
-
 /// Returns `entry_id`/`row_ix`'s cached Info value if present; otherwise, if
 /// `downloaded` is true, computes it via `compute_file_info(path, format)`
 /// and caches it. Returns `FileInfo::None` for undownloaded files without

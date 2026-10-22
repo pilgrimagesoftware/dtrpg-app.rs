@@ -132,9 +132,13 @@ menu, to remove the download. Its tabs are:
   Openers, which the hint under it links to.
 - **Files** - each file with its size and download state, with a count beside
   the tab's name. For an item with several files this is the list you pick
-  from. **Verify on disk** checks the files against the disk right away and
+  from; the file you pick has its details (name, format, size, file id and
+  location) below the list, laid out like the Info tab's Details. **Verify on disk** checks the files against the disk right away and
   corrects the catalog if a file was moved or deleted outside Libri.
-- **Contents** - what is inside an archive file, loaded when you open the tab.
+- **Contents** - what is inside an archive file, loaded when you open the tab. It
+  names the archive and counts its entries; when the item has more than one
+  archive, the name is a menu for choosing which to show. The list scrolls in a
+  box of its own, so even an archive with thousands of entries stays smooth.
 - **Summary** - the item's saved content summary, with the model that wrote it,
   when, and its length in tokens. Items without a summary say so. The tab only
   shows summaries; they are written elsewhere for now, for example by an agent

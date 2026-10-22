@@ -26,7 +26,8 @@ pub enum InspectorTab {
 pub enum InspectorContentsState {
     Unavailable,
     Loading,
-    Loaded(Vec<ContainerEntry>),
+    /// The archive's entries, shared so a redraw does not copy them.
+    Loaded(Arc<Vec<ContainerEntry>>),
 }
 
 /// State of the lazily loaded summary tab.

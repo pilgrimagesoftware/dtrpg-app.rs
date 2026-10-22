@@ -22,15 +22,12 @@ use gpui::{
 };
 use gpui_kit::component::Disableable;
 use gpui_kit::component::ElementExt as _;
-use gpui_kit::component::Icon;
 use gpui_kit::component::IconName;
 use gpui_kit::component::Sizable;
 use gpui_kit::component::Size;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::clipboard::Clipboard;
-use gpui_kit::component::collapsible::Collapsible;
-use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::spinner::Spinner;
@@ -167,6 +164,7 @@ pub fn render_inspector(context: InspectorContext<'_>, window: &mut Window, cx: 
 }
 
 mod actions;
+mod contents_tab;
 mod cover;
 mod header;
 mod info_tab;
@@ -179,6 +177,7 @@ mod other_details;
 mod sections;
 
 use actions::*;
+use contents_tab::*;
 use cover::*;
 use header::*;
 use info_tab::*;
