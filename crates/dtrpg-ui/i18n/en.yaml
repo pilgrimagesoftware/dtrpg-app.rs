@@ -230,6 +230,7 @@ detail:
   opens_with_settings_link: "Settings > File Openers"
   field_system: "System"
   field_category: "Type"
+  field_location: "Location"
   field_format: "Format"
   field_pages: "Pages"
   field_file_size: "File size"

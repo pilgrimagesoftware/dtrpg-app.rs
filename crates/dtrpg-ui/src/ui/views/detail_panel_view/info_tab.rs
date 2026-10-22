@@ -21,7 +21,11 @@ pub(super) fn render_info_tab(item: &LibraryItem, storage_root_path: &Path,
     let tags = render_tags_section(item, controller.clone(), colors, cx).into_any_element();
     let collections =
         render_collections_section(item, controller.clone(), colors, cx).into_any_element();
+    let location = controller.read(cx)
+                             .item_location(&item.id)
+                             .map(str::to_owned);
     let details = render_metadata_table(item,
+                                        location,
                                         storage_root_path,
                                         colors,
                                         &label_font_family,

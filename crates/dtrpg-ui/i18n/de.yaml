@@ -212,6 +212,7 @@ detail:
   opens_with_settings_link: "Einstellungen > Datei-Öffner"
   field_system: "System"
   field_category: "Typ"
+  field_location: "Speicherort"
   field_format: "Format"
   field_pages: "Seiten"
   field_file_size: "Dateigröße"

@@ -267,6 +267,8 @@ pub struct LibraryController {
     collection_cloud:              Arc<HashMap<u64, usize>>,
     /// How many downloaded titles each storage location holds, by location id.
     root_title_counts:             HashMap<u32, usize>,
+    /// The name of the location each downloaded title is in, by item id.
+    item_locations:                HashMap<Arc<str>, String>,
     /// How many items each smart collection holds, by collection id, as of
     /// the last change to the catalog or the collections.
     smart_counts:                  HashMap<u64, usize>,
