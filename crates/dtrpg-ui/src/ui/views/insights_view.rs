@@ -12,6 +12,7 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
+use crate::ui::views::insights_cache::cache_card;
 use crate::ui::views::insights_cards::{
     analyzed_label, availability_card, disk_card, glance_card, roots_card, time_card, top_card,
     type_card,
@@ -34,9 +35,12 @@ const CARD_MAX_WIDTH: f32 = (CONTENT_MAX_WIDTH - 2.0 * CARD_GAP) / 3.0;
 /// Renders the Insights page for `library`'s current aggregates.
 pub fn render_insights(library: &Entity<LibraryController>, colors: &ColorTokens, cx: &gpui::App)
                        -> impl IntoElement + use<> {
-    let (insights, computing, live) = {
+    let (insights, computing, live, cache_counts) = {
         let controller = library.read(cx);
-        (controller.insights(), controller.is_insights_computing(), controller.live_availability())
+        (controller.insights(),
+         controller.is_insights_computing(),
+         controller.live_availability(),
+         controller.cache_counts())
     };
     let recompute = library.clone();
     let export = library.clone();
@@ -113,7 +117,8 @@ pub fn render_insights(library: &Entity<LibraryController>, colors: &ColorTokens
                                          .child(tile(availability_card(&insights, live, colors))))
                              .child(disk_card(&insights, colors))
                              .child(time_card(&insights.added_by_month, colors))
-                             .child(roots_card(&insights.roots, colors)))
+                             .child(roots_card(&insights.roots, colors))
+                             .child(cache_card(cache_counts, colors)))
                  .into_any_element()
         }
         Some(_) => message(t!("insights.empty").to_string(), colors),

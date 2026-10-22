@@ -82,8 +82,9 @@ title's text.
 
 ## Advanced
 
-Cache details (size and location on disk) and maintenance actions:
-opening the cache folder directly, or clearing it.
+The cache maintenance actions: opening the cache folder directly, or clearing it.
+What the cache holds, and the timing Libri keeps it by, is shown in
+[Insights]({{ '/latest/insights/' | relative_url }}).
 
 ### Operating system
 

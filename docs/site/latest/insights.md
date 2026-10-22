@@ -31,6 +31,14 @@ the next row when the window is narrower.
 - **Titles added over time** - a chart by the month you acquired them.
 - **Storage locations** - for each location, what Libri uses there and how
   much space is free.
+- **Cache** - what Libri keeps on disk so it starts fast: how many titles the
+  saved catalog lists and when it was saved, how many cover thumbnails are kept,
+  whether your avatar is, and when the last availability check ran. It also lists
+  the timing Libri works by (how old the catalog may get, and the cooldowns between
+  reloads and checks). Hover a time for the exact moment. These are read when the
+  figures are worked out, so **Recompute** refreshes them, and clearing the cache
+  in Settings > Advanced does too. The actions to open or clear the cache stay in
+  Settings > Advanced.
 
 ## Recompute and export
 

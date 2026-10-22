@@ -63,6 +63,8 @@ agent:
   tool_summarize_item: "Eine Zusammenfassung schreiben; verbraucht Token"
   tool_download_item: "Die Dateien eines Titels herunterladen"
 insights:
+  cache_title: "Zwischenspeicher"
+  cache_note: "Was Libri auf dem Datenträger vorhält, damit es schnell startet, und die Zeiten, nach denen es arbeitet."
   title: "Einblicke"
   analyzed: "%{titles} analysiert"
   recompute: "Neu berechnen"
@@ -412,7 +414,7 @@ settings:
   clear_cache_button: "Cache leeren"
   clear_cache_confirm_title: "Cache leeren?"
   clear_cache_confirm_description: "Katalog und Sammlungen werden beim nächsten Laden erneut von DriveThruRPG abgerufen."
-  cache_details_title: "Cache-Details"
+  cache_details_moved: "Zahlen und Zeiten zum Zwischenspeicher finden Sie unter Einblicke."
   cache_metadata_label: "Metadaten-Einträge"
   cache_metadata_description: "Anzahl der Katalog- und Sammlungseinträge im lokalen Metadaten-Cache."
   cache_metadata_saved_label: "Zuletzt gespeichert"

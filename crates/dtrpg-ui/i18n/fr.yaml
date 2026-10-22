@@ -63,6 +63,8 @@ agent:
   tool_summarize_item: "Rédiger un résumé ; dépense des jetons"
   tool_download_item: "Télécharger les fichiers d’un titre"
 insights:
+  cache_title: "Cache"
+  cache_note: "Ce que Libri conserve sur le disque pour démarrer vite, et les délais qu'il suit."
   title: "Aperçu"
   analyzed: "%{titles} analysés"
   recompute: "Recalculer"
@@ -403,7 +405,7 @@ settings:
   clear_cache_button: "Vider le cache"
   clear_cache_confirm_title: "Vider le cache ?"
   clear_cache_confirm_description: "Le catalogue et les collections seront à nouveau récupérés depuis DriveThruRPG lors du prochain chargement."
-  cache_details_title: "Détails du cache"
+  cache_details_moved: "Les chiffres et les délais du cache sont dans Analyses."
   cache_metadata_label: "Éléments de métadonnées"
   cache_metadata_description: "Nombre d'entrées de catalogue et de collections stockées dans le cache local de métadonnées."
   cache_metadata_saved_label: "Dernière sauvegarde"

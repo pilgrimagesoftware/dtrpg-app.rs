@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::cache_counts::CacheCounts;
 use dtrpg_core::data::storage::StorageConfig;
 use dtrpg_core::library::insights::{Insights, RootUsage, root_usages};
 
@@ -23,6 +24,13 @@ impl LibraryController {
     #[must_use]
     pub fn insights(&self) -> Option<Arc<Insights>> {
         self.insights.clone()
+    }
+
+    /// What the caches hold, as of the last time the aggregates were worked
+    /// out.
+    #[must_use]
+    pub const fn cache_counts(&self) -> CacheCounts {
+        self.cache_counts
     }
 
     /// True while the aggregates are being worked out.
@@ -51,14 +59,17 @@ impl LibraryController {
         let roots = StorageConfig::load().roots();
         cx.emit(LibraryChanged);
         cx.spawn(async move |this, async_cx| {
-              let insights =
+              let (insights, cache_counts) =
                   async_cx.background_executor()
                           .spawn(async move {
-                              Insights::compute(&library.all_items(), now_secs()).with_roots(&roots)
+                              let insights = Insights::compute(&library.all_items(), now_secs())
+                                  .with_roots(&roots);
+                              (insights, CacheCounts::read())
                           })
                           .await;
               this.update(async_cx, |ctrl, cx| {
                       ctrl.insights = Some(Arc::new(insights));
+                      ctrl.cache_counts = cache_counts;
                       ctrl.insights_computing = false;
                       cx.emit(LibraryChanged);
                   })
