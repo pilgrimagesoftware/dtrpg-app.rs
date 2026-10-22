@@ -39,7 +39,17 @@ A theme sets four font roles:
 - **Label** - field and row labels, sans-serif by default.
 - **Monospace** - fixed-width content such as the masked API key hint.
 
-There are no font pickers in Settings; the fonts come from the theme.
+There are no font pickers in Settings; the fonts come from the theme file.
+Set them with these optional keys, using any font installed on your computer:
+
+```toml
+body_font = "Inter"
+value_font = "Inter"
+label_font = "Inter"
+mono_font = "Menlo"
+```
+
+A role the file leaves out uses the built-in default.
 
 A separate "Text Scale" control adjusts the shared UI text size, scaling
 every size-aware element in the window together, like zooming a page.
@@ -108,6 +118,14 @@ tag. Below the grid:
 - **Reveal themes folder** opens the themes directory, creating it if needed.
 - **Reload** re-reads the themes directory immediately instead of waiting for
   the file watcher.
+
+### Editing a theme in Settings
+
+Below the gallery, **Theme file** shows the active theme's file as text. A user
+theme can be edited there: **Save** checks the text and, if it is a valid theme,
+writes the file and applies it at once; **Revert** discards your edits. A color
+that is not written like `"#1B1812"` is refused, with the key named. A built-in
+theme is shown read-only; use **Duplicate & edit** to get a copy you can change.
 
 A duplicated or imported file re-serializes the palette without the original's
 comments and key order; the source file is untouched.

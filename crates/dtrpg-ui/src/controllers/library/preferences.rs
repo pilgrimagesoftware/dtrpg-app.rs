@@ -53,64 +53,6 @@ impl LibraryController {
         cx.notify();
     }
 
-    /// Applies a new body font family (any font installed on the user's
-    /// system, not a curated list — see `settings_appearance_view`), updating
-    /// the GPUI global, `gpui_kit`'s `Theme.font_family`, and
-    /// persisting the selection via
-    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
-    pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
-        let font = font.into();
-        let current = cx.global::<LibriTheme>();
-        let mut fonts = current.fonts.clone();
-        fonts.body_font = font.clone();
-        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
-        cx.set_global(new_theme);
-        cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
-              theme.font_family = font.clone();
-          });
-        dtrpg_core::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
-        cx.notify();
-    }
-
-    /// Applies a new value font family and persists the selection via
-    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
-    pub fn set_value_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
-        let font = font.into();
-        let current = cx.global::<LibriTheme>();
-        let mut fonts = current.fonts.clone();
-        fonts.value_font = font.clone();
-        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
-        cx.set_global(new_theme);
-        dtrpg_core::data::ui_preferences::UiPreferences::load().save_value_font_name(&font);
-        cx.notify();
-    }
-
-    /// Applies a new label font family and persists the selection via
-    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
-    pub fn set_label_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
-        let font = font.into();
-        let current = cx.global::<LibriTheme>();
-        let mut fonts = current.fonts.clone();
-        fonts.label_font = font.clone();
-        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
-        cx.set_global(new_theme);
-        dtrpg_core::data::ui_preferences::UiPreferences::load().save_label_font_name(&font);
-        cx.notify();
-    }
-
-    /// Applies a new monospace font family and persists the selection via
-    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
-    pub fn set_mono_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
-        let font = font.into();
-        let current = cx.global::<LibriTheme>();
-        let mut fonts = current.fonts.clone();
-        fonts.mono_font = font.clone();
-        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
-        cx.set_global(new_theme);
-        dtrpg_core::data::ui_preferences::UiPreferences::load().save_mono_font_name(&font);
-        cx.notify();
-    }
-
     /// Applies a new shared UI text size (see [`FontSelections::ui_text_size`])
     /// and persists it via [`dtrpg_core::data::ui_preferences::UiPreferences`].
     /// Applied to each window via `Window::set_rem_size` in

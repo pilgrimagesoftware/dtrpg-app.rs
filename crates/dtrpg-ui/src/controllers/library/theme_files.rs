@@ -8,7 +8,7 @@
 
 use super::*;
 use crate::data::theme_catalog::{ThemeCatalog, ThemeId, theme_label};
-use crate::data::theme_loader;
+use crate::data::{theme_loader, theme_source};
 use crate::util::reveal::reveal_in_file_manager;
 use crate::util::theme_watcher;
 
@@ -28,6 +28,12 @@ pub enum ThemeFileError {
     /// The imported file's stem cannot serve as a theme id.
     #[error("cannot use {0} as a theme id")]
     InvalidStem(String),
+    /// The active theme is built in, so it has no file to save to.
+    #[error("{0} is a built-in theme and cannot be edited")]
+    BuiltIn(String),
+    /// The edited text is not a valid theme; the message says what is wrong.
+    #[error("{0}")]
+    Rejected(String),
     /// Filesystem failure while copying or writing a theme file.
     #[error("theme file I/O failed: {0}")]
     Io(#[from] std::io::Error),
@@ -88,6 +94,29 @@ impl LibraryController {
         let id = ThemeId::from(stem.as_str());
         self.set_theme(id.clone(), cx);
         Ok(id)
+    }
+
+    /// Saves `source` as the active user theme's file, then applies it.
+    ///
+    /// The text is checked first, so a theme that would not load is never
+    /// written over a good one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ThemeFileError::BuiltIn`] for a built-in theme,
+    /// [`ThemeFileError::Rejected`] for text that is not a valid theme, and
+    /// [`ThemeFileError::Io`] if the file cannot be written.
+    pub fn save_active_theme_source(&self, source: &str, cx: &mut Context<Self>)
+                                    -> Result<(), ThemeFileError> {
+        let active = cx.global::<LibriTheme>().id.clone();
+        if theme_source::is_builtin(&active) {
+            return Err(ThemeFileError::BuiltIn(active.to_string()));
+        }
+        theme_source::validate_source(source).map_err(ThemeFileError::Rejected)?;
+        let _ = std::fs::create_dir_all(dtrpg_core::data::paths::themes_dir());
+        theme_source::save_user_theme(&active, source)?;
+        theme_watcher::apply_theme_changes(cx);
+        Ok(())
     }
 
     /// Opens the themes directory in the file manager, creating it first so

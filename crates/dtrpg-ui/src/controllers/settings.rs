@@ -25,7 +25,7 @@ use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
 use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
 use dtrpg_core::services::LoginService;
 use gpui::{Context, Entity, EventEmitter};
-use gpui_kit::component::input::InputState;
+use gpui_kit::component::input::{EditorState, InputState};
 use rust_i18n::t;
 
 use crate::data::events::{
@@ -134,6 +134,10 @@ pub struct SettingsSnapshot {
     pub rule_editor_type:               RuleEditorType,
     /// `true` while the "Add rule…" editor is open.
     pub rule_editor_open:               bool,
+    /// The editor showing the active theme's file, once attached.
+    pub theme_editor_input:             Option<Entity<EditorState>>,
+    /// Why the last attempt to save the theme file failed, if it did.
+    pub theme_editor_error:             Option<String>,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -271,6 +275,8 @@ pub struct SettingsController {
     rule_target_root_id:            u32,
     rule_editor_type:               RuleEditorType,
     rule_editor_open:               bool,
+    theme_editor_input:             Option<Entity<EditorState>>,
+    theme_editor_error:             Option<String>,
 }
 
 impl SettingsController {
@@ -364,7 +370,9 @@ impl SettingsController {
                               size_rule_input: None,
                               rule_target_root_id: 0,
                               rule_editor_type: RuleEditorType::Publisher,
-                              rule_editor_open: false };
+                              rule_editor_open: false,
+                              theme_editor_input: None,
+                              theme_editor_error: None };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl.refresh_page_data();
         ctrl
@@ -414,7 +422,9 @@ impl SettingsController {
                size_rule_input: None,
                rule_target_root_id: 0,
                rule_editor_type: RuleEditorType::Publisher,
-               rule_editor_open: false }
+               rule_editor_open: false,
+               theme_editor_input: None,
+               theme_editor_error: None }
     }
 
     /// Updates the storage path draft field.

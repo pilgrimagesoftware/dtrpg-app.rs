@@ -219,6 +219,23 @@ impl Default for FontSelections {
     }
 }
 
+impl FontSelections {
+    /// These selections with each font family taken from the theme `id`, or
+    /// the built-in default where the theme names none.
+    #[must_use]
+    pub fn with_families_of(self, id: &ThemeId) -> Self {
+        let named = crate::data::theme_source::fonts_of(id);
+        let family = |name: Option<String>, default: &'static str| {
+            name.map_or_else(|| SharedString::from(default), SharedString::from)
+        };
+        Self { body_font:    family(named.body, DEFAULT_BODY_FONT),
+               value_font:   family(named.value, DEFAULT_VALUE_FONT),
+               label_font:   family(named.label, DEFAULT_LABEL_FONT),
+               mono_font:    family(named.mono, DEFAULT_MONO_FONT),
+               ui_text_size: self.ui_text_size, }
+    }
+}
+
 /// GPUI app-level global containing the active Libri theme, density, and
 /// font selections.
 #[derive(Debug, Clone)]
@@ -235,8 +252,12 @@ impl gpui::Global for LibriTheme {}
 
 impl LibriTheme {
     /// Constructs the theme for `id`, `density`, and `fonts`.
+    ///
+    /// The font families come from the theme file, with the built-in default
+    /// for any role it leaves out; only the text size is taken from `fonts`.
     pub fn new(id: ThemeId, density: Density, fonts: FontSelections) -> Self {
         let colors = crate::data::theme_loader::load(&id);
+        let fonts = fonts.with_families_of(&id);
         let density_constants = match density {
             Density::Comfortable => DensityConstants::comfortable(),
             Density::Compact => DensityConstants::compact(),

@@ -1,11 +1,8 @@
 use dtrpg_core::data::catalog_cache::ensure_cache_metadata_exists;
-use dtrpg_core::data::constants::{
-    DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
-    DEFAULT_VALUE_FONT,
-};
+use dtrpg_core::data::constants::DEFAULT_UI_TEXT_SIZE;
 use dtrpg_core::data::paths::cache_dir;
 use dtrpg_core::data::ui_preferences::UiPreferences;
-use gpui::{App, SharedString, px};
+use gpui::{App, px};
 
 use crate::data::theme::{Density, FontSelections, LibriTheme};
 use crate::data::theme_catalog::ThemeCatalog;
@@ -30,7 +27,7 @@ pub fn init_globals(cx: &mut App) {
     // Discovers user themes first so `initial_theme` can resolve a persisted
     // user-theme id, and so the render path never reads the themes directory.
     ThemeCatalog::refresh();
-    cx.set_global(initial_theme(cx));
+    cx.set_global(initial_theme());
     cx.set_global(CoverCache::new());
     crate::util::theme_watcher::start_theme_watcher(cx);
     // `StorageConfig::load`/`UiPreferences::load`/`UiState::load` already
@@ -43,42 +40,21 @@ pub fn init_globals(cx: &mut App) {
 
 /// Resolves the persisted theme key and font selections into a [`LibriTheme`],
 /// used only at startup — subsequent changes go through
-/// `LibraryController::set_theme`/`set_body_font`/`set_value_font`/
-/// `set_label_font`/`set_mono_font`/`set_ui_text_size`, which preserve
-/// whichever selections aren't being changed.
-fn initial_theme(cx: &App) -> LibriTheme {
+/// `LibraryController::set_theme`/`set_ui_text_size`, which preserve
+/// whichever selection isn't being changed.
+fn initial_theme() -> LibriTheme {
     let prefs = UiPreferences::load();
     let id = prefs.theme_key()
                   .and_then(ThemeCatalog::resolve)
                   .unwrap_or_default();
 
-    let installed = cx.text_system().all_font_names();
-    let body_font = resolve_installed_font(&installed, prefs.body_font_name(), DEFAULT_BODY_FONT);
-    let value_font =
-        resolve_installed_font(&installed, prefs.value_font_name(), DEFAULT_VALUE_FONT);
-    let label_font =
-        resolve_installed_font(&installed, prefs.label_font_name(), DEFAULT_LABEL_FONT);
-    let mono_font = resolve_installed_font(&installed, prefs.mono_font_name(), DEFAULT_MONO_FONT);
     // Persisted as a scale multiplier (1.0 = normal), not an absolute pixel
     // size, so it round-trips to exactly what Settings > Appearance displays.
     let text_scale = prefs.text_scale().unwrap_or(1.0);
     let ui_text_size = px(text_scale * DEFAULT_UI_TEXT_SIZE);
 
-    let fonts = FontSelections { body_font,
-                                 value_font,
-                                 label_font,
-                                 mono_font,
-                                 ui_text_size };
+    // The families come from the theme; `LibriTheme::new` fills them in.
+    let fonts = FontSelections { ui_text_size,
+                                 ..FontSelections::default() };
     LibriTheme::new(id, Density::default(), fonts)
-}
-
-/// Resolves a persisted font family name against `installed` (the system's
-/// actually-available font names), falling back to `default` if the
-/// persisted name is `None` or no longer installed.
-fn resolve_installed_font(installed: &[String], persisted: Option<&str>, default: &'static str)
-                          -> SharedString {
-    match persisted {
-        Some(name) if installed.iter().any(|f| f == name) => SharedString::from(name.to_string()),
-        _ => SharedString::from(default),
-    }
 }

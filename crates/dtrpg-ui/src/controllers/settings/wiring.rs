@@ -31,6 +31,23 @@ impl SettingsController {
         self.max_concurrent_downloads_input = Some(input);
     }
 
+    /// Attaches the theme file editor state created by the root view.
+    pub fn set_theme_editor_input(&mut self, input: Entity<EditorState>) {
+        self.theme_editor_input = Some(input);
+    }
+
+    /// The theme file editor state, once the root view has attached it.
+    #[must_use]
+    pub fn theme_editor_input(&self) -> Option<Entity<EditorState>> {
+        self.theme_editor_input.clone()
+    }
+
+    /// Sets, or with `None` clears, the message shown under the theme editor.
+    pub fn set_theme_editor_error(&mut self, error: Option<String>, cx: &mut Context<Self>) {
+        self.theme_editor_error = error;
+        cx.notify();
+    }
+
     /// Attaches the publisher rule input state created by the root view.
     pub fn set_publisher_rule_input(&mut self, input: Entity<InputState>) {
         self.publisher_rule_input = Some(input);
