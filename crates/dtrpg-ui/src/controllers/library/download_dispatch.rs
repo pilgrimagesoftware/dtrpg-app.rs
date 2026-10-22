@@ -142,6 +142,9 @@ impl LibraryController {
         {
             self.file_info_cache
                 .remove(&(Arc::clone(&item_id), index as usize));
+            self.library
+                .record_file_locations(&StorageConfig::load(), &item_id);
+            self.refresh_root_title_counts();
             if let Some(dest) = &dest {
                 create_collections_symlinks(dest,
                                             item.order_product_id,

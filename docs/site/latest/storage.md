@@ -20,7 +20,11 @@ volume.
   Drive, OneDrive, Dropbox, Google Drive) keeps in step. Libri recognises these
   from the folder's path, so a badge is a good guess, not a guarantee;
 - how much space is free on its volume, such as `582.0 MB free of 994.0 MB`; and
-- how many downloaded titles it holds, such as `6 titles here`.
+- how many downloaded titles it holds, such as `6 titles here`. Libri records
+  which location each file was put in when it is downloaded, so this stays true
+  when you change a rule later; a rule never moves files that are already
+  there. Titles downloaded before Libri recorded this are given the location
+  your rules would pick, which is the best it can know.
 
 Each location has a ⋮ menu to show it in the file manager, to change the
 default location's folder, or to remove any other location. **Add location…**

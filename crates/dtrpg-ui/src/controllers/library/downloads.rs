@@ -17,6 +17,7 @@ impl LibraryController {
     /// cleared first, then the entry status is re-derived.
     pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
         if self.library.clear_item_downloads(id) {
+            self.refresh_root_title_counts();
             self.refresh_section_counts();
             self.invalidate_cache();
             self.file_info_cache

@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use dtrpg_core::data::storage::{StorageConfig, locations_of_titles, titles_per_root};
+use dtrpg_core::data::storage::{StorageConfig, titles_per_root};
 
 use super::*;
 
@@ -34,13 +34,18 @@ impl LibraryController {
             .collect()
     }
 
-    /// Counts the titles in each location. Reads the catalog and the storage
-    /// settings, so it runs when those change, not while drawing.
+    /// Reads where each downloaded title's files are kept, and counts the
+    /// titles in each location. Downloads from before locations were
+    /// recorded get one first, from the placement rules. Reads the index
+    /// and the storage settings, so it runs when those change, not while
+    /// drawing.
     pub fn refresh_root_title_counts(&mut self) {
         let storage = StorageConfig::load();
-        let items = self.library.all_items();
-        let collections = self.library.collections();
-        self.root_title_counts = titles_per_root(&storage, &items, &collections);
-        self.item_locations = locations_of_titles(&storage, &items, &collections);
+        self.library.record_missing_file_locations(&storage);
+        let recorded = self.library.file_locations_by_item();
+        self.root_title_counts = titles_per_root(&recorded, &storage.roots());
+        self.item_locations = recorded.into_iter()
+                                      .map(|(item_id, locations)| (item_id, locations.join(", ")))
+                                      .collect();
     }
 }

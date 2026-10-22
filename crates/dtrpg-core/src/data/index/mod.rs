@@ -11,6 +11,7 @@ mod facets;
 mod filtered_items;
 mod functions;
 mod items;
+mod locations;
 mod migrate;
 mod schema;
 mod summaries;

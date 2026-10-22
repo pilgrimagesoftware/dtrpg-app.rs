@@ -107,6 +107,7 @@ impl Library {
         }
         item.recompute_status();
         self.persist_item(&item, "item status");
+        self.clear_file_locations(item_id);
         true
     }
 

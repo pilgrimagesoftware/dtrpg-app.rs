@@ -121,6 +121,16 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
             PRIMARY KEY (item_id, storage_root_id)
         );
 
+        -- Which storage location each downloaded file was put in, by the
+        -- location's name. It is not tied to `items`, whose rows are replaced
+        -- whenever an item is written, so the record survives a catalog sync.
+        CREATE TABLE IF NOT EXISTS file_locations (
+            item_id   TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            location  TEXT NOT NULL,
+            PRIMARY KEY (item_id, file_name)
+        );
+
         CREATE TABLE IF NOT EXISTS summaries (
             item_id    TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
             text       TEXT NOT NULL,
