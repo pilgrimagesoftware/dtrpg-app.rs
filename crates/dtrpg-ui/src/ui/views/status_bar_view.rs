@@ -14,6 +14,7 @@
 //! regardless of window width or future status bar layout changes.
 
 use dtrpg_core::data::activity::{ActivitySnapshot, AlertHistorySnapshot};
+use dtrpg_core::data::mcp_access::McpTool;
 use gpui::prelude::*;
 use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
 use gpui_kit::component::IconName;
@@ -23,6 +24,7 @@ use gpui_kit::component::popover::Popover;
 use gpui_kit::component::progress::ProgressCircle;
 use gpui_kit::component::separator::Separator;
 use gpui_kit::component::status_bar::StatusBar;
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Sizable as _, Size};
 use rust_i18n::t;
 
@@ -35,6 +37,10 @@ use crate::ui::views::activity_panel_view::render_activity_panel;
 use crate::ui::views::alert_history_view::render_alert_history_panel;
 use crate::util::pluralize::pluralize;
 use crate::util::size::size_format;
+
+/// The color of the Agent dot when agents may use Libri: a green that stays the
+/// same in every theme, so "on" never looks like "off".
+const AGENT_ON_COLOR: u32 = 0x56_8B_5A;
 
 /// Data the status bar needs to render, decoupled from where it's sourced.
 pub struct StatusBarSnapshot {
@@ -50,6 +56,10 @@ pub struct StatusBarSnapshot {
     pub theme_key:      ThemeId,
     /// Currently active locale.
     pub current_locale: Locale,
+    /// Whether agents may use Libri.
+    pub agent_enabled:  bool,
+    /// How many tools an agent can call right now.
+    pub agent_exposed:  usize,
 }
 
 /// Activity and alert history state needed to render the status bar's
@@ -239,9 +249,40 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
             )
         });
 
+    // Whether agents may use Libri: a green dot when they may, a grey one when
+    // not. A coloured dot alone says nothing, so the word beside it and the
+    // tooltip say what it means.
+    let agent_dot = if snap.agent_enabled {
+        gpui::rgb(AGENT_ON_COLOR).into()
+    }
+    else {
+        colors.text_tertiary
+    };
+    let agent_tooltip = if snap.agent_enabled {
+        t!("status_bar.agent_on_tooltip",
+           exposed = snap.agent_exposed,
+           all = McpTool::ALL.len()).to_string()
+    }
+    else {
+        t!("status_bar.agent_off_tooltip").to_string()
+    };
+    let agent_indicator =
+        div().id("status-bar-agent")
+             .flex()
+             .items_center()
+             .gap(px(6.0))
+             .px(px(8.0))
+             .tooltip(move |window, cx| Tooltip::new(agent_tooltip.clone()).build(window, cx))
+             .child(div().size(px(8.0)).rounded_full().bg(agent_dot))
+             .child(div().text_xs()
+                         .text_color(colors.text_secondary)
+                         .child(t!("status_bar.agent").to_string()));
+
     StatusBar::new().left(library_summary)
                     .left(Separator::vertical().h_5())
                     .left(active_tab_summary)
+                    .right(agent_indicator)
+                    .right(Separator::vertical().h_5())
                     .right(language_picker)
                     .right(Separator::vertical().h_5())
                     .right(theme_picker)

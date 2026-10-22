@@ -130,9 +130,10 @@ fn tag_switches(entity: Entity<SettingsController>, native: NativePreferencesFil
 
 /// One switch with its title and a note beneath, in the layout of the Storage
 /// page's "Create collections" row.
-fn switch_row(id: &'static str, title: String, note: String, checked: bool,
-              colors: &ColorTokens, on_change: impl Fn(bool, &mut gpui::App) + 'static)
-              -> AnyElement {
+pub(crate) fn switch_row(id: &'static str, title: String, note: String, checked: bool,
+                         colors: &ColorTokens,
+                         on_change: impl Fn(bool, &mut gpui::App) + 'static)
+                         -> AnyElement {
     div().flex()
          .flex_col()
          .gap(px(4.0))

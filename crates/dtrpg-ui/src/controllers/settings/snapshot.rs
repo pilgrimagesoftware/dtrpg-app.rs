@@ -57,6 +57,8 @@ impl SettingsController {
                                                                .clone(),
                            create_collections: self.storage.create_collections(),
                            native: self.native.snapshot(),
+                           mcp: self.mcp.snapshot(),
+                           mcp_activity: self.mcp_activity.clone(),
                            recently_updated_window_days: self.storage
                                                              .recently_updated_window_days(),
                            recently_updated_window_input: self.recently_updated_window_input

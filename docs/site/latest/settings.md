@@ -43,6 +43,13 @@ Override which application opens a given file extension, instead of
 relying on your system's default. Add, edit, or remove per-extension
 overrides here.
 
+## Agent & MCP
+
+Whether an AI agent may use Libri, and what it may do: three scopes (read, change,
+download and spend), a switch for each tool, the config to copy into the agent, and
+the latest calls it made. It is off until you turn it on. See
+[Using Libri from an AI agent]({{ '/latest/mcp/' | relative_url }}).
+
 ## Advanced
 
 Cache details (size and location on disk) and maintenance actions:

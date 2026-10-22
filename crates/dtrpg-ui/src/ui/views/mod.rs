@@ -18,6 +18,7 @@ pub mod report_feature_bug_window_view;
 pub mod root_view;
 pub mod settings_account_view;
 pub mod settings_advanced_view;
+pub mod settings_agent_view;
 pub mod settings_appearance_view;
 pub mod settings_file_openers_view;
 pub mod settings_filter_values_view;
