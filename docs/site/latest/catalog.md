@@ -127,7 +127,7 @@ menu, to remove the download. Its tabs are:
 - **Info** - the description, the item's tags, the collections it belongs to,
   a table of its details (the Type row is the content category DriveThruRPG
   files it under, and the Location row names the storage location a
-  downloaded title is in, going by your placement rules), and which application opens the item's file type. That
+  downloaded title is in, as recorded when it was downloaded), and which application opens the item's file type. That
   application is the system default unless you set one in Settings > File
   Openers, which the hint under it links to.
 - **Files** - each file with its size and download state, with a count beside

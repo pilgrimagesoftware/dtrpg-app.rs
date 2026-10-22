@@ -417,54 +417,25 @@ fn a_default_root_that_no_longer_exists_falls_back_to_the_first_root() {
 }
 
 #[test]
-fn titles_are_counted_for_the_root_the_rules_send_them_to() {
+fn titles_are_counted_for_each_root_they_have_files_in() {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
     use super::titles_per_root;
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
 
-    let item = |id: &str, publisher: &str, status| {
-        LibraryItem::new(id, id, publisher, "", "", "PDF", 1, 1.0, 2024, 0, status, "#000000", "",
-                         None)
-    };
-    let mut cfg = two_root_config();
-    cfg.rules = vec![PlacementRule { condition:
-                                         PlacementCondition::Publisher("Paizo".to_owned()),
-                                     target_root_id: 1, }];
-    let items = [item("a", "Paizo", ItemStatus::Downloaded),
-                 item("b", "Paizo", ItemStatus::Downloaded),
-                 item("c", "Other", ItemStatus::Downloaded),
-                 item("d", "Paizo", ItemStatus::Cloud)];
+    let cfg = two_root_config();
+    let default_name = cfg.default_root().name;
+    let recorded: HashMap<Arc<str>, Vec<String>> =
+        HashMap::from([(Arc::from("a"), vec!["Vault".to_owned()]),
+                       (Arc::from("b"), vec!["Vault".to_owned()]),
+                       (Arc::from("c"), vec![default_name]),
+                       (Arc::from("d"), vec!["Vault".to_owned(), "Gone".to_owned()])]);
 
-    let counts = titles_per_root(&cfg, &items, &[]);
+    let counts = titles_per_root(&recorded, &cfg.roots());
 
-    assert_eq!(counts.get(&1), Some(&2));
+    assert_eq!(counts.get(&1), Some(&3));
     assert_eq!(counts.get(&DEFAULT_ROOT_ID), Some(&1));
     assert_eq!(counts.len(),
                2,
-               "a title that is only in the cloud is held by no root");
-}
-
-#[test]
-fn each_downloaded_title_is_named_for_the_root_the_rules_send_it_to() {
-    use super::locations_of_titles;
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
-
-    let item = |id: &str, publisher: &str, status| {
-        LibraryItem::new(id, id, publisher, "", "", "PDF", 1, 1.0, 2024, 0, status, "#000000", "",
-                         None)
-    };
-    let mut cfg = two_root_config();
-    cfg.rules = vec![PlacementRule { condition:
-                                         PlacementCondition::Publisher("Paizo".to_owned()),
-                                     target_root_id: 1, }];
-    let items = [item("a", "Paizo", ItemStatus::Downloaded),
-                 item("b", "Other", ItemStatus::Downloaded),
-                 item("c", "Paizo", ItemStatus::Cloud)];
-
-    let locations = locations_of_titles(&cfg, &items, &[]);
-
-    assert_eq!(locations.get("a").map(String::as_str), Some("Vault"));
-    assert_eq!(locations.get("b"), Some(&cfg.default_root().name));
-    assert_eq!(locations.get("c"), None);
+               "a location that is not a root counts for nothing");
 }
