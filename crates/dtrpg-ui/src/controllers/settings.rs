@@ -26,7 +26,6 @@ use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
 use dtrpg_core::services::LoginService;
 use gpui::{Context, Entity, EventEmitter};
 use gpui_kit::component::input::InputState;
-use gpui_kit::component::select::SelectState;
 use rust_i18n::t;
 
 use crate::data::events::{
@@ -38,11 +37,10 @@ use crate::data::token_status_global::TokenStatusGlobal;
 /// Index of the File Openers page of the settings window, for opening the
 /// settings on it.
 pub const FILE_OPENERS_PAGE_IX: usize = 3;
-
-/// State for one Appearance-page font picker: a searchable list of every
-/// font name installed on the user's system (see
-/// `cx.text_system().all_font_names()`), not a curated list.
-pub type FontSelectState = Entity<SelectState<Vec<String>>>;
+/// Index of the Storage page.
+pub const STORAGE_PAGE_IX: usize = 2;
+/// Index of the Advanced page.
+pub const ADVANCED_PAGE_IX: usize = 5;
 
 /// Placement rule condition currently being edited in Downloads settings.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -182,19 +180,15 @@ pub struct SettingsSnapshot {
     pub mcp:                            McpSettingsFile,
     /// The latest calls agents made, newest first, as of the last refresh.
     pub mcp_activity:                   Vec<AuditEntry>,
+    /// The full path of the MCP server program, for the agent's config.
+    pub mcp_command_path:               String,
+    /// Where the log of agent calls is kept.
+    pub mcp_log_path:                   String,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
     /// the Advanced tab.
     pub recently_updated_window_input:  Option<Entity<InputState>>,
-    /// Font picker state for the Appearance page's body-font row.
-    pub body_font_select:               Option<FontSelectState>,
-    /// Font picker state for the Appearance page's value-font row.
-    pub value_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's label-font row.
-    pub label_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's monospace-font row.
-    pub mono_font_select:               Option<FontSelectState>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
@@ -208,6 +202,8 @@ pub struct SettingsController {
     native:                         NativePreferences,
     mcp:                            McpSettings,
     mcp_activity:                   Vec<AuditEntry>,
+    mcp_command_path:               String,
+    mcp_log_path:                   String,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -270,18 +266,6 @@ pub struct SettingsController {
     size_rule_input:                Option<Entity<InputState>>,
     rule_target_root_id:            u32,
     rule_editor_type:               RuleEditorType,
-    /// Font picker state for the Appearance page's body-font row; set by the
-    /// root view after creation.
-    body_font_select:               Option<FontSelectState>,
-    /// Font picker state for the Appearance page's value-font row; set by the
-    /// root view after creation.
-    value_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's label-font row; set by the
-    /// root view after creation.
-    label_font_select:              Option<FontSelectState>,
-    /// Font picker state for the Appearance page's monospace-font row; set by
-    /// the root view after creation.
-    mono_font_select:               Option<FontSelectState>,
 }
 
 impl SettingsController {
@@ -345,6 +329,8 @@ impl SettingsController {
                               native: NativePreferences::load(),
                               mcp: McpSettings::load(),
                               mcp_activity: AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS),
+                              mcp_command_path: agent::mcp_command_path(),
+                              mcp_log_path: AuditLog::open().path().display().to_string(),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -372,11 +358,7 @@ impl SettingsController {
                               collection_rule_input: None,
                               size_rule_input: None,
                               rule_target_root_id: 0,
-                              rule_editor_type: RuleEditorType::Publisher,
-                              body_font_select: None,
-                              value_font_select: None,
-                              label_font_select: None,
-                              mono_font_select: None };
+                              rule_editor_type: RuleEditorType::Publisher };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl.refresh_page_data();
         ctrl
@@ -400,6 +382,8 @@ impl SettingsController {
                native: NativePreferences::in_memory(),
                mcp: McpSettings::in_memory(),
                mcp_activity: Vec::new(),
+               mcp_command_path: String::new(),
+               mcp_log_path: String::new(),
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -423,11 +407,7 @@ impl SettingsController {
                collection_rule_input: None,
                size_rule_input: None,
                rule_target_root_id: 0,
-               rule_editor_type: RuleEditorType::Publisher,
-               body_font_select: None,
-               value_font_select: None,
-               label_font_select: None,
-               mono_font_select: None }
+               rule_editor_type: RuleEditorType::Publisher }
     }
 
     /// Updates the storage path draft field.

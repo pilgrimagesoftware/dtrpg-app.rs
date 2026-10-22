@@ -26,8 +26,10 @@ line.
 The server reads these settings on every call, so a change applies to the very next
 call. A call that is refused says which switch is off.
 
-Copy the config from the same page into your agent's MCP settings. It runs
-`libri-mcp` (or `cargo run -p dtrpg-mcp` from a checkout).
+Copy the config from the same page (the copy button inside the code block) into
+your agent's MCP settings. It names the full path of the `dtrpg-mcp` program that
+sits next to Libri, so it works wherever Libri is installed. The same page shows
+where the activity log is kept.
 
 ## What it can read (Read scope)
 

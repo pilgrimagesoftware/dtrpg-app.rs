@@ -3,6 +3,7 @@
 use dtrpg_core::data::mcp_access::{McpScope, McpTool};
 
 use super::*;
+use crate::view_models::agent_display::locate_mcp_server;
 
 /// The index of the Agent & MCP page in the settings window.
 pub const AGENT_PAGE_IX: usize = 4;
@@ -36,4 +37,11 @@ impl SettingsController {
         self.mcp_activity = AuditLog::open().recent(MCP_ACTIVITY_ROWS);
         cx.notify();
     }
+}
+
+/// The full path of the MCP server program: the one next to the running app.
+pub(super) fn mcp_command_path() -> String {
+    std::env::current_exe().ok()
+                           .and_then(|exe| exe.parent().map(locate_mcp_server))
+                           .map_or_else(String::new, |path| path.display().to_string())
 }

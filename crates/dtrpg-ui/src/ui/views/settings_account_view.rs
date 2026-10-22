@@ -19,10 +19,11 @@ use crate::data::theme::ColorTokens;
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::format_absolute;
 
-/// Width of the Email/API Key/token info rows' shared label column, sized to
-/// fit the longest label ("Acquired", "API Key", "Expires") at `text_sm` plus a
-/// small margin.
-const ACCOUNT_INFO_LABEL_WIDTH: gpui::Pixels = px(80.0);
+/// Width of the Email/API Key/token info rows' shared label column. The labels
+/// are in capitals ("ACQUIRED", "API KEY", "EXPIRES"), which are wider than the
+/// same words in lower case, and a label that does not fit wraps onto a second
+/// line, so this leaves room to spare (and the labels do not wrap in any case).
+const ACCOUNT_INFO_LABEL_WIDTH: gpui::Pixels = px(120.0);
 
 /// Renders the Account settings section.
 #[allow(clippy::too_many_arguments)]
@@ -151,6 +152,7 @@ fn account_info_item(value_id: &'static str, label: String, value: String, color
     DescriptionItem::new(
         div()
             .w_full()
+            .whitespace_nowrap()
             .text_right()
             .text_sm()
             .font_family(label_font_family.to_string())

@@ -28,6 +28,7 @@ agent:
   copy_config: "Copier la configuration"
   activity_heading: "Activité récente"
   activity_refresh: "Actualiser"
+  log_location: "Fichier journal"
   activity_empty: "Aucun agent n’a encore utilisé Libri."
   denied: "refusé"
   tool_list_items: "Lister chaque titre de l’index de la bibliothèque"

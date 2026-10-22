@@ -31,10 +31,8 @@ use crate::controllers::settings::{
 };
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
-    settings_account_view::render_account_section,
-    settings_advanced_view::render_advanced_section,
-    settings_agent_view::render_agent_section,
-    settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
+    settings_account_view::render_account_section, settings_advanced_view::render_advanced_section,
+    settings_agent_view::render_agent_section, settings_appearance_view::render_appearance_section,
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
@@ -91,7 +89,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              max_concurrent_downloads_input: Option<Entity<InputState>>,
                              create_collections: bool, recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
-                             font_selects: AppearanceFontSelects, native: NativePreferencesFile,
+                             native: NativePreferencesFile,
                              filter_values: Vec<FilterValueSection>)
                              -> AnyElement {
     let surface = colors.surface;
@@ -119,7 +117,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                   .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
-        1 => render_appearance_section(library, colors, theme, font_selects).into_any_element(),
+        1 => render_appearance_section(library, colors, theme).into_any_element(),
         2 => render_storage_section(storage_root_path,
                                     storage_path_exists,
                                     entity.clone(),

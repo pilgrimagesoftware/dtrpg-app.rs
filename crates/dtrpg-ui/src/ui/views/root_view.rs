@@ -28,8 +28,7 @@ use dtrpg_core::{
 };
 use gpui::{
     AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, ParentElement, Pixels, Render, SharedString, Styled,
-    WindowHandle, div, px,
+    InteractiveElement, IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
 };
 use gpui_kit::component::Root;
 use gpui_kit::component::WindowExt as _;
@@ -41,8 +40,6 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::AppMenuBar;
 use gpui_kit::component::notification::{Notification, NotificationType};
 use gpui_kit::component::resizable::{ResizableState, h_resizable, resizable_panel};
-use gpui_kit::component::searchable_list::SearchableListDelegate as _;
-use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{IconName, Sizable as _};
 use rust_i18n::t;
 
@@ -224,7 +221,7 @@ impl LibraryRootView {
         let login_service = cx.global::<LoginServiceFactory>().0();
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
-        wiring_inputs::wire_settings_inputs(window, cx, &settings, &controller);
+        wiring_inputs::wire_settings_inputs(window, cx, &settings);
 
         let catalog_view = cx.new(|cx| {
                                  CatalogView::new(window,

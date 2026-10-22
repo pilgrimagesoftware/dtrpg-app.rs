@@ -31,14 +31,15 @@ Four light, two dark:
 
 ## Fonts
 
-Four roles, each independently selectable from any font installed on your
-system:
+A theme sets four font roles:
 
 - **Body** - the catalog and detail view's primary text.
 - **Value** - data values (e.g. the Advanced settings page's cache details),
   rendered slightly smaller than body text by default.
 - **Label** - field and row labels, sans-serif by default.
 - **Monospace** - fixed-width content such as the masked API key hint.
+
+There are no font pickers in Settings; the fonts come from the theme.
 
 A separate "Text Scale" control adjusts the shared UI text size, scaling
 every size-aware element in the window together, like zooming a page.

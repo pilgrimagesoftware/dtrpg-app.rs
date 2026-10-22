@@ -2,26 +2,61 @@
 //! text for each scope and tool, and the line for each logged call. No window
 //! and no I/O, so it can be tested directly.
 
+use std::path::{Path, PathBuf};
+
 use dtrpg_core::data::mcp_access::{AuditEntry, McpScope, McpSettings, McpSettingsFile, McpTool};
 use rust_i18n::t;
 
-/// The server entry an agent's MCP settings need to start Libri's server.
-pub const AGENT_CONFIG_JSON: &str = r#"{
-  "mcpServers": {
-    "libri": {
-      "command": "libri-mcp"
-    }
-  }
-}"#;
+/// The name of the MCP server program, as the build produces it.
+const SERVER_PROGRAM: &str = "dtrpg-mcp";
+
+/// Where the MCP server program is, given the folder the app runs from: the
+/// program next to the app. The server is built alongside the app, so it is
+/// there in a build and in a release.
+///
+/// # Examples
+///
+/// ```
+/// use std::path::Path;
+///
+/// use dtrpg_ui::view_models::agent_display::locate_mcp_server;
+///
+/// let path = locate_mcp_server(Path::new("/opt/libri"));
+/// assert!(path.starts_with("/opt/libri"));
+/// ```
+#[must_use]
+pub fn locate_mcp_server(app_dir: &Path) -> PathBuf {
+    app_dir.join(format!("{SERVER_PROGRAM}{}", std::env::consts::EXE_SUFFIX))
+}
+
+/// The config an agent's MCP settings need to start Libri's server, with
+/// `command` as the full path of the server program.
+///
+/// # Examples
+///
+/// ```
+/// use dtrpg_ui::view_models::agent_display::agent_config_json;
+///
+/// assert!(agent_config_json("/opt/libri/dtrpg-mcp").contains("\"command\": \"/opt/libri/dtrpg-mcp\""));
+/// ```
+#[must_use]
+pub fn agent_config_json(command: &str) -> String {
+    let command = command.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("{{\n  \"mcpServers\": {{\n    \"libri\": {{\n      \"command\": \"{command}\"\n    }}\n  }}\n}}")
+}
 
 /// What the page shows about everything it lists: the settings, and the
 /// latest calls, newest first.
 #[derive(Clone, Debug, Default)]
 pub struct AgentPageData {
     /// What agents may do.
-    pub settings: McpSettingsFile,
+    pub settings:     McpSettingsFile,
     /// The latest calls agents made.
-    pub activity: Vec<AuditEntry>,
+    pub activity:     Vec<AuditEntry>,
+    /// The full path of the MCP server program, for the agent's config.
+    pub command_path: String,
+    /// Where the log of calls is kept.
+    pub log_path:     String,
 }
 
 /// How many tools a call can use right now: all of them when the scope and

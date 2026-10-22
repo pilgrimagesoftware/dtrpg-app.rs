@@ -160,8 +160,12 @@ pub fn apply_theme_colors(theme: &mut gpui_kit::component::Theme, colors: &Color
     theme.tokens.overlay = colors.scrim.into();
     theme.tokens.window_border = colors.border_strong.into();
     theme.tokens.skeleton = colors.surface_alt.into();
-    theme.tokens.switch = colors.surface_alt.into();
-    theme.tokens.switch_thumb = colors.accent_on.into();
+    // A switch that is off must show against the page in every theme: the
+    // surface color it used to take is the page's own color in a dark theme,
+    // and the thumb in `accent_on` is dark there too. The thumb is white,
+    // which reads against both the accent (on) and the strong border (off).
+    theme.tokens.switch = colors.border_strong.into();
+    theme.tokens.switch_thumb = gpui::white().into();
     theme.tokens.slider_bar = colors.accent.into();
     theme.tokens.slider_thumb = colors.accent_on.into();
     theme.tokens.link = colors.accent.into();
