@@ -19,7 +19,7 @@ impl Library {
     fn item_filter<'a>(view: &'a ViewState, now_secs: i64) -> ItemFilter<'a> {
         use crate::util::filter::SidebarFilter;
         match &view.filter {
-            SidebarFilter::AllTitles => ItemFilter::default(),
+            SidebarFilter::AllTitles | SidebarFilter::Insights => ItemFilter::default(),
             SidebarFilter::Tag { name, .. } => ItemFilter { tag_name: Some(name),
                                                             ..Default::default() },
             SidebarFilter::OnDevice => {

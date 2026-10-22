@@ -31,6 +31,8 @@ purchases, on macOS, Linux, and Windows. This is the latest documentation.
   concurrency, retries, and the collections-symlink option.
 - [Storage roots]({{ '/latest/storage/' | relative_url }}) - configure
   additional download locations and placement behavior.
+- [Insights]({{ '/latest/insights/' | relative_url }}) - figures about your
+  whole library, with CSV export.
 
 ## Customizing
 

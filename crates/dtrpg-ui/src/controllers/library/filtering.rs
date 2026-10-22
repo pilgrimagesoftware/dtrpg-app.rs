@@ -75,6 +75,9 @@ impl LibraryController {
         self.filter = filter;
         self.refresh_smart_members();
         self.refresh_attention_members();
+        if self.filter == SidebarFilter::Insights && self.insights.is_none() {
+            self.recompute_insights(cx);
+        }
         self.selection = Selection::None;
         self.invalidate_cache();
         self.save_view_prefs();

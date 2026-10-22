@@ -8,6 +8,7 @@
 //! mutations (Slice 5). It is the core side of the ADR 0002 controller
 //! decomposition.
 
+pub mod insights;
 mod jobs;
 mod mutations;
 mod queries;

@@ -92,6 +92,8 @@ impl LibraryController {
                           filter_choices: prefs.filter_value_choices(),
                           known_filter_values: HashMap::new(),
                           failed_downloads: HashSet::new(),
+                          insights: None,
+                          insights_computing: false,
                           collection_cloud: Arc::new(HashMap::new()),
                           root_title_counts: HashMap::new(),
                           library,

@@ -17,6 +17,8 @@ pub enum SidebarFilter {
     /// Filter to the items whose last download failed. The controller holds
     /// their ids as it does a collection's.
     NeedsAttention,
+    /// Show the Insights page in place of the catalog. It holds no items.
+    Insights,
     Publisher(Arc<str>),
     /// Filter to items belonging to the DTRPG product list with this id and
     /// display name.
@@ -41,7 +43,8 @@ impl PartialEq for SidebarFilter {
             | (Self::RecentlyUpdated, Self::RecentlyUpdated)
             | (Self::OnDevice, Self::OnDevice)
             | (Self::InCloud, Self::InCloud)
-            | (Self::NeedsAttention, Self::NeedsAttention) => true,
+            | (Self::NeedsAttention, Self::NeedsAttention)
+            | (Self::Insights, Self::Insights) => true,
             (Self::Publisher(a), Self::Publisher(b)) => a == b,
             // Compare collections by id only — names are derived from the same id.
             (Self::Collection(a, _), Self::Collection(b, _))

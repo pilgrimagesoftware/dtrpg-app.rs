@@ -50,9 +50,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                           active == SidebarFilter::NeedsAttention,
                                           SidebarFilter::NeedsAttention,
                                           entity.clone()))
-                          // Insights arrives with its own change; the entry holds
-                          // its place in the list until then.
-                          .child(SidebarMenuItem::new(t!("sidebar.insights")).disable(true));
+                          .child(insights_item(active == SidebarFilter::Insights, entity.clone()));
 
     let publishers_count = publishers.len();
 
@@ -313,4 +311,15 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                                   sidebar_open.tags,
                                                                   &active,
                                                                   entity))))
+}
+
+/// The Insights entry: it has no count, since it shows figures, not titles.
+fn insights_item(is_active: bool, entity: Entity<LibraryController>) -> SidebarMenuItem {
+    SidebarMenuItem::new(t!("sidebar.insights")).active(is_active)
+                                                .on_click(move |_, _, cx| {
+                                                    entity.update(cx, |ctrl, cx| {
+                                                        ctrl.set_filter(SidebarFilter::Insights,
+                                                                        cx);
+                                                    });
+                                                })
 }
