@@ -189,7 +189,7 @@ detail:
   read_button: "Lire"
   download_button: "Télécharger"
   downloaded_button: "Téléchargé"
-  download_sheet_button: "Télécharger…"
+  download_sheet_tooltip: "Télécharger… Maj-clic pour tout télécharger maintenant vers l’emplacement par défaut."
   open_in_detail_button: "Ouvrir dans le détail"
   show_in_finder: "Afficher dans le Finder"
   show_in_explorer: "Afficher dans l'Explorateur"

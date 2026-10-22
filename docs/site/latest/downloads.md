@@ -12,7 +12,9 @@ Queue a catalog item's files for download from the inspector.
 
 The **Download…** button in the inspector, and **Download** in the right-click
 menu of a title in the catalog (list, grid and thumbnails), open the download
-sheet. The cloud icon beside a single file in the Files tab still queues just
+sheet. **Shift-click** the inspector's Download… button to skip the sheet and
+download with its defaults: every file you do not have yet, to the location your
+rules pick, without saving a rule. The button's tooltip says so. The cloud icon beside a single file in the Files tab still queues just
 that file.
 It lists the item's files with their formats and sizes; the files you do not
 have yet start checked, and a file you already have shows a check mark and
