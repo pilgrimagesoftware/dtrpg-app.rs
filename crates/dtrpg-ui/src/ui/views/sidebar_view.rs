@@ -170,8 +170,9 @@ impl SidebarItem for CollectionsSection {
         let loading = self.loading;
         let entity = self.entity.clone();
 
+        let header_id = SharedString::from(format!("{id:?}-header"));
         let header =
-            div().id(SharedString::from(format!("{id:?}-header")))
+            div().id(header_id.clone())
                  .w_full()
                  .flex()
                  .items_center()
@@ -194,7 +195,8 @@ impl SidebarItem for CollectionsSection {
                              .gap_x_2()
                              .overflow_x_hidden()
                              .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
-                             .child(suffix));
+                             .child(suffix))
+                 .child(sidebar_section::section_caret(&header_id, open));
 
         let mut rows: Vec<AnyElement> =
             self.rows

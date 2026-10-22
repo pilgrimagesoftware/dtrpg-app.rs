@@ -5,7 +5,26 @@
 //! it cannot save that it was collapsed. This section is told whether it is
 //! open, and reports each click on its header, as the Collections section does.
 
+use gpui_kit::component::tooltip::Tooltip;
+
 use super::*;
+
+/// The caret at the right of a section header, which points down while the
+/// section is open and right while it is closed. The header itself takes the
+/// click; the caret has a tooltip because it is only an image.
+pub(super) fn section_caret(id: &SharedString, open: bool) -> impl IntoElement {
+    let (icon, tip) = if open {
+        (IconName::ChevronDown, t!("sidebar.section_hide"))
+    }
+    else {
+        (IconName::ChevronRight, t!("sidebar.section_show"))
+    };
+    let tip = tip.to_string();
+    div().id(SharedString::from(format!("{id}-caret")))
+         .flex_none()
+         .child(Icon::new(icon).small())
+         .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+}
 
 /// A header over a list of rows. The header shows `title` and the `suffix`, and
 /// a click on it calls `on_toggle`; the rows show only while `open`.
@@ -42,8 +61,9 @@ impl SidebarItem for ControlledSection {
         let suffix = (self.suffix)(window, cx);
         let open = self.open;
 
+        let header_id = SharedString::from(format!("{id:?}-header"));
         let header =
-            div().id(SharedString::from(format!("{id:?}-header")))
+            div().id(header_id.clone())
                  .w_full()
                  .flex()
                  .items_center()
@@ -66,7 +86,8 @@ impl SidebarItem for ControlledSection {
                              .gap_x_2()
                              .overflow_x_hidden()
                              .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
-                             .child(suffix));
+                             .child(suffix))
+                 .child(section_caret(&header_id, open));
 
         let rows: Vec<AnyElement> = self.items
                                         .into_iter()
@@ -94,5 +115,17 @@ impl SidebarItem for ControlledSection {
                                  .py_0p5()
                                  .children(rows))
              })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rust_i18n::t;
+
+    #[test]
+    fn the_caret_tooltips_resolve() {
+        for key in ["sidebar.section_hide", "sidebar.section_show"] {
+            assert_ne!(t!(key).to_string(), key, "{key} has no text");
+        }
     }
 }
