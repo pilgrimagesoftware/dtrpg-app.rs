@@ -175,6 +175,8 @@ pub struct LibrarySnapshot {
     /// For each collection, how many of its titles are only in the cloud.
     pub collection_cloud:          Arc<HashMap<u64, usize>>,
     pub total_mb:                  f64,
+    /// The page count of the whole catalog.
+    pub total_pages:               u64,
     /// Items matching the active sidebar filter but ignoring the search query.
     pub filter_count:              usize,
     /// Items matching both the active sidebar filter and the search query.

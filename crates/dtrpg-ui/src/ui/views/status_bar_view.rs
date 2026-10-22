@@ -23,7 +23,7 @@ use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::popover::Popover;
-use gpui_kit::component::progress::{Progress, ProgressCircle};
+use gpui_kit::component::progress::Progress;
 use gpui_kit::component::separator::Separator;
 use gpui_kit::component::status_bar::StatusBar;
 use gpui_kit::component::tooltip::Tooltip;
@@ -66,6 +66,8 @@ pub struct StatusBarSnapshot {
     pub agent_exposed:  usize,
     /// What Libri uses on each storage location.
     pub roots:          Arc<Vec<RootUsage>>,
+    /// How many titles are being downloaded now.
+    pub downloading:    usize,
 }
 
 /// Activity and alert history state needed to render the status bar's
@@ -91,26 +93,23 @@ fn status_bar_tooltip(title: &str, body: &str) -> String {
 pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryController>,
                          activity_data: ActivityBarData<'_>, colors: &ColorTokens)
                          -> impl IntoElement + 'static {
-    let total_size_str = size_format(snap.total_mb);
-
-    let library_summary =
+    // "18 of 18 titles": how many are on show of how many there are.
+    let titles_summary =
         div().text_xs()
              .text_color(colors.text_secondary)
-             .child(format!("{} \u{2022} {total_size_str}",
-                            pluralize(snap.total_count, "count.total_item", "count.total_items")));
-
-    let active_tab_summary =
-        div().text_xs()
-             .text_color(colors.text_secondary)
-             .child(format!("{} \u{2022} {}",
-                            snap.section_label,
-                            pluralize(snap.section_count, "count.item", "count.items")));
+             .child(t!("status_bar.titles_of",
+                       shown = snap.section_count,
+                       total = pluralize(snap.total_count, "count.title", "count.titles")).to_string());
+    let size_summary = div().text_xs()
+                            .text_color(colors.text_secondary)
+                            .child(size_format(snap.total_mb));
 
     let language_entity = entity.clone();
     let language_picker = Button::new("status-bar-language")
         .ghost()
         .compact()
-        .label(snap.current_locale.label())
+        .icon(Icon::empty().path("icons/globe.svg"))
+        .label(snap.current_locale.code().to_uppercase())
         .tooltip(
             t!(
                 "status_bar.language_tooltip",
@@ -171,33 +170,20 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
         t!("status_bar.activity_tooltip_in_progress_only",
            in_progress = activity_snap.in_progress_count)
     };
-    // Idle state (no in-progress loaders) renders at value 0, which draws
-    // only the faint background ring — an inactive circle rather than the
-    // former "○" glyph. `gpui-kit`'s default `progress_bar` theme
-    // token is near-black, invisible against a dark status bar, so the
-    // circle uses the app's accent color (already used for in-progress
-    // activity elsewhere, e.g. `activity_panel_view`) instead.
-    let progress_circle = if activity_snap.in_progress_count > 0 {
-        match activity_snap.aggregate_progress {
-            Some(fraction) => {
-                ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
-                                                                   .color(colors.accent)
-                                                                   .value(fraction * 100.0)
-            }
-            None => ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
-                                                                       .color(colors.accent)
-                                                                       .loading(true),
-        }
-    }
-    else {
-        ProgressCircle::new("status-bar-activity-progress").with_size(Size::Small)
-                                                           .color(colors.accent)
-                                                           .value(0.0)
-    };
+    // The activity button shows a download arrow and, while titles are being
+    // downloaded, how many. It opens the activity panel, which lists every
+    // task in progress, not only downloads.
+    let downloading_label = (snap.downloading > 0).then(|| {
+                                                      t!("status_bar.downloading",
+                                                         n = snap.downloading).to_string()
+                                                  });
     let activity_indicator =
         Button::new("status-bar-activity").ghost()
                                           .compact()
-                                          .child(progress_circle)
+                                          .icon(Icon::empty().path("icons/download.svg"))
+                                          .when_some(downloading_label, |button, label| {
+                                              button.label(label)
+                                          })
                                           .tooltip(status_bar_tooltip(&t!("activity.title"),
                                                                       &activity_tooltip_body));
 
@@ -287,20 +273,20 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                          .text_color(colors.text_secondary)
                          .child(t!("status_bar.agent").to_string()));
 
-    let mut bar = StatusBar::new().left(library_summary)
+    let mut bar = StatusBar::new().left(titles_summary)
                                   .left(Separator::vertical().h_5())
-                                  .left(active_tab_summary);
+                                  .left(size_summary);
     for (index, root) in snap.roots.iter().enumerate() {
         bar = bar.left(Separator::vertical().h_5())
                  .left(root_meter(index, root, colors));
     }
     bar.right(agent_indicator)
        .right(Separator::vertical().h_5())
+       .right(activity_panel)
+       .right(Separator::vertical().h_5())
        .right(language_picker)
        .right(Separator::vertical().h_5())
        .right(theme_picker)
-       .right(Separator::vertical().h_5())
-       .right(activity_panel)
        .right(Separator::vertical().h_5())
        .right(notification_panel)
 }
@@ -329,6 +315,9 @@ fn root_meter(index: usize, root: &RootUsage, colors: &ColorTokens) -> impl Into
          .gap(px(6.0))
          .px(px(8.0))
          .tooltip(move |window, cx| Tooltip::new(tooltip.clone()).build(window, cx))
+         .child(Icon::empty().path("icons/hard-drive.svg")
+                             .with_size(Size::Small)
+                             .text_color(colors.text_secondary))
          .child(div().text_xs()
                      .text_color(colors.text_secondary)
                      .child(root.name.clone()))

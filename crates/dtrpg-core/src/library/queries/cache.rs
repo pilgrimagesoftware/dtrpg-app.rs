@@ -211,6 +211,19 @@ impl Library {
             }
             Err(error) => tracing::warn!(%error, "could not total the catalog size"),
         }
+        let pages = self.index
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .total_pages();
+        match pages {
+            Ok(total_pages) => {
+                self.query_cache
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .total_pages = total_pages;
+            }
+            Err(error) => tracing::warn!(%error, "could not total the catalog's pages"),
+        }
     }
 
     /// Refreshes both sidebar facet lists (section counts and publishers),
@@ -296,6 +309,16 @@ impl Library {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .total_mb
+    }
+
+    /// The total page count of the catalog, as of the last refresh of the
+    /// section counts. Cheap: the render path asks every frame.
+    #[must_use]
+    pub fn total_pages(&self) -> u64 {
+        self.query_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .total_pages
     }
 
     /// The publisher list, from the most recent `invalidate_cache` call.

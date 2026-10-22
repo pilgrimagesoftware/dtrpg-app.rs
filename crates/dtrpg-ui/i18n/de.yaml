@@ -101,6 +101,8 @@ insights:
   empty: "Noch nichts zu analysieren. Melden Sie sich an und laden Sie zuerst Ihre Bibliothek."
   computing: "Wird berechnet …"
 sidebar:
+  footer_totals: "%{titles} · %{size}"
+  footer_pages: "%{pages} Seiten an %{locations}"
   section_hide: "Diesen Bereich ausblenden"
   section_show: "Diesen Bereich einblenden"
   smart_collections: "Intelligente Sammlungen"
@@ -153,6 +155,8 @@ toolbar:
   filtered_suffix: " (%{n} gefiltert)"
 
 count:
+  location: "Speicherort"
+  locations: "Speicherorten"
   title: "Titel"
   titles: "Titel"
   item: "Titel"
@@ -604,6 +608,8 @@ report:
   submit: "Melden"
 
 status_bar:
+  titles_of: "%{shown} von %{total}"
+  downloading: "%{n} werden geladen"
   root_tooltip: "%{name}: %{used} von Libri belegt, %{free} frei"
   agent: "Agent"
   agent_on_tooltip: "Agenten dürfen Libri nutzen: %{exposed} von %{all} Werkzeugen verfügbar"
