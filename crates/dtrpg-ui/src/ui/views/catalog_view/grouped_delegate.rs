@@ -135,8 +135,8 @@ impl TableDelegate for GroupedCatalogListDelegate {
                 })
             }
             ItemStatus::Cloud => menu.item(
-                PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, _, cx| {
-                    entity.update(cx, |ctrl, cx| ctrl.request_download(&id, title.clone(), cx));
+                PopupMenuItem::new(t!("catalog.action_download")).on_click(move |_, window, cx| {
+                    request_download_with_sheet(window, cx, &entity, &id, title.clone());
                 }),
             ),
         };

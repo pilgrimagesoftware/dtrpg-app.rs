@@ -10,7 +10,10 @@ Queue a catalog item's files for download from the inspector.
 
 ## Choosing files and a location
 
-The **Download…** button in the inspector opens the download sheet.
+The **Download…** button in the inspector, and **Download** in the right-click
+menu of a title in the catalog (list, grid and thumbnails), open the download
+sheet. The cloud icon beside a single file in the Files tab still queues just
+that file.
 It lists the item's files with their formats and sizes; the files you do not
 have yet start checked, and a file you already have shows a check mark and
 cannot be selected again. **All** and **None** change the selection, and the

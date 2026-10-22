@@ -193,6 +193,15 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                  })
       .detach();
 
+    // The download sheet's "Remember this choice" writes a placement rule
+    // behind the settings controller's back; have it read the rules again.
+    let settings_for_rules = settings.clone();
+    cx.subscribe(controller,
+                 move |_this, _ctrl, _event: &PlacementRulesChanged, cx| {
+                     settings_for_rules.update(cx, |ctrl, cx| ctrl.reload_storage(cx));
+                 })
+      .detach();
+
     // Placement rules and locations decide how many titles each location
     // holds, so recount when the storage settings change.
     let controller_for_usage = controller.clone();

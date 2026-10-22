@@ -47,7 +47,7 @@ use crate::ui::library::cover::{
     CoverCache, cover_style, detail_cache_key, render_generative_cover,
 };
 use crate::ui::views::catalog_view::render_checking_indicator;
-use crate::ui::views::download_sheet_dialog::open_download_sheet_dialog;
+use crate::ui::views::download_sheet_dialog::request_download_with_sheet;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::ui::views::tags_section_view::render_tags_section;
 use crate::ui::widgets::{selectable_text, small_caps_text};

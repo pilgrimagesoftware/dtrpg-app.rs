@@ -51,6 +51,17 @@ pub struct DownloadError {
 
 impl EventEmitter<DownloadError> for ActivityController {}
 
+// ── PlacementRulesChanged
+// ───────────────────────────────────────────────────
+
+/// Emitted by `LibraryController` after it changes the storage settings'
+/// placement rules itself (the download sheet's "Remember this choice"), so the
+/// settings controller reloads them rather than keeping, and later saving over
+/// them, a stale copy.
+pub struct PlacementRulesChanged;
+
+impl EventEmitter<PlacementRulesChanged> for LibraryController {}
+
 // ── SettingsChanged
 // ───────────────────────────────────────────────────────────
 

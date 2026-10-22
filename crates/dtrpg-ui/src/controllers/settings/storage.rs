@@ -59,6 +59,17 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
+    /// Reads the storage settings from disk again, for when something else (the
+    /// download sheet's "Remember this choice") has changed them. Without it
+    /// this controller would show the old rules, and the next setting changed
+    /// here would save over the new ones.
+    pub fn reload_storage(&mut self, cx: &mut Context<Self>) {
+        self.storage = StorageConfig::load();
+        self.refresh_root_volumes();
+        cx.emit(SettingsChanged);
+        cx.notify();
+    }
+
     /// Opens or closes the "Add rule…" editor.
     pub fn set_rule_editor_open(&mut self, open: bool, cx: &mut Context<Self>) {
         self.rule_editor_open = open;

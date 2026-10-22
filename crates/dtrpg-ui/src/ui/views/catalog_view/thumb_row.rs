@@ -264,10 +264,12 @@ pub(super) fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image
                      let dl_title = ctx_item.title.to_string();
                      let entity_dl = ctx_entity.clone();
                      menu.item(PopupMenuItem::new(t!("catalog.action_download")).on_click(
-                        move |_, _, cx| {
-                            entity_dl.update(cx, |ctrl, cx| {
-                                ctrl.request_download(&dl_id, dl_title.clone(), cx)
-                            });
+                        move |_, window, cx| {
+                            request_download_with_sheet(window,
+                                                        cx,
+                                                        &entity_dl,
+                                                        &dl_id,
+                                                        dl_title.clone());
                         },
                     ))
                  }
