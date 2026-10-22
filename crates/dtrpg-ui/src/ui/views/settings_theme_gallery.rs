@@ -24,7 +24,7 @@ use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
 use crate::data::theme_catalog::{ThemeCatalog, ThemeId, theme_label};
 use crate::data::theme_loader;
-use crate::ui::widgets::small_caps_text;
+use crate::ui::views::settings_card::section_heading;
 
 // Card and preview dimensions from the design's `.theme-card`/`.theme-prev`
 // styles, in pixels.
@@ -42,11 +42,10 @@ const DOT_GREEN: u32 = 0x61_C5_54;
 /// Renders the theme gallery: a wrapping grid of theme cards, then the
 /// theme-file action buttons.
 ///
-/// `colors` and `label_font_family` come from the active theme and style the
-/// chrome around each card; a card's interior uses the preview palette of the
-/// theme it depicts.
+/// `colors` come from the active theme and style the chrome around each card; a
+/// card's interior uses the preview palette of the theme it depicts.
 pub fn render_theme_gallery(entity: Entity<LibraryController>, colors: &ColorTokens,
-                            theme_id: &ThemeId, label_font_family: &str)
+                            theme_id: &ThemeId)
                             -> impl IntoElement + 'static + use<> {
     let grid = div().flex()
                     .flex_wrap()
@@ -61,22 +60,9 @@ pub fn render_theme_gallery(entity: Entity<LibraryController>, colors: &ColorTok
     div().flex()
          .flex_col()
          .gap(px(12.0))
-         .child(heading(colors, label_font_family))
+         .child(section_heading(t!("settings.appearance_theme_label").to_string(), colors))
          .child(grid)
          .child(action_buttons(entity))
-}
-
-/// Section heading: the theme label in small caps, followed by a hairline
-/// rule filling the remaining width.
-fn heading(colors: &ColorTokens, label_font_family: &str) -> impl IntoElement {
-    div().flex()
-         .items_center()
-         .gap(px(12.0))
-         .child(div().text_sm()
-                     .font_family(label_font_family.to_string())
-                     .text_color(colors.text_primary)
-                     .child(small_caps_text(t!("settings.appearance_theme_label"))))
-         .child(div().flex_1().h(px(1.0)).bg(colors.border))
 }
 
 /// One theme card: the palette preview, a hairline, and the footer with the
