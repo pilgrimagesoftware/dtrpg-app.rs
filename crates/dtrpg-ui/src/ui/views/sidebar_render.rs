@@ -83,24 +83,21 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     else {
         t!("sidebar.publishers").into()
     };
-    let pub_menu = SidebarMenu::new().gap(SIDEBAR_ROW_GAP).child(
-        SidebarMenuItem::new(pub_title)
-            .default_open(publishers_open)
-            .click_to_toggle(true)
-            .on_click(move |_, _, cx| {
-                entity_for_pub.update(cx, |ctrl, cx| {
-                    ctrl.toggle_sidebar_section(SidebarSection::Publishers, cx);
-                });
-            })
-            .suffix(render_section_search_suffix(
-                "publishers",
-                publishers_count,
-                publisher_search,
-                entity.clone(),
-                LibraryController::toggle_publisher_search,
-            ))
-            .children(pub_children),
-    );
+    let pub_suffix = render_section_search_suffix("publishers",
+                                                  publishers_count,
+                                                  publisher_search,
+                                                  entity.clone(),
+                                                  LibraryController::toggle_publisher_search);
+    let pub_section =
+        ControlledSection { title:     pub_title,
+                            open:      publishers_open,
+                            suffix:    Rc::new(move |window, cx| pub_suffix(window, cx)),
+                            on_toggle: Rc::new(move |_window, cx| {
+                                entity_for_pub.update(cx, |ctrl, cx| {
+                                    ctrl.toggle_sidebar_section(SidebarSection::Publishers, cx);
+                                });
+                            }),
+                            items:     pub_children, };
 
     // ── Sidebar assembly (collections before publishers)
     // ────────────────────── `w_full()` rather than a fixed pixel width:
@@ -299,17 +296,17 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                                                    &entity))))
     };
     let sidebar_builder = sidebar_builder.child(SidebarContent::Separator)
-                                         .child(SidebarContent::Menu(Box::new(pub_menu)));
+                                         .child(SidebarContent::Section(Box::new(pub_section)));
     // Nothing to list until something has been tagged.
     let sidebar_builder = if tags.is_empty() {
         sidebar_builder
     }
     else {
         sidebar_builder.child(SidebarContent::Separator)
-                       .child(SidebarContent::Menu(Box::new(tags_menu(tags,
-                                                                      sidebar_open.tags,
-                                                                      &active,
-                                                                      entity.clone()))))
+                       .child(SidebarContent::Section(Box::new(tags_section(tags,
+                                                                            sidebar_open.tags,
+                                                                            &active,
+                                                                            &entity))))
     };
     // Analysis comes last, as in the design.
     sidebar_builder.child(SidebarContent::Separator)
@@ -333,4 +330,24 @@ fn analysis_menu(insights_active: bool, entity: Entity<LibraryController>) -> Si
                       .child(SidebarMenuItem::new(t!("sidebar.analysis")).default_open(true)
                                                                          .click_to_toggle(true)
                                                                          .children([insights]))
+}
+
+/// The Tags section: a header with the number of tags, over a row for each tag.
+fn tags_section(tags: Vec<TagEntry>, open: bool, active: &SidebarFilter,
+                entity: &Entity<LibraryController>)
+                -> ControlledSection {
+    let count = tags.len();
+    let items = tag_rows(tags, active, entity);
+    let toggle_entity = entity.clone();
+    ControlledSection { title: t!("sidebar.tags").into(),
+                        open,
+                        suffix: Rc::new(move |_, _| {
+                            div().text_xs().child(count.to_string()).into_any_element()
+                        }),
+                        on_toggle: Rc::new(move |_window, cx| {
+                            toggle_entity.update(cx, |ctrl, cx| {
+                                             ctrl.toggle_sidebar_section(SidebarSection::Tags, cx);
+                                         });
+                        }),
+                        items }
 }
