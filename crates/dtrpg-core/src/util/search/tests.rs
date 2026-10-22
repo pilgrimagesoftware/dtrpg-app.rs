@@ -222,9 +222,9 @@ fn every_term_must_hold_and_the_text_must_match() {
 
 #[test]
 fn a_word_before_a_colon_that_is_not_a_field_is_free_text() {
-    let query = SearchQuery::parse("location:cloud");
+    let query = SearchQuery::parse("colour:cloud");
 
-    assert_eq!(query.free_text(), "location:cloud");
+    assert_eq!(query.free_text(), "colour:cloud");
     assert!(query.terms().is_empty());
 }
 
@@ -338,4 +338,24 @@ fn a_filter_in_another_category_does_not_answer_a_term() {
 
     assert!(!matches("system:fantasy", &item, &[]));
     assert!(!matches("type:fantasy", &item, &[]));
+}
+
+#[test]
+fn a_location_term_is_held_by_an_item_with_files_there() {
+    let mut moria = item("Moria", "Free League", "The One Ring");
+    moria.locations = vec!["Vault".into(), "Local".into()];
+
+    assert!(matches("location:vault", &moria, &[]));
+    assert!(matches("location:\"local\"", &moria, &[]));
+    assert!(!matches("location:cloud", &moria, &[]));
+    assert!(!matches("-location:vault", &moria, &[]));
+    assert!(matches("-location:cloud", &moria, &[]));
+}
+
+#[test]
+fn an_item_with_no_files_is_in_no_location() {
+    let moria = item("Moria", "Free League", "The One Ring");
+
+    assert!(!matches("location:vault", &moria, &[]));
+    assert!(matches("-location:vault", &moria, &[]));
 }

@@ -44,17 +44,20 @@ pub enum Field {
     Genre,
     /// Whether the item is `downloaded` or still in the `cloud`.
     Availability,
+    /// The storage location a downloaded file of the item is in.
+    Location,
 }
 
 impl Field {
     /// Every field, in the order a search is documented.
-    pub const ALL: [Self; 7] = [Self::Tag,
+    pub const ALL: [Self; 8] = [Self::Tag,
                                 Self::Publisher,
                                 Self::System,
                                 Self::Type,
                                 Self::Format,
                                 Self::Genre,
-                                Self::Availability];
+                                Self::Availability,
+                                Self::Location];
 
     /// The field whose keyword is `keyword`, ignoring case.
     ///
@@ -83,6 +86,7 @@ impl Field {
             Self::Format => "format",
             Self::Genre => "genre",
             Self::Availability => "availability",
+            Self::Location => "location",
         }
     }
 
@@ -104,7 +108,7 @@ impl Field {
             Self::Type => Some(CATEGORY_PRODUCT_TYPE),
             Self::Format => Some(CATEGORY_FORMAT),
             Self::Genre => Some(CATEGORY_GENRE),
-            Self::Tag | Self::Publisher | Self::Availability => None,
+            Self::Tag | Self::Publisher | Self::Availability | Self::Location => None,
         }
     }
 }
@@ -151,6 +155,7 @@ impl Term {
                     .any(|filter| filter.is_in(category) && equals(&filter.name))
             }
             Field::Availability => self.availability() == Some(item.status),
+            Field::Location => item.locations.iter().any(|location| equals(location)),
         }
     }
 }

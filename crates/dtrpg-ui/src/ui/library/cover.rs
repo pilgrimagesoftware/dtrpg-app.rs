@@ -275,7 +275,8 @@ mod tests {
                       is_available:              true,
                       availability_last_checked: None,
                       files:                     Vec::new(),
-                      filters:                   Vec::new(), }
+                      filters:                   Vec::new(),
+                      locations:                 Vec::new(), }
     }
 
     #[test]

@@ -175,3 +175,59 @@ fn replacing_one_item_replaces_its_filters() {
     assert_eq!(read.filters.len(), 1);
     assert_eq!(read.filters[0].name.as_ref(), "Pathfinder");
 }
+
+/// Records where the files of items `a`, `b` and `c` are: `a` in two places,
+/// `b` and `c` in one each.
+fn with_locations(mut index: LibraryIndex) -> LibraryIndex {
+    let file = |name: &str, location: &str| (name.to_owned(), location.to_owned());
+    index.set_file_locations("a", &[file("x.pdf", "Vault"), file("y.pdf", "Local")])
+         .unwrap();
+    index.set_file_locations("b", &[file("z.pdf", "Vault")])
+         .unwrap();
+    index.set_file_locations("c", &[file("w.pdf", "Local")])
+         .unwrap();
+    index
+}
+
+#[test]
+fn locations_count_each_item_once_for_each_place_it_has_files() {
+    let index = with_locations(seeded());
+
+    assert_eq!(counts(&index, &ItemFilter::default(), Field::Location),
+               [("local".to_owned(), 2), ("vault".to_owned(), 2)]);
+}
+
+#[test]
+fn location_counts_follow_the_filter() {
+    let index = with_locations(seeded());
+    let query = SearchQuery::parse("availability:downloaded");
+    let filter = ItemFilter { search: Some(&query),
+                              ..ItemFilter::default() };
+
+    assert_eq!(counts(&index, &filter, Field::Location),
+               [("vault".to_owned(), 1)]);
+}
+
+#[test]
+fn a_location_term_keeps_the_items_with_files_there_and_a_negated_one_the_rest() {
+    let index = with_locations(seeded());
+    let ids = |text: &str| -> Vec<String> {
+        let query = SearchQuery::parse(text);
+        let filter = ItemFilter { search: Some(&query),
+                                  ..ItemFilter::default() };
+        let mut ids: Vec<String> =
+            index.list_items_filtered(&filter,
+                                      crate::util::sort::SortMethod::Title,
+                                      crate::util::sort::SortDirection::Ascending)
+                 .unwrap()
+                 .into_iter()
+                 .map(|item| item.id.to_string())
+                 .collect();
+        ids.sort();
+        ids
+    };
+
+    assert_eq!(ids("location:vault"), ["a", "b"]);
+    assert_eq!(ids("location:VAULT location:local"), ["a", "b", "c"]);
+    assert_eq!(ids("-location:vault"), ["c", "d"]);
+}

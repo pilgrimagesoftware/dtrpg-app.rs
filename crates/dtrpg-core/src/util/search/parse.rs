@@ -53,7 +53,7 @@ impl SearchQuery {
     /// search behaves as it always has; with a term the leftover words rejoin
     /// with single spaces. A term with no value asks for nothing, and is left
     /// out of the text. A word before a colon that is not a field, such as
-    /// `location:cloud`, is free text.
+    /// `colour:cloud`, is free text.
     ///
     /// # Examples
     ///

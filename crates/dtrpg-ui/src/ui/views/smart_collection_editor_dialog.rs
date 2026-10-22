@@ -127,6 +127,7 @@ fn field_label(field: Field) -> String {
         Field::Format => t!("smart_collections.editor.field_format"),
         Field::Genre => t!("smart_collections.editor.field_genre"),
         Field::Availability => t!("smart_collections.editor.field_availability"),
+        Field::Location => t!("smart_collections.editor.field_location"),
     }.to_string()
 }
 

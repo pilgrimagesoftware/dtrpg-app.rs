@@ -52,6 +52,16 @@ fn by_item(conn: &Connection) -> rusqlite::Result<HashMap<String, Vec<String>>> 
     Ok(by_item)
 }
 
+/// The names of the locations `item_id` has files in, in name order.
+fn of_item(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<String>> {
+    let mut statement = conn.prepare(
+                                     "SELECT DISTINCT location FROM file_locations
+         WHERE item_id = ?1 ORDER BY location",
+    )?;
+    statement.query_map(params![item_id], |row| row.get(0))?
+             .collect()
+}
+
 /// The ids of downloaded items that have no recorded file location: those
 /// downloaded before locations were recorded.
 fn downloaded_without_location(conn: &Connection) -> rusqlite::Result<Vec<String>> {
@@ -91,6 +101,15 @@ impl LibraryIndex {
     /// Returns [`IndexError::Sqlite`] if the query fails.
     pub fn file_locations_by_item(&self) -> Result<HashMap<String, Vec<String>>, IndexError> {
         Ok(by_item(&self.conn)?)
+    }
+
+    /// The names of the storage locations `item_id` has files in.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn file_locations_of(&self, item_id: &str) -> Result<Vec<String>, IndexError> {
+        Ok(of_item(&self.conn, item_id)?)
     }
 
     /// The ids of downloaded items with no recorded file location.

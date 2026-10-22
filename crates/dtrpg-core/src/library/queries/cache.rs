@@ -134,6 +134,7 @@ impl Library {
                  types:        count(Field::Type),
                  formats:      count(Field::Format),
                  genres:       count(Field::Genre),
+                 locations:    count(Field::Location),
                  tags:         count(Field::Tag), }
     }
 

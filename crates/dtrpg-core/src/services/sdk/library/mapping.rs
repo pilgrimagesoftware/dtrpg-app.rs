@@ -301,7 +301,8 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
                   is_available: true,
                   availability_last_checked: None,
                   files,
-                  filters }
+                  filters,
+                  locations: Vec::new() }
 }
 
 #[cfg(test)]
