@@ -54,7 +54,6 @@ impl SettingsController {
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone(),
                            active_page_ix: self.active_page_ix,
-                           cache_counts: self.cache_counts,
                            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
                            max_concurrent_downloads_input: self.max_concurrent_downloads_input
                                                                .clone(),

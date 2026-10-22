@@ -181,7 +181,6 @@ impl Render for SettingsWindowView {
                                           self.file_opener_extension_input.clone(),
                                           snap.pending_file_opener,
                                           snap.active_page_ix,
-                                          snap.cache_counts,
                                           snap.recently_updated_window_days,
                                           snap.recently_updated_window_input,
                                           snap.native,

@@ -10,13 +10,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use dtrpg_core::credentials::{Credential, CredentialStore, KeyringCredentialStore};
-use dtrpg_core::data::avatar::{avatar_cached, fetch_avatar_bytes};
-use dtrpg_core::data::catalog_cache::load_cache_metadata;
+use dtrpg_core::data::avatar::fetch_avatar_bytes;
 use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use dtrpg_core::data::mcp_access::{AuditEntry, AuditLog, McpSettings, McpSettingsFile};
 use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
-use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
+use dtrpg_core::data::paths::app_cache_dir;
 use dtrpg_core::data::profile::ProfileConfig;
 use dtrpg_core::data::storage::placement::PlacementCondition;
 use dtrpg_core::data::storage::placement::PlacementRule;
@@ -49,25 +48,6 @@ pub enum RuleEditorType {
     Publisher,
     Collection,
     Size,
-}
-
-/// Per-type counts of regenerable app cache data, computed from disk and
-/// cached on the controller — see [`SettingsController::refresh_cache_counts`].
-#[derive(Clone, Copy, Default)]
-pub struct CacheCounts {
-    /// Number of items in the cached catalog/collections metadata.
-    pub metadata_items:             usize,
-    /// Number of cached cover thumbnail files.
-    pub cover_thumbnails:           usize,
-    /// `true` if an avatar image is currently cached.
-    pub avatar_cached:              bool,
-    /// Unix timestamp (seconds) when the catalog/collections metadata cache
-    /// was last written. `None` when no cache metadata exists yet.
-    pub metadata_saved_at_secs:     Option<i64>,
-    /// Unix timestamp (seconds) of the last per-item availability check
-    /// batch (manual or automatic). `None` when no batch has run yet, or
-    /// predates the field being tracked.
-    pub last_item_check_batch_secs: Option<i64>,
 }
 
 // ── AuthState
@@ -168,9 +148,6 @@ pub struct SettingsSnapshot {
     pub pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     pub active_page_ix:                 usize,
-    /// Current per-type counts of cached data, for the Advanced section's
-    /// "Cache details" area.
-    pub cache_counts:                   CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
     pub max_concurrent_downloads:       usize,
     /// Shared input state for the "Max concurrent downloads" number field in
@@ -258,11 +235,6 @@ pub struct SettingsController {
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
     active_page_ix:                 usize,
-    /// Cached per-type cache counts for the Advanced page. Refreshed on the
-    /// panel-open, page-change, and cache-clear paths — see
-    /// [`Self::refresh_cache_counts`] — rather than recomputed on every
-    /// render pass, so rendering performs no disk I/O.
-    cache_counts:                   CacheCounts,
     /// Free and total space of each storage root's volume, by root id, for
     /// the Storage page. Refreshed with the cache counts, so rendering does
     /// no disk I/O.
@@ -371,7 +343,6 @@ impl SettingsController {
                               active_page_ix:
                                   dtrpg_core::data::ui_state::UiState::load().settings_page_ix()
                                                                              .unwrap_or(0),
-                              cache_counts: CacheCounts::default(),
                               root_volumes: HashMap::new(),
                               focus_email_pending: false,
                               recently_updated_window_input: None,
@@ -425,7 +396,6 @@ impl SettingsController {
                token_status: TokenStatusHandle::default(),
                pending_file_opener: None,
                active_page_ix: 0,
-               cache_counts: CacheCounts::default(),
                root_volumes: HashMap::new(),
                focus_email_pending: false,
                recently_updated_window_input: None,

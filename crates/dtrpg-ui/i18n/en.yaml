@@ -58,6 +58,8 @@ agent:
   tool_summarize_item: "Write a summary; spends tokens"
   tool_download_item: "Download a title’s files"
 insights:
+  cache_title: "Cache"
+  cache_note: "What Libri keeps on disk so it starts fast, and the timing it works by."
   title: "Insights"
   analyzed: "%{titles} analyzed"
   recompute: "Recompute"
@@ -418,7 +420,7 @@ settings:
   clear_cache_button: "Clear Cache"
   clear_cache_confirm_title: "Clear cache?"
   clear_cache_confirm_description: "The catalog and collections will re-fetch from DriveThruRPG the next time they load."
-  cache_details_title: "Cache Details"
+  cache_details_moved: "Counts and timing for the cache are in Insights."
   cache_metadata_label: "Metadata Items"
   cache_metadata_description: "Number of catalog and collection entries stored in the local metadata cache."
   cache_metadata_saved_label: "Last Saved"
