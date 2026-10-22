@@ -51,6 +51,34 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
       .detach();
     settings.update(cx, |ctrl, _cx| ctrl.set_password_input(password_input));
 
+    // The Anthropic key is saved to the keychain when the field loses focus,
+    // and the field is cleared so the key is not left on screen.
+    let anthropic_key_input = cx.new(|cx| {
+                                    InputState::new(window, cx)
+            .placeholder(t!("agent.summary_key_placeholder").to_string())
+            .masked(true)
+                                });
+    let settings_for_key = settings.clone();
+    cx.subscribe_in(&anthropic_key_input,
+                    window,
+                    move |_this, input_entity, event: &InputEvent, window, cx| {
+                        if matches!(event, InputEvent::Blur) {
+                            let key = input_entity.read(cx).value().to_string();
+                            let saved = settings_for_key.update(cx, |ctrl, cx| {
+                                                            ctrl.save_anthropic_key(&key, cx)
+                                                        });
+                            if saved {
+                                input_entity.update(cx, |state, cx| {
+                                                state.set_value("", window, cx)
+                                            });
+                            }
+                        }
+                    })
+      .detach();
+    settings.update(cx, |ctrl, _cx| {
+                ctrl.set_anthropic_key_input(anthropic_key_input)
+            });
+
     let theme_editor_input = cx.new(|cx| {
                                    gpui_kit::component::input::EditorState::new(window, cx)
                                         .language("toml")

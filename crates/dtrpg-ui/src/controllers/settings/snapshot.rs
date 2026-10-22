@@ -49,7 +49,6 @@ impl SettingsController {
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone(),
                            active_page_ix: self.active_page_ix,
-                           cache_counts: self.cache_counts,
                            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
                            max_concurrent_downloads_input: self.max_concurrent_downloads_input
                                                                .clone(),
@@ -61,7 +60,7 @@ impl SettingsController {
                            mcp_command_path: self.mcp_command_path.clone(),
                            mcp_log_path: self.mcp_log_path.clone(),
                            summaries: self.summaries.snapshot(),
-                           summary_tokens_used: self.summary_tokens_used,
+                           summary_page: self.summary_page.clone(),
                            recently_updated_window_days: self.storage
                                                              .recently_updated_window_days(),
                            recently_updated_window_input: self.recently_updated_window_input

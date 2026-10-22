@@ -24,7 +24,7 @@ use gpui_kit::component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::{FilterValueSection, LibraryController};
-use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
+use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
@@ -75,7 +75,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              sign_in_error: Option<String>,
                              file_opener_extension_input: Entity<InputState>,
                              pending_file_opener: Option<PathBuf>, active_page_ix: usize,
-                             cache_counts: CacheCounts, recently_updated_window_days: u32,
+                             recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
                              native: NativePreferencesFile,
                              filter_values: Vec<FilterValueSection>)
@@ -119,10 +119,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                   &theme.fonts.mono_font).into_any_element(),
         5 => render_advanced_section(entity.clone(),
                                      native,
-                                     cache_counts,
                                      colors,
                                      &theme.fonts.label_font,
-                                     &theme.fonts.value_font,
                                      recently_updated_window_days,
                                      recently_updated_window_input,
                                      &filter_values,

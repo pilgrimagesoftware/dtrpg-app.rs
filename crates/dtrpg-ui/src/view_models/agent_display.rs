@@ -8,6 +8,8 @@ use dtrpg_core::data::mcp_access::{AuditEntry, McpScope, McpSettings, McpSetting
 use dtrpg_core::data::summary_settings::SummarySettingsFile;
 use rust_i18n::t;
 
+use crate::view_models::summary_display::SummaryPage;
+
 /// The name of the MCP server program, as the build produces it.
 const SERVER_PROGRAM: &str = "dtrpg-mcp";
 
@@ -60,8 +62,8 @@ pub struct AgentPageData {
     pub log_path:     String,
     /// How summaries are made.
     pub summaries:    SummarySettingsFile,
-    /// Tokens this month's summaries have used.
-    pub tokens_used:  u64,
+    /// What the Summaries card reads besides the settings.
+    pub summary_page: SummaryPage,
 }
 
 /// How many tools a call can use right now: all of them when the scope and

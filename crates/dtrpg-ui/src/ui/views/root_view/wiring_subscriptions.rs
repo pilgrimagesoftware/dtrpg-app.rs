@@ -330,7 +330,12 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
                  move |_this, _settings, _event: &CacheCleared, cx| {
                      let controller = controller_for_cache_cleared.clone();
                      cx.defer(move |cx| {
-                           controller.update(cx, |ctrl, cx| ctrl.clear_and_reload(cx));
+                           controller.update(cx, |ctrl, cx| {
+                                         ctrl.clear_and_reload(cx);
+                                         // The Insights cache card counts what
+                                         // was just removed.
+                                         ctrl.recompute_insights(cx);
+                                     });
                        });
                  })
       .detach();

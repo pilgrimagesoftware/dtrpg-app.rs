@@ -56,9 +56,9 @@ fn series(index: usize) -> Hsla {
 }
 
 /// A card: a titled box with a note under the title.
-fn card(id: &'static str, title: String, note: String, colors: &ColorTokens,
-        body: impl IntoElement)
-        -> impl IntoElement {
+pub(super) fn card(id: &'static str, title: String, note: String, colors: &ColorTokens,
+                   body: impl IntoElement)
+                   -> impl IntoElement {
     GroupBox::new().id(id)
                    .title(div().flex()
                                .flex_col()
