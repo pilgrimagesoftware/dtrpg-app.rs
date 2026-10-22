@@ -15,6 +15,7 @@ use rust_i18n::t;
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::settings_native_view::switch_row;
+use crate::ui::views::settings_summaries_view::render_summaries;
 use crate::ui::widgets::{selectable_note, selectable_text, small_caps_text};
 use crate::view_models::agent_display::{
     AgentPageData, agent_config_json, exposed_tools, scope_label, summary_label, time_label,
@@ -318,4 +319,5 @@ pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageD
                                 })))
          .child(activity_rows(&data, colors))
          .child(log_location(&data.log_path, colors))
+         .child(render_summaries(&entity, &data.summaries, data.tokens_used, colors))
 }

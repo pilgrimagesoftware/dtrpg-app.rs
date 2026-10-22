@@ -163,6 +163,9 @@ impl LibraryController {
         if succeeded && let Some(dest) = dest.clone() {
             self.project_tags_after_download(&item_id, dest, cx);
         }
+        if succeeded {
+            self.summarize_after_download(&item_id, cx);
+        }
 
         let activity_id = job.activity_id;
         match outcome {

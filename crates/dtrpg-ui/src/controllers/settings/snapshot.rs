@@ -65,6 +65,8 @@ impl SettingsController {
                            mcp_activity: self.mcp_activity.clone(),
                            mcp_command_path: self.mcp_command_path.clone(),
                            mcp_log_path: self.mcp_log_path.clone(),
+                           summaries: self.summaries.snapshot(),
+                           summary_tokens_used: self.summary_tokens_used,
                            recently_updated_window_days: self.storage
                                                              .recently_updated_window_days(),
                            recently_updated_window_input: self.recently_updated_window_input

@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use dtrpg_core::data::mcp_access::{AuditEntry, McpScope, McpSettings, McpSettingsFile, McpTool};
+use dtrpg_core::data::summary_settings::SummarySettingsFile;
 use rust_i18n::t;
 
 /// The name of the MCP server program, as the build produces it.
@@ -57,6 +58,10 @@ pub struct AgentPageData {
     pub command_path: String,
     /// Where the log of calls is kept.
     pub log_path:     String,
+    /// How summaries are made.
+    pub summaries:    SummarySettingsFile,
+    /// Tokens this month's summaries have used.
+    pub tokens_used:  u64,
 }
 
 /// How many tools a call can use right now: all of them when the scope and

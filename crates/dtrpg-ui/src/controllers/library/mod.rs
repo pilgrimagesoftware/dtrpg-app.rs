@@ -47,6 +47,7 @@ use crate::view_models::inspector::{
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 mod attention;
+mod auto_summary;
 mod bulk_selection;
 mod catalog;
 mod catalog_sync;
