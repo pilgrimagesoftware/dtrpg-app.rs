@@ -38,6 +38,7 @@ impl SettingsController {
                            size_rule_input: self.size_rule_input.clone(),
                            rule_target_root_id: self.rule_target_root_id,
                            rule_editor_type: self.rule_editor_type,
+                           rule_editor_open: self.rule_editor_open,
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,
@@ -56,6 +57,7 @@ impl SettingsController {
                            max_concurrent_downloads_input: self.max_concurrent_downloads_input
                                                                .clone(),
                            create_collections: self.storage.create_collections(),
+                           check_free_space: self.storage.check_free_space(),
                            native: self.native.snapshot(),
                            mcp: self.mcp.snapshot(),
                            mcp_activity: self.mcp_activity.clone(),

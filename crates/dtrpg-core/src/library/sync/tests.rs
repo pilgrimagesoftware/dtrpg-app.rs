@@ -86,6 +86,7 @@ fn test_storage_config() -> StorageConfig {
                     max_concurrent_downloads:
                         crate::data::storage::DEFAULT_MAX_CONCURRENT_DOWNLOADS,
                     create_collections:           false,
+                    check_free_space:             true,
                     recently_updated_window_days:
                         crate::data::constants::RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
                     extra_roots:                  Vec::new(),

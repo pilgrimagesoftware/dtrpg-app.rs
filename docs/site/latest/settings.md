@@ -30,12 +30,14 @@ size-aware element in the window together. See
 [Themes and appearance]({{ '/latest/themes/' | relative_url }}) for the full
 theme list.
 
-## Downloads
+## Storage
 
-Where files save to, how many download (and thumbnail-load) operations run
-at once, whether collections get mirrored into a `collections/` folder of
-symlinks, and how many days an item stays in the sidebar's Recently Updated
-section. See [Downloads]({{ '/latest/downloads/' | relative_url }}).
+Locations (each with its free space and how many titles it holds), the
+placement rules that choose between them, and behavior: checking free space
+before a download, mirroring collections as folders of symlinks, and how many
+download (and thumbnail-load) operations run at once. See
+[Storage roots]({{ '/latest/storage/' | relative_url }}) and
+[Downloads]({{ '/latest/downloads/' | relative_url }}).
 
 ## File Openers
 
