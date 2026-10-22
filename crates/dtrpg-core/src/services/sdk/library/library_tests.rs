@@ -173,6 +173,31 @@ fn count_items_falls_back_to_page_length_without_last_link() {
 }
 
 #[test]
+fn count_items_is_unknown_when_more_pages_exist_but_no_last_link_is_given() {
+    let mut gateway = FakeSdkGateway::seeded();
+    gateway.list_result = Ok(OrderProductListResponse {
+        links: PaginationLinks {
+            self_: "self".to_string(),
+            first: None,
+            last: None,
+            prev: None,
+            next: Some("https://api.example.com/order_products?pageSize=1&page=2".to_string()),
+        },
+        meta: PaginationMeta {
+            items_per_page: 1,
+            current_page: 1,
+        },
+        data: vec![order_product_item(1, "First Item")],
+        included: None,
+    });
+    let service = RustSdkLibraryService::new(Box::new(gateway));
+
+    let count = service.count_items().expect("count supported");
+
+    assert!(count.is_err(), "a count of 1 would be a wrong answer");
+}
+
+#[test]
 fn count_items_propagates_gateway_error() {
     let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
 
