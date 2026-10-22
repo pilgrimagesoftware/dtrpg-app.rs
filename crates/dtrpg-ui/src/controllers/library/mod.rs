@@ -28,7 +28,7 @@ use dtrpg_core::util::publisher::*;
 use dtrpg_core::util::search::Field;
 use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{JobEvent, JobEvents, JobId, Outcome, Priority};
-use gpui::{AppContext, BorrowAppContext, Context, Entity, Pixels, SharedString, Window};
+use gpui::{AppContext, BorrowAppContext, Context, Entity, Pixels, Window};
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
 

@@ -51,6 +51,15 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
       .detach();
     settings.update(cx, |ctrl, _cx| ctrl.set_password_input(password_input));
 
+    let theme_editor_input = cx.new(|cx| {
+                                   gpui_kit::component::input::EditorState::new(window, cx)
+                                        .language("toml")
+                                        .line_number(false)
+                               });
+    settings.update(cx, |ctrl, _cx| {
+                ctrl.set_theme_editor_input(theme_editor_input)
+            });
+
     let storage_path_placeholder = {
         use dtrpg_core::data::storage::StorageConfig;
         StorageConfig::load().root_path()

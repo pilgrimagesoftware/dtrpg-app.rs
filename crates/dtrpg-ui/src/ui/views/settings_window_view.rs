@@ -13,6 +13,7 @@ use crate::controllers::settings::{ADVANCED_PAGE_IX, STORAGE_PAGE_IX, SettingsCo
 use crate::data::theme::LibriTheme;
 use crate::ui::app::save_settings_window_bounds_soon;
 use crate::ui::views::settings_storage_view::StoragePageData;
+use crate::ui::views::settings_theme_editor::{ThemeEditorData, load_theme_editor};
 use crate::ui::views::settings_view::render_settings_panel;
 use crate::util::debounce::Debounce;
 use crate::view_models::agent_display::AgentPageData;
@@ -53,11 +54,29 @@ impl SettingsWindowView {
               save_settings_window_bounds_soon(window, &this.bounds_debounce, cx);
           })
           .detach();
-        Self { settings,
-               library,
-               file_opener_extension_input,
-               focus_handle,
-               bounds_debounce: Debounce::new() }
+        // The editor shows the active theme's file, so it follows theme changes
+        // (a pick in the gallery, or the file changing on disk).
+        cx.observe_global_in::<LibriTheme>(window, |this, window, cx| {
+              this.load_theme_editor(window, cx);
+          })
+          .detach();
+        let view = Self { settings,
+                          library,
+                          file_opener_extension_input,
+                          focus_handle,
+                          bounds_debounce: Debounce::new() };
+        view.load_theme_editor(window, cx);
+        view
+    }
+
+    /// Fills the theme editor with the active theme's file, if the editor is
+    /// attached.
+    fn load_theme_editor(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(editor) = self.settings.read(cx).theme_editor_input() {
+            load_theme_editor(&editor, window, cx);
+            self.settings
+                .update(cx, |ctrl, cx| ctrl.set_theme_editor_error(None, cx));
+        }
     }
 }
 
@@ -135,6 +154,9 @@ impl Render for SettingsWindowView {
                                         publisher_names,
                                         rule_editor_type: snap.rule_editor_type,
                                         rule_editor_open: snap.rule_editor_open };
+        let theme_editor = ThemeEditorData { input:    snap.theme_editor_input.clone(),
+                                             error:    snap.theme_editor_error.clone(),
+                                             settings: self.settings.clone(), };
         let panel = render_settings_panel(&snap.file_openers,
                                           snap.auth,
                                           storage,
@@ -143,6 +165,7 @@ impl Render for SettingsWindowView {
                                                           command_path: snap.mcp_command_path
                                                                             .clone(),
                                                           log_path:     snap.mcp_log_path.clone(), },
+                                          theme_editor,
                                           self.settings.clone(),
                                           self.library.clone(),
                                           &self.focus_handle,

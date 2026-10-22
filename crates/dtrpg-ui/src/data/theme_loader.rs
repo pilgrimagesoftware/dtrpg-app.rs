@@ -28,36 +28,49 @@ struct ThemeToml {
     palette: PaletteToml,
 }
 
+/// The font keys of a theme file. Every key is optional.
 #[derive(Debug, Default, Deserialize)]
-struct PaletteToml {
+pub(super) struct FontsToml {
     #[serde(default)]
-    desktop_bg:     Option<String>,
+    pub(super) body_font:  Option<String>,
     #[serde(default)]
-    surface:        Option<String>,
+    pub(super) value_font: Option<String>,
     #[serde(default)]
-    surface_alt:    Option<String>,
+    pub(super) label_font: Option<String>,
     #[serde(default)]
-    hover:          Option<String>,
+    pub(super) mono_font:  Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct PaletteToml {
     #[serde(default)]
-    text_primary:   Option<String>,
+    pub(super) desktop_bg:     Option<String>,
     #[serde(default)]
-    text_secondary: Option<String>,
+    pub(super) surface:        Option<String>,
     #[serde(default)]
-    text_tertiary:  Option<String>,
+    pub(super) surface_alt:    Option<String>,
     #[serde(default)]
-    border:         Option<String>,
+    pub(super) hover:          Option<String>,
     #[serde(default)]
-    border_strong:  Option<String>,
+    pub(super) text_primary:   Option<String>,
     #[serde(default)]
-    accent:         Option<String>,
+    pub(super) text_secondary: Option<String>,
     #[serde(default)]
-    accent_soft:    Option<String>,
+    pub(super) text_tertiary:  Option<String>,
     #[serde(default)]
-    accent_on:      Option<String>,
+    pub(super) border:         Option<String>,
     #[serde(default)]
-    shadow:         Option<String>,
+    pub(super) border_strong:  Option<String>,
     #[serde(default)]
-    scrim:          Option<String>,
+    pub(super) accent:         Option<String>,
+    #[serde(default)]
+    pub(super) accent_soft:    Option<String>,
+    #[serde(default)]
+    pub(super) accent_on:      Option<String>,
+    #[serde(default)]
+    pub(super) shadow:         Option<String>,
+    #[serde(default)]
+    pub(super) scrim:          Option<String>,
 }
 
 /// Loads a theme's colors by id: a built-in id reads its embedded TOML, any
@@ -74,7 +87,7 @@ pub fn load(id: &ThemeId) -> ColorTokens {
 }
 
 /// The embedded TOML source for a built-in theme, or `None` for any other id.
-fn builtin_toml(id: &str) -> Option<&'static str> {
+pub(super) fn builtin_toml(id: &str) -> Option<&'static str> {
     match id {
         "parchment" => Some(include_str!("../../../../assets/themes/parchment.toml")),
         "slate" => Some(include_str!("../../../../assets/themes/slate.toml")),
@@ -102,7 +115,7 @@ pub fn theme_source(id: &ThemeId) -> Option<String> {
 ///
 /// Returns `None` for an id containing path separators or `..` (a persisted
 /// id is never trusted as a filesystem path).
-fn user_theme_path(id: &str) -> Option<PathBuf> {
+pub(super) fn user_theme_path(id: &str) -> Option<PathBuf> {
     if id.contains(['/', '\\']) || id.is_empty() || id.contains("..") {
         return None;
     }
@@ -155,7 +168,7 @@ pub fn load_from_path(path: &PathBuf) -> Option<ColorTokens> {
                                  .and_then(|s| parse_theme_toml(&s).ok())
 }
 
-fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
+pub(super) fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
     let theme: ThemeToml = toml::from_str(s)?;
     let palette = theme.palette;
     let mode = theme.mode
@@ -201,7 +214,7 @@ fn parse_hex_alpha_opt(s: Option<&str>) -> Option<Hsla> {
     s.and_then(parse_hex_alpha)
 }
 
-fn parse_hex(s: &str) -> Option<Hsla> {
+pub(super) fn parse_hex(s: &str) -> Option<Hsla> {
     let s = s.trim().trim_start_matches('#');
     if s.len() == 6 {
         let r = u8::from_str_radix(&s[0..2], 16).ok()?;
@@ -220,7 +233,7 @@ fn parse_hex(s: &str) -> Option<Hsla> {
     }
 }
 
-fn parse_hex_alpha(s: &str) -> Option<Hsla> {
+pub(super) fn parse_hex_alpha(s: &str) -> Option<Hsla> {
     let s = s.trim();
     // "#RRGGBB a.f32" format: hex then space then alpha
     let parts: Vec<&str> = s.split_whitespace().collect();

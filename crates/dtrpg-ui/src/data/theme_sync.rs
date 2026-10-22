@@ -26,8 +26,10 @@ use super::{ColorTokens, LibriTheme};
 /// two-global update.
 pub fn install_theme(theme: LibriTheme, cx: &mut gpui::App) {
     let colors = theme.colors.clone();
+    let body_font = theme.fonts.body_font.clone();
     cx.set_global(theme);
     cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
+          theme.font_family = body_font;
           apply_theme_colors(theme, &colors);
       });
 }

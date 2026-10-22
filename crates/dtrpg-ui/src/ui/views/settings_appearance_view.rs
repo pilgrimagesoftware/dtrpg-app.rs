@@ -22,6 +22,7 @@ use rust_i18n::t;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
 use crate::data::theme::LibriTheme;
+use crate::ui::views::settings_theme_editor::{ThemeEditorData, render_theme_editor};
 use crate::ui::views::settings_theme_gallery::render_theme_gallery;
 use crate::ui::widgets::small_caps_text;
 
@@ -127,7 +128,7 @@ fn text_scale_row(scale: f32, entity: Entity<LibraryController>, colors: &ColorT
 /// Renders the Appearance settings section: a shared text-scale stepper and the
 /// theme gallery. Fonts are part of a theme, so they are set by editing it.
 pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &ColorTokens,
-                                 theme: &LibriTheme)
+                                 theme: &LibriTheme, theme_editor: ThemeEditorData)
                                  -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let border = colors.border;
@@ -136,6 +137,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
     let label_font_family = theme.fonts.label_font.to_string();
 
     let entity_gallery = entity.clone();
+    let entity_editor = entity.clone();
 
     div().flex()
          .flex_col()
@@ -149,4 +151,5 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
          .child(text_scale_row(scale, entity, colors, &label_font_family))
          .child(div().h(px(1.0)).bg(border))
          .child(render_theme_gallery(entity_gallery, colors, &theme_id, &label_font_family))
+         .child(render_theme_editor(theme_editor, entity_editor, &theme_id, colors))
 }

@@ -39,6 +39,8 @@ impl SettingsController {
                            rule_target_root_id: self.rule_target_root_id,
                            rule_editor_type: self.rule_editor_type,
                            rule_editor_open: self.rule_editor_open,
+                           theme_editor_input: self.theme_editor_input.clone(),
+                           theme_editor_error: self.theme_editor_error.clone(),
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,

@@ -25,6 +25,7 @@ pub mod settings_file_openers_view;
 pub mod settings_filter_values_view;
 pub mod settings_native_view;
 pub mod settings_storage_view;
+pub mod settings_theme_editor;
 pub mod settings_theme_gallery;
 pub mod settings_view;
 pub mod settings_window_view;

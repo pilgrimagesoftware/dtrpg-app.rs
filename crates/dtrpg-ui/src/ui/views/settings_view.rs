@@ -33,6 +33,7 @@ use crate::ui::views::{
     settings_appearance_view::render_appearance_section,
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::{StoragePageData, render_storage_section},
+    settings_theme_editor::ThemeEditorData,
 };
 use crate::view_models::agent_display::AgentPageData;
 
@@ -65,7 +66,7 @@ fn page_title(ix: usize) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage: StoragePageData, agent: AgentPageData,
-                             entity: Entity<SettingsController>,
+                             theme_editor: ThemeEditorData, entity: Entity<SettingsController>,
                              library: Entity<LibraryController>, focus_handle: &FocusHandle,
                              colors: &ColorTokens, theme: &LibriTheme,
                              email_input: Option<Entity<InputState>>,
@@ -104,7 +105,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                   .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
-        1 => render_appearance_section(library, colors, theme).into_any_element(),
+        1 => render_appearance_section(library, colors, theme, theme_editor).into_any_element(),
         2 => render_storage_section(entity.clone(), colors, storage).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
