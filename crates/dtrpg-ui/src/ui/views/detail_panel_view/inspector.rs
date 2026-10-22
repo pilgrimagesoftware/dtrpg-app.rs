@@ -343,8 +343,12 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
             let verifying = context.entity
                                    .read(context.cx)
                                    .is_verifying_downloads(&item.id);
+            // Padded like the other tabs, so the list and the file's details
+            // do not touch the inspector's edge.
             div().flex()
                  .flex_col()
+                 .gap(px(12.0))
+                 .p(px(16.0))
                  .child(render_item_tier(item,
                                          context.storage_root_path,
                                          context.entity.clone(),
