@@ -40,6 +40,7 @@ use crate::data::events::LibraryChanged;
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::ui::library::drag::DraggedLibraryItem;
+use crate::ui::views::download_sheet_dialog::request_download_with_sheet;
 use crate::ui::views::list_columns::{
     ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
 };

@@ -108,20 +108,12 @@ fn download_button(item: &LibraryItem, is_downloaded: bool,
                                                                          title.clone());
                                              }
                                          }
-                                         else if let Some(sheet) =
-                                             controller.read(cx).download_sheet_for(&item_id)
-                                         {
-                                             open_download_sheet_dialog(window,
-                                                                        cx,
-                                                                        controller.clone(),
-                                                                        sheet);
-                                         }
                                          else {
-                                             controller.update(cx, |ctrl, cx| {
-                                                           ctrl.request_download(&item_id,
-                                                                                 title.clone(),
-                                                                                 cx);
-                                                       });
+                                             request_download_with_sheet(window,
+                                                                         cx,
+                                                                         &controller,
+                                                                         &item_id,
+                                                                         title.clone());
                                          }
                                      })
 }

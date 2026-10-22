@@ -39,6 +39,24 @@ pub fn open_download_sheet_dialog(window: &mut Window, cx: &mut App,
           });
 }
 
+/// Starts a download of the item `entry_id` from a menu or button: opens the
+/// download sheet so the person chooses the files and the location, or, for an
+/// item with no file list yet, asks the controller to download it directly.
+///
+/// Every place that offers to download a single item calls this, so the sheet
+/// is the one way a download is set up.
+pub fn request_download_with_sheet(window: &mut Window, cx: &mut App,
+                                   controller: &Entity<LibraryController>, entry_id: &str,
+                                   title: String) {
+    let sheet = controller.read(cx).download_sheet_for(entry_id);
+    match sheet {
+        Some(sheet) => open_download_sheet_dialog(window, cx, controller.clone(), sheet),
+        None => {
+            controller.update(cx, |ctrl, cx| ctrl.request_download(entry_id, title, cx));
+        }
+    }
+}
+
 /// Megabytes as the app writes sizes, for example `162.4 MB`.
 fn size_label(mb: f64) -> String {
     format_bytes((mb.max(0.0) * 1024.0 * 1024.0) as u64)
