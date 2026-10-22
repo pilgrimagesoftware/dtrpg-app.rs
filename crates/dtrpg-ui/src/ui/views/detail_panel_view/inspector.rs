@@ -25,6 +25,7 @@ pub(super) fn inspector_tab_label(tab: InspectorTab) -> String {
         InspectorTab::Contents => t!("detail.inspector_contents_tab").to_string(),
         InspectorTab::Summary => t!("detail.inspector_summary_tab").to_string(),
         InspectorTab::Cover => t!("detail.inspector_cover_tab").to_string(),
+        InspectorTab::OtherDetails => t!("detail.inspector_other_details_tab").to_string(),
     }
 }
 
@@ -39,7 +40,8 @@ pub(super) fn render_inspector_tab_bar(item: &LibraryItem, entity: Entity<Librar
                 InspectorTab::Files,
                 InspectorTab::Contents,
                 InspectorTab::Summary,
-                InspectorTab::Cover];
+                InspectorTab::Cover,
+                InspectorTab::OtherDetails];
     let file_count = item.files.len();
     div().id("inspector-tabs")
          .flex()
@@ -71,20 +73,9 @@ pub(super) fn render_inspector_tab_bar(item: &LibraryItem, entity: Entity<Librar
                  .border_b_2()
                  .border_color(active_color)
                  .cursor_pointer()
-                 .on_click(move |_, window, cx| {
+                 .on_click(move |_, _, cx| {
                      click_entity.update(cx, |controller, cx| {
                          controller.set_inspector_tab(Arc::clone(&click_id), tab, cx);
-                         if tab == InspectorTab::Contents {
-                             controller.ensure_inspector_filter_input(Arc::clone(&click_id),
-                                                                     window, cx);
-                             controller.load_inspector_contents(Arc::clone(&click_id), cx);
-                         }
-                         if tab == InspectorTab::Summary {
-                             controller.load_inspector_summary(Arc::clone(&click_id), cx);
-                         }
-                         if tab == InspectorTab::Cover {
-                             controller.ensure_detail_cover(&click_id, cx);
-                         }
                      });
                  })
                  .child(inspector_tab_label(tab))
@@ -352,8 +343,12 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
             let verifying = context.entity
                                    .read(context.cx)
                                    .is_verifying_downloads(&item.id);
+            // Padded like the other tabs, so the list and the file's details
+            // do not touch the inspector's edge.
             div().flex()
                  .flex_col()
+                 .gap(px(12.0))
+                 .p(px(16.0))
                  .child(render_item_tier(item,
                                          context.storage_root_path,
                                          context.entity.clone(),
@@ -383,6 +378,7 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
         InspectorTab::Cover => {
             render_cover_tab(item, context.entity.clone(), context.colors, context.cx)
         }
+        InspectorTab::OtherDetails => render_other_details_tab(item, context.colors, context.cx),
         InspectorTab::Overview => div().into_any_element(),
     };
 

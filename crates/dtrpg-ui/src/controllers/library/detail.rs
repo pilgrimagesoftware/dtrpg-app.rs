@@ -1,4 +1,5 @@
-//! Detail-panel state: ZIP previews, other-details disclosure, panel width.
+//! Detail-panel state: ZIP previews, per-file other-details disclosure, panel
+//! width.
 
 use super::*;
 
@@ -12,15 +13,30 @@ impl LibraryController {
             .unwrap_or_default()
     }
 
-    /// Changes the active v2 inspector tab for `entry_id`.
+    /// Changes the active v2 inspector tab for `entry_id`, and starts loading
+    /// what the tab shows if that has not been loaded.
+    ///
+    /// The loading starts here, not in the tab's click handler, so that any
+    /// way of showing a tab (the tab bar, the Files link, a menu action) loads
+    /// its data.
     pub fn set_inspector_tab(&mut self, entry_id: Arc<str>, tab: InspectorTab,
                              cx: &mut Context<Self>) {
-        if self.inspector_tab_for(&entry_id) == tab {
-            return;
+        if self.inspector_tab_for(&entry_id) != tab {
+            self.inspector_tabs.insert(Arc::clone(&entry_id), tab);
+            cx.emit(LibraryChanged);
         }
-        self.inspector_tabs.insert(entry_id, tab);
-        cx.emit(LibraryChanged);
+        match tab {
+            InspectorTab::Contents if !self.inspector_contents.contains_key(&entry_id) => {
+                self.load_inspector_contents(entry_id, cx);
+            }
+            InspectorTab::Summary if !self.inspector_summaries.contains_key(&entry_id) => {
+                self.load_inspector_summary(entry_id, cx);
+            }
+            InspectorTab::Cover => self.ensure_detail_cover(&entry_id, cx),
+            _ => {}
+        }
     }
+
     /// Returns the current archive contents state for `entry_id`.
     #[must_use]
     pub fn inspector_contents_for(&self, entry_id: &str) -> InspectorContentsState {
@@ -178,32 +194,10 @@ impl LibraryController {
     /// Loads one archive entry for inline text preview off the render path.
     pub fn preview_inspector_entry(&mut self, entry_id: Arc<str>, name: String,
                                    cx: &mut Context<Self>) {
-        let Some(item) = self.item_by_id(&entry_id)
+        let Some(path) = self.selected_archive_path(&entry_id)
         else {
             return;
         };
-        let selected_idx = self.inspector_selected_archive_for(&entry_id);
-        let mut archives: Vec<_> = item.files
-                                       .iter()
-                                       .enumerate()
-                                       .filter(|(_, file)| {
-                                           matches!(file.format.to_ascii_uppercase().as_str(),
-                                                    "ZIP"
-                                                    | "TAR"
-                                                    | "TAR.GZ"
-                                                    | "TGZ"
-                                                    | "TAR.BZ2"
-                                                    | "TBZ2"
-                                                    | "TAR.XZ"
-                                                    | "TXZ")
-                                       })
-                                       .collect();
-        archives.sort_by_key(|(i, _)| *i);
-        let Some((_, file)) = archives.get(selected_idx).copied()
-        else {
-            return;
-        };
-        let path = resolved_item_dir(&StorageConfig::load(), &item).join(file.name.as_ref());
         self.inspector_preview.insert(Arc::clone(&entry_id),
                                       InspectorPreviewState::Loading(name.clone()));
         cx.emit(LibraryChanged);
@@ -264,33 +258,10 @@ impl LibraryController {
         if names.is_empty() {
             return;
         }
-        let Some(item) = self.item_by_id(&entry_id)
+        let Some(archive_path) = self.selected_archive_path(&entry_id)
         else {
             return;
         };
-        let selected_idx = self.inspector_selected_archive_for(&entry_id);
-        let mut archives: Vec<_> = item.files
-                                       .iter()
-                                       .enumerate()
-                                       .filter(|(_, file)| {
-                                           matches!(file.format.to_ascii_uppercase().as_str(),
-                                                    "ZIP"
-                                                    | "TAR"
-                                                    | "TAR.GZ"
-                                                    | "TGZ"
-                                                    | "TAR.BZ2"
-                                                    | "TBZ2"
-                                                    | "TAR.XZ"
-                                                    | "TXZ")
-                                       })
-                                       .collect();
-        archives.sort_by_key(|(i, _)| *i);
-        let Some((_, file)) = archives.get(selected_idx).copied()
-        else {
-            return;
-        };
-        let archive_path =
-            resolved_item_dir(&StorageConfig::load(), &item).join(file.name.as_ref());
         self.inspector_extractions
             .insert(Arc::clone(&entry_id), true);
         cx.emit(LibraryChanged);
@@ -327,35 +298,13 @@ impl LibraryController {
         {
             return;
         }
-        let Some(item) = self.item_by_id(&entry_id)
-        else {
-            return;
-        };
-        let selected_idx = self.inspector_selected_archive_for(&entry_id);
-        let mut archives: Vec<_> = item.files
-                                       .iter()
-                                       .enumerate()
-                                       .filter(|(_, file)| {
-                                           matches!(file.format.to_ascii_uppercase().as_str(),
-                                                    "ZIP"
-                                                    | "TAR"
-                                                    | "TAR.GZ"
-                                                    | "TGZ"
-                                                    | "TAR.BZ2"
-                                                    | "TBZ2"
-                                                    | "TAR.XZ"
-                                                    | "TXZ")
-                                       })
-                                       .collect();
-        archives.sort_by_key(|(i, _)| *i);
-        let Some((_, file)) = archives.get(selected_idx).copied()
+        let Some(path) = self.selected_archive_path(&entry_id)
         else {
             self.inspector_contents
                 .insert(entry_id, InspectorContentsState::Unavailable);
             cx.emit(LibraryChanged);
             return;
         };
-        let path = resolved_item_dir(&StorageConfig::load(), &item).join(file.name.as_ref());
         self.inspector_contents
             .insert(Arc::clone(&entry_id), InspectorContentsState::Loading);
         cx.emit(LibraryChanged);
@@ -407,29 +356,7 @@ impl LibraryController {
                          &format)
     }
 
-    // ── Other details disclosure ─────────────────────────────────────────────
-
-    /// Returns whether `entry_id`'s "Other details" section is expanded.
-    ///
-    /// Defaults to `false` (collapsed) for any entry id not yet toggled, per
-    /// `catalog-entry-detail-advanced-disclosure`.
-    #[must_use]
-    pub fn is_other_details_open(&self, entry_id: &str) -> bool {
-        self.other_details_open
-            .get(entry_id)
-            .copied()
-            .unwrap_or(false)
-    }
-
-    /// Flips `entry_id`'s "Other details" open/collapsed state.
-    ///
-    /// Ephemeral — never persisted, and independent per entry id.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn toggle_other_details(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
-        toggle_bool_flag(&mut self.other_details_open, entry_id);
-        cx.emit(LibraryChanged);
-    }
+    // ── Per-file other details disclosure ────────────────────────────────────
 
     /// Returns whether a single file's "Other details" section is expanded
     /// within a multi-item entry's item tier.

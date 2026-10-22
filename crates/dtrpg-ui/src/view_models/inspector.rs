@@ -17,6 +17,8 @@ pub enum InspectorTab {
     Contents,
     Summary,
     Cover,
+    /// The ids and other fields that are not in the Details table.
+    OtherDetails,
 }
 
 /// State of the lazily loaded archive contents tab.

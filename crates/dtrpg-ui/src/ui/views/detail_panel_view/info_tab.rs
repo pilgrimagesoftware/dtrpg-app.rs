@@ -1,7 +1,7 @@
 use super::*;
 
 /// Renders the Info tab: the description, tags, collections, a details table,
-/// what opens the file, and the collapsed "other details".
+/// and what opens the file.
 pub(super) fn render_info_tab(item: &LibraryItem, storage_root_path: &Path,
                               file_openers: &[FileOpenerEntry],
                               settings: &Entity<SettingsController>,
@@ -43,6 +43,5 @@ pub(super) fn render_info_tab(item: &LibraryItem, storage_root_path: &Path,
          .child(section(t!("detail.details_heading").to_string(), details))
          .child(section(t!("detail.opens_with_heading").to_string(),
                         render_opens_with(item, file_openers, settings, colors)))
-         .child(render_other_details(item, controller, colors, cx))
          .into_any_element()
 }
