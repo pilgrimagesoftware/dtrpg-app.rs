@@ -163,6 +163,8 @@ pub struct LibrarySnapshot {
     pub catalog_ids:               Arc<HashSet<u64>>,
     /// Total items in the full catalog (no filter, no search).
     pub total_count:               usize,
+    /// What Libri uses on each storage location.
+    pub root_usage:                Arc<Vec<dtrpg_core::library::insights::RootUsage>>,
     /// For each collection, how many of its titles are only in the cloud.
     pub collection_cloud:          Arc<HashMap<u64, usize>>,
     pub total_mb:                  f64,
@@ -259,6 +261,8 @@ pub struct LibraryController {
     insights:                      Option<Arc<dtrpg_core::library::insights::Insights>>,
     /// True while the aggregates are being worked out off the main thread.
     insights_computing:            bool,
+    /// What Libri uses on each storage location, for the status bar.
+    root_usage:                    Arc<Vec<dtrpg_core::library::insights::RootUsage>>,
     /// For each collection, how many of its titles are only in the cloud.
     collection_cloud:              Arc<HashMap<u64, usize>>,
     /// How many downloaded titles each storage location holds, by location id.

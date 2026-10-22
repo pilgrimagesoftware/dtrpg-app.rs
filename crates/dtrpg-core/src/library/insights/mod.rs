@@ -137,15 +137,7 @@ impl Insights {
     /// belongs on a background thread.
     #[must_use]
     pub fn with_roots(mut self, roots: &[StorageRoot]) -> Self {
-        self.roots = roots.iter()
-                          .map(|root| {
-                              let capacity = root_capacity(root);
-                              RootUsage { name:         root.name.clone(),
-                                          used_mb:      capacity.used_mb,
-                                          available_mb: capacity.available_mb,
-                                          total_mb:     capacity.total_mb, }
-                          })
-                          .collect();
+        self.roots = root_usages(roots);
         self
     }
 
@@ -155,6 +147,21 @@ impl Insights {
     pub fn to_csv(&self) -> String {
         csv::render(self)
     }
+}
+
+/// What Libri uses on each of `roots`, and the room left on each one's volume.
+/// Reads the disk, so it belongs on a background thread.
+#[must_use]
+pub fn root_usages(roots: &[StorageRoot]) -> Vec<RootUsage> {
+    roots.iter()
+         .map(|root| {
+             let capacity = root_capacity(root);
+             RootUsage { name:         root.name.clone(),
+                         used_mb:      capacity.used_mb,
+                         available_mb: capacity.available_mb,
+                         total_mb:     capacity.total_mb, }
+         })
+         .collect()
 }
 
 /// The most specific name `item` has in `category`: the last the product lists,

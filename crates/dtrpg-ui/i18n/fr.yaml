@@ -542,6 +542,7 @@ report:
   submit: "Signaler"
 
 status_bar:
+  root_tooltip: "%{name} : %{used} utilisés par Libri, %{free} libres"
   agent: "Agent"
   agent_on_tooltip: "Les agents peuvent utiliser Libri : %{exposed} outils sur %{all} disponibles"
   agent_off_tooltip: "Les agents ne peuvent pas utiliser Libri (Réglages > Agent et MCP)"

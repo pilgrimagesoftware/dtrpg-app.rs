@@ -237,6 +237,7 @@ impl LibraryController {
                           collections_loaded: self.library.collections_loaded(),
                           catalog_ids: self.library.cached_catalog_ids(),
                           total_count: counts.all,
+                          root_usage: Arc::clone(&self.root_usage),
                           collection_cloud: Arc::clone(&self.collection_cloud),
                           total_mb: self.total_size_mb(),
                           filter_count: self.library.filter_count(),

@@ -180,7 +180,8 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                            agent_enabled:
                                                                settings_snap.mcp.enabled,
                                                            agent_exposed:
-                                                               exposed_tools(&settings_snap.mcp) },
+                                                               exposed_tools(&settings_snap.mcp),
+                                                           roots: snap.root_usage.clone() },
                                        lib_entity.clone(),
                                        ActivityBarData { entity:     activity_entity.clone(),
                                                          snap:       &activity_snap,

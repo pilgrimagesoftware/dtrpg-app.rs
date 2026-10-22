@@ -151,6 +151,9 @@ impl LibraryController {
         }
         self.refresh_section_counts();
         self.refresh_collection_cloud();
+        if self.library.downloading_item_ids().is_empty() {
+            self.refresh_root_usage(cx);
+        }
         self.invalidate_cache();
         cx.emit(LibraryChanged);
 
