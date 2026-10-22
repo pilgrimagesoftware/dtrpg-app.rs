@@ -1,11 +1,18 @@
 //! The Placement rules section of the Storage page: the default location, the
-//! rules in the order they are tried, and the editor that adds one.
+//! rules in the order they are tried, and the editor that adds or changes one
+//! (`storage_rule_editor_view`).
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use gpui::Window;
 use gpui::prelude::*;
 use gpui_kit::component::Icon;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 
+use super::storage_rule_editor_view::{rule_editor_row, value_placeholder};
 use super::*;
+use crate::controllers::settings::RuleEditor;
 use crate::ui::views::settings_card::{card, card_row, section_heading};
 use crate::view_models::storage_display::describe_rule;
 
@@ -17,70 +24,49 @@ pub(super) struct RulesData {
     pub roots:           Vec<StorageRoot>,
     /// Names and counts used to describe the rules.
     pub display:         StorageDisplay,
-    /// Whether the "Add rule…" editor is showing.
-    pub editor_open:     bool,
-    /// Which kind of rule the editor is adding.
-    pub editor_type:     RuleEditorType,
-    /// The location the new rule will send downloads to.
-    pub target_root_id:  u32,
-    /// Publisher names offered as suggestions in the editor.
+    /// The editor: adding a rule or changing one.
+    pub editor:          RuleEditor,
+    /// Publisher names the editor suggests from.
     pub publisher_names: Vec<String>,
-    /// The editor's value fields, by rule type.
-    pub inputs:          RuleInputs,
-}
-
-/// The value field of each kind of rule.
-pub(super) struct RuleInputs {
-    /// For a publisher rule.
-    pub publisher:  Option<Entity<InputState>>,
-    /// For a collection rule.
-    pub collection: Option<Entity<InputState>>,
-    /// For a size rule.
-    pub size:       Option<Entity<InputState>>,
-}
-
-impl RuleInputs {
-    /// The field for the kind of rule being added.
-    fn for_type(&self, kind: RuleEditorType) -> Option<Entity<InputState>> {
-        match kind {
-            RuleEditorType::Publisher => self.publisher.clone(),
-            RuleEditorType::Collection => self.collection.clone(),
-            RuleEditorType::Size => self.size.clone(),
-        }
-    }
 }
 
 /// Renders the Placement rules heading, the rules card, and the button that
-/// opens the editor.
+/// adds a rule.
 pub(super) fn render_storage_rules(data: RulesData, entity: Entity<SettingsController>,
                                    colors: &ColorTokens)
                                    -> impl IntoElement + 'static + use<> {
-    let editor_open = data.editor_open;
+    let editor_open = data.editor.open;
     let rules_card = rules_card(&data, &entity, colors);
-    let editor = editor_open.then(|| rule_editor(&data, &entity, colors));
+    let collection_names = data.display.collection_names.clone();
     div().flex()
          .flex_col()
          .gap(px(10.0))
          .child(section_heading(t!("settings.storage_rules_title").to_string(), colors))
          .child(rules_card)
-         .children(editor)
-         .child(div().flex().child(add_rule_button(editor_open, entity)))
+         .child(div().flex()
+                     .children((!editor_open).then(|| add_rule_button(entity, collection_names))))
 }
 
-/// The card: the default location, then a row for each rule.
+/// The card: the default location, then a row for each rule. The editor takes
+/// the place of the row it changes, or comes last when it adds a rule.
 fn rules_card(data: &RulesData, entity: &Entity<SettingsController>, colors: &ColorTokens)
               -> impl IntoElement + 'static + use<> {
     let count = data.rules.len();
+    let editor = &data.editor;
+    let adding = editor.open && editor.editing.is_none();
     card(colors).child(default_location_row(&data.roots,
                                             data.display.default_root_id,
                                             entity,
                                             colors))
-                .children(data.rules
-                              .iter()
-                              .enumerate()
-                              .map(|(index, rule)| {
-                                  rule_row(index, count, rule, data, entity, colors)
-                              }))
+                .children(data.rules.iter().enumerate().map(|(index, rule)| {
+                    if editor.open && editor.editing == Some(index) {
+                        rule_editor_row(data, entity, colors).into_any_element()
+                    }
+                    else {
+                        rule_row(index, count, rule, data, entity, colors).into_any_element()
+                    }
+                }))
+                .children(adding.then(|| rule_editor_row(data, entity, colors)))
 }
 
 /// The row that picks where downloads go when no rule matches.
@@ -132,6 +118,8 @@ fn rule_row(index: usize, count: usize, rule: &PlacementRule, data: &RulesData,
     let up = entity.clone();
     let down = entity.clone();
     let remove = entity.clone();
+    let edit = entity.clone();
+    let collection_names = data.display.collection_names.clone();
     card_row(false, colors).child(div().flex_1()
                                        .flex()
                                        .flex_col()
@@ -142,6 +130,13 @@ fn rule_row(index: usize, count: usize, rule: &PlacementRule, data: &RulesData,
                                        .child(div().text_xs()
                                                    .text_color(colors.text_secondary)
                                                    .child(description.category)))
+                           .child(Button::new(SharedString::from(format!("rule-edit-{index}")))
+                                      .ghost()
+                                      .icon(Icon::empty().path("icons/pencil.svg"))
+                                      .tooltip(t!("settings.storage_rule_edit_tooltip").to_string())
+                                      .on_click(move |_, window, cx| {
+                                          open_editor(&edit, Some(index), &collection_names, window, cx);
+                                      }))
                            .when(index > 0, |row| {
                                row.child(Button::new(SharedString::from(format!("rule-up-{index}")))
                                              .ghost()
@@ -169,122 +164,32 @@ fn rule_row(index: usize, count: usize, rule: &PlacementRule, data: &RulesData,
                                       }))
 }
 
-/// The "Add rule…" button, which opens the editor, or closes it again.
-fn add_rule_button(editor_open: bool, entity: Entity<SettingsController>) -> impl IntoElement {
+/// The "Add rule…" button, which opens the editor on a new rule.
+fn add_rule_button(entity: Entity<SettingsController>, collection_names: HashMap<u64, Arc<str>>)
+                   -> impl IntoElement {
     Button::new("add-placement-rule").outline()
-                                     .icon(if editor_open {
-                                               IconName::Close
-                                           }
-                                           else {
-                                               IconName::Plus
-                                           })
-                                     .label(if editor_open {
-                                                t!("settings.storage_cancel_rule").to_string()
-                                            }
-                                            else {
-                                                t!("settings.storage_add_rule").to_string()
-                                            })
-                                     .on_click(move |_, _, cx| {
-                                         entity.update(cx, |ctrl, cx| {
-                                                   ctrl.set_rule_editor_open(!editor_open, cx)
-                                               });
+                                     .icon(IconName::Plus)
+                                     .label(t!("settings.storage_add_rule").to_string())
+                                     .on_click(move |_, window, cx| {
+                                         open_editor(&entity, None, &collection_names, window, cx);
                                      })
 }
 
-/// The editor: which kind of rule, where it sends downloads, its value, and
-/// the button that adds it.
-fn rule_editor(data: &RulesData, entity: &Entity<SettingsController>, colors: &ColorTokens)
-               -> impl IntoElement + 'static + use<> {
-    let kind = data.editor_type;
-    let input = data.inputs.for_type(kind);
-    let add_entity = entity.clone();
-    let add_input = input.clone();
-    card(colors).gap(px(10.0))
-                .p(px(16.0))
-                .child(choice_row(t!("settings.storage_rule_type").to_string(),
-                                  rule_type_buttons(kind, entity),
-                                  colors))
-                .child(choice_row(t!("settings.storage_rule_target").to_string(),
-                                  target_buttons(&data.roots, data.target_root_id, entity),
-                                  colors))
-                .child(input.map_or_else(|| div().into_any_element(),
-                                         |input| Input::new(&input).appearance(true).into_any_element()))
-                .when(kind == RuleEditorType::Publisher, |editor| {
-                    editor.child(publisher_suggestions(&data.publisher_names, data.inputs.publisher.clone()))
-                })
-                .child(div().flex().child(
-                    Button::new("confirm-placement-rule").label(t!("settings.storage_add_rule_confirm").to_string())
-                                                         .on_click(move |_, _, cx| {
-                                                             let Some(input) = add_input.clone()
-                                                             else {
-                                                                 return;
-                                                             };
-                                                             let value = input.read(cx).value().to_string();
-                                                             add_entity.update(cx, |ctrl, cx| match kind {
-                                                                 RuleEditorType::Publisher => ctrl.add_publisher_rule(value, cx),
-                                                                 RuleEditorType::Collection => ctrl.add_collection_rule(value, cx),
-                                                                 RuleEditorType::Size => ctrl.add_size_rule(value, cx),
-                                                             });
-                                                         })))
-}
-
-/// A label with a row of buttons beside it.
-fn choice_row(label: String, buttons: gpui::Div, colors: &ColorTokens) -> impl IntoElement {
-    div().flex()
-         .items_center()
-         .gap(px(8.0))
-         .child(div().w(px(80.0))
-                     .text_xs()
-                     .text_color(colors.text_secondary)
-                     .child(label))
-         .child(buttons)
-}
-
-/// One button per kind of rule, the chosen one selected.
-fn rule_type_buttons(kind: RuleEditorType, entity: &Entity<SettingsController>) -> gpui::Div {
-    let kinds = [(RuleEditorType::Publisher, t!("settings.storage_rule_kind_publisher")),
-                 (RuleEditorType::Collection, t!("settings.storage_rule_kind_collection")),
-                 (RuleEditorType::Size, t!("settings.storage_rule_kind_size"))];
-    div().flex().gap(px(4.0)).children(kinds.into_iter().map(|(choice, label)| {
-        let entity = entity.clone();
-        Button::new(SharedString::from(format!("rule-type-{label}"))).ghost()
-                                                                     .selected(choice == kind)
-                                                                     .label(label.to_string())
-                                                                     .on_click(move |_, _, cx| {
-                                                                         entity.update(cx, |ctrl, cx| ctrl.set_rule_editor_type(choice, cx));
-                                                                     })
-    }))
-}
-
-/// One button per location, the chosen one selected.
-fn target_buttons(roots: &[StorageRoot], target_root_id: u32,
-                  entity: &Entity<SettingsController>)
-                  -> gpui::Div {
-    div().flex().gap(px(4.0)).children(roots.iter().map(|root| {
-        let id = root.id;
-        let entity = entity.clone();
-        Button::new(SharedString::from(format!("rule-target-{id}"))).ghost()
-                                                                    .selected(id == target_root_id)
-                                                                    .label(root.name.clone())
-                                                                    .on_click(move |_, _, cx| {
-                                                                        entity.update(cx, |ctrl, cx| ctrl.set_rule_target_root(id, cx));
-                                                                    })
-    }))
-}
-
-/// The first few publisher names, each a button that fills the value field.
-fn publisher_suggestions(names: &[String], input: Option<Entity<InputState>>) -> gpui::Div {
-    div().flex().flex_wrap().gap(px(4.0)).children(names.iter().take(8).map(|name| {
-        let input = input.clone();
-        let value = name.clone();
-        Button::new(SharedString::from(format!("publisher-suggestion-{name}"))).ghost()
-                                                                               .label(name.clone())
-                                                                               .on_click(move |_, window, cx| {
-                                                                                   if let Some(input) = input.clone() {
-                                                                                       input.update(cx, |state, cx| {
-                                                                                                 state.set_value(value.clone(), window, cx);
-                                                                                             });
-                                                                                   }
-                                                                               })
-    }))
+/// Opens the editor on a new rule (`editing` is `None`) or on the rule at that
+/// index, and puts the rule's value in the value field.
+fn open_editor(entity: &Entity<SettingsController>, editing: Option<usize>,
+               collection_names: &HashMap<u64, Arc<str>>, window: &mut Window,
+               cx: &mut gpui::App) {
+    let (text, input, kind) = entity.update(cx, |ctrl, cx| {
+                                        let text =
+                                            ctrl.open_rule_editor(editing, collection_names, cx);
+                                        let editor = ctrl.rule_editor();
+                                        (text, editor.input.clone(), editor.kind)
+                                    });
+    if let Some(input) = input {
+        input.update(cx, |state, cx| {
+                 state.set_value(text, window, cx);
+                 state.set_placeholder(value_placeholder(kind), window, cx);
+             });
+    }
 }

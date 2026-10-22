@@ -48,17 +48,9 @@ impl SettingsController {
         cx.notify();
     }
 
-    /// Attaches the publisher rule input state created by the root view.
-    pub fn set_publisher_rule_input(&mut self, input: Entity<InputState>) {
-        self.publisher_rule_input = Some(input);
-    }
-
-    /// Attaches the collection and size rule inputs created by the root view.
-    pub fn set_collection_rule_input(&mut self, input: Entity<InputState>) {
-        self.collection_rule_input = Some(input);
-    }
-
-    pub fn set_size_rule_input(&mut self, input: Entity<InputState>) {
-        self.size_rule_input = Some(input);
+    /// Attaches the placement rule editor's value field, created by the root
+    /// view.
+    pub fn set_rule_editor_input(&mut self, input: Entity<InputState>) {
+        self.rule_editor.input = Some(input);
     }
 }
