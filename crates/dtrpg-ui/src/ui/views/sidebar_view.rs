@@ -35,7 +35,7 @@ use rust_i18n::t;
 use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::sidebar_smart::{SmartCollectionRow, smart_collections_menu};
-use crate::ui::views::sidebar_tags::tags_menu;
+use crate::ui::views::sidebar_tags::tag_rows;
 use crate::util::pluralize::pluralize;
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
@@ -59,6 +59,7 @@ pub struct SidebarSectionSearch {
 enum SidebarContent {
     Menu(Box<SidebarMenu>),
     Collections(Box<CollectionsSection>),
+    Section(Box<ControlledSection>),
     Separator,
 }
 
@@ -67,6 +68,7 @@ impl Collapsible for SidebarContent {
         match self {
             Self::Menu(m) => Self::Menu(Box::new(m.collapsed(collapsed))),
             Self::Collections(c) => Self::Collections(c),
+            Self::Section(s) => Self::Section(s),
             Self::Separator => Self::Separator,
         }
     }
@@ -74,7 +76,7 @@ impl Collapsible for SidebarContent {
     fn is_collapsed(&self) -> bool {
         match self {
             Self::Menu(m) => m.is_collapsed(),
-            Self::Collections(_) | Self::Separator => false,
+            Self::Collections(_) | Self::Section(_) | Self::Separator => false,
         }
     }
 }
@@ -85,6 +87,7 @@ impl SidebarItem for SidebarContent {
         match self {
             Self::Menu(m) => m.render(id, window, cx).into_any_element(),
             Self::Collections(c) => c.render(id, window, cx).into_any_element(),
+            Self::Section(s) => s.render(id, window, cx).into_any_element(),
             Self::Separator => div().h(px(1.))
                                     .w_full()
                                     .bg(cx.theme().sidebar_border)
@@ -347,7 +350,11 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
 #[path = "sidebar_render.rs"]
 mod sidebar_render;
 
+#[path = "sidebar_section.rs"]
+mod sidebar_section;
+
 pub(super) use sidebar_render::render_sidebar;
+use sidebar_section::ControlledSection;
 
 #[path = "sidebar_helpers.rs"]
 mod sidebar_helpers;
