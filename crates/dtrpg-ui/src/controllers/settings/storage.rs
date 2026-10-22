@@ -46,19 +46,6 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
-    /// Adds a publisher rule targeting the most recently configured root.
-    pub fn add_publisher_rule(&mut self, publisher: String, cx: &mut Context<Self>) {
-        let publisher = publisher.trim();
-        if publisher.is_empty() {
-            return;
-        }
-        self.storage
-            .add_rule(PlacementCondition::Publisher(publisher.to_owned()),
-                      self.rule_target_root_id);
-        self.rule_editor_open = false;
-        cx.emit(SettingsChanged);
-    }
-
     /// Reads the storage settings from disk again, for when something else (the
     /// download sheet's "Remember this choice") has changed them. Without it
     /// this controller would show the old rules, and the next setting changed
@@ -68,49 +55,6 @@ impl SettingsController {
         self.refresh_root_volumes();
         cx.emit(SettingsChanged);
         cx.notify();
-    }
-
-    /// Opens or closes the "Add rule…" editor.
-    pub fn set_rule_editor_open(&mut self, open: bool, cx: &mut Context<Self>) {
-        self.rule_editor_open = open;
-        cx.emit(SettingsChanged);
-    }
-
-    /// Selects the root targeted by newly created placement rules.
-    pub fn set_rule_target_root(&mut self, id: u32, cx: &mut Context<Self>) {
-        if self.storage.root(id).is_some() {
-            self.rule_target_root_id = id;
-            cx.emit(SettingsChanged);
-        }
-    }
-
-    /// Selects the placement condition type shown in the rule editor.
-    pub fn set_rule_editor_type(&mut self, kind: RuleEditorType, cx: &mut Context<Self>) {
-        self.rule_editor_type = kind;
-        cx.emit(SettingsChanged);
-    }
-
-    /// Adds a collection-membership placement rule from the numeric ID input.
-    pub fn add_collection_rule(&mut self, value: String, cx: &mut Context<Self>) {
-        if let Ok(id) = value.trim().parse::<u64>() {
-            self.storage
-                .add_rule(PlacementCondition::Collection(id), self.rule_target_root_id);
-            self.rule_editor_open = false;
-            cx.emit(SettingsChanged);
-        }
-    }
-
-    /// Adds a minimum-size placement rule from the megabytes input.
-    pub fn add_size_rule(&mut self, value: String, cx: &mut Context<Self>) {
-        if let Ok(size) = value.trim().parse::<f64>()
-           && size >= 0.0
-        {
-            self.storage
-                .add_rule(PlacementCondition::SizeAtLeastMb(size),
-                          self.rule_target_root_id);
-            self.rule_editor_open = false;
-            cx.emit(SettingsChanged);
-        }
     }
 
     /// Validates `path` for writability and saves it as the new storage root.

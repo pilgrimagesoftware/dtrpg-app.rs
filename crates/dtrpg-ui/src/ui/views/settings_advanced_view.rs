@@ -20,6 +20,7 @@ use rust_i18n::t;
 use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::{CacheCounts, SettingsController};
 use crate::data::theme::ColorTokens;
+use crate::ui::views::settings_card::field_row;
 use crate::ui::views::settings_filter_values_view::render_filter_values_section;
 use crate::ui::views::settings_native_view::render_native_section;
 use crate::ui::widgets::{selectable_note, small_caps_text};
@@ -223,30 +224,21 @@ fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens,
 fn render_recently_updated_window_row(recently_updated_window_days: u32,
                                       input: Option<Entity<InputState>>, colors: &ColorTokens)
                                       -> impl IntoElement + 'static + use<> {
-    let text_primary = colors.text_primary;
-    let text_secondary = colors.text_secondary;
-
     let field: AnyElement = if let Some(input_state) = input {
         NumberInput::new(&input_state).into_any_element()
     }
     else {
         div().text_sm()
-             .text_color(text_primary)
+             .text_color(colors.text_primary)
              .child(recently_updated_window_days.to_string())
              .into_any_element()
     };
 
-    div().flex()
-         .flex_col()
-         .gap(px(6.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(text_primary)
-                     .child(t!("settings.recently_updated_window_title")))
-         .child(div().w(px(140.0)).child(field))
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(t!("settings.recently_updated_window_note")))
+    field_row("recently-updated-window-note",
+              t!("settings.recently_updated_window_title").to_string(),
+              t!("settings.recently_updated_window_note").to_string(),
+              field,
+              colors)
 }
 
 /// Renders the Advanced settings section: the "Recently Updated window"
