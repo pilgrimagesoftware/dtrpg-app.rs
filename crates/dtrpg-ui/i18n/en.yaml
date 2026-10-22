@@ -94,6 +94,8 @@ insights:
   empty: "Nothing to analyze yet. Sign in and load your library first."
   computing: "Working it out…"
 sidebar:
+  section_hide: "Hide this section"
+  section_show: "Show this section"
   smart_collections: "Smart collections"
   all_titles: "All Titles"
   recently_updated: "Recently Updated"

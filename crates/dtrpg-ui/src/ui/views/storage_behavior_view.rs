@@ -9,9 +9,8 @@ use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_card::{card, card_row, section_heading};
+use crate::ui::views::settings_card::{card, card_row, field_row, section_heading};
 use crate::ui::views::settings_native_view::switch_row;
-use crate::ui::widgets::selectable_note;
 
 /// What the Behavior section shows.
 pub(super) struct BehaviorData {
@@ -75,11 +74,12 @@ fn create_collections_note() -> String {
     }
 }
 
-/// The "Max concurrent downloads" row: a title, the stepper field, and a note.
+/// The "Max concurrent downloads" row: a title and a note, with the stepper
+/// field on the right.
 /// Shows the plain number until the root view attaches the shared field.
 fn concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<InputState>>,
                    colors: &ColorTokens)
-                   -> impl IntoElement {
+                   -> AnyElement {
     let field: AnyElement = match input {
         Some(input_state) => NumberInput::new(&input_state).into_any_element(),
         None => div().text_sm()
@@ -87,15 +87,9 @@ fn concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<InputSt
                      .child(max_concurrent_downloads.to_string())
                      .into_any_element(),
     };
-    div().flex()
-         .flex_col()
-         .gap(px(4.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(colors.text_primary)
-                     .child(t!("settings.max_concurrent_downloads_title").to_string()))
-         .child(div().w(px(140.0)).child(field))
-         .child(selectable_note("max-concurrent-downloads-note",
-                                t!("settings.max_concurrent_downloads_note").to_string(),
-                                colors))
+    field_row("max-concurrent-downloads-note",
+              t!("settings.max_concurrent_downloads_title").to_string(),
+              t!("settings.max_concurrent_downloads_note").to_string(),
+              field,
+              colors)
 }

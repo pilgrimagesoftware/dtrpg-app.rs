@@ -94,6 +94,8 @@ insights:
   empty: "Rien à analyser pour l'instant. Connectez-vous et chargez d'abord votre bibliothèque."
   computing: "Calcul en cours…"
 sidebar:
+  section_hide: "Masquer cette section"
+  section_show: "Afficher cette section"
   smart_collections: "Collections intelligentes"
   all_titles: "Tous les titres"
   recently_updated: "Mises à jour récentes"
