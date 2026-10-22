@@ -262,6 +262,7 @@ detail:
   inspector_contents_tab: "Inhalt"
   inspector_summary_tab: "Zusammenfassung"
   inspector_cover_tab: "Titelbild"
+  inspector_other_details_tab: "Weitere Details"
   cover_open_tooltip: "Doppelklicken, um das Titelbild in voller Größe zu sehen"
   inspector_contents_loading: "Archivinhalt wird geladen…"
   inspector_contents_unavailable: "Archivinhalt ist nicht verfügbar."

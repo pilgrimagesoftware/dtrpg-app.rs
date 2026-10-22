@@ -1,128 +1,41 @@
 use super::*;
 
-/// Renders the "Other details" disclosure section: a clickable header that
-/// toggles a collapsed-by-default panel of fields not already shown in the
-/// primary metadata table or item tier (stable id, numeric id, order product
-/// id, product id, added-order value, and the generative cover color).
-///
-/// See `catalog-entry-detail-advanced-disclosure`.
-pub(super) fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
-                                   colors: &ColorTokens, cx: &App)
-                                   -> impl IntoElement + 'static {
-    let entry_id = Arc::clone(&item.id);
-    let open = entity.read(cx).is_other_details_open(&entry_id);
+/// Renders the Other details tab: the ids and other fields not shown in the
+/// Details table (stable id, numeric id, order product id, product id,
+/// added-order value, and the generative cover color), laid out like the
+/// Details table.
+pub(super) fn render_other_details_tab(item: &LibraryItem, colors: &ColorTokens, cx: &App)
+                                       -> AnyElement {
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
     let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
-
-    let toggle_entity = entity;
-    let toggle_entry_id = Arc::clone(&entry_id);
-
-    let header = div().id("other-details-header")
-                      .flex()
+    let copyable = |id: &'static str, value: String| {
+        copyable_value(SharedString::from(id), value, &value_font_family)
+    };
+    let swatch = div().flex()
                       .items_center()
                       .gap(px(6.0))
-                      .cursor_pointer()
-                      .text_sm()
-                      .font_weight(gpui::FontWeight::SEMIBOLD)
-                      .text_color(colors.text_primary)
-                      .on_click(move |_, _, cx| {
-                          toggle_entity.update(cx, |ctrl, cx| {
-                                           ctrl.toggle_other_details(Arc::clone(&toggle_entry_id),
-                                                                     cx);
-                                       });
-                      })
-                      .child(Icon::new(if open {
-                                           IconName::ChevronUp
-                                       }
-                                       else {
-                                           IconName::ChevronDown
-                                       }).text_color(colors.text_secondary))
-                      .child(t!("detail.other_details_heading").to_string());
-
-    let swatch_color = cover_style(item).background;
-    let content = DescriptionList::vertical()
-        .columns(2)
-        .bordered(false)
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_stable_id").to_string(),
-                &label_font_family,
-            ))
-            .value(copyable_value(
-                SharedString::from("other-details-stable-id"),
-                item.id.to_string(),
-                &value_font_family,
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_numeric_id").to_string(),
-                &label_font_family,
-            ))
-            .value(copyable_value(
-                SharedString::from("other-details-numeric-id"),
-                item.numeric_id.to_string(),
-                &value_font_family,
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_order_product_id").to_string(),
-                &label_font_family,
-            ))
-            .value(copyable_value(
-                SharedString::from("other-details-order-product-id"),
-                item.order_product_id.to_string(),
-                &value_font_family,
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_product_id").to_string(),
-                &label_font_family,
-            ))
-            .value(copyable_value(
-                SharedString::from("other-details-product-id"),
-                item.product_id.to_string(),
-                &value_font_family,
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_added_order").to_string(),
-                &label_font_family,
-            ))
-            .value(styled_value(
-                item.added_order.to_string(),
-                &value_font_family,
-            )),
-        )
-        .child(
-            DescriptionItem::new(styled_label(
-                t!("detail.field_cover_color").to_string(),
-                &label_font_family,
-            ))
-            .value(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(6.0))
-                    .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
-                    .child(copyable_value(
-                        SharedString::from("other-details-cover-color"),
-                        item.color.to_string(),
-                        &value_font_family,
-                    ))
-                    .into_any_element(),
-            )
-            .span(2),
-        );
-
-    Collapsible::new().gap(px(8.0))
-                      .open(open)
-                      .child(header)
-                      .content(content)
+                      .child(div().size(px(12.0))
+                                  .rounded_full()
+                                  .bg(cover_style(item).background))
+                      .child(copyable("other-details-cover-color", item.color.to_string()))
+                      .into_any_element();
+    let rows = vec![(t!("detail.field_stable_id").to_string(),
+                     copyable("other-details-stable-id", item.id.to_string())),
+                    (t!("detail.field_numeric_id").to_string(),
+                     copyable("other-details-numeric-id", item.numeric_id.to_string())),
+                    (t!("detail.field_order_product_id").to_string(),
+                     copyable("other-details-order-product-id",
+                              item.order_product_id.to_string())),
+                    (t!("detail.field_product_id").to_string(),
+                     copyable("other-details-product-id", item.product_id.to_string())),
+                    (t!("detail.field_added_order").to_string(),
+                     styled_value(item.added_order.to_string(), &value_font_family)),
+                    (t!("detail.field_cover_color").to_string(), swatch)];
+    div().p(px(16.0))
+         .child(render_detail_rows(rows, colors, &label_font_family))
+         .into_any_element()
 }
+
 /// Renders a summary of the collections this entry currently belongs to, with a
 /// "Manage…" button opening the Manage Collections dialog scoped to this entry.
 ///

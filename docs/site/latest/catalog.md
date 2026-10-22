@@ -129,7 +129,7 @@ menu, to remove the download. Its tabs are:
   files it under, and the Location row names the storage location a
   downloaded title is in, going by your placement rules), and which application opens the item's file type. That
   application is the system default unless you set one in Settings > File
-  Openers, which the hint under it links to. A collapsed "Other details" section holds the ids.
+  Openers, which the hint under it links to.
 - **Files** - each file with its size and download state, with a count beside
   the tab's name. For an item with several files this is the list you pick
   from. **Verify on disk** checks the files against the disk right away and
@@ -139,6 +139,9 @@ menu, to remove the download. Its tabs are:
   when, and its length in tokens. Items without a summary say so. The tab only
   shows summaries; they are written elsewhere for now, for example by an agent
   through the MCP server.
+- **Other details** - the ids (stable, numeric, order product and product) and
+  the other fields that are not in the Details table, laid out the same way, each
+  with a copy button.
 - **Cover** - the cover as wide as the inspector. An item with no image shows
   its generated cover.
 

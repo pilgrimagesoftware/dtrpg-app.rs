@@ -316,7 +316,7 @@ pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                      div()
                                                     .flex()
                                                     .gap(d.card_gap_x)
-                                                    .mb(d.card_gap_y)
+                                                    .pb(d.card_gap_y)
                                                     .children(
                                                         row_items
                                                             .iter()

@@ -64,6 +64,7 @@ mod filtering;
 mod helpers;
 mod insights;
 mod inspector_actions;
+mod inspector_archive;
 mod lifecycle;
 mod preferences;
 mod selection;
@@ -355,11 +356,6 @@ pub struct LibraryController {
     inspector_preview:             HashMap<Arc<str>, InspectorPreviewState>,
     inspector_collapsed_dirs:      HashMap<Arc<str>, HashSet<String>>,
     inspector_filter_inputs:       HashMap<Arc<str>, Entity<InputState>>,
-    /// Whether the "Other details" disclosure section is expanded in a
-    /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
-    /// never persisted, and defaults to collapsed for entries with no entry
-    /// here (see `catalog-entry-detail-advanced-disclosure`).
-    other_details_open:            HashMap<Arc<str>, bool>,
     /// Whether a per-file "Other details" disclosure is expanded within a
     /// multi-item entry's item tier, keyed by `"{entry_id}:{row_ix}"`. Keyed
     /// by row position rather than file id for the same reason as

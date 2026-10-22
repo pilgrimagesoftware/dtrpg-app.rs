@@ -262,6 +262,7 @@ detail:
   inspector_contents_tab: "Contenu"
   inspector_summary_tab: "Résumé"
   inspector_cover_tab: "Couverture"
+  inspector_other_details_tab: "Autres détails"
   cover_open_tooltip: "Double-cliquez pour voir la couverture en taille réelle"
   inspector_contents_loading: "Chargement du contenu de l'archive…"
   inspector_contents_unavailable: "Le contenu de l'archive est indisponible."

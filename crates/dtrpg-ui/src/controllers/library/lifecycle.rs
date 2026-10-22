@@ -123,7 +123,6 @@ impl LibraryController {
                           inspector_selected_archive: HashMap::new(),
                           inspector_collapsed_dirs: HashMap::new(),
                           inspector_filter_inputs: HashMap::new(),
-                          other_details_open: HashMap::new(),
                           file_other_details_open: HashMap::new(),
                           file_info_cache: HashMap::new(),
                           file_tag_sync_running: false,

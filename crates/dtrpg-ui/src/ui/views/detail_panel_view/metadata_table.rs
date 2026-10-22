@@ -173,6 +173,15 @@ pub(super) fn render_metadata_table(item: &LibraryItem, location: Option<String>
                    text_value("detail-field-location", location)));
     }
 
+    render_detail_rows(rows, colors, label_font_family)
+}
+
+/// Lays out label and value rows as the Details table does: a fixed-width label
+/// column of plain labels, and the values beside them. The Info tab's Details
+/// and the Other details tab both use it, so they read the same.
+pub(super) fn render_detail_rows(rows: Vec<(String, AnyElement)>, colors: &ColorTokens,
+                                 label_font_family: &str)
+                                 -> impl IntoElement + 'static + use<> {
     let label_color = colors.text_secondary;
     let value_color = colors.text_primary;
     div().flex()

@@ -280,6 +280,7 @@ detail:
   inspector_contents_tab: "Contents"
   inspector_summary_tab: "Summary"
   inspector_cover_tab: "Cover"
+  inspector_other_details_tab: "Other details"
   cover_open_tooltip: "Double-click to see the cover at full size"
   inspector_contents_loading: "Loading archive contents…"
   inspector_contents_unavailable: "Archive contents are unavailable."
