@@ -33,5 +33,5 @@ Beside the totals, each storage location has a small meter of how much of its
 volume Libri's files fill; hover it for the figures (used by Libri, and free). The
 meters are measured in the background at startup, when the locations change, and
 when downloads finish, so they can lag a little behind the disk. The **Agent**
-dot is green when agents may use Libri and grey when they may not; see
+indicator, a dot then an icon then the word, shows a dot that is green when agents may use Libri and grey when they may not; see
 [Using Libri from an AI agent]({{ '/latest/mcp/' | relative_url }}).

@@ -12,6 +12,10 @@ and it never changes your library.
 
 ## What it shows
 
+The page is kept to a readable width and centered, so the charts do not stretch
+across a very wide window. The four small charts share a row, and move down to
+the next row when the window is narrower.
+
 - **Library at a glance** - titles (and how many were added this month), total
   size, pages, how many titles are downloaded, publishers and game systems.
 - **Titles by publisher** and **Titles by system** - the top eight of each,
