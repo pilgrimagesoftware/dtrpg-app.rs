@@ -43,7 +43,8 @@ pub(super) fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image
                                entity: Entity<LibraryController>,
                                inspector: Entity<InspectorController>,
                                storage_root_path: PathBuf, window: &Window, is_checking: bool,
-                               activity: ItemActivity, selection_mode: bool, selected: bool)
+                               activity: ItemActivity, selection_mode: bool, selected: bool,
+                               opened: bool)
                                -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -135,7 +136,9 @@ pub(super) fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image
         }
     };
 
+    let ring = open_ring(&colors);
     div().id(Arc::clone(&id))
+         .relative()
          .w_full()
          .flex()
          .items_center()
@@ -186,6 +189,7 @@ pub(super) fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image
                               .children(render_checking_indicator(is_checking)))
          })
          .child(render_status(&id, status, item.is_offloaded(), activity, &colors))
+         .when(opened, |this| this.child(ring))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {

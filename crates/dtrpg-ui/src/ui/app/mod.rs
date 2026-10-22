@@ -252,7 +252,10 @@ pub use inspector_window::{
     ShuttingDown, open_inspector_window, remember_window, show_library_window,
 };
 use window_bounds::{restore_library_window_bounds, restore_settings_window_bounds};
-pub use window_bounds::{save_library_window_bounds, save_settings_window_bounds};
+pub use window_bounds::{
+    save_library_window_bounds, save_library_window_bounds_soon, save_settings_window_bounds,
+    save_settings_window_bounds_soon,
+};
 
 /// Initializes the GPUI application and routes to the login or library window.
 ///

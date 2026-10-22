@@ -291,6 +291,7 @@ mod grouped_delegate;
 mod list_cell;
 mod list_delegate;
 mod loading_skeleton;
+mod open_ring;
 mod render;
 mod thumb_row;
 
@@ -301,4 +302,5 @@ use grouped_delegate::*;
 pub(crate) use list_cell::*;
 use list_delegate::*;
 use loading_skeleton::render_loading_skeleton;
+use open_ring::open_ring;
 use thumb_row::*;

@@ -18,7 +18,6 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, ElementId, Entity, IntoElement, SharedString, Window, div, px,
 };
-use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
 use gpui_kit::component::input::{Input, InputState};
@@ -30,6 +29,7 @@ use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{
     ActiveTheme, Collapsible, Side, Sizable as _, Size, StyledExt as _, WindowExt as _,
 };
+use gpui_kit::component::{Icon, IconName};
 use rust_i18n::t;
 
 use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};

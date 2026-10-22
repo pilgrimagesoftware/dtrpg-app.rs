@@ -1,11 +1,15 @@
 //! The cards on the Insights page. Each takes the aggregates (already worked
 //! out) and returns an element, so none reads a catalog or the disk.
 
-use dtrpg_core::library::insights::{Insights, MonthCount, RootUsage, Share};
-use gpui::{Hsla, IntoElement, ParentElement, SharedString, Styled, div, px};
+use dtrpg_core::library::insights::{Insights, MonthCount, RootUsage};
+use gpui::{
+    Hsla, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement,
+    Styled, div, px, relative,
+};
 use gpui_kit::component::chart::{AreaChart, PieChart};
 use gpui_kit::component::group_box::GroupBox;
 use gpui_kit::component::progress::Progress;
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LiveAvailability;
@@ -15,6 +19,7 @@ use crate::view_models::insights_display::{
     Availability, TOP_ROWS, availability_slices, month_label, top_rows,
 };
 use crate::view_models::storage_display::volume_size_label;
+use crate::view_models::treemap;
 
 /// The colors the charts take in turn, as red, blue, green, ochre, purple,
 /// teal, mauve and olive. Fixed rather than taken from the theme so a chart
@@ -30,6 +35,16 @@ const SERIES: [(u8, u8, u8); 8] = [(0xA9, 0x5D, 0x54),
 
 /// The side of the square a ring is drawn in, in pixels.
 const RING_SIZE: f32 = 130.0;
+
+/// The width-to-height ratio the treemap is laid out for. The tiles are shares
+/// of the box, so they keep their proportions at any width.
+const TREEMAP_ASPECT: f64 = 4.0;
+
+/// The height of the treemap, in pixels.
+const TREEMAP_HEIGHT: f32 = 240.0;
+
+/// How many publishers get a tile of their own before the rest are gathered.
+const TREEMAP_TILES: usize = 12;
 
 /// The height of the time chart, in pixels.
 const TIME_CHART_HEIGHT: f32 = 140.0;
@@ -234,41 +249,60 @@ pub(super) fn availability_card(insights: &Insights, live: LiveAvailability,
          ring_with_legend("insights-availability-ring", slices, colors))
 }
 
-/// "Disk usage by publisher": each publisher's share of the total, largest
-/// first.
+/// "Disk usage by publisher": a treemap, each publisher's tile as large as its
+/// share of the total, and the small ones gathered into "Other".
+///
+/// Drawn with plain boxes because gpui-kit has no treemap: its charts are
+/// rings, bars and lines. The layout itself is in `view_models::treemap`.
 pub(super) fn disk_card(insights: &Insights, colors: &ColorTokens) -> impl IntoElement {
-    let largest = insights.disk_by_publisher
-                          .first()
-                          .map_or(1.0, |share| share.mb.max(1.0));
-    let rows = insights.disk_by_publisher
-                       .iter()
-                       .take(TOP_ROWS)
-                       .enumerate()
-                       .map(|(index, Share { label, mb })| {
-                           div().flex()
-                 .items_center()
-                 .gap(px(8.0))
-                 .child(div().w(px(150.0))
-                             .truncate()
-                             .text_sm()
-                             .text_color(colors.text_primary)
-                             .child(label.clone()))
-                 .child(div().flex_1()
-                             .child(Progress::new(("insights-disk", index))
-                                        .value((mb / largest * 100.0) as f32)
-                                        .color(series(index))))
-                 .child(div().w(px(80.0))
-                             .text_right()
-                             .text_sm()
-                             .text_color(colors.text_secondary)
-                             .child(volume_size_label(*mb)))
-                       });
+    let tiles = treemap::tiles(&insights.disk_by_publisher,
+                               TREEMAP_TILES,
+                               &t!("insights.disk_other"),
+                               TREEMAP_ASPECT);
+    let last = tiles.len().saturating_sub(1);
+    let boxes =
+        tiles.into_iter().enumerate().map(|(index, tile)| {
+                                         // The gathered tail is grey, so it
+                                         // does not read as a publisher.
+                                         let fill = if tile.label == t!("insights.disk_other")
+                                                       && index == last
+                                         {
+                                             colors.text_tertiary
+                                         }
+                                         else {
+                                             series(index)
+                                         };
+                                         let size = volume_size_label(tile.mb);
+                                         let tooltip = format!("{}: {size}", tile.label);
+                                         div().id(("insights-disk-tile", index))
+             .absolute()
+             .left(relative(tile.rect.x as f32))
+             .top(relative(tile.rect.y as f32))
+             .w(relative(tile.rect.w as f32))
+             .h(relative(tile.rect.h as f32))
+             .p(px(1.0))
+             .tooltip(move |window, cx| Tooltip::new(tooltip.clone()).build(window, cx))
+             .child(div().size_full()
+                         .rounded(px(3.0))
+                         .overflow_hidden()
+                         .p(px(6.0))
+                         .bg(fill)
+                         .text_color(gpui::white())
+                         .child(div().text_xs()
+                                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                                     .truncate()
+                                     .child(tile.label))
+                         .child(div().text_xs().opacity(0.85).truncate().child(size)))
+                                     });
     card("insights-disk",
          t!("insights.disk_title").to_string(),
          t!("insights.disk_note",
             total = volume_size_label(insights.total_size_mb)).to_string(),
          colors,
-         div().flex().flex_col().gap(px(8.0)).children(rows))
+         div().relative()
+              .w_full()
+              .h(px(TREEMAP_HEIGHT))
+              .children(boxes))
 }
 
 /// "Titles added over time": an area chart by month.

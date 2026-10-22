@@ -41,15 +41,15 @@ Pages, Size and Added are shown until you choose otherwise.
 
 ## Navigation and filtering
 
-The sidebar has three sections:
+The sidebar has these sections:
 
 - **Smart filters** - All Titles, Recently Updated, On This Device, In the
   Cloud, and Needs Attention. Needs Attention lists the titles whose last
   download failed, and a title leaves it when a download of it succeeds. It
-  starts empty each time Libri opens. Insights is listed after it but is greyed
-  out until it is built.
+  starts empty each time Libri opens.
 - **Publishers** - every publisher represented in your library, each
   filtering the catalog to just their titles.
+- **Analysis** - at the bottom, with [Insights]({{ '/latest/insights/' | relative_url }}).
 - **Collections** - your custom collections (see
   [Collections]({{ '/latest/collections/' | relative_url }})). A cloud
   marker beside a collection's count means some of its titles are only in the
@@ -186,3 +186,8 @@ Enter bulk-selection mode from the toolbar to check multiple items at once.
 A bulk-action bar appears below the toolbar once at least one item is
 checked, including a "Select Matches" control that checks every item whose
 title, publisher, or game line/series matches a text pattern you type.
+
+## Finding the open title
+
+The title that is open in the inspector has a ring around its card (Thumbs and Grid)
+or row, so you can find it again among the covers.

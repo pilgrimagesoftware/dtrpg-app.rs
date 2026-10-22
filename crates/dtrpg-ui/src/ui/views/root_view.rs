@@ -47,6 +47,7 @@ use gpui_kit::component::{IconName, Sizable as _};
 use rust_i18n::t;
 
 use self::inspector_pane::render_inspector_pane;
+use self::panel_widths::{restored_inspector_width, restored_sidebar_width, save_panel_widths};
 use self::wiring_subscriptions::RootViewEntities;
 use crate::ui::actions::{
     About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
@@ -57,7 +58,7 @@ use crate::ui::actions::{
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
     install_menus, open_about_window, open_inspector_window, open_settings_window,
-    save_library_window_bounds,
+    save_library_window_bounds_soon,
 };
 use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
@@ -71,6 +72,7 @@ use crate::ui::views::{
     title_bar_view::render_title_bar,
     toolbar_view::render_toolbar,
 };
+use crate::util::debounce::{Debounce, SAVE_DELAY};
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 use crate::{
     controllers::{
@@ -145,6 +147,10 @@ pub struct LibraryRootView {
     resize_state:                Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
     sidebar_width:               f32,
+    /// Waits for a drag or a window resize to stop before saving sizes.
+    save_debounce:               Debounce,
+    /// Waits for a window move or resize to stop before saving its bounds.
+    bounds_debounce:             Debounce,
     /// Default focus handle for the root div, ensuring menu-triggered actions
     /// always have a dispatch path even before any child element grabs focus.
     root_focus:                  FocusHandle,
@@ -241,11 +247,13 @@ impl LibraryRootView {
         wiring_subscriptions::wire_controller_subscriptions(window, cx, &entities, startup_api_key);
 
         let ui_state = UiState::load();
-        let sidebar_width = ui_state.sidebar_width().unwrap_or(250.0);
-        let inspector_width = ui_state.detail_width()
-                                      .unwrap_or(INSPECTOR_PANE_DEFAULT_WIDTH);
+        let sidebar_width = restored_sidebar_width(ui_state.sidebar_width(), 250.0);
+        let inspector_width =
+            restored_inspector_width(ui_state.detail_width(), INSPECTOR_PANE_DEFAULT_WIDTH);
         let resize_state = cx.new(|_| ResizableState::default());
 
+        // Dragging a divider (or squeezing the window) reports sizes on every
+        // frame, so they are saved once the drag has stopped.
         cx.subscribe(&resize_state, move |this, state, _event, cx| {
               let sizes = state.read(cx).sizes().clone();
               let Some(sidebar) = sizes.first().map(|size| size.as_f32())
@@ -255,20 +263,21 @@ impl LibraryRootView {
               // A hidden pane keeps its last width, so only a shown one is
               // saved.
               let pane_shown = this.controller.read(cx).selected_item().is_some();
-              match sizes.get(2) {
-                  Some(pane) if pane_shown => {
-                      UiState::load().save_panel_widths(sidebar, pane.as_f32());
-                  }
-                  _ => UiState::load().save_sidebar_width(sidebar),
-              }
+              let pane = sizes.get(2)
+                              .map(|size| size.as_f32())
+                              .filter(|_| pane_shown);
+              this.save_debounce
+                  .run(cx.background_executor(), SAVE_DELAY, move || {
+                      save_panel_widths(sidebar, pane);
+                  });
           })
           .detach();
 
         // Save the window's position/size on every live resize/move, not
         // just at close time — some quit paths (e.g. Cmd+Q) don't reliably
         // fire `on_window_should_close`, which left the saved bounds stale.
-        cx.observe_window_bounds(window, |_this, window, _cx| {
-              save_library_window_bounds(window);
+        cx.observe_window_bounds(window, |this, window, cx| {
+              save_library_window_bounds_soon(window, &this.bounds_debounce, cx);
           })
           .detach();
 
@@ -290,6 +299,8 @@ impl LibraryRootView {
                filters_open: false,
                resize_state,
                sidebar_width,
+               save_debounce: Debounce::new(),
+               bounds_debounce: Debounce::new(),
                root_focus,
                settings_window: None,
                report_feature_bug_window: None,
@@ -323,6 +334,7 @@ impl Render for LibraryRootView {
 mod actions;
 mod inspector_pane;
 mod inspector_windows;
+mod panel_widths;
 mod render;
 mod wiring_inputs;
 mod wiring_subscriptions;

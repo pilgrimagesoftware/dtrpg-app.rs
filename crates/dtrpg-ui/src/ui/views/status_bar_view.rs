@@ -20,7 +20,6 @@ use dtrpg_core::data::mcp_access::McpTool;
 use dtrpg_core::library::insights::RootUsage;
 use gpui::prelude::*;
 use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
-use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::popover::Popover;
@@ -28,6 +27,7 @@ use gpui_kit::component::progress::{Progress, ProgressCircle};
 use gpui_kit::component::separator::Separator;
 use gpui_kit::component::status_bar::StatusBar;
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{Icon, IconName};
 use gpui_kit::component::{Sizable as _, Size};
 use rust_i18n::t;
 
@@ -279,6 +279,9 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
              .gap(px(6.0))
              .px(px(8.0))
              .tooltip(move |window, cx| Tooltip::new(agent_tooltip.clone()).build(window, cx))
+             .child(Icon::empty().path("icons/bot.svg")
+                                 .with_size(Size::Small)
+                                 .text_color(colors.text_secondary))
              .child(div().size(px(8.0)).rounded_full().bg(agent_dot))
              .child(div().text_xs()
                          .text_color(colors.text_secondary)

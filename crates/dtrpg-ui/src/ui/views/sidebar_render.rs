@@ -23,34 +23,32 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
 
     // ── Library smart-filter menu
     // ─────────────────────────────────────────────
-    let lib_menu =
-        SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
-                          .child(nav_item(&t!("sidebar.all_titles"),
-                                          counts.all,
-                                          active == SidebarFilter::AllTitles,
-                                          SidebarFilter::AllTitles,
-                                          entity.clone()))
-                          .child(nav_item(&t!("sidebar.recently_updated"),
-                                          counts.recently_updated,
-                                          active == SidebarFilter::RecentlyUpdated,
-                                          SidebarFilter::RecentlyUpdated,
-                                          entity.clone()))
-                          .child(nav_item(&t!("sidebar.on_this_device"),
-                                          counts.on_device,
-                                          active == SidebarFilter::OnDevice,
-                                          SidebarFilter::OnDevice,
-                                          entity.clone()))
-                          .child(nav_item(&t!("sidebar.in_the_cloud"),
-                                          counts.in_cloud,
-                                          active == SidebarFilter::InCloud,
-                                          SidebarFilter::InCloud,
-                                          entity.clone()))
-                          .child(nav_item(&t!("sidebar.needs_attention"),
-                                          counts.needs_attention,
-                                          active == SidebarFilter::NeedsAttention,
-                                          SidebarFilter::NeedsAttention,
-                                          entity.clone()))
-                          .child(insights_item(active == SidebarFilter::Insights, entity.clone()));
+    let lib_menu = SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
+                                     .child(nav_item(&t!("sidebar.all_titles"),
+                                                     counts.all,
+                                                     active == SidebarFilter::AllTitles,
+                                                     SidebarFilter::AllTitles,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.recently_updated"),
+                                                     counts.recently_updated,
+                                                     active == SidebarFilter::RecentlyUpdated,
+                                                     SidebarFilter::RecentlyUpdated,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.on_this_device"),
+                                                     counts.on_device,
+                                                     active == SidebarFilter::OnDevice,
+                                                     SidebarFilter::OnDevice,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.in_the_cloud"),
+                                                     counts.in_cloud,
+                                                     active == SidebarFilter::InCloud,
+                                                     SidebarFilter::InCloud,
+                                                     entity.clone()))
+                                     .child(nav_item(&t!("sidebar.needs_attention"),
+                                                     counts.needs_attention,
+                                                     active == SidebarFilter::NeedsAttention,
+                                                     SidebarFilter::NeedsAttention,
+                                                     entity.clone()));
 
     let publishers_count = publishers.len();
 
@@ -303,23 +301,36 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     let sidebar_builder = sidebar_builder.child(SidebarContent::Separator)
                                          .child(SidebarContent::Menu(Box::new(pub_menu)));
     // Nothing to list until something has been tagged.
-    if tags.is_empty() {
-        return sidebar_builder;
+    let sidebar_builder = if tags.is_empty() {
+        sidebar_builder
     }
+    else {
+        sidebar_builder.child(SidebarContent::Separator)
+                       .child(SidebarContent::Menu(Box::new(tags_menu(tags,
+                                                                      sidebar_open.tags,
+                                                                      &active,
+                                                                      entity.clone()))))
+    };
+    // Analysis comes last, as in the design.
     sidebar_builder.child(SidebarContent::Separator)
-                   .child(SidebarContent::Menu(Box::new(tags_menu(tags,
-                                                                  sidebar_open.tags,
-                                                                  &active,
-                                                                  entity))))
+                   .child(SidebarContent::Menu(Box::new(analysis_menu(active
+                                                                      == SidebarFilter::Insights,
+                                                                      entity))))
 }
 
-/// The Insights entry: it has no count, since it shows figures, not titles.
-fn insights_item(is_active: bool, entity: Entity<LibraryController>) -> SidebarMenuItem {
-    SidebarMenuItem::new(t!("sidebar.insights")).active(is_active)
-                                                .on_click(move |_, _, cx| {
-                                                    entity.update(cx, |ctrl, cx| {
-                                                        ctrl.set_filter(SidebarFilter::Insights,
-                                                                        cx);
-                                                    });
-                                                })
+/// The Analysis group, holding Insights. The entry has no count, since it shows
+/// figures, not titles.
+fn analysis_menu(insights_active: bool, entity: Entity<LibraryController>) -> SidebarMenu {
+    let insights = SidebarMenuItem::new(t!("sidebar.insights")).icon(Icon::empty().path("icons/chart-no-axes-column.svg"))
+                                                               .active(insights_active)
+                                                               .on_click(move |_, _, cx| {
+                                                                   entity.update(cx, |ctrl, cx| {
+                                                                             ctrl.set_filter(SidebarFilter::Insights,
+                                                                                             cx);
+                                                                         });
+                                                               });
+    SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
+                      .child(SidebarMenuItem::new(t!("sidebar.analysis")).default_open(true)
+                                                                         .click_to_toggle(true)
+                                                                         .children([insights]))
 }
