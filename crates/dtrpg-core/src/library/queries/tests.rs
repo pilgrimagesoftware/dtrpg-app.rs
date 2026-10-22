@@ -204,3 +204,32 @@ fn the_filter_values_of_a_field_are_listed_once_across_the_whole_catalog() {
     assert_eq!(library.filter_values(Field::Genre), ["Horror"]);
     assert!(library.filter_values(Field::Publisher).is_empty());
 }
+
+#[test]
+fn a_collection_counts_the_members_that_are_only_in_the_cloud() {
+    use crate::data::collection::CollectionEntry;
+
+    let library = open_library();
+    let mut downloaded = item("a", "Paizo");
+    downloaded.status = ItemStatus::Downloaded;
+    downloaded.product_id = 21;
+    let mut cloud = item("b", "Paizo");
+    cloud.status = ItemStatus::Cloud;
+    cloud.product_id = 22;
+    let mut outsider = item("c", "Paizo");
+    outsider.status = ItemStatus::Cloud;
+    outsider.product_id = 23;
+    library.index
+           .lock()
+           .unwrap()
+           .replace_all_items(&[downloaded, cloud, outsider])
+           .unwrap();
+    library.set_collections(vec![CollectionEntry { id:         7,
+                                                   name:       "Shelf".into(),
+                                                   member_ids: Arc::from([21, 22]),
+                                                   created_at: 0, }]);
+
+    let counts = library.collection_cloud_counts();
+
+    assert_eq!(counts.get(&7), Some(&1));
+}

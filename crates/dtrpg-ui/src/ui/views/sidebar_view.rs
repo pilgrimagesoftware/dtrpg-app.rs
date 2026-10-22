@@ -3,7 +3,7 @@
 //! The app wordmark lives in `title_bar_view`, next to the macOS traffic
 //! lights — it is not repeated here.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -36,6 +36,7 @@ use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::sidebar_smart::{SmartCollectionRow, smart_collections_menu};
 use crate::ui::views::sidebar_tags::tags_menu;
+use crate::util::pluralize::pluralize;
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
 /// Collections).
@@ -105,6 +106,9 @@ struct CollectionRow {
     id:        u64,
     name:      Arc<str>,
     count:     usize,
+    /// How many of its titles are only in the cloud; a marker shows when any
+    /// are.
+    in_cloud:  usize,
     is_active: bool,
 }
 
@@ -282,7 +286,14 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
                      .child(div().flex_1()
                                  .overflow_x_hidden()
                                  .child(row.name.to_string()))
-                     .child(div().text_xs().child(row.count.to_string())))
+                     .child(div().flex()
+                                 .items_center()
+                                 .gap_x_1()
+                                 .text_xs()
+                                 .when(row.in_cloud > 0, |this| {
+                                     this.child(cloud_marker(row.id, row.in_cloud))
+                                 })
+                                 .child(row.count.to_string())))
          .drag_over::<DraggedLibraryItem>(|this, _, _, cx| this.bg(cx.theme().tokens.drop_target))
          .on_drop(move |drag: &DraggedLibraryItem, _, cx| {
              drop_entity.update(cx, |ctrl, cx| {
@@ -342,3 +353,16 @@ pub(super) use sidebar_render::render_sidebar;
 mod sidebar_helpers;
 
 use sidebar_helpers::{nav_item, render_collection_sort_control, render_section_search_suffix};
+
+/// The marker on a collection row that says some of its titles are only in the
+/// cloud. A bare glyph, so it carries a tooltip with the number.
+fn cloud_marker(collection_id: u64, in_cloud: usize) -> impl IntoElement {
+    let tooltip = pluralize(in_cloud,
+                            "sidebar.collection_cloud_one",
+                            "sidebar.collection_cloud_many");
+    div().id(("collection-cloud", collection_id as usize))
+         .tooltip(move |window, cx| {
+             gpui_kit::component::tooltip::Tooltip::new(tooltip.clone()).build(window, cx)
+         })
+         .child("\u{2601}")
+}

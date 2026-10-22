@@ -74,6 +74,7 @@ impl LibraryController {
                          self.collection_sort_direction,
                          &catalog_ids);
         self.library.set_collections(collections);
+        self.refresh_collection_cloud();
         // Refresh collection_members if the current filter is a Collection
         // filter, in case the filter was set before the collections
         // loaded.

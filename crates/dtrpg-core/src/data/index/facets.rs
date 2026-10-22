@@ -58,7 +58,8 @@ pub(super) fn section_counts(conn: &Connection, now_secs: i64, window_days: u32)
                                                                        now_secs,
                                                                        window_days)?,
                        on_device:        items::count_by_status(conn, ItemStatus::Downloaded)?,
-                       in_cloud:         items::count_by_status(conn, ItemStatus::Cloud)?, })
+                       in_cloud:         items::count_by_status(conn, ItemStatus::Cloud)?,
+                       needs_attention:  0, })
 }
 
 impl LibraryIndex {

@@ -95,6 +95,30 @@ impl Library {
             .unwrap_or_default()
     }
 
+    /// For each collection, how many of its titles are only in the cloud (not
+    /// downloaded), by collection id.
+    #[must_use]
+    pub fn collection_cloud_counts(&self) -> std::collections::HashMap<u64, usize> {
+        let in_cloud: Vec<_> =
+            self.all_items()
+                .into_iter()
+                .filter(|item| item.status == crate::data::enums::ItemStatus::Cloud)
+                .collect();
+        self.collections()
+            .iter()
+            .map(|collection| {
+                let members: HashSet<u64> = collection.member_ids.iter().copied().collect();
+                let count = in_cloud.iter()
+                                    .filter(|item| {
+                                        members.contains(&item.order_product_id)
+                                        || members.contains(&item.product_id)
+                                    })
+                                    .count();
+                (collection.id, count)
+            })
+            .collect()
+    }
+
     /// See [`add_member`].
     pub fn add_collection_member(&self, collection_id: u64, item_id: u64, product_id: u64)
                                  -> Option<Arc<str>> {

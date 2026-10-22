@@ -46,6 +46,7 @@ use crate::view_models::inspector::{
 };
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
+mod attention;
 mod bulk_selection;
 mod catalog;
 mod catalog_sync;
@@ -71,6 +72,8 @@ mod tags;
 mod theme_files;
 mod thumbnails;
 
+#[cfg(test)]
+mod tests_attention;
 #[cfg(test)]
 mod tests_availability;
 #[cfg(test)]
@@ -156,6 +159,8 @@ pub struct LibrarySnapshot {
     pub catalog_ids:               Arc<HashSet<u64>>,
     /// Total items in the full catalog (no filter, no search).
     pub total_count:               usize,
+    /// For each collection, how many of its titles are only in the cloud.
+    pub collection_cloud:          Arc<HashMap<u64, usize>>,
     pub total_mb:                  f64,
     /// Items matching the active sidebar filter but ignoring the search query.
     pub filter_count:              usize,
@@ -243,6 +248,11 @@ pub struct LibraryController {
     /// The values the catalog has for each choosable filter field, as of the
     /// last change to the catalog.
     known_filter_values:           HashMap<Field, Vec<String>>,
+    /// Ids of the items whose last download failed, for the Needs Attention
+    /// section. Kept for the session; a download that succeeds clears its item.
+    failed_downloads:              HashSet<Arc<str>>,
+    /// For each collection, how many of its titles are only in the cloud.
+    collection_cloud:              Arc<HashMap<u64, usize>>,
     /// How many downloaded titles each storage location holds, by location id.
     root_title_counts:             HashMap<u32, usize>,
     /// How many items each smart collection holds, by collection id, as of

@@ -91,6 +91,8 @@ impl LibraryController {
                           smart_counts: HashMap::new(),
                           filter_choices: prefs.filter_value_choices(),
                           known_filter_values: HashMap::new(),
+                          failed_downloads: HashSet::new(),
+                          collection_cloud: Arc::new(HashMap::new()),
                           root_title_counts: HashMap::new(),
                           library,
                           thumbnail_activity_id: None,

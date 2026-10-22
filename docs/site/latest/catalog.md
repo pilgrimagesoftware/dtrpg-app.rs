@@ -44,11 +44,16 @@ Pages, Size and Added are shown until you choose otherwise.
 The sidebar has three sections:
 
 - **Smart filters** - All Titles, Recently Updated, On This Device, In the
-  Cloud.
+  Cloud, and Needs Attention. Needs Attention lists the titles whose last
+  download failed, and a title leaves it when a download of it succeeds. It
+  starts empty each time Libri opens. Insights is listed after it but is greyed
+  out until it is built.
 - **Publishers** - every publisher represented in your library, each
   filtering the catalog to just their titles.
 - **Collections** - your custom collections (see
-  [Collections]({{ '/latest/collections/' | relative_url }})).
+  [Collections]({{ '/latest/collections/' | relative_url }})). A cloud
+  marker beside a collection's count means some of its titles are only in the
+  cloud; hover it to see how many.
 
 The toolbar's search box filters the current section's titles as you type. It also finds items by tag and by
 other fields: see [Searching by field](#searching-by-field) below and [Tags]({{ '/latest/tags/' | relative_url }}).

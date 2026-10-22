@@ -131,6 +131,7 @@ impl LibraryController {
         let (item_id, index) = job.key.clone();
         let dest = job.dest.take();
         let succeeded = outcome == Outcome::Succeeded;
+        self.note_download_result(&item_id, succeeded);
         // `Library` persists the download to the index immediately —
         // otherwise a restart before the next catalog reload shows `Cloud`
         // status regardless of what `reconcile_catalog` does (see
@@ -149,6 +150,7 @@ impl LibraryController {
             }
         }
         self.refresh_section_counts();
+        self.refresh_collection_cloud();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
 

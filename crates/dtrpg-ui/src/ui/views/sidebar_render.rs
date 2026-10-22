@@ -14,6 +14,7 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                              publisher_search: SidebarSectionSearch,
                              collection_search: SidebarSectionSearch, tags: Vec<TagEntry>,
                              smart_collections: Vec<SmartCollectionRow>,
+                             collection_cloud: Arc<HashMap<u64, usize>>,
                              sidebar_open: SidebarOpen)
                              -> impl IntoElement + 'static {
     let active = filter.clone();
@@ -22,27 +23,36 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
 
     // ── Library smart-filter menu
     // ─────────────────────────────────────────────
-    let lib_menu = SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
-                                     .child(nav_item(&t!("sidebar.all_titles"),
-                                                     counts.all,
-                                                     active == SidebarFilter::AllTitles,
-                                                     SidebarFilter::AllTitles,
-                                                     entity.clone()))
-                                     .child(nav_item(&t!("sidebar.recently_updated"),
-                                                     counts.recently_updated,
-                                                     active == SidebarFilter::RecentlyUpdated,
-                                                     SidebarFilter::RecentlyUpdated,
-                                                     entity.clone()))
-                                     .child(nav_item(&t!("sidebar.on_this_device"),
-                                                     counts.on_device,
-                                                     active == SidebarFilter::OnDevice,
-                                                     SidebarFilter::OnDevice,
-                                                     entity.clone()))
-                                     .child(nav_item(&t!("sidebar.in_the_cloud"),
-                                                     counts.in_cloud,
-                                                     active == SidebarFilter::InCloud,
-                                                     SidebarFilter::InCloud,
-                                                     entity.clone()));
+    let lib_menu =
+        SidebarMenu::new().gap(SIDEBAR_ROW_GAP)
+                          .child(nav_item(&t!("sidebar.all_titles"),
+                                          counts.all,
+                                          active == SidebarFilter::AllTitles,
+                                          SidebarFilter::AllTitles,
+                                          entity.clone()))
+                          .child(nav_item(&t!("sidebar.recently_updated"),
+                                          counts.recently_updated,
+                                          active == SidebarFilter::RecentlyUpdated,
+                                          SidebarFilter::RecentlyUpdated,
+                                          entity.clone()))
+                          .child(nav_item(&t!("sidebar.on_this_device"),
+                                          counts.on_device,
+                                          active == SidebarFilter::OnDevice,
+                                          SidebarFilter::OnDevice,
+                                          entity.clone()))
+                          .child(nav_item(&t!("sidebar.in_the_cloud"),
+                                          counts.in_cloud,
+                                          active == SidebarFilter::InCloud,
+                                          SidebarFilter::InCloud,
+                                          entity.clone()))
+                          .child(nav_item(&t!("sidebar.needs_attention"),
+                                          counts.needs_attention,
+                                          active == SidebarFilter::NeedsAttention,
+                                          SidebarFilter::NeedsAttention,
+                                          entity.clone()))
+                          // Insights arrives with its own change; the entry holds
+                          // its place in the list until then.
+                          .child(SidebarMenuItem::new(t!("sidebar.insights")).disable(true));
 
     let publishers_count = publishers.len();
 
@@ -133,6 +143,9 @@ pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                        CollectionRow { id: c.id,
                                        name: c.name,
                                        count,
+                                       in_cloud: collection_cloud.get(&c.id)
+                                                                 .copied()
+                                                                 .unwrap_or(0),
                                        is_active }
                    })
                    .collect();

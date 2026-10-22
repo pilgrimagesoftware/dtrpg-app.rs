@@ -263,6 +263,9 @@ pub struct SectionCounts {
     pub recently_updated: usize,
     pub on_device:        usize,
     pub in_cloud:         usize,
+    /// Items whose last download failed. The catalog does not know this; the
+    /// app fills it in.
+    pub needs_attention:  usize,
 }
 
 /// Computes smart section counts from the full catalog.
@@ -281,7 +284,8 @@ pub fn section_counts(catalog: &[LibraryItem], now_secs: i64, window_days: u32) 
                                              .count(),
                     in_cloud:         catalog.iter()
                                              .filter(|i| i.status == ItemStatus::Cloud)
-                                             .count(), }
+                                             .count(),
+                    needs_attention:  0, }
 }
 
 // ── Thumbnail cooldown
