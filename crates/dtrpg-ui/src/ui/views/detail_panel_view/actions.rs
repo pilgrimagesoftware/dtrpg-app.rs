@@ -69,9 +69,10 @@ fn open_item_for_reading(entry_dir: &Path, item: &LibraryItem,
     }
 }
 
-/// Downloads the item, through the download sheet where one applies. Once the
-/// item is downloaded the button only shows that; holding Shift while clicking
-/// it asks to remove the download.
+/// Downloads the item, through the download sheet where one applies. Holding
+/// Shift while clicking skips the sheet and downloads with its defaults. Once
+/// the item is downloaded the button only shows that, and Shift-clicking it
+/// asks to remove the download.
 fn download_button(item: &LibraryItem, is_downloaded: bool,
                    controller: Entity<LibraryController>, cx: &App)
                    -> Button {
@@ -85,7 +86,7 @@ fn download_button(item: &LibraryItem, is_downloaded: bool,
         t!("detail.downloaded_tooltip")
     }
     else {
-        t!("detail.download_sheet_button")
+        t!("detail.download_sheet_tooltip")
     };
     Button::new("inspector-download").ghost()
                                      .outline()
@@ -107,6 +108,18 @@ fn download_button(item: &LibraryItem, is_downloaded: bool,
                                                                          Arc::clone(&item_id),
                                                                          title.clone());
                                              }
+                                         }
+                                         else if event.modifiers().shift {
+                                             // Everything not yet downloaded,
+                                             // to the location the
+                                             // rules pick, and no rule
+                                             // remembered: what the sheet
+                                             // starts with, without showing it.
+                                             controller.update(cx, |ctrl, cx| {
+                                                           ctrl.request_download(&item_id,
+                                                                                 title.clone(),
+                                                                                 cx);
+                                                       });
                                          }
                                          else {
                                              request_download_with_sheet(window,
