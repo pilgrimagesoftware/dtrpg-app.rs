@@ -10,13 +10,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use dtrpg_core::credentials::{Credential, CredentialStore, KeyringCredentialStore};
-use dtrpg_core::data::avatar::{avatar_cached, fetch_avatar_bytes};
-use dtrpg_core::data::catalog_cache::load_cache_metadata;
+use dtrpg_core::data::avatar::fetch_avatar_bytes;
 use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use dtrpg_core::data::mcp_access::{AuditEntry, AuditLog, McpSettings, McpSettingsFile};
 use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
-use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
+use dtrpg_core::data::paths::app_cache_dir;
 use dtrpg_core::data::profile::ProfileConfig;
 use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
@@ -34,6 +33,7 @@ use crate::data::events::{
 };
 use crate::data::token_status_global::TokenStatusGlobal;
 pub use crate::view_models::rule_editor::{RuleEditor, RuleEditorType};
+use crate::view_models::summary_display::SummaryPage;
 
 /// Index of the File Openers page of the settings window, for opening the
 /// settings on it.
@@ -42,25 +42,6 @@ pub const FILE_OPENERS_PAGE_IX: usize = 3;
 pub const STORAGE_PAGE_IX: usize = 2;
 /// Index of the Advanced page.
 pub const ADVANCED_PAGE_IX: usize = 5;
-
-/// Per-type counts of regenerable app cache data, computed from disk and
-/// cached on the controller — see [`SettingsController::refresh_cache_counts`].
-#[derive(Clone, Copy, Default)]
-pub struct CacheCounts {
-    /// Number of items in the cached catalog/collections metadata.
-    pub metadata_items:             usize,
-    /// Number of cached cover thumbnail files.
-    pub cover_thumbnails:           usize,
-    /// `true` if an avatar image is currently cached.
-    pub avatar_cached:              bool,
-    /// Unix timestamp (seconds) when the catalog/collections metadata cache
-    /// was last written. `None` when no cache metadata exists yet.
-    pub metadata_saved_at_secs:     Option<i64>,
-    /// Unix timestamp (seconds) of the last per-item availability check
-    /// batch (manual or automatic). `None` when no batch has run yet, or
-    /// predates the field being tracked.
-    pub last_item_check_batch_secs: Option<i64>,
-}
 
 // ── AuthState
 // ─────────────────────────────────────────────────────────────────
@@ -154,9 +135,6 @@ pub struct SettingsSnapshot {
     pub pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     pub active_page_ix:                 usize,
-    /// Current per-type counts of cached data, for the Advanced section's
-    /// "Cache details" area.
-    pub cache_counts:                   CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
     pub max_concurrent_downloads:       usize,
     /// Shared input state for the "Max concurrent downloads" number field in
@@ -182,9 +160,9 @@ pub struct SettingsSnapshot {
     /// How summaries are made: provider, model, ceiling, and whether on
     /// download.
     pub summaries:                      SummarySettingsFile,
-    /// Tokens the summaries made this calendar month have used, as of the
-    /// last time the Agent page was opened.
-    pub summary_tokens_used:            u64,
+    /// What the Summaries card reads besides the settings, as of the last time
+    /// the Agent page was opened.
+    pub summary_page:                   SummaryPage,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
@@ -206,7 +184,7 @@ pub struct SettingsController {
     mcp_command_path:               String,
     mcp_log_path:                   String,
     summaries:                      SummarySettings,
-    summary_tokens_used:            u64,
+    summary_page:                   SummaryPage,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -244,11 +222,6 @@ pub struct SettingsController {
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
     active_page_ix:                 usize,
-    /// Cached per-type cache counts for the Advanced page. Refreshed on the
-    /// panel-open, page-change, and cache-clear paths — see
-    /// [`Self::refresh_cache_counts`] — rather than recomputed on every
-    /// render pass, so rendering performs no disk I/O.
-    cache_counts:                   CacheCounts,
     /// Free and total space of each storage root's volume, by root id, for
     /// the Storage page. Refreshed with the cache counts, so rendering does
     /// no disk I/O.
@@ -333,7 +306,7 @@ impl SettingsController {
                               mcp_command_path: agent::mcp_command_path(),
                               mcp_log_path: AuditLog::open().path().display().to_string(),
                               summaries: SummarySettings::load(),
-                              summary_tokens_used: summaries::tokens_used_this_month(),
+                              summary_page: summaries::read_summary_page(None),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -352,7 +325,6 @@ impl SettingsController {
                               active_page_ix:
                                   dtrpg_core::data::ui_state::UiState::load().settings_page_ix()
                                                                              .unwrap_or(0),
-                              cache_counts: CacheCounts::default(),
                               root_volumes: HashMap::new(),
                               focus_email_pending: false,
                               recently_updated_window_input: None,
@@ -386,7 +358,7 @@ impl SettingsController {
                mcp_command_path: String::new(),
                mcp_log_path: String::new(),
                summaries: SummarySettings::in_memory(),
-               summary_tokens_used: 0,
+               summary_page: SummaryPage::default(),
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -401,7 +373,6 @@ impl SettingsController {
                token_status: TokenStatusHandle::default(),
                pending_file_opener: None,
                active_page_ix: 0,
-               cache_counts: CacheCounts::default(),
                root_volumes: HashMap::new(),
                focus_email_pending: false,
                recently_updated_window_input: None,
@@ -423,7 +394,7 @@ impl SettingsController {
         self.active_page_ix = ix;
         if ix == agent::AGENT_PAGE_IX {
             self.mcp_activity = AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS);
-            self.summary_tokens_used = summaries::tokens_used_this_month();
+            self.summary_page = summaries::read_summary_page(self.summary_page.key_input.take());
         }
         self.refresh_page_data();
         dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);

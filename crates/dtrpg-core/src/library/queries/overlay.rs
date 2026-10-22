@@ -22,8 +22,11 @@ impl Library {
     /// Overlays the ephemeral state and the file locations on `items`.
     pub(super) fn overlaid_items(&self, mut items: Vec<LibraryItem>) -> Vec<LibraryItem> {
         let mut locations = self.file_locations_by_item();
+        let mut collections = self.collection_names_by_member();
         for item in &mut items {
             self.overlay_ephemeral_state(item);
+            item.collections = collections.remove(&item.order_product_id)
+                                          .unwrap_or_default();
             item.locations = locations.remove(&item.id)
                                       .unwrap_or_default()
                                       .into_iter()
@@ -70,6 +73,9 @@ impl Library {
                              .into_iter()
                              .map(Arc::from)
                              .collect();
+        item.collections = self.collection_names_by_member()
+                               .remove(&item.order_product_id)
+                               .unwrap_or_default();
         Some(item)
     }
 

@@ -270,6 +270,8 @@ pub struct LibraryController {
     insights:                      Option<Arc<dtrpg_core::library::insights::Insights>>,
     /// True while the aggregates are being worked out off the main thread.
     insights_computing:            bool,
+    /// What the caches hold, read with the Insights aggregates.
+    cache_counts:                  dtrpg_core::data::cache_counts::CacheCounts,
     /// What Libri uses on each storage location, for the status bar.
     root_usage:                    Arc<Vec<dtrpg_core::library::insights::RootUsage>>,
     /// For each collection, how many of its titles are only in the cloud.

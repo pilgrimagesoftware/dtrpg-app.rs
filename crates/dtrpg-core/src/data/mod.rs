@@ -2,6 +2,7 @@ pub mod activity;
 pub mod anthropic_summary;
 pub mod auth_state;
 pub mod avatar;
+pub mod cache_counts;
 pub mod catalog_cache;
 pub mod collection;
 pub mod collections_cache;

@@ -101,6 +101,10 @@ pub struct LibraryItem {
     /// item, so it is empty on an item built any other way.
     #[serde(skip)]
     pub locations:                 Vec<Arc<str>>,
+    /// The names of the manual collections the item is a member of. Not stored
+    /// in the index; the catalog fills it in from the collections it holds.
+    #[serde(skip)]
+    pub collections:               Vec<Arc<str>>,
 }
 
 impl LibraryItem {
@@ -134,7 +138,8 @@ impl LibraryItem {
                availability_last_checked: None,
                files: Vec::new(),
                filters: Vec::new(),
-               locations: Vec::new() }
+               locations: Vec::new(),
+               collections: Vec::new() }
     }
 
     /// The item with one more filter, in `category`, named `name`, for building

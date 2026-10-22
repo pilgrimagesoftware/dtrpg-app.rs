@@ -186,7 +186,8 @@ pub(super) fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
                      availability_last_checked: None,
                      files:                     Vec::new(),
                      filters:                   Vec::new(),
-                     locations:                 Vec::new(), })
+                     locations:                 Vec::new(),
+                     collections:               Vec::new(), })
 }
 
 /// Reads the filters of the item `item_id`, in the order they were stored.

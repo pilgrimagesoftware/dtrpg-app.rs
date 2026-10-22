@@ -74,6 +74,7 @@ spaces in quotes.
 | `genre` | genres include the value | `genre:horror` |
 | `availability` | download state is `downloaded` or `cloud` | `-availability:cloud` |
 | `location` | downloaded files are in the storage location of that name | `location:"archive vault"` |
+| `collection` | item is in the manual collection of that name | `collection:"solo play"` |
 
 Combine terms with each other and with ordinary words: `type:adventure -tag:solo moria`. An item has to meet
 every term, except that several terms for the same field (`type:adventure type:core`) are alternatives: an

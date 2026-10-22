@@ -162,23 +162,10 @@ impl SettingsController {
         cx.emit(CacheCleared);
     }
 
-    /// Recomputes the per-type [`CacheCounts`] shown on the Advanced page and
-    /// stores them for subsequent [`snapshot`](Self::snapshot) calls.
-    ///
-    /// The computation touches disk: a cache-metadata sidecar read (no full
-    /// catalog parse), one `read_dir` of the covers directory, and one avatar
-    /// `exists()` check. It runs on the panel-open, page-change, and
-    /// cache-clear paths rather than once per render pass, so the render path
-    /// itself performs no disk I/O.
-    pub fn refresh_cache_counts(&mut self) {
-        self.cache_counts = compute_cache_counts();
-    }
-
-    /// Refreshes everything the pages read from disk: the cache counts and
-    /// the free space of each storage root's volume. Runs on the same paths
-    /// as [`Self::refresh_cache_counts`].
+    /// Refreshes what the pages read from disk: the free space of each storage
+    /// root's volume. Runs when the panel opens, the page changes, and the
+    /// cache is cleared, never while drawing.
     pub fn refresh_page_data(&mut self) {
-        self.refresh_cache_counts();
         self.refresh_root_volumes();
     }
 
@@ -222,27 +209,4 @@ impl SettingsController {
             tracing::warn!("reveal_in_file_manager failed: {e}");
         }
     }
-}
-
-/// Reads the current per-type cache counts from disk.
-///
-/// Kept free of `SettingsController` so its disk-I/O cost is obvious at the
-/// call site and it stays trivially unit-testable — see
-/// [`SettingsController::refresh_cache_counts`], its only production caller.
-fn compute_cache_counts() -> CacheCounts {
-    let metadata = load_cache_metadata(&cache_dir());
-    let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
-    let metadata_saved_at_secs =
-        metadata.as_ref()
-                .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
-    let last_item_check_batch_secs = metadata.as_ref()
-                                             .and_then(|m| m.last_item_check_batch_secs)
-                                             .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
-    let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
-                                                          .unwrap_or(0);
-    CacheCounts { metadata_items,
-                  cover_thumbnails,
-                  avatar_cached: avatar_cached(),
-                  metadata_saved_at_secs,
-                  last_item_check_batch_secs }
 }

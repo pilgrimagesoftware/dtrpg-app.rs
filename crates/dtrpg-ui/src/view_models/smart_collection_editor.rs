@@ -9,13 +9,14 @@ use dtrpg_core::data::smart_collection::{MatchMode, Operator, Rule, SmartCollect
 use dtrpg_core::util::search::{Field, SearchQuery};
 
 /// The fields a rule can test, in the order the field menu lists them.
-pub const RULE_FIELDS: [Field; 7] = [Field::Tag,
+pub const RULE_FIELDS: [Field; 8] = [Field::Tag,
                                      Field::Publisher,
                                      Field::System,
                                      Field::Type,
                                      Field::Format,
                                      Field::Genre,
-                                     Field::Availability];
+                                     Field::Availability,
+                                     Field::Collection];
 
 /// A smart collection as it is being edited.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -31,6 +32,31 @@ impl SmartCollectionDraft {
     pub fn new() -> Self {
         let mut draft = Self::default();
         draft.add_rule();
+        draft
+    }
+
+    /// A draft that finds the members of the manual collection `name`: its
+    /// name, and one rule, `collection is <name>`. Used to make a smart
+    /// collection from a manual one. The smart collection follows the manual
+    /// one, and more rules can narrow it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::util::search::Field;
+    /// use dtrpg_ui::view_models::smart_collection_editor::SmartCollectionDraft;
+    ///
+    /// let draft = SmartCollectionDraft::from_manual_collection("Solo play");
+    /// assert_eq!(draft.name(), "Solo play");
+    /// assert_eq!(draft.rules()[0].field, Field::Collection);
+    /// assert_eq!(draft.rules()[0].value, "Solo play");
+    /// ```
+    #[must_use]
+    pub fn from_manual_collection(name: &str) -> Self {
+        let mut draft = Self::new();
+        draft.set_name(name);
+        draft.set_field(0, Field::Collection);
+        draft.set_value(0, name);
         draft
     }
 

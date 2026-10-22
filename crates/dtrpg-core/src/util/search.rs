@@ -46,18 +46,21 @@ pub enum Field {
     Availability,
     /// The storage location a downloaded file of the item is in.
     Location,
+    /// A manual collection the item is a member of.
+    Collection,
 }
 
 impl Field {
     /// Every field, in the order a search is documented.
-    pub const ALL: [Self; 8] = [Self::Tag,
+    pub const ALL: [Self; 9] = [Self::Tag,
                                 Self::Publisher,
                                 Self::System,
                                 Self::Type,
                                 Self::Format,
                                 Self::Genre,
                                 Self::Availability,
-                                Self::Location];
+                                Self::Location,
+                                Self::Collection];
 
     /// The field whose keyword is `keyword`, ignoring case.
     ///
@@ -87,6 +90,7 @@ impl Field {
             Self::Genre => "genre",
             Self::Availability => "availability",
             Self::Location => "location",
+            Self::Collection => "collection",
         }
     }
 
@@ -108,7 +112,11 @@ impl Field {
             Self::Type => Some(CATEGORY_PRODUCT_TYPE),
             Self::Format => Some(CATEGORY_FORMAT),
             Self::Genre => Some(CATEGORY_GENRE),
-            Self::Tag | Self::Publisher | Self::Availability | Self::Location => None,
+            Self::Tag
+            | Self::Publisher
+            | Self::Availability
+            | Self::Location
+            | Self::Collection => None,
         }
     }
 }
@@ -156,6 +164,7 @@ impl Term {
             }
             Field::Availability => self.availability() == Some(item.status),
             Field::Location => item.locations.iter().any(|location| equals(location)),
+            Field::Collection => item.collections.iter().any(|name| equals(name)),
         }
     }
 }

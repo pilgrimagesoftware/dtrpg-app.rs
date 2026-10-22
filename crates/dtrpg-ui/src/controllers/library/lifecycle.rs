@@ -102,6 +102,7 @@ impl LibraryController {
                           item_locations: HashMap::new(),
                           library,
                           agent_link: None,
+                          cache_counts: dtrpg_core::data::cache_counts::CacheCounts::default(),
                           thumbnail_activity_id: None,
                           thumbnail_processed: 0,
                           thumbnail_refresh_active: false,
