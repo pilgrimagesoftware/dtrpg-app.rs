@@ -718,6 +718,7 @@ smart_collections:
     add_rule: "Add rule"
     remove_rule_tooltip: "Remove this rule"
     preview: "Matches %{matching} of %{total} titles right now"
+    preview_more: "…and %{count} more"
     on_match_heading: "On match"
     download_new: "Download new matches automatically"
     mirror: "Mirror to a folder of symlinks on disk"

@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use dtrpg_core::data::smart_collection::{MatchMode, Operator};
+use dtrpg_core::library::SmartPreview;
 use dtrpg_core::util::search::Field;
 use gpui::prelude::*;
 use gpui::{App, Entity, SharedString, Window, div, px};
@@ -33,9 +34,12 @@ struct EditorState {
     name_input:   Entity<InputState>,
     /// The box for each rule's value, in the same order as the rules.
     value_inputs: Vec<Entity<InputState>>,
-    /// How many titles match now, of how many there are.
-    preview:      (usize, usize),
+    /// What matches now: the counts and the first few titles.
+    preview:      SmartPreview,
 }
+
+/// The tallest the list of matching titles grows before it scrolls.
+const PREVIEW_LIST_HEIGHT: f32 = 140.0;
 
 /// The editor's state, shared by the dialog and the callbacks that change it.
 type SharedState = Rc<RefCell<EditorState>>;
@@ -57,7 +61,7 @@ pub fn open_smart_collection_editor(window: &mut Window, cx: &mut App,
     let state = Rc::new(RefCell::new(EditorState { draft,
                                                    name_input: name_input.clone(),
                                                    value_inputs,
-                                                   preview: (0, 0) }));
+                                                   preview: SmartPreview::default() }));
     watch_input(cx, &name_input, &state, &controller);
     let inputs = state.borrow().value_inputs.clone();
     for input in &inputs {
@@ -240,19 +244,36 @@ fn render_rule_row(index: usize, state: &SharedState, controller: &Entity<Librar
                                                          }))
 }
 
-/// The box that says how many titles match now.
+/// The box that says how many titles match now, with the first few of them
+/// in a list that scrolls.
 fn render_preview(state: &SharedState, colors: &ColorTokens) -> impl IntoElement {
-    let (matching, total) = state.borrow().preview;
-    div().p(px(12.0))
-         .rounded_lg()
-         .border_1()
-         .border_color(colors.border)
-         .bg(colors.surface_alt)
-         .text_sm()
-         .text_color(colors.text_primary)
-         .child(t!("smart_collections.editor.preview",
-                   matching = matching,
-                   total = total).to_string())
+    let preview = state.borrow().preview.clone();
+    let hidden = preview.matching.saturating_sub(preview.titles.len());
+    v_flex().p(px(12.0))
+            .gap(px(8.0))
+            .rounded_lg()
+            .border_1()
+            .border_color(colors.border)
+            .bg(colors.surface_alt)
+            .text_sm()
+            .text_color(colors.text_primary)
+            .child(t!("smart_collections.editor.preview",
+                      matching = preview.matching,
+                      total = preview.total).to_string())
+            .when(!preview.titles.is_empty(), |column| {
+                column.child(v_flex().id("smart-preview-titles")
+                                     .max_h(px(PREVIEW_LIST_HEIGHT))
+                                     .overflow_y_scroll()
+                                     .gap(px(2.0))
+                                     .text_color(colors.text_secondary)
+                                     .children(preview.titles
+                                                      .iter()
+                                                      .map(|title| div().truncate().child(title.to_string())))
+                                     .when(hidden > 0, |list| {
+                                         list.child(t!("smart_collections.editor.preview_more",
+                                                       count = hidden).to_string())
+                                     }))
+            })
 }
 
 /// A switch for an on-match action. The actions are not built yet, so the
@@ -400,6 +421,7 @@ mod tests {
                     "smart_collections.editor.add_rule",
                     "smart_collections.editor.remove_rule_tooltip",
                     "smart_collections.editor.on_match_later_tooltip",
+                    "smart_collections.editor.preview_more",
                     "smart_collections.editor.no_equivalent_query",
                     "smart_collections.editor.field_format",
                     "smart_collections.editor.field_genre",

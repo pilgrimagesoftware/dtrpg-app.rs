@@ -700,6 +700,7 @@ smart_collections:
     add_rule: "Ajouter une règle"
     remove_rule_tooltip: "Supprimer cette règle"
     preview: "%{matching} titres sur %{total} correspondent actuellement"
+    preview_more: "…et %{count} de plus"
     on_match_heading: "À la correspondance"
     download_new: "Télécharger automatiquement les nouvelles correspondances"
     mirror: "Refléter dans un dossier de liens symboliques sur le disque"
