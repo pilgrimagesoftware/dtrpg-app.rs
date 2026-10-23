@@ -4,8 +4,11 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{clear_mirror, smart_collection_dir, sync_mirror};
+#[cfg(unix)]
+use super::sync_mirror;
+use super::{clear_mirror, smart_collection_dir};
 
+#[cfg(unix)]
 fn file_in(root: &Path, name: &str) -> PathBuf {
     let path = root.join("items").join(name);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
