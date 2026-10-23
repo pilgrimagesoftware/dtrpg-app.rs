@@ -78,6 +78,7 @@ impl LibraryController {
                           activity,
                           filter: view_prefs.to_filter(),
                           search_query: String::new(),
+                          search_epoch: 0,
                           sort: view_prefs.to_sort(),
                           sort_direction: SortDirection::default(),
                           collection_sort: prefs.collection_sort(),

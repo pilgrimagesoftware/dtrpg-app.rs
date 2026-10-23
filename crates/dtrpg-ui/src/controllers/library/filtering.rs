@@ -1,7 +1,13 @@
 //! Sidebar filtering, search, sorting, grouping, and view-preference
 //! persistence.
 
+use std::time::Duration;
+
 use super::*;
+
+/// Quiet time after the last typed keystroke before the catalog filters to
+/// the new query.
+pub(super) const SEARCH_SETTLE_DELAY: Duration = Duration::from_millis(150);
 
 impl LibraryController {
     /// Returns the filtered, sorted result set for the current state.
@@ -87,8 +93,34 @@ impl LibraryController {
     // ── Search mutations
     // ──────────────────────────────────────────────────────
 
-    /// Updates the text search query.
+    /// Updates the text search query once typing settles. A burst of
+    /// keystrokes applies only its last query: every invalidation re-reads
+    /// the matched catalog, which is not something to afford per key.
+    pub fn set_search_query_debounced(&mut self, query: String, cx: &mut Context<Self>) {
+        // The epoch kills this task once anything else applies a query - a
+        // newer keystroke, the clear button, or a sidebar chip edit - so the
+        // settle never resurrects text the user has moved past.
+        self.search_epoch += 1;
+        let epoch = self.search_epoch;
+        cx.spawn(async move |this, async_cx| {
+              async_cx.background_executor()
+                      .timer(SEARCH_SETTLE_DELAY)
+                      .await;
+              let _ = this.update(async_cx, move |ctrl, cx| {
+                              if ctrl.search_epoch == epoch {
+                                  ctrl.set_search_query(query, cx);
+                              }
+                          });
+          })
+          .detach();
+    }
+
+    /// Updates the text search query. Bumping the epoch here retires any
+    /// settle task [`Self::set_search_query_debounced`] left pending, so an
+    /// immediate apply - a chip edit, the clear button - is never followed by
+    /// a stale keystroke applying its older text.
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
+        self.search_epoch += 1;
         self.search_query = query;
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -96,9 +128,7 @@ impl LibraryController {
 
     /// Clears the text search query.
     pub fn clear_search_query(&mut self, cx: &mut Context<Self>) {
-        self.search_query.clear();
-        self.invalidate_cache();
-        cx.emit(LibraryChanged);
+        self.set_search_query(String::new(), cx);
     }
 
     // ── Sidebar section search mutations
