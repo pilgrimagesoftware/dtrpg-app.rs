@@ -53,6 +53,9 @@ impl SettingsController {
     pub fn commit_pending_file_opener(&mut self, extension: &str, cx: &mut Context<Self>) {
         let trimmed = extension.trim();
         if trimmed.is_empty() {
+            // Discard the pending row so the add button is not left disabled.
+            self.pending_file_opener.take();
+            cx.emit(SettingsChanged);
             return;
         }
         let Some(app_path) = self.pending_file_opener.take()
