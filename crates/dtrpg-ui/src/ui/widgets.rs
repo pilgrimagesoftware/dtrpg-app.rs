@@ -15,7 +15,7 @@ use crate::util::text::escape_markdown;
 /// unique among sibling elements, same as any other `gpui` element id.
 pub fn selectable_text(id: impl Into<ElementId>, text: impl Into<SharedString>) -> TextView {
     let escaped = escape_markdown(text.into().as_ref());
-    TextView::markdown(id, escaped).selectable(true)
+    TextView::markdown(id, escaped).selectable(false)
 }
 
 /// Uppercases a field/section label.
