@@ -160,6 +160,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                      ctrl.filter_value_choices()),
                                                    &search_query,
                                                    &view.search_input,
+                                                   &view.controller,
                                                    colors)
                          });
     let title_bar = render_title_bar(&settings_snap.auth,
@@ -231,16 +232,20 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
              .child(div().flex_1()
                          .min_h_0()
                          .flex()
-                         .children(filters_column)
-                         // A column, so the catalog view's own `flex_1` has a height to fill:
-                         // as a plain box it collapsed to nothing and the whole content
-                         // area went blank.
-                         .child(div().flex_1()
-                                     .min_w_0()
-                                     .min_h_0()
-                                     .flex()
-                                     .flex_col()
-                                     .child(view.catalog_view.clone())));
+                         .child(h_resizable("filters-layout")
+                                    .child(resizable_panel()
+                                               .visible(view.filters_open)
+                                               .size(px(220.))
+                                               .size_range(px(160.)..px(420.))
+                                               .flex_none()
+                                               .children(filters_column))
+                                    .child(resizable_panel()
+                                               .child(div().flex_1()
+                                                           .min_w_0()
+                                                           .min_h_0()
+                                                           .flex()
+                                                           .flex_col()
+                                                           .child(view.catalog_view.clone())))));
 
     let surface = colors.surface;
     let text_primary = colors.text_primary;

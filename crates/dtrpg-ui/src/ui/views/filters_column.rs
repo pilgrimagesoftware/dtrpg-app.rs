@@ -25,9 +25,6 @@ use crate::data::theme::ColorTokens;
 use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
-/// The width of the filters column.
-const FILTERS_COLUMN_WIDTH: f32 = 220.0;
-
 /// The facets the column lists, in order, with the heading of each.
 const FACET_SECTIONS: [(Field, &str); 7] = [(Field::Availability, "filters.availability"),
                                             (Field::System, "filters.system"),
@@ -37,13 +34,15 @@ const FACET_SECTIONS: [(Field, &str); 7] = [(Field::Availability, "filters.avail
                                             (Field::Genre, "filters.genre"),
                                             (Field::Tag, "filters.tags")];
 
-/// Replaces the search box text with `query`, which the box reports to the
-/// controller like any typing.
-fn set_search_text(input: &Entity<InputState>, query: &SearchQuery, window: &mut Window,
-                   cx: &mut App) {
+/// Replaces the search box text with `query` and pushes it into the
+/// controller. `set_value` does not emit `InputEvent::Change`.
+fn set_search_text(input: &Entity<InputState>, controller: &Entity<LibraryController>,
+                   query: &SearchQuery, window: &mut Window, cx: &mut App) {
     input.update(cx, |state, cx| {
              state.set_value(query.to_string(), window, cx)
          });
+    let next = query.to_string();
+    controller.update(cx, |ctrl, cx| ctrl.set_search_query(next, cx));
 }
 
 /// How a facet value is shown. Availability values are words the user did not
@@ -99,7 +98,8 @@ pub fn without_hidden_values(facets: &Facets, choices: &FilterValueChoices) -> F
 
 /// Renders one facet: a heading and a checkbox with a count for each value.
 fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query: &SearchQuery,
-                        search_input: &Entity<InputState>, colors: &ColorTokens)
+                        search_input: &Entity<InputState>, controller: &Entity<LibraryController>,
+                        colors: &ColorTokens)
                         -> Option<impl IntoElement + use<>> {
     let counts = counts_for(facets, field);
     if counts.is_empty() {
@@ -114,6 +114,7 @@ fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query:
         let value = count.value.clone();
         let query = query.clone();
         let input = search_input.clone();
+        let controller = controller.clone();
         // The bar is a share of the largest count in this list.
         let share = count.count as f32 / largest as f32;
         div().flex()
@@ -127,7 +128,7 @@ fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query:
                                                                     .checked(query.asks_for(field, &value))
                                                                     .on_click(move |_, window, cx| {
                                                                         let next = query.toggled(field, &value);
-                                                                        set_search_text(&input, &next, window, cx);
+                                                                        set_search_text(&input, &controller, &next, window, cx);
                                                                     }))
                          .child(div().text_xs()
                                      .text_color(colors.text_tertiary)
@@ -153,7 +154,8 @@ fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query:
 /// Renders the filters column: the facets of the items on show, each with a
 /// count, ready to be checked.
 pub fn render_filters_column(facets: &Facets, query: &SearchQuery,
-                             search_input: &Entity<InputState>, colors: &ColorTokens)
+                             search_input: &Entity<InputState>,
+                             controller: &Entity<LibraryController>, colors: &ColorTokens)
                              -> impl IntoElement + use<> {
     let sections = FACET_SECTIONS.iter().filter_map(|(field, heading_key)| {
                                             render_facet_section(*field,
@@ -161,10 +163,11 @@ pub fn render_filters_column(facets: &Facets, query: &SearchQuery,
                                                                  facets,
                                                                  query,
                                                                  search_input,
+                                                                 controller,
                                                                  colors)
                                         });
     div().id("filters-column")
-         .w(px(FILTERS_COLUMN_WIDTH))
+         .w_full()
          .flex_none()
          .h_full()
          .border_r_1()
@@ -193,6 +196,7 @@ pub fn render_filter_chips(query: &SearchQuery, search_input: &Entity<InputState
                                                     let term = term.clone();
                                                     let query = query.clone();
                                                     let input = search_input.clone();
+                                                    let controller = controller.clone();
                                                     Button::new(("filter-chip", ix)).outline()
                                         .compact()
                                         .label(term.to_string())
@@ -200,7 +204,7 @@ pub fn render_filter_chips(query: &SearchQuery, search_input: &Entity<InputState
                                         .tooltip(t!("filters.remove_chip_tooltip"))
                                         .on_click(move |_, window, cx| {
                                             let next = query.without_term(&term);
-                                            set_search_text(&input, &next, window, cx);
+                                            set_search_text(&input, &controller, &next, window, cx);
                                         })
                                                 });
     let (save_query, save_controller) = (query.clone(), controller.clone());
