@@ -98,8 +98,8 @@ pub fn without_hidden_values(facets: &Facets, choices: &FilterValueChoices) -> F
 
 /// Renders one facet: a heading and a checkbox with a count for each value.
 fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query: &SearchQuery,
-                        search_input: &Entity<InputState>, controller: &Entity<LibraryController>,
-                        colors: &ColorTokens)
+                        search_input: &Entity<InputState>,
+                        controller: &Entity<LibraryController>, colors: &ColorTokens)
                         -> Option<impl IntoElement + use<>> {
     let counts = counts_for(facets, field);
     if counts.is_empty() {
