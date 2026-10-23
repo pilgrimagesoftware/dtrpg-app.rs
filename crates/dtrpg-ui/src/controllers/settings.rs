@@ -13,7 +13,9 @@ use dtrpg_core::credentials::{Credential, CredentialStore, KeyringCredentialStor
 use dtrpg_core::data::avatar::fetch_avatar_bytes;
 use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
-use dtrpg_core::data::mcp_access::{AuditEntry, AuditLog, McpSettings, McpSettingsFile};
+use dtrpg_core::data::mcp_access::{
+    AuditEntry, AuditLog, IpcEndpoint, McpSettings, McpSettingsFile,
+};
 use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
 use dtrpg_core::data::paths::app_cache_dir;
 use dtrpg_core::data::profile::ProfileConfig;
@@ -157,6 +159,9 @@ pub struct SettingsSnapshot {
     pub mcp_activity:                   Vec<AuditEntry>,
     /// The full path of the MCP server program, for the agent's config.
     pub mcp_command_path:               String,
+    /// Where the agent's requests are listened for: the socket file on
+    /// macOS and Linux, the named pipe on Windows.
+    pub mcp_bind_display:               String,
     /// Where the log of agent calls is kept.
     pub mcp_log_path:                   String,
     /// How summaries are made: provider, model, ceiling, and whether on
@@ -184,6 +189,7 @@ pub struct SettingsController {
     mcp:                            McpSettings,
     mcp_activity:                   Vec<AuditEntry>,
     mcp_command_path:               String,
+    mcp_bind_display:               String,
     mcp_log_path:                   String,
     summaries:                      SummarySettings,
     summary_page:                   SummaryPage,
@@ -309,6 +315,7 @@ impl SettingsController {
                               mcp: McpSettings::load(),
                               mcp_activity: AuditLog::open().recent(agent::MCP_ACTIVITY_ROWS),
                               mcp_command_path: agent::mcp_command_path(),
+                              mcp_bind_display: agent::mcp_bind_display(),
                               mcp_log_path: AuditLog::open().path().display().to_string(),
                               summaries: SummarySettings::load(),
                               summary_page: summaries::read_summary_page(None),
@@ -362,6 +369,7 @@ impl SettingsController {
                mcp: McpSettings::in_memory(),
                mcp_activity: Vec::new(),
                mcp_command_path: String::new(),
+               mcp_bind_display: String::new(),
                mcp_log_path: String::new(),
                summaries: SummarySettings::in_memory(),
                summary_page: SummaryPage::default(),

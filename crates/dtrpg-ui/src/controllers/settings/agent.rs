@@ -46,3 +46,10 @@ pub(super) fn mcp_command_path() -> String {
                            .and_then(|exe| exe.parent().map(locate_mcp_server))
                            .map_or_else(String::new, |path| path.display().to_string())
 }
+
+/// Where the agent's requests are listened for, as one line of text: the
+/// socket file on macOS and Linux, the named pipe on Windows. Never a
+/// network address: the server is loopback-only by construction.
+pub(super) fn mcp_bind_display() -> String {
+    IpcEndpoint::production().bind_display()
+}

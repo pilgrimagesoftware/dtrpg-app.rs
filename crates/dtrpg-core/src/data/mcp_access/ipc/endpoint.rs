@@ -57,18 +57,41 @@ impl IpcEndpoint {
         {
             use interprocess::local_socket::{GenericNamespaced, ToNsName};
 
-            // One pipe per folder, so tests and a second profile do not meet.
-            let suffix: String = self.folder
-                                     .to_string_lossy()
-                                     .chars()
-                                     .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-                                     .collect();
-            format!("libri-agent-{suffix}").to_ns_name::<GenericNamespaced>()
+            self.pipe_name().to_ns_name::<GenericNamespaced>()
         }
     }
 
-    /// Writes a new random token for this run of the app and returns it.
-    pub(super) fn write_token(&self) -> io::Result<String> {
+    /// The pipe name on Windows: one per folder, so tests and a second
+    /// profile do not meet.
+    #[cfg(not(unix))]
+    fn pipe_name(&self) -> String {
+        let suffix: String = self.folder
+                                 .to_string_lossy()
+                                 .chars()
+                                 .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                                 .collect();
+        format!("libri-agent-{suffix}")
+    }
+
+    /// What the agent settings page says the server is bound to. This is
+    /// never a network address: the socket is local, and loopback-only by
+    /// construction.
+    #[must_use]
+    pub fn bind_display(&self) -> String {
+        #[cfg(unix)]
+        {
+            self.socket_path().display().to_string()
+        }
+        #[cfg(not(unix))]
+        {
+            self.pipe_name()
+        }
+    }
+
+    /// Writes a new random token and returns it. The app calls this when the
+    /// listener starts; the settings page calls it when the person rotates
+    /// the token so an old copy of the file stops working.
+    pub fn rotate_token(&self) -> io::Result<String> {
         fs::create_dir_all(&self.folder)?;
         let token = format!("{}{}",
                             uuid::Uuid::new_v4().simple(),

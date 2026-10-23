@@ -21,9 +21,10 @@ use super::*;
 
 /// The listener, and the requests it has received and nobody has answered.
 pub(super) struct AgentLink {
-    /// Dropping this stops the listener.
-    _listener: IpcListener,
-    incoming:  Receiver<Incoming>,
+    /// The listener; kept so the token can be rotated while access is on.
+    /// Dropping it stops the listener.
+    listener: IpcListener,
+    incoming: Receiver<Incoming>,
 }
 
 impl AgentLink {
@@ -31,8 +32,7 @@ impl AgentLink {
     fn start() -> Option<Self> {
         let (sender, incoming) = channel();
         match IpcListener::start(&IpcEndpoint::production(), sender) {
-            Ok(listener) => Some(Self { _listener: listener,
-                                        incoming }),
+            Ok(listener) => Some(Self { listener, incoming }),
             Err(error) => {
                 tracing::warn!(%error, "could not start listening for agent requests");
                 None
@@ -49,6 +49,19 @@ impl LibraryController {
             (true, false) => self.agent_link = AgentLink::start(),
             (false, true) => self.agent_link = None,
             _ => {}
+        }
+    }
+
+    /// Writes a new agent token, so a copy of the old one stops working.
+    /// While the listener is running its in-memory copy is updated too;
+    /// otherwise only the file is rewritten, which the next start replaces.
+    pub fn rotate_agent_token(&mut self) {
+        let result = match &self.agent_link {
+            Some(link) => link.listener.rotate_token().map(|_| ()),
+            None => IpcEndpoint::production().rotate_token().map(|_| ()),
+        };
+        if let Err(error) = result {
+            tracing::warn!(%error, "could not rotate the agent token");
         }
     }
 

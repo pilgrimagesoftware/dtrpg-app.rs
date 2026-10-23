@@ -58,6 +58,9 @@ pub struct AgentPageData {
     pub activity:     Vec<AuditEntry>,
     /// The full path of the MCP server program, for the agent's config.
     pub command_path: String,
+    /// Where the agent's requests are listened for: the socket file on
+    /// macOS and Linux, the named pipe on Windows.
+    pub bind_display: String,
     /// Where the log of calls is kept.
     pub log_path:     String,
     /// How summaries are made.
