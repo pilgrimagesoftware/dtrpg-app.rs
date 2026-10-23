@@ -94,12 +94,14 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                          activity_data: ActivityBarData<'_>, colors: &ColorTokens)
                          -> impl IntoElement + 'static {
     // "18 of 18 titles": how many are on show of how many there are.
-    let titles_summary =
-        div().text_xs()
-             .text_color(colors.text_secondary)
-             .child(t!("status_bar.titles_of",
-                       shown = snap.section_count,
-                       total = pluralize(snap.total_count, "count.title", "count.titles")).to_string());
+    let titles_summary = div().text_xs().text_color(colors.text_secondary).child(
+        t!(
+            "status_bar.titles_of",
+            shown = snap.section_count,
+            total = pluralize(snap.total_count, "count.title", "count.titles")
+        )
+        .to_string(),
+    );
     let size_summary = div().text_xs()
                             .text_color(colors.text_secondary)
                             .child(size_format(snap.total_mb));
@@ -133,27 +135,31 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
         });
 
     let theme_picker =
-        Button::new("status-bar-theme").ghost()
-                                       .compact()
-                                       .label(theme_label(&snap.theme_key))
-                                       .tooltip(t!("status_bar.theme_tooltip",
-                                                   theme = theme_label(&snap.theme_key)).to_string())
-                                       .dropdown_menu(move |menu, _, _| {
-                                           let mut m = menu;
-                                           for id in ThemeCatalog::all_ids() {
-                                               let e = entity.clone();
-                                               let lbl = theme_label(&id);
-                                               let checked = id == snap.theme_key;
-                                               m = m.item(
-                    PopupMenuItem::new(lbl)
-                        .checked(checked)
-                        .on_click(move |_, _, cx| {
+        Button::new("status-bar-theme")
+            .ghost()
+            .compact()
+            .label(theme_label(&snap.theme_key))
+            .tooltip(
+                t!(
+                    "status_bar.theme_tooltip",
+                    theme = theme_label(&snap.theme_key)
+                )
+                .to_string(),
+            )
+            .dropdown_menu(move |menu, _, _| {
+                let mut m = menu;
+                for id in ThemeCatalog::all_ids() {
+                    let e = entity.clone();
+                    let lbl = theme_label(&id);
+                    let checked = id == snap.theme_key;
+                    m = m.item(PopupMenuItem::new(lbl).checked(checked).on_click(
+                        move |_, _, cx| {
                             e.update(cx, |ctrl, cx| ctrl.set_theme(id.clone(), cx));
-                        }),
-                );
-                                           }
-                                           m
-                                       });
+                        },
+                    ));
+                }
+                m
+            });
 
     let ActivityBarData { entity: activity,
                           snap: activity_snap,
@@ -289,6 +295,8 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
        .right(theme_picker)
        .right(Separator::vertical().h_5())
        .right(notification_panel)
+       .w_full()
+       .h_full()
 }
 
 /// The width of a storage location's meter, in pixels.
@@ -322,9 +330,10 @@ fn root_meter(index: usize, root: &RootUsage, colors: &ColorTokens) -> impl Into
                      .text_color(colors.text_secondary)
                      .child(root.name.clone()))
          .children(fraction.map(|fraction| {
-                               div().w(px(ROOT_METER_WIDTH))
-                            .child(Progress::new(("status-bar-root-meter", index))
-                                       .value((fraction * 100.0).clamp(1.0, 100.0) as f32)
-                                       .color(colors.accent))
+                               div().w(px(ROOT_METER_WIDTH)).child(
+                Progress::new(("status-bar-root-meter", index))
+                    .value((fraction * 100.0).clamp(1.0, 100.0) as f32)
+                    .color(colors.accent),
+            )
                            }))
 }
