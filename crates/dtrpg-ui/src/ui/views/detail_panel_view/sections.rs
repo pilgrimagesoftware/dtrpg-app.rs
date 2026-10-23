@@ -43,8 +43,7 @@ pub(super) fn render_opens_with(item: &LibraryItem, file_openers: &[FileOpenerEn
     let application =
         file_openers.iter()
                     .find(|opener| opener.extension == extension)
-                    .and_then(|opener| opener.app_path.file_stem())
-                    .map(|name| name.to_string_lossy().into_owned())
+                    .map(|opener| opener.app_path.display().to_string())
                     .unwrap_or_else(|| t!("detail.opens_with_system_default").to_string());
     div().flex()
          .flex_col()
