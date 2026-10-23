@@ -181,6 +181,16 @@ impl SmartCollectionDraft {
         self.collection.mirror_as_symlinks
     }
 
+    /// Sets whether items that start to match are downloaded without asking.
+    pub const fn set_download_new_matches(&mut self, on: bool) {
+        self.collection.download_new_matches = on;
+    }
+
+    /// Sets whether the members are mirrored as symlinks in a folder.
+    pub const fn set_mirror_as_symlinks(&mut self, on: bool) {
+        self.collection.mirror_as_symlinks = on;
+    }
+
     /// Whether the collection can be saved: it has a name and at least one
     /// rule with a value.
     #[must_use]

@@ -68,8 +68,18 @@ positive terms for the same field as alternatives (`type:adventure type:core` fi
 either), so a collection that needs both, or that mixes fields under "any", has no
 equivalent query.
 
-The two **On match** switches (download new matches automatically, and mirror to a folder
-of symlinks) are in the editor but switched off. They come in a later version.
+The two **On match** switches do something with the titles a smart collection holds:
+
+- **Download new matches automatically** queues the download of a title when it starts to
+  match, for example after you tag it or a library update brings it in. Titles the
+  collection already holds when you turn the switch on are not downloaded. Libri
+  remembers what matched only while it runs, so a title that starts to match while Libri
+  is closed is not downloaded.
+- **Mirror to a folder of symlinks** keeps a folder named after the collection under
+  `smart-collections` in your storage location. It holds a symlink to each downloaded
+  file of each member, and is updated when the library, the tags, or the downloads change.
+  Libri only removes symlinks from that folder, never other files. Renaming the collection,
+  turning the switch off, or deleting the collection removes the old folder's links.
 
 ### Using them
 

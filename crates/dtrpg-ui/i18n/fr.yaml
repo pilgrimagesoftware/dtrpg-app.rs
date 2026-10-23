@@ -732,7 +732,6 @@ smart_collections:
     on_match_heading: "À la correspondance"
     download_new: "Télécharger automatiquement les nouvelles correspondances"
     mirror: "Refléter dans un dossier de liens symboliques sur le disque"
-    on_match_later_tooltip: "Pas encore disponible. Cela viendra dans une version ultérieure."
     equivalent_query: "Recherche équivalente : %{query}"
     no_equivalent_query: "La zone de recherche ne peut pas l’exprimer exactement."
     cancel: "Annuler"

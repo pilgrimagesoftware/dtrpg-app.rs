@@ -95,8 +95,7 @@ impl Render for InspectorWindowView {
         window.set_rem_size(theme.fonts.ui_text_size);
 
         let window_content = div().id("inspector-window")
-                                  .on_mouse_down(MouseButton::Left,
-                                                 suppress_selection_outside_text)
+                                  .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
                                   .size_full()
                                   .flex()
                                   .flex_col()

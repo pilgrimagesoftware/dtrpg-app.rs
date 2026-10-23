@@ -732,7 +732,6 @@ smart_collections:
     on_match_heading: "Bei Treffer"
     download_new: "Neue Treffer automatisch herunterladen"
     mirror: "In einem Ordner mit Symlinks auf der Festplatte spiegeln"
-    on_match_later_tooltip: "Noch nicht verfügbar. Das kommt in einer späteren Version."
     equivalent_query: "Gleichwertige Suche: %{query}"
     no_equivalent_query: "Das Suchfeld kann dies nicht genau ausdrücken."
     cancel: "Abbrechen"

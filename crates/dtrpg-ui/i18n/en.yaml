@@ -750,7 +750,6 @@ smart_collections:
     on_match_heading: "On match"
     download_new: "Download new matches automatically"
     mirror: "Mirror to a folder of symlinks on disk"
-    on_match_later_tooltip: "Not available yet. It comes in a later version."
     equivalent_query: "Equivalent query: %{query}"
     no_equivalent_query: "The search box cannot say this exactly."
     cancel: "Cancel"

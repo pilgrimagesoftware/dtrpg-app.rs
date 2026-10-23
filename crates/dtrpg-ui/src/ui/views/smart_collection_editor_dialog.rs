@@ -277,38 +277,36 @@ fn render_preview(state: &SharedState, colors: &ColorTokens) -> impl IntoElement
             })
 }
 
-/// A switch for an on-match action. The actions are not built yet, so the
-/// switch is off and cannot be turned on; the tooltip says so.
-fn render_on_match_row(id: &'static str, label: String, colors: &ColorTokens) -> impl IntoElement {
+/// A switch for an on-match action, which `on_change` turns on or off in the
+/// draft.
+fn render_on_match_row(id: &'static str, label: String, checked: bool, colors: &ColorTokens,
+                       on_change: impl Fn(bool, &mut App) + 'static)
+                       -> impl IntoElement {
     div().flex()
          .items_center()
          .justify_between()
          .child(div().text_sm()
                      .text_color(colors.text_secondary)
                      .child(label))
-         .child(div().id(id)
-                     .tooltip(|window, cx| {
-                         gpui_kit::component::tooltip::Tooltip::new(
-                             t!("smart_collections.editor.on_match_later_tooltip").to_string(),
-                         )
-                         .build(window, cx)
-                     })
-                     .child(Switch::new(id).checked(false).disabled(true)))
+         .child(Switch::new(id).checked(checked)
+                               .on_click(move |checked, _window, cx| on_change(*checked, cx)))
 }
 
 fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                   state: &SharedState, controller: &Entity<LibraryController>)
                   -> DialogContent {
     let colors = cx.global::<LibriTheme>().colors.clone();
-    let (is_new, name_input, rule_count, mode, can_save, query) = {
+    let (is_new, name_input, rule_count, mode, can_save, query, on_match) = {
         let editor = state.borrow();
         (editor.draft.collection().id == 0,
          editor.name_input.clone(),
          editor.draft.rules().len(),
          editor.draft.mode(),
          editor.draft.can_save(),
-         editor.draft.equivalent_query_text())
+         editor.draft.equivalent_query_text(),
+         (editor.draft.download_new_matches(), editor.draft.mirror_as_symlinks()))
     };
+    let (download_state, mirror_state) = (state.clone(), state.clone());
     let title = if is_new {
         t!("smart_collections.editor.title_new")
     }
@@ -371,10 +369,24 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                                                                 &colors))
                                          .child(render_on_match_row("smart-on-match-download",
                                                                     t!("smart_collections.editor.download_new").to_string(),
-                                                                    &colors))
+                                                                    on_match.0,
+                                                                    &colors,
+                                                                    move |on, cx| {
+                                                                        download_state.borrow_mut()
+                                                                                      .draft
+                                                                                      .set_download_new_matches(on);
+                                                                        cx.refresh_windows();
+                                                                    }))
                                          .child(render_on_match_row("smart-on-match-mirror",
                                                                     t!("smart_collections.editor.mirror").to_string(),
-                                                                    &colors))))
+                                                                    on_match.1,
+                                                                    &colors,
+                                                                    move |on, cx| {
+                                                                        mirror_state.borrow_mut()
+                                                                                    .draft
+                                                                                    .set_mirror_as_symlinks(on);
+                                                                        cx.refresh_windows();
+                                                                    }))))
            .child(DialogFooter::new().px_4()
                                      .pb_4()
                                      .justify_between()
@@ -421,7 +433,6 @@ mod tests {
                     "smart_collections.editor.op_is_not",
                     "smart_collections.editor.add_rule",
                     "smart_collections.editor.remove_rule_tooltip",
-                    "smart_collections.editor.on_match_later_tooltip",
                     "smart_collections.editor.preview_more",
                     "smart_collections.editor.no_equivalent_query",
                     "smart_collections.editor.field_format",
