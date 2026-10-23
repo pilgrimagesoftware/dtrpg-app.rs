@@ -87,7 +87,10 @@ not running, the tool says so and does nothing.
 
 The request goes over a local socket in Libri's data folder (a named pipe on Windows)
 and carries a random token that only your own account can read, so other programs on
-the computer cannot use it. Nothing goes over the network.
+the computer cannot use it. Nothing goes over the network. **Settings > Agent & MCP**
+shows that socket's location under **Bind address**, and its **Rotate token** button
+writes a new one: a copy of the old token stops working at once, while your agent -
+which reads the token from the file on every request - keeps working untouched.
 
 ## When a change shows up
 
