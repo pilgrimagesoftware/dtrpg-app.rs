@@ -28,7 +28,8 @@ use dtrpg_core::{
 };
 use gpui::{
     AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, ParentElement, Pixels, Render, Styled, WindowHandle, div, px,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Render, Styled,
+    WindowHandle, div, px,
 };
 use gpui_kit::component::Root;
 use gpui_kit::component::WindowExt as _;

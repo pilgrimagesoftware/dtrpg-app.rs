@@ -26,6 +26,7 @@ use rust_i18n::t;
 use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::{ColorTokens, LibriTheme};
+use crate::ui::widgets::suppress_selection_outside_text;
 use crate::ui::views::{
     settings_account_view::render_account_section,
     settings_advanced_view::render_advanced_section,
@@ -163,6 +164,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
 
     div().id("settings-window-root")
          .track_focus(focus_handle)
+         .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
          .on_key_down(move |event, _window, cx| {
              if event.keystroke.key == "escape" {
                  entity_escape.update(cx, |ctrl, cx| ctrl.close(cx));

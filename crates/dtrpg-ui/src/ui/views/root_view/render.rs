@@ -13,6 +13,7 @@ use crate::ui::views::filters_column::{
 use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
+use crate::ui::widgets::suppress_selection_outside_text;
 use crate::view_models::agent_display::exposed_tools;
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
@@ -314,6 +315,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
         .text_color(text_primary)
         .relative()
         .track_focus(&view.root_focus)
+        .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
         .on_action(move |_: &ShowSettings, _, cx| {
             this_entity.update(cx, |view, cx| view.show_settings(cx));
         })

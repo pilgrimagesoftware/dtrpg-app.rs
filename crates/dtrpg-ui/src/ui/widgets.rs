@@ -1,6 +1,7 @@
 //! Small reusable rendering helpers shared across views.
 
-use gpui::{ElementId, SharedString, Styled as _};
+use gpui::{App, ElementId, MouseDownEvent, SharedString, Styled as _, Window};
+use gpui_kit::base::{GlobalState, TextSelection};
 use gpui_kit::component::text::TextView;
 
 use crate::data::theme::ColorTokens;
@@ -16,6 +17,19 @@ use crate::util::text::escape_markdown;
 pub fn selectable_text(id: impl Into<ElementId>, text: impl Into<SharedString>) -> TextView {
     let escaped = escape_markdown(text.into().as_ref());
     TextView::markdown(id, escaped).selectable(true)
+}
+
+/// Keeps window text selection to presses that start on selectable text.
+///
+/// A window selection starts on any left press, including presses on drag
+/// handles, rows and other controls. Controls that own a press suppress it
+/// themselves; window roots call this for everything else. A press on a
+/// selectable text field is not suppressed, so drag selection and multi-click
+/// selection inside the field keep working.
+pub fn suppress_selection_outside_text(event: &MouseDownEvent, window: &mut Window, cx: &mut App) {
+    if !TextSelection::is_selectable_at(event.position, window, cx) {
+        GlobalState::suppress_text_selection(cx);
+    }
 }
 
 /// Uppercases a field/section label.

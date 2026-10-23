@@ -29,7 +29,7 @@ use rust_i18n::t;
 
 use crate::build_info;
 use crate::data::theme::LibriTheme;
-use crate::ui::widgets::selectable_text;
+use crate::ui::widgets::{selectable_text, suppress_selection_outside_text};
 
 const ISSUE_URL_BASE: &str = "https://github.com/pilgrimagesoftware/dtrpg-app.rs/issues/new";
 const WINDOW_WIDTH: f32 = 440.0;
@@ -237,6 +237,7 @@ impl Render for ReportFeatureBugWindowView {
 
         div().id("report-window-root")
              .track_focus(&self.focus_handle)
+             .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
              .on_key_down(move |event, window, _cx| {
                  if event.keystroke.key == "escape" {
                      window.remove_window();

@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use dtrpg_core::data::ui_state::UiState;
 use gpui::{
-    AppContext as _, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    Styled, Window, div,
+    AppContext as _, Context, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Render, Styled, Window, div,
 };
 
 use crate::controllers::inspector::{InspectorController, InspectorPlacement};
@@ -17,6 +17,7 @@ use crate::data::events::LibraryChanged;
 use crate::data::theme::LibriTheme;
 use crate::ui::app::{remember_window, show_library_window};
 use crate::ui::views::detail_panel_view::render_item_inspector;
+use crate::ui::widgets::suppress_selection_outside_text;
 
 /// Root view for a popped-out inspector window.
 pub struct InspectorWindowView {
@@ -94,6 +95,8 @@ impl Render for InspectorWindowView {
         window.set_rem_size(theme.fonts.ui_text_size);
 
         let window_content = div().id("inspector-window")
+                                  .on_mouse_down(MouseButton::Left,
+                                                 suppress_selection_outside_text)
                                   .size_full()
                                   .flex()
                                   .flex_col()
