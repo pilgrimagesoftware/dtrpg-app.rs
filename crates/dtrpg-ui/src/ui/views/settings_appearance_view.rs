@@ -9,13 +9,11 @@
 //! `dtrpg_core::data::ui_preferences::UiPreferences`. Fonts are part of a
 //! theme, so they are changed by editing the theme.
 
-use dtrpg_core::data::constants::{
-    DEFAULT_UI_TEXT_SIZE, MAX_UI_TEXT_SCALE, MIN_UI_TEXT_SCALE, UI_TEXT_SCALE_STEP,
-};
+use dtrpg_core::data::constants::DEFAULT_UI_TEXT_SIZE;
 use gpui::prelude::*;
-use gpui::{Entity, div, px};
-use gpui_kit::component::IconName;
-use gpui_kit::component::button::Button;
+use gpui::{AnyElement, Entity, div, px};
+use gpui_kit::component::Sizable as _;
+use gpui_kit::component::input::{InputState, NumberInput};
 use gpui_kit::component::tab::{Tab, TabBar};
 use rust_i18n::t;
 
@@ -41,40 +39,18 @@ fn row_text(title: String, note: String, colors: &ColorTokens) -> impl IntoEleme
                      .child(note))
 }
 
-/// The text scale stepper: a button to make text smaller, the scale, and a
-/// button to make it larger. The scale is a multiplier shown in tenths, where
-/// `1.0` is the app's normal text size.
-fn text_scale_control(scale: f32, entity: Entity<LibraryController>, colors: &ColorTokens)
-                      -> impl IntoElement + 'static {
-    let entity_dec = entity.clone();
-    let entity_inc = entity;
-    let set_scale = |entity: &Entity<LibraryController>, next: f32, cx: &mut gpui::App| {
-        entity.update(cx, |ctrl, cx| {
-                  ctrl.set_ui_text_size(px(next * DEFAULT_UI_TEXT_SIZE), cx);
-              });
-    };
-    div().flex()
-         .items_center()
-         .gap(px(4.0))
-         .child(Button::new("appearance-text-size-decrement").outline()
-                                                             .icon(IconName::Minus)
-                                                             .tooltip(t!("settings.appearance_text_size_decrement_tooltip").to_string())
-                                                             .on_click(move |_, _, cx| {
-                                                                 let next = (scale - UI_TEXT_SCALE_STEP).max(MIN_UI_TEXT_SCALE);
-                                                                 set_scale(&entity_dec, next, cx);
-                                                             }))
-         .child(div().w(px(48.0))
-                     .text_sm()
+/// The text scale field: an editable number with +/- buttons, shown as a
+/// multiplier in tenths where `1.0` is the app's normal text size. Shows the
+/// plain scale until the root view attaches the shared field.
+fn text_scale_control(scale: f32, input: Option<Entity<InputState>>, colors: &ColorTokens)
+                      -> AnyElement {
+    match input {
+        Some(input_state) => NumberInput::new(&input_state).small().into_any_element(),
+        None => div().text_sm()
                      .text_color(colors.text_primary)
-                     .text_align(gpui::TextAlign::Center)
-                     .child(format!("{scale:.1}")))
-         .child(Button::new("appearance-text-size-increment").outline()
-                                                             .icon(IconName::Plus)
-                                                             .tooltip(t!("settings.appearance_text_size_increment_tooltip").to_string())
-                                                             .on_click(move |_, _, cx| {
-                                                                 let next = (scale + UI_TEXT_SCALE_STEP).min(MAX_UI_TEXT_SCALE);
-                                                                 set_scale(&entity_inc, next, cx);
-                                                             }))
+                     .child(format!("{scale:.1}"))
+                     .into_any_element(),
+    }
 }
 
 /// The label of `density` on the density selector.
@@ -103,7 +79,7 @@ fn density_control(current: Density, entity: Entity<LibraryController>) -> impl 
 
 /// The "Text & density" card: the text scale and the density.
 fn text_and_density(scale: f32, density: Density, entity: &Entity<LibraryController>,
-                    colors: &ColorTokens)
+                    text_scale_input: Option<Entity<InputState>>, colors: &ColorTokens)
                     -> impl IntoElement + 'static + use<> {
     div().flex()
          .flex_col()
@@ -113,7 +89,7 @@ fn text_and_density(scale: f32, density: Density, entity: &Entity<LibraryControl
                                        .child(row_text(t!("settings.appearance_text_size_label").to_string(),
                                                        t!("settings.appearance_text_size_note").to_string(),
                                                        colors))
-                                       .child(text_scale_control(scale, entity.clone(), colors)))
+                                       .child(text_scale_control(scale, text_scale_input, colors)))
                             .child(card_row(false, colors)
                                        .child(row_text(t!("settings.appearance_density_label").to_string(),
                                                        t!("settings.appearance_density_note").to_string(),
@@ -124,7 +100,8 @@ fn text_and_density(scale: f32, density: Density, entity: &Entity<LibraryControl
 /// Renders the Appearance settings section: the text scale and density, the
 /// theme gallery and the theme file editor.
 pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &ColorTokens,
-                                 theme: &LibriTheme, theme_editor: ThemeEditorData)
+                                 theme: &LibriTheme, theme_editor: ThemeEditorData,
+                                 text_scale_input: Option<Entity<InputState>>)
                                  -> impl IntoElement + 'static + use<> {
     let scale = theme.fonts.ui_text_size.as_f32() / DEFAULT_UI_TEXT_SIZE;
     div().flex()
@@ -135,7 +112,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(colors.text_primary)
                      .child(t!("settings.appearance_title")))
-         .child(text_and_density(scale, theme.density, &entity, colors))
+         .child(text_and_density(scale, theme.density, &entity, text_scale_input, colors))
          .child(render_theme_gallery(entity.clone(), colors, &theme.id))
          .child(render_theme_editor(theme_editor, entity, &theme.id, colors))
 }

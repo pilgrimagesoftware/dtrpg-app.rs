@@ -31,6 +31,12 @@ impl SettingsController {
         self.max_concurrent_downloads_input = Some(input);
     }
 
+    /// Attaches the text scale number input state entity created by the root
+    /// view.
+    pub fn set_text_scale_input(&mut self, input: Entity<InputState>) {
+        self.text_scale_input = Some(input);
+    }
+
     /// Attaches the theme file editor state created by the root view.
     pub fn set_theme_editor_input(&mut self, input: Entity<EditorState>) {
         self.theme_editor_input = Some(input);

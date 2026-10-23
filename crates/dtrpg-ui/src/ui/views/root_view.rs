@@ -223,6 +223,7 @@ impl LibraryRootView {
         let settings = cx.new(|cx| SettingsController::new(login_service, cx));
 
         wiring_inputs::wire_settings_inputs(window, cx, &settings);
+        wiring_number_inputs::wire_text_scale_input(window, cx, &controller, &settings);
 
         let catalog_view = cx.new(|cx| {
                                  CatalogView::new(window,
@@ -335,4 +336,5 @@ mod inspector_windows;
 mod panel_widths;
 mod render;
 mod wiring_inputs;
+mod wiring_number_inputs;
 mod wiring_subscriptions;

@@ -470,8 +470,6 @@ settings:
   appearance_text_size_label: "Échelle du texte"
   appearance_typography_title: "Texte et densité"
   appearance_text_size_note: "Agrandir ou réduire ensemble tout le texte et les contrôles de la fenêtre"
-  appearance_text_size_decrement_tooltip: "Réduire"
-  appearance_text_size_increment_tooltip: "Agrandir"
   appearance_density_label: "Densité"
   appearance_density_comfortable: "Confortable"
   appearance_density_compact: "Compacte"

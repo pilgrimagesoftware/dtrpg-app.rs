@@ -488,8 +488,6 @@ settings:
   appearance_text_size_label: "Text Scale"
   appearance_typography_title: "Text & density"
   appearance_text_size_note: "Zoom all text and controls in the window together"
-  appearance_text_size_decrement_tooltip: "Decrease"
-  appearance_text_size_increment_tooltip: "Increase"
   appearance_density_label: "Density"
   appearance_density_comfortable: "Comfortable"
   appearance_density_compact: "Compact"
