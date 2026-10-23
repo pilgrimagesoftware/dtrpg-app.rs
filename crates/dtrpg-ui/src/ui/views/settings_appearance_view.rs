@@ -19,7 +19,7 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, Density, LibriTheme};
-use crate::ui::views::settings_card::{card, card_row, section_heading};
+use crate::ui::views::settings_card::{FIELD_WIDTH, card, card_row, section_heading};
 use crate::ui::views::settings_theme_editor::{ThemeEditorData, render_theme_editor};
 use crate::ui::views::settings_theme_gallery::render_theme_gallery;
 
@@ -45,7 +45,10 @@ fn row_text(title: String, note: String, colors: &ColorTokens) -> impl IntoEleme
 fn text_scale_control(scale: f32, input: Option<Entity<InputState>>, colors: &ColorTokens)
                       -> AnyElement {
     match input {
-        Some(input_state) => NumberInput::new(&input_state).small().into_any_element(),
+        Some(input_state) => div().w(px(FIELD_WIDTH))
+                                  .flex_none()
+                                  .child(NumberInput::new(&input_state).small())
+                                  .into_any_element(),
         None => div().text_sm()
                      .text_color(colors.text_primary)
                      .child(format!("{scale:.1}"))
