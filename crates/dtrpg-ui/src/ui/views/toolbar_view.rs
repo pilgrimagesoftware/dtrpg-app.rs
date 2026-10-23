@@ -133,7 +133,7 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
          .child(div().flex()
                      .items_center()
                      .gap(px(10.0))
-                     .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
+                     .child(Input::new(&search_input).w(px(320.0)).cleanable(true))
                      .child(filters_toggle)
                      .child(render_sort_selector(sort, sort_direction, group_by, entity.clone()))
                      .child(render_layout_switcher(presentation, entity.clone()))
