@@ -470,8 +470,6 @@ settings:
   appearance_text_size_label: "Textskalierung"
   appearance_typography_title: "Text & Dichte"
   appearance_text_size_note: "Alle Texte und Bedienelemente im Fenster gemeinsam vergrößern oder verkleinern"
-  appearance_text_size_decrement_tooltip: "Verkleinern"
-  appearance_text_size_increment_tooltip: "Vergrößern"
   appearance_density_label: "Dichte"
   appearance_density_comfortable: "Komfortabel"
   appearance_density_compact: "Kompakt"

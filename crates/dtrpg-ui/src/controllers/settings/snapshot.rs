@@ -52,6 +52,7 @@ impl SettingsController {
                            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
                            max_concurrent_downloads_input: self.max_concurrent_downloads_input
                                                                .clone(),
+                           text_scale_input: self.text_scale_input.clone(),
                            create_collections: self.storage.create_collections(),
                            check_free_space: self.storage.check_free_space(),
                            native: self.native.snapshot(),

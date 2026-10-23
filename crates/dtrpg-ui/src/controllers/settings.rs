@@ -140,6 +140,8 @@ pub struct SettingsSnapshot {
     /// Shared input state for the "Max concurrent downloads" number field in
     /// the Storage tab.
     pub max_concurrent_downloads_input: Option<Entity<InputState>>,
+    /// Shared input state for the text scale field in the Appearance tab.
+    pub text_scale_input:               Option<Entity<InputState>>,
     /// `true` when completing a download should also symlink the item under
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
@@ -237,6 +239,9 @@ pub struct SettingsController {
     /// Input state for the "Max concurrent downloads" number field; set by
     /// the root view after creation.
     max_concurrent_downloads_input: Option<Entity<InputState>>,
+    /// Input state for the Appearance page's text scale field; set by the
+    /// root view after creation.
+    text_scale_input:               Option<Entity<InputState>>,
     rule_editor:                    RuleEditor,
     theme_editor_input:             Option<Entity<EditorState>>,
     theme_editor_error:             Option<String>,
@@ -329,6 +334,7 @@ impl SettingsController {
                               focus_email_pending: false,
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
+                              text_scale_input: None,
                               rule_editor: RuleEditor::default(),
                               theme_editor_input: None,
                               theme_editor_error: None };
@@ -377,6 +383,7 @@ impl SettingsController {
                focus_email_pending: false,
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
+               text_scale_input: None,
                rule_editor: RuleEditor::default(),
                theme_editor_input: None,
                theme_editor_error: None }

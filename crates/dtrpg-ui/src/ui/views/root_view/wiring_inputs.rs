@@ -197,6 +197,10 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
                      }
                  })
       .detach();
+    wiring_number_inputs::subscribe_concurrency_step(window,
+                                                     cx,
+                                                     &max_concurrent_downloads_input,
+                                                     settings);
     settings.update(cx, |ctrl, _cx| {
                 ctrl.set_max_concurrent_downloads_input(max_concurrent_downloads_input)
             });

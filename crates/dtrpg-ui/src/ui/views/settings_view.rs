@@ -79,7 +79,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
                              native: NativePreferencesFile,
-                             filter_values: Vec<FilterValueSection>)
+                             filter_values: Vec<FilterValueSection>,
+                             text_scale_input: Option<Entity<InputState>>)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -106,7 +107,11 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                   .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
-        1 => render_appearance_section(library, colors, theme, theme_editor).into_any_element(),
+        1 => render_appearance_section(library,
+                                       colors,
+                                       theme,
+                                       theme_editor,
+                                       text_scale_input).into_any_element(),
         2 => render_storage_section(entity.clone(), colors, storage).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
