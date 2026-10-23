@@ -20,6 +20,7 @@ impl Library {
     }
 
     /// Overlays the ephemeral state and the file locations on `items`.
+    #[track_caller]
     pub(super) fn overlaid_items(&self, mut items: Vec<LibraryItem>) -> Vec<LibraryItem> {
         let mut locations = self.file_locations_by_item();
         let mut collections = self.collection_names_by_member();
@@ -40,7 +41,8 @@ impl Library {
     ///
     /// The one place every other catalog-reading method should go through,
     /// so none of them forget the overlay.
-    pub fn all_items(&self) -> Vec<LibraryItem> {
+    #[track_caller]
+    pub fn all_items_scan(&self) -> Vec<LibraryItem> {
         let items = self.index
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)

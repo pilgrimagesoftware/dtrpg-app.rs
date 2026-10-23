@@ -4,6 +4,7 @@
 use rusqlite::{Connection, params_from_iter};
 
 use super::clause::{ItemFilter, build_where};
+use crate::catalog_scan;
 use crate::data::index::IndexError;
 use crate::util::search::Field;
 
@@ -27,9 +28,11 @@ pub struct FacetCount {
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(in crate::data::index) fn facet_counts(conn: &Connection, filter: &ItemFilter<'_>,
                                            field: Field)
                                            -> Result<Vec<FacetCount>, IndexError> {
+    catalog_scan!();
     let (where_clause, mut args) = build_where(filter);
     let sql = match field {
         Field::Availability => {

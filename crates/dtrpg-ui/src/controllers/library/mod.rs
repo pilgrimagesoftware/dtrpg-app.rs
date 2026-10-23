@@ -96,6 +96,8 @@ mod tests_insights;
 #[cfg(test)]
 mod tests_inspector;
 #[cfg(test)]
+mod tests_render_guard;
+#[cfg(test)]
 mod tests_sign_in;
 #[cfg(test)]
 mod tests_smart_collections;

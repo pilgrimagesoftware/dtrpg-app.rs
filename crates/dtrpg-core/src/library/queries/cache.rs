@@ -261,14 +261,16 @@ impl Library {
     /// Includes both `order_product_id` and `product_id` since the product
     /// list items API returns `productId` (not `orderProductId`) in its
     /// response. Prefer [`Self::cached_catalog_ids`] on a render path — this
-    /// recomputes from a fresh `all_items()` scan every call.
+    /// recomputes from a fresh `all_items_scan()` call every time.
     #[must_use]
-    pub fn catalog_ids(&self) -> HashSet<u64> {
+    #[track_caller]
+    pub fn catalog_ids_scan(&self) -> HashSet<u64> {
         self.compute_catalog_ids()
     }
 
+    #[track_caller]
     fn compute_catalog_ids(&self) -> HashSet<u64> {
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let mut ids = HashSet::with_capacity(all.len() * 2);
         for item in &all {
             if item.order_product_id > 0 {
@@ -282,7 +284,8 @@ impl Library {
     }
 
     /// The product-id set computed by the most recent `invalidate_cache`
-    /// call. Cheap: a render path should use this, not [`Self::catalog_ids`].
+    /// call. Cheap: a render path should use this, not
+    /// [`Self::catalog_ids_scan`].
     #[must_use]
     pub fn cached_catalog_ids(&self) -> Arc<HashSet<u64>> {
         Arc::clone(&self.query_cache

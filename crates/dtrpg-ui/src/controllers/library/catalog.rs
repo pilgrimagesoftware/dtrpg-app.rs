@@ -22,8 +22,9 @@ impl LibraryController {
     }
 
     /// Returns every item in the catalog, with ephemeral state overlaid.
-    pub(super) fn all_items(&self) -> Vec<LibraryItem> {
-        self.library.all_items()
+    #[track_caller]
+    pub(super) fn all_items_scan(&self) -> Vec<LibraryItem> {
+        self.library.all_items_scan()
     }
 
     /// Reacts to new items a catalog-sync run (`dtrpg_core::library::Library`)
@@ -290,8 +291,9 @@ impl LibraryController {
 
     /// Builds the set of all product IDs that can match a collection's
     /// `member_ids`, by a full catalog scan.
-    pub(super) fn catalog_ids(&self) -> HashSet<u64> {
-        self.library.catalog_ids()
+    #[track_caller]
+    pub(super) fn catalog_ids_scan(&self) -> HashSet<u64> {
+        self.library.catalog_ids_scan()
     }
 
     /// Records that a thumbnail fetch for item `id` was attempted at `at`.

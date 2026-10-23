@@ -163,7 +163,7 @@ impl LibraryController {
     /// the collections in place.
     pub fn set_collection_sort(&mut self, method: CollectionSortMethod, cx: &mut Context<Self>) {
         self.collection_sort = method;
-        let catalog_ids = self.catalog_ids();
+        let catalog_ids = self.catalog_ids_scan();
         self.library
             .sort_collections(method, self.collection_sort_direction, &catalog_ids);
         dtrpg_core::data::ui_preferences::UiPreferences::load()
@@ -176,7 +176,7 @@ impl LibraryController {
     pub fn set_collection_sort_direction(&mut self, direction: SortDirection,
                                          cx: &mut Context<Self>) {
         self.collection_sort_direction = direction;
-        let catalog_ids = self.catalog_ids();
+        let catalog_ids = self.catalog_ids_scan();
         self.library
             .sort_collections(self.collection_sort, direction, &catalog_ids);
         dtrpg_core::data::ui_preferences::UiPreferences::load()

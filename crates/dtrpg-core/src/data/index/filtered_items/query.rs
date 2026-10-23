@@ -6,6 +6,7 @@
 use rusqlite::{Connection, params_from_iter};
 
 use super::clause::{ItemFilter, build_where};
+use crate::catalog_scan;
 use crate::data::index::IndexError;
 use crate::data::index::items::{attach_details, row_to_item};
 use crate::data::library::LibraryItem;
@@ -22,9 +23,11 @@ use crate::util::sort::{SortDirection, SortMethod};
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(in crate::data::index) fn list_items_filtered(conn: &Connection, filter: &ItemFilter<'_>,
                                                   sort: SortMethod, direction: SortDirection)
                                                   -> Result<Vec<LibraryItem>, IndexError> {
+    catalog_scan!();
     let (where_clause, args) = build_where(filter);
     let order_by = order_by_clause(sort);
     let sql = format!("SELECT * FROM items {where_clause} ORDER BY {order_by}");
@@ -50,8 +53,10 @@ pub(in crate::data::index) fn list_items_filtered(conn: &Connection, filter: &It
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(in crate::data::index) fn count_items_filtered(conn: &Connection, filter: &ItemFilter<'_>)
                                                    -> Result<usize, IndexError> {
+    catalog_scan!();
     let (where_clause, args) = build_where(filter);
     let sql = format!("SELECT COUNT(*) FROM items {where_clause}");
     let count: i64 = conn.query_row(&sql,
@@ -70,9 +75,11 @@ pub(in crate::data::index) fn count_items_filtered(conn: &Connection, filter: &I
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(in crate::data::index) fn list_items_for_grouping_by_publisher(
     conn: &Connection, filter: &ItemFilter<'_>, sort: SortMethod, direction: SortDirection)
     -> Result<Vec<LibraryItem>, IndexError> {
+    catalog_scan!();
     let (where_clause, args) = build_where(filter);
     let order_by = format!("ulower(publisher) ASC, publisher, {}",
                            user_sort_clause(sort, direction));
@@ -99,9 +106,11 @@ pub(in crate::data::index) fn list_items_for_grouping_by_publisher(
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if either query fails.
+#[track_caller]
 pub(in crate::data::index) fn list_items_for_grouping_by_tag(
     conn: &Connection, filter: &ItemFilter<'_>, sort: SortMethod, direction: SortDirection)
     -> Result<Vec<(Option<String>, LibraryItem)>, IndexError> {
+    catalog_scan!();
     let (where_clause, args) = build_where(filter);
     let user_sort = user_sort_clause(sort, direction);
 

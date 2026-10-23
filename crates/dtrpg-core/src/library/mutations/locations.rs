@@ -56,6 +56,7 @@ impl Library {
     /// Records locations for downloaded items that have none, which are those
     /// downloaded before locations were recorded. Their location is taken from
     /// the placement rules in `storage`, the best that is known.
+    #[track_caller]
     pub fn record_missing_file_locations(&self, storage: &StorageConfig) {
         let missing = self.index
                           .lock()
@@ -71,6 +72,7 @@ impl Library {
     /// The names of the storage locations each downloaded item has files in, by
     /// item id.
     #[must_use]
+    #[track_caller]
     pub fn file_locations_by_item(&self) -> HashMap<Arc<str>, Vec<String>> {
         let by_item = self.index
                           .lock()

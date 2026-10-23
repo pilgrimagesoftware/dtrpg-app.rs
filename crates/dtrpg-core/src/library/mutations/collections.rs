@@ -98,9 +98,10 @@ impl Library {
     /// For each collection, how many of its titles are only in the cloud (not
     /// downloaded), by collection id.
     #[must_use]
+    #[track_caller]
     pub fn collection_cloud_counts(&self) -> std::collections::HashMap<u64, usize> {
         let in_cloud: Vec<_> =
-            self.all_items()
+            self.all_items_scan()
                 .into_iter()
                 .filter(|item| item.status == crate::data::enums::ItemStatus::Cloud)
                 .collect();

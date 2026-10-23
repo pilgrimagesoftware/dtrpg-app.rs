@@ -54,7 +54,7 @@ impl LibraryController {
     /// without this its covers would wait for a full fetch to finish, which may
     /// never happen (offline, not signed in yet).
     pub(super) fn enqueue_stored_thumbnails(&mut self, cx: &mut Context<Self>) {
-        let items = self.all_items();
+        let items = self.all_items_scan();
         self.enqueue_thumbnails(&items, cx);
     }
 
@@ -178,7 +178,7 @@ impl LibraryController {
     /// caches — this action exists specifically to retry or refresh a
     /// cover, not to redundantly reload whatever is already cached.
     pub fn load_thumbnail(&mut self, cover_url: Arc<str>, cx: &mut Context<Self>) {
-        let item_id = self.all_items()
+        let item_id = self.all_items_scan()
                           .into_iter()
                           .find(|i| i.cover_url.as_deref() == Some(&*cover_url))
                           .map(|i| i.id);
@@ -241,7 +241,7 @@ impl LibraryController {
     /// re-queued with a forced network re-fetch.
     pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
         let to_enqueue: Vec<(Arc<str>, Arc<str>)> =
-            self.all_items()
+            self.all_items_scan()
                 .into_iter()
                 .filter_map(|item| item.cover_url.map(|url| (item.id, url)))
                 .collect();
