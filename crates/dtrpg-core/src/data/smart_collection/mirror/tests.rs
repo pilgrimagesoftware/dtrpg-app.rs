@@ -2,14 +2,14 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[cfg(unix)]
 use super::sync_mirror;
 use super::{clear_mirror, smart_collection_dir};
 
 #[cfg(unix)]
-fn file_in(root: &Path, name: &str) -> PathBuf {
+fn file_in(root: &Path, name: &str) -> std::path::PathBuf {
     let path = root.join("items").join(name);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, b"x").unwrap();
