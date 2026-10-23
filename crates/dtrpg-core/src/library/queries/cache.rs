@@ -48,8 +48,10 @@ impl Library {
                      ..filter }
     }
 
-    /// Recomputes the filtered, sorted item cache (and its grouped view, the
-    /// sidebar facet counts, and the catalog's product-id set) from `view`.
+    /// Recomputes the filtered, sorted item cache (and its grouped view and
+    /// the sidebar facet counts) from `view`. The catalog's product-id set
+    /// rides with [`Self::refresh_section_counts`], called here, so this stays
+    /// off any whole-catalog item read.
     ///
     /// Called by the controller at every mutation site that changes the
     /// filter, search query, sort, or group-by setting, so render-path
@@ -100,7 +102,6 @@ impl Library {
 
         let items = self.overlaid_items(matched);
         let grouped = self.build_grouped_cache(view, now_secs, untagged_label, &collection_ids);
-        let catalog_ids = self.compute_catalog_ids();
         let facets = Arc::new(self.count_facets(view, now_secs, &query, &collection_ids));
 
         let mut cache = self.query_cache
@@ -108,7 +109,6 @@ impl Library {
                             .unwrap_or_else(PoisonError::into_inner);
         cache.items = Some(Arc::new(items));
         cache.grouped = grouped;
-        cache.catalog_ids = Arc::new(catalog_ids);
         cache.facets = facets;
     }
 
@@ -223,6 +223,19 @@ impl Library {
                     .total_pages = total_pages;
             }
             Err(error) => tracing::warn!(%error, "could not total the catalog's pages"),
+        }
+        let ids = self.index
+                      .lock()
+                      .unwrap_or_else(PoisonError::into_inner)
+                      .catalog_product_ids();
+        match ids {
+            Ok(ids) => {
+                self.query_cache
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .catalog_ids = Arc::new(ids);
+            }
+            Err(error) => tracing::warn!(%error, "could not collect the catalog's product ids"),
         }
     }
 

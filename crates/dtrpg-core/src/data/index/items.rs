@@ -1,14 +1,15 @@
 //! Item (and file) read/write/search against the library index.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use crate::catalog_scan;
 use crate::data::enums::ItemStatus;
-use crate::data::index::{IndexError, tags};
+use crate::data::index::{IndexError, LibraryIndex, tags};
 use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::product_filter::ProductFilter;
+use crate::{catalog_materialization, catalog_scan};
 
 pub(super) fn status_to_text(status: ItemStatus) -> &'static str {
     match status {
@@ -244,6 +245,7 @@ pub(super) fn load_files_for(conn: &Connection, item_id: &str)
 #[track_caller]
 pub(super) fn list_items(conn: &Connection) -> Result<Vec<LibraryItem>, IndexError> {
     catalog_scan!();
+    catalog_materialization!();
     let mut stmt = conn.prepare("SELECT * FROM items ORDER BY added_order")?;
     let mut items = stmt.query_map([], row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -281,6 +283,7 @@ pub(super) fn get_item(conn: &Connection, id: &str) -> Result<Option<LibraryItem
 #[track_caller]
 pub(super) fn search(conn: &Connection, query: &str) -> Result<Vec<LibraryItem>, IndexError> {
     catalog_scan!();
+    catalog_materialization!();
     let fts_query = sanitize_fts_query(query);
     if fts_query.is_empty() {
         return Ok(Vec::new());
@@ -389,6 +392,43 @@ pub(super) fn count_recently_updated(conn: &Connection, now_secs: i64, window_da
                                     |row| row.get(0),
     )?;
     Ok(count as usize)
+}
+
+/// Every item's product ids (both kinds) in one cheap pass, without
+/// materializing the items themselves — the stand-in for a full-catalog read
+/// when only the id set matters.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
+pub(super) fn catalog_product_ids(conn: &Connection) -> Result<HashSet<u64>, IndexError> {
+    catalog_scan!();
+    let mut stmt = conn.prepare("SELECT order_product_id, product_id FROM items")?;
+    let mut ids = HashSet::new();
+    for row in stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))? {
+        let (order_product_id, product_id) = row?;
+        if order_product_id > 0 {
+            ids.insert(order_product_id as u64);
+        }
+        if product_id > 0 {
+            ids.insert(product_id as u64);
+        }
+    }
+    Ok(ids)
+}
+
+impl LibraryIndex {
+    /// Every item's product ids (both kinds) in one cheap pass, without
+    /// materializing the items themselves.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
+    pub fn catalog_product_ids(&self) -> Result<HashSet<u64>, IndexError> {
+        catalog_product_ids(&self.conn)
+    }
 }
 
 #[cfg(test)]

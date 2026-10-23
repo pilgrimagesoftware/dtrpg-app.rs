@@ -25,6 +25,12 @@ thread_local! {
     /// Whole-catalog reads on this thread since the last [`reset_catalog_scans`].
     static SCANS: Cell<u64> = const { Cell::new(0) };
 
+    /// Reads that materialize every catalog item into memory, since the last
+    /// reset. Cheaper aggregate SQL over the whole table counts as a scan but
+    /// not a materialization; event paths may scan, but materializing on a
+    /// keystroke is the sluggishness regression.
+    static MATERIALIZATIONS: Cell<u64> = const { Cell::new(0) };
+
     /// The call site of the thread's most recent scan, for failure messages.
     static LAST_SCAN_CALLER: RefCell<Option<&'static Location<'static>>> =
         const { RefCell::new(None) };
@@ -35,6 +41,26 @@ thread_local! {
 pub fn note_catalog_scan(caller: &'static Location<'static>) {
     SCANS.with(|scans| scans.set(scans.get() + 1));
     LAST_SCAN_CALLER.with(|last| *last.borrow_mut() = Some(caller));
+}
+
+/// Records a read that materializes every catalog item into memory. Call it
+/// at the top of each full-table item read, alongside [`catalog_scan`].
+pub fn note_catalog_materialization(caller: &'static Location<'static>) {
+    SCANS.with(|scans| scans.set(scans.get() + 1));
+    MATERIALIZATIONS.with(|m| m.set(m.get() + 1));
+    LAST_SCAN_CALLER.with(|last| *last.borrow_mut() = Some(caller));
+}
+
+/// Reads that materialized the whole catalog on this thread since the reset.
+#[must_use]
+pub fn catalog_materialization_count() -> u64 {
+    MATERIALIZATIONS.with(Cell::get)
+}
+
+/// The call site of the most recent whole-catalog materialization, if any.
+#[must_use]
+pub fn last_catalog_materializer() -> Option<&'static Location<'static>> {
+    LAST_SCAN_CALLER.with(|last| *last.borrow())
 }
 
 /// Whole-catalog scans counted on this thread since the last reset.
@@ -53,6 +79,7 @@ pub fn last_catalog_scanner() -> Option<&'static Location<'static>> {
 /// want policed.
 pub fn reset_catalog_scans() {
     SCANS.with(|scans| scans.set(0));
+    MATERIALIZATIONS.with(|m| m.set(0));
     LAST_SCAN_CALLER.with(|last| *last.borrow_mut() = None);
 }
 
@@ -64,6 +91,14 @@ pub fn reset_catalog_scans() {
 macro_rules! catalog_scan {
     () => {
         $crate::scan_counter::note_catalog_scan(::std::panic::Location::caller())
+    };
+}
+
+/// Instruments a read that materializes every catalog item into memory.
+#[macro_export]
+macro_rules! catalog_materialization {
+    () => {
+        $crate::scan_counter::note_catalog_materialization(::std::panic::Location::caller())
     };
 }
 
@@ -91,11 +126,10 @@ mod tests {
         reset_catalog_scans();
         note_catalog_scan(Location::caller());
         let other = std::thread::spawn(|| {
-            reset_catalog_scans();
-            catalog_scan_count()
-        })
-        .join()
-        .unwrap();
+                        reset_catalog_scans();
+                        catalog_scan_count()
+                    }).join()
+                      .unwrap();
         assert_eq!(other, 0, "a fresh thread learns nothing from this one");
         assert_eq!(catalog_scan_count(), 1);
     }

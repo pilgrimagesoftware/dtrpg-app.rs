@@ -10,7 +10,9 @@
 
 use std::hint::black_box;
 
-use dtrpg_core::scan_counter::{catalog_scan_count, last_catalog_scanner, reset_catalog_scans};
+use dtrpg_core::scan_counter::{
+    catalog_materialization_count, catalog_scan_count, last_catalog_scanner, reset_catalog_scans,
+};
 use gpui::TestAppContext;
 
 use super::tests_support::*;
@@ -56,5 +58,33 @@ fn a_frame_of_view_reads_does_not_scan_the_catalog(cx: &mut TestAppContext) {
                0,
                "the render path scanned the catalog {scans} times, the last from {}",
                last_catalog_scanner().map_or_else(|| "an unattributed query".to_owned(),
+                                                  |caller| caller.to_string()));
+}
+
+/// Typing must not materialize the catalog. The per-keystroke invalidation may
+/// run cheap aggregate SQL over the whole table — counts, facets, the id set —
+/// but a read that walks every item into memory here is the sluggishness
+/// regression again, and this is the path a filter or search change takes.
+#[gpui::test]
+fn typing_a_search_query_does_not_materialize_the_catalog(cx: &mut TestAppContext) {
+    let items: Vec<_> = (1..=30).map(|n| item_numbered(&format!("id{n}"), n))
+                                .collect();
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               4,
+                               items);
+    fixture.controller
+           .update(cx, |ctrl, _| ctrl.show_stored_catalog());
+
+    reset_catalog_scans();
+    fixture.controller
+           .update(cx, |ctrl, cx| ctrl.set_search_query("id1".to_owned(), cx));
+
+    let reads = catalog_materialization_count();
+    assert_eq!(reads,
+               0,
+               "typing materialized the whole catalog {reads} times, the last from {}",
+               last_catalog_scanner().map_or_else(|| "nowhere".to_owned(),
                                                   |caller| caller.to_string()));
 }
