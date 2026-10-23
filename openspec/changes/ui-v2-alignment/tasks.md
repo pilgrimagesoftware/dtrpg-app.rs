@@ -8,11 +8,11 @@
 - [x] #382 Slice 1: Domain foundations. Per-file location is now recorded (`file_locations`); the Location facet and the `location:` token are built on it.
 - [x] #383 Slice 2: Query language (shared parser).
 - [x] #384 Slice 3: Library chrome (the Location facet is in).
-- [ ] #385 Slice 4: Inspector parity.
-- [ ] #386 Slice 5: Download sheet.
+- [x] #385 Slice 4: Inspector parity.
+- [x] #386 Slice 5: Download sheet.
 - [x] #387 Slice 6: Smart collections. Still open: on-match actions, Preview (#426), seeding from a manual collection.
 - [x] #388 Slice 7: Insights.
 - [x] #389 Slice 8: Settings parity. Still open: Storage behaviour toggles and cloud-placeholder toggles (nothing backs them yet), Summaries (#437), Appearance gaps (#439).
 - [x] #390 Slice 9: MCP completion. Still open: `create_collection`, `add_to_collection`, `download_item` (#436).
-- [ ] #391 Slice 10: Windows and Linux chrome.
-- [ ] #392 Slice 11: Empty and loading states.
+- [x] #391 Slice 10: Windows and Linux chrome.
+- [x] #392 Slice 11: Empty and loading states.
