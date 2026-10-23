@@ -264,6 +264,10 @@ pub const BULK_ACTION_CONFIRM_THRESHOLD: usize = 20;
 /// collections.
 pub const SMART_COLLECTIONS_FILE: &str = "smart_collections.toml";
 
+/// The folder, under a storage root, that holds the symlink mirrors of smart
+/// collections.
+pub const SMART_COLLECTIONS_DIR: &str = "smart-collections";
+
 /// How often, in milliseconds, the app looks for requests an AI agent made
 /// through the MCP server.
 pub const AGENT_REQUEST_POLL_MS: u64 = 250;

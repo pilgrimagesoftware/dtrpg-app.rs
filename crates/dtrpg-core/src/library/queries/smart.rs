@@ -83,6 +83,13 @@ impl Library {
     }
 
     /// The catalog items that belong to `collection`.
+    #[must_use]
+    pub fn smart_collection_members(&self, collection: &SmartCollection)
+                                    -> Vec<crate::data::library::LibraryItem> {
+        self.members_of(collection, &self.tags())
+    }
+
+    /// The catalog items that belong to `collection`.
     fn members_of(&self, collection: &SmartCollection,
                   tags: &crate::data::tag_library::TagLibrary)
                   -> Vec<crate::data::library::LibraryItem> {

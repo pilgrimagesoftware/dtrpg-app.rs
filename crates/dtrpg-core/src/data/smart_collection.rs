@@ -6,8 +6,12 @@
 //! facts the search box and the filters column use.
 
 mod matching;
+mod mirror;
 mod model;
 mod store;
+mod tracker;
 
+pub use mirror::{clear_mirror, smart_collection_dir, sync_mirror};
 pub use model::{MatchMode, Operator, Rule, SmartCollection};
 pub use store::{SmartCollectionError, SmartCollectionStore};
+pub use tracker::MatchTracker;

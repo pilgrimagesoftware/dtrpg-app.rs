@@ -165,6 +165,7 @@ impl LibraryController {
         }
         if succeeded {
             self.summarize_after_download(&item_id, cx);
+            self.run_smart_actions(cx);
         }
 
         let activity_id = job.activity_id;
