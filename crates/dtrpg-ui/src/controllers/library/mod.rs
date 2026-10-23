@@ -96,6 +96,10 @@ mod tests_insights;
 #[cfg(test)]
 mod tests_inspector;
 #[cfg(test)]
+mod tests_render_guard;
+#[cfg(test)]
+mod tests_search_debounce;
+#[cfg(test)]
 mod tests_sign_in;
 #[cfg(test)]
 mod tests_smart_collections;
@@ -230,6 +234,10 @@ pub struct LibraryController {
     pub filter:                    SidebarFilter,
     /// Text search query.
     pub search_query:              String,
+    /// Bumps with every typed search query, so the settle task applies only
+    /// the last keystroke of a burst (see
+    /// [`Self::set_search_query_debounced`]).
+    search_epoch:                  u64,
     /// Current sort method.
     pub sort:                      SortMethod,
     /// Current sort direction.

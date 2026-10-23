@@ -20,7 +20,7 @@ fn signing_in_keeps_the_stored_library(cx: &mut TestAppContext) {
                                        ctrl.install_services(fixture.library_service(),
                                                              fixture.collections_service(),
                                                              cx);
-                                       ctrl.library.all_items().len()
+                                       ctrl.library.all_items_scan().len()
                                    });
 
     assert_eq!(stored, 3,
@@ -39,7 +39,7 @@ fn signing_out_forgets_the_stored_library(cx: &mut TestAppContext) {
 
     let stored = fixture.controller.update(cx, |ctrl, cx| {
                                        ctrl.forget_library(cx);
-                                       ctrl.library.all_items().len()
+                                       ctrl.library.all_items_scan().len()
                                    });
 
     assert_eq!(stored, 0);

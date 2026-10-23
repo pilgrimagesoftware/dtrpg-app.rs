@@ -246,7 +246,7 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
                      if matches!(event, InputEvent::Change) {
                          let value = input_entity.read(cx).value().to_string();
                          controller_for_search.update(cx, |ctrl, cx| {
-                                                  ctrl.set_search_query(value, cx);
+                                                  ctrl.set_search_query_debounced(value, cx);
                                               });
                      }
                  })

@@ -53,9 +53,10 @@ pub struct Facets {
 
 /// The cached result of the most recent
 /// [`super::super::Library::invalidate_cache`] call: the filtered/sorted item
-/// list, its grouped view, the sidebar facet counts, and the full-catalog
-/// product-id set. Render paths read these fields through `Library`'s accessor
-/// methods; nothing here is recomputed on a read.
+/// list, its grouped view, and the sidebar facet counts. The full-catalog
+/// product-id set rides with [`super::super::Library::refresh_section_counts`].
+/// Render paths read these fields through `Library`'s accessor methods; nothing
+/// here is recomputed on a read.
 #[derive(Default)]
 pub(crate) struct QueryCache {
     pub(super) items:          Option<Arc<Vec<LibraryItem>>>,

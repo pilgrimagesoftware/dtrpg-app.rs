@@ -60,7 +60,7 @@ impl LibraryController {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let targets = collection_download_targets(&all, &member_ids);
         for (id, title) in targets {
             self.enqueue_download(&id, title.to_string(), cx);
@@ -74,7 +74,7 @@ impl LibraryController {
     /// Already-downloaded, already-queued, and already-active items/files
     /// are left untouched — see [`Self::enqueue_download`].
     pub fn download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let targets = publisher_download_targets(&all, publisher);
         for (id, title) in targets {
             self.enqueue_download(&id, title.to_string(), cx);
@@ -91,7 +91,7 @@ impl LibraryController {
     /// already-queued, and already-active items/files are left untouched —
     /// see [`Self::enqueue_download`].
     pub fn download_all_for_filter(&mut self, filter: &SidebarFilter, cx: &mut Context<Self>) {
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let targets = filter_download_targets(&all,
                                               filter,
                                               &self.collection_members,
@@ -187,7 +187,7 @@ impl LibraryController {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let targets = collection_download_targets(&all, &member_ids);
         let needed_mb =
             missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
@@ -205,7 +205,7 @@ impl LibraryController {
     /// The check is evaluated once as an aggregate across every matching
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let targets = publisher_download_targets(&all, publisher);
         let needed_mb =
             missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
@@ -225,7 +225,7 @@ impl LibraryController {
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_filter(&mut self, filter: SidebarFilter,
                                            cx: &mut Context<Self>) {
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let targets = filter_download_targets(&all,
                                               &filter,
                                               &self.collection_members,

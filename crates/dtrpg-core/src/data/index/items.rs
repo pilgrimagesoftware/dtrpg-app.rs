@@ -1,13 +1,15 @@
 //! Item (and file) read/write/search against the library index.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::data::enums::ItemStatus;
-use crate::data::index::{IndexError, tags};
+use crate::data::index::{IndexError, LibraryIndex, tags};
 use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::product_filter::ProductFilter;
+use crate::{catalog_materialization, catalog_scan};
 
 pub(super) fn status_to_text(status: ItemStatus) -> &'static str {
     match status {
@@ -240,7 +242,10 @@ pub(super) fn load_files_for(conn: &Connection, item_id: &str)
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn list_items(conn: &Connection) -> Result<Vec<LibraryItem>, IndexError> {
+    catalog_scan!();
+    catalog_materialization!();
     let mut stmt = conn.prepare("SELECT * FROM items ORDER BY added_order")?;
     let mut items = stmt.query_map([], row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -275,7 +280,10 @@ pub(super) fn get_item(conn: &Connection, id: &str) -> Result<Option<LibraryItem
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn search(conn: &Connection, query: &str) -> Result<Vec<LibraryItem>, IndexError> {
+    catalog_scan!();
+    catalog_materialization!();
     let fts_query = sanitize_fts_query(query);
     if fts_query.is_empty() {
         return Ok(Vec::new());
@@ -316,7 +324,9 @@ fn sanitize_fts_query(input: &str) -> String {
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn count_all(conn: &Connection) -> Result<usize, IndexError> {
+    catalog_scan!();
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM items", [], |row| row.get(0))?;
     Ok(count as usize)
 }
@@ -326,7 +336,9 @@ pub(super) fn count_all(conn: &Connection) -> Result<usize, IndexError> {
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn total_size_mb(conn: &Connection) -> Result<f64, IndexError> {
+    catalog_scan!();
     Ok(conn.query_row("SELECT COALESCE(SUM(size_mb), 0.0) FROM items", [], |row| {
                row.get(0)
            })?)
@@ -337,7 +349,9 @@ pub(super) fn total_size_mb(conn: &Connection) -> Result<f64, IndexError> {
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn total_pages(conn: &Connection) -> Result<u64, IndexError> {
+    catalog_scan!();
     let pages: i64 = conn.query_row("SELECT COALESCE(SUM(pages), 0) FROM items", [], |row| {
                              row.get(0)
                          })?;
@@ -349,7 +363,9 @@ pub(super) fn total_pages(conn: &Connection) -> Result<u64, IndexError> {
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn count_by_status(conn: &Connection, status: ItemStatus) -> Result<usize, IndexError> {
+    catalog_scan!();
     let count: i64 = conn.query_row("SELECT COUNT(*) FROM items WHERE status = ?1",
                                     params![status_to_text(status)],
                                     |row| row.get(0))?;
@@ -364,8 +380,10 @@ pub(super) fn count_by_status(conn: &Connection, status: ItemStatus) -> Result<u
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn count_recently_updated(conn: &Connection, now_secs: i64, window_days: u32)
                                      -> Result<usize, IndexError> {
+    catalog_scan!();
     let window_secs = i64::from(window_days) * 24 * 60 * 60;
     let count: i64 = conn.query_row(
                                     "SELECT COUNT(*) FROM items
@@ -374,6 +392,43 @@ pub(super) fn count_recently_updated(conn: &Connection, now_secs: i64, window_da
                                     |row| row.get(0),
     )?;
     Ok(count as usize)
+}
+
+/// Every item's product ids (both kinds) in one cheap pass, without
+/// materializing the items themselves — the stand-in for a full-catalog read
+/// when only the id set matters.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
+pub(super) fn catalog_product_ids(conn: &Connection) -> Result<HashSet<u64>, IndexError> {
+    catalog_scan!();
+    let mut stmt = conn.prepare("SELECT order_product_id, product_id FROM items")?;
+    let mut ids = HashSet::new();
+    for row in stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))? {
+        let (order_product_id, product_id) = row?;
+        if order_product_id > 0 {
+            ids.insert(order_product_id as u64);
+        }
+        if product_id > 0 {
+            ids.insert(product_id as u64);
+        }
+    }
+    Ok(ids)
+}
+
+impl LibraryIndex {
+    /// Every item's product ids (both kinds) in one cheap pass, without
+    /// materializing the items themselves.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
+    pub fn catalog_product_ids(&self) -> Result<HashSet<u64>, IndexError> {
+        catalog_product_ids(&self.conn)
+    }
 }
 
 #[cfg(test)]

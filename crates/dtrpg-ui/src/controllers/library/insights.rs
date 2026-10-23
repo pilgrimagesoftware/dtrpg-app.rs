@@ -62,8 +62,8 @@ impl LibraryController {
               let (insights, cache_counts) =
                   async_cx.background_executor()
                           .spawn(async move {
-                              let insights = Insights::compute(&library.all_items(), now_secs())
-                                  .with_roots(&roots);
+                              let insights = Insights::compute(&library.all_items_scan(),
+                                                               now_secs()).with_roots(&roots);
                               (insights, CacheCounts::read())
                           })
                           .await;

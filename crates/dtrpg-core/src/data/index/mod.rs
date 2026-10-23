@@ -129,6 +129,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn list_items(&self) -> Result<Vec<LibraryItem>, IndexError> {
         items::list_items(&self.conn)
     }
@@ -158,6 +159,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn search(&self, query: &str) -> Result<Vec<LibraryItem>, IndexError> {
         items::search(&self.conn, query)
     }
@@ -167,6 +169,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn count_all(&self) -> Result<usize, IndexError> {
         items::count_all(&self.conn)
     }

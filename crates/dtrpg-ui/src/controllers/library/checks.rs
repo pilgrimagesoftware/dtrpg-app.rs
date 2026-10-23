@@ -231,7 +231,7 @@ impl LibraryController {
             return;
         }
 
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let ids = select_check_batch(&all, dtrpg_core::data::constants::ITEM_CHECK_BATCH_SIZE);
         if let Err(e) = save_check_batch_timestamp(&root, now_secs) {
             tracing::warn!(error = %e, "failed to persist check-batch cooldown timestamp");

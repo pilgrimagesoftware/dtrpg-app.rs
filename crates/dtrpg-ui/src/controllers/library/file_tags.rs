@@ -56,7 +56,7 @@ impl LibraryController {
     /// before there is a catalog to look at.
     pub(super) fn begin_tag_sync(&mut self, force: bool, cx: &mut Context<Self>) {
         self.load_tags(cx);
-        let catalog = self.all_items();
+        let catalog = self.all_items_scan();
         if catalog.is_empty()
            || self.file_tag_sync_running
            || (self.file_tags_reconciled && !force)
