@@ -55,7 +55,7 @@ const CACHE_SCHEMA_VERSION: u32 = 4;
 /// Used to check whether the cached catalog is stale without reading the full
 /// cache file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheMetadata {
+pub struct LibraryMetadata {
     /// Unix timestamp (seconds since epoch) when the cache was written.
     pub saved_at_secs:                   u64,
     /// Number of items in the cache at write time.
@@ -80,7 +80,7 @@ pub struct CacheMetadata {
     pub last_fresh_install_request_secs: Option<u64>,
 }
 
-impl CacheMetadata {
+impl LibraryMetadata {
     /// Returns true if the cache is older than 7 days or was written by an
     /// older schema version whose data may be missing fields the current
     /// app expects to be populated.
@@ -99,7 +99,7 @@ impl CacheMetadata {
 ///
 /// Returns `None` on any error (missing file, malformed JSON). Callers that
 /// receive `None` should treat the cache as stale.
-pub fn load_library_metadata(root: &Path) -> Option<CacheMetadata> {
+pub fn load_library_metadata(root: &Path) -> Option<LibraryMetadata> {
     let path = root.join(LIBRARY_METADATA_CACHE_FILE);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
@@ -134,7 +134,7 @@ pub fn ensure_cache_metadata_exists(root: &Path) {
     if path.exists() {
         return;
     }
-    let meta = CacheMetadata { saved_at_secs:                   0,
+    let meta = LibraryMetadata { saved_at_secs:                   0,
                                item_count:                      0,
                                schema_version:                  0,
                                last_item_check_batch_secs:      None,
@@ -161,7 +161,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
     let last_item_check_batch_secs = existing.as_ref().and_then(|m| m.last_item_check_batch_secs);
     let last_fresh_install_request_secs = existing.as_ref()
                                                   .and_then(|m| m.last_fresh_install_request_secs);
-    let meta = CacheMetadata { saved_at_secs,
+    let meta = LibraryMetadata { saved_at_secs,
                                item_count,
                                schema_version: CACHE_SCHEMA_VERSION,
                                last_item_check_batch_secs,
@@ -177,7 +177,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// run before any catalog has ever been successfully synced).
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
     let mut meta =
-        load_library_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+        load_library_metadata(root).unwrap_or(LibraryMetadata { saved_at_secs:                   0,
                                    item_count:                      0,
                                    schema_version:                  0,
                                    last_item_check_batch_secs:      None,
@@ -196,7 +196,7 @@ pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), Cata
 pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
                                             -> Result<(), CatalogCacheError> {
     let mut meta =
-        load_library_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+        load_library_metadata(root).unwrap_or(LibraryMetadata { saved_at_secs:                   0,
                                    item_count:                      0,
                                    schema_version:                  0,
                                    last_item_check_batch_secs:      None,
@@ -333,5 +333,5 @@ pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), Cata
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-#[path = "catalog_cache_tests.rs"]
-mod tests;
+#[path = "library_metadata_tests.rs"]
+mod library_metadata_tests;

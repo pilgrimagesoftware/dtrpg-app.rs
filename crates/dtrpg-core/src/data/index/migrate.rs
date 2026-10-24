@@ -10,7 +10,7 @@ use std::path::Path;
 
 use rusqlite::Connection;
 
-use crate::data::catalog_cache::legacy_load_catalog_cache_json;
+use crate::data::library_metadata::legacy_load_catalog_cache_json;
 use crate::data::collections_cache::legacy_load_collections_cache_json;
 use crate::data::index::{IndexError, collections, items};
 

@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::data::catalog_cache::CacheMetadata;
+use crate::data::library_metadata::LibraryMetadata;
 use crate::data::constants::{
     CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS, FORCE_RELOAD_COOLDOWN_SECS,
 };
@@ -168,7 +168,7 @@ pub(super) fn merge_partial_fetch(mut existing: Vec<LibraryItem>, partial: Vec<L
 /// (e.g. before any successful sync, or right after `clear_and_reload`
 /// clears the on-disk cache) — treated as "not recently reloaded," so a
 /// missing timestamp never blocks a reload.
-pub fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64) -> bool {
+pub fn reload_cooldown_active(meta: Option<&LibraryMetadata>, now_secs: u64) -> bool {
     let Some(meta) = meta
     else {
         return false;

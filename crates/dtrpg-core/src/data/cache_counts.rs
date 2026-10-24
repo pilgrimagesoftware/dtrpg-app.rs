@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use crate::data::avatar::avatar_cached;
-use crate::data::catalog_cache::{CacheMetadata, load_library_metadata};
+use crate::data::library_metadata::{LibraryMetadata, load_library_metadata};
 use crate::data::paths::{cache_dir, covers_dir};
 
 /// Per-type counts of regenerable app cache data.
@@ -44,7 +44,7 @@ impl CacheCounts {
     /// The counts for the given cache metadata, cover file count and avatar
     /// state.
     #[must_use]
-    pub fn from_parts(metadata: Option<&CacheMetadata>, cover_thumbnails: usize,
+    pub fn from_parts(metadata: Option<&LibraryMetadata>, cover_thumbnails: usize,
                       avatar_cached: bool)
                       -> Self {
         let secs = |secs: u64| i64::try_from(secs).unwrap_or(i64::MAX);
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn the_metadata_gives_the_item_count_and_the_two_times() {
-        let metadata = CacheMetadata { saved_at_secs:                   1_000,
+        let metadata = LibraryMetadata { saved_at_secs:                   1_000,
                                        item_count:                      42,
                                        schema_version:                  0,
                                        last_item_check_batch_secs:      Some(2_000),

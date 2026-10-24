@@ -180,7 +180,7 @@ fn only_one_comparison_runs_at_a_time(cx: &mut TestAppContext) {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[test]
 fn a_tag_added_to_a_file_outside_libri_reaches_the_library() {
-    use dtrpg_core::data::catalog_cache::save_catalog_cache;
+    use dtrpg_core::data::library_metadata::save_catalog_cache;
     use dtrpg_core::data::index::LibraryIndex;
     use dtrpg_core::platform::{FileTag, Platform, PlatformIntegration};
     use dtrpg_core::services::tag_projection::{SyncSettings, reconcile_with_index};

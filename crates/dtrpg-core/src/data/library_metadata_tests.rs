@@ -46,7 +46,7 @@ fn load_malformed_json_returns_none() {
 
 #[test]
 fn fresh_metadata_is_not_stale() {
-    let meta = CacheMetadata { saved_at_secs:
+    let meta = LibraryMetadata { saved_at_secs:
                                    SystemTime::now().duration_since(UNIX_EPOCH)
                                                     .unwrap()
                                                     .as_secs(),
@@ -59,7 +59,7 @@ fn fresh_metadata_is_not_stale() {
 
 #[test]
 fn old_metadata_is_stale() {
-    let meta = CacheMetadata { saved_at_secs:                   0, // epoch — very old
+    let meta = LibraryMetadata { saved_at_secs:                   0, // epoch — very old
                                item_count:                      10,
                                schema_version:                  CACHE_SCHEMA_VERSION,
                                last_item_check_batch_secs:      None,
@@ -72,7 +72,7 @@ fn fresh_metadata_with_stale_schema_version_is_stale() {
     // Regression: a cache saved before `cover_url` was populated
     // correctly must not be trusted as fresh just because it's recent —
     // it silently disabled thumbnail loading for up to 7 days otherwise.
-    let meta = CacheMetadata { saved_at_secs:
+    let meta = LibraryMetadata { saved_at_secs:
                                    SystemTime::now().duration_since(UNIX_EPOCH)
                                                     .unwrap()
                                                     .as_secs(),
@@ -89,7 +89,7 @@ fn metadata_without_schema_version_field_defaults_to_stale() {
     // has no such key; `#[serde(default)]` must decode it as `0`, which
     // never matches `CACHE_SCHEMA_VERSION` and is always stale.
     let json = r#"{"saved_at_secs": 9999999999, "item_count": 10}"#;
-    let meta: CacheMetadata = serde_json::from_str(json).unwrap();
+    let meta: LibraryMetadata = serde_json::from_str(json).unwrap();
     assert_eq!(meta.schema_version, 0);
     assert!(meta.is_stale());
 }

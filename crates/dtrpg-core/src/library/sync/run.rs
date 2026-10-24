@@ -23,8 +23,8 @@ use std::sync::{Arc, PoisonError};
 
 use super::merge::{dedupe_by_product_id, partial_fetch_since, should_attempt_partial_fetch};
 use super::types::{LibraryEvent, SyncStage};
-use crate::data::catalog_cache::load_library_metadata;
-use crate::data::catalog_cache::load_library_db;
+use crate::data::library_metadata::load_library_metadata;
+use crate::data::library_metadata::load_library_db;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
 use crate::data::library::LibraryItem;
 use crate::library::Library;
