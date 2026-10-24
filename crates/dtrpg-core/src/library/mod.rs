@@ -10,13 +10,13 @@
 
 pub mod insights;
 mod jobs;
-mod library;
+mod core;
 mod mutations;
 mod queries;
 mod sync;
 
 pub use jobs::{CheckJob, CheckResult, DownloadJob, DownloadKey, DownloadSubmission, ThumbnailJob};
-pub use library::Library;
+pub use core::Library;
 pub use mutations::{
     RemovedMember, add_member, apply_check_result, remove_member, restore_removed_member,
     revert_added_member,
