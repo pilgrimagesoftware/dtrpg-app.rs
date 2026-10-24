@@ -50,7 +50,7 @@ mod agent_requests;
 mod attention;
 mod auto_summary;
 mod bulk_selection;
-mod catalog;
+mod controller;
 mod catalog_sync;
 mod checks;
 mod collection_links;
