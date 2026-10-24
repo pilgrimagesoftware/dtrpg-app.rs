@@ -60,22 +60,22 @@ pub fn load_collections_from_db(root: &Path) -> Option<Vec<CollectionEntry>> {
 // /// caller should read the JSON file directly once the index exists.
 // ///
 // /// Returns `None` on any error (missing file, malformed JSON).
-// pub(crate) fn legacy_load_collections_cache_json(root: &Path) -> Option<Vec<CollectionEntry>> {
-//     let path = root.join(COLLECTIONS_CACHE_FILE);
-//     let text = match fs::read_to_string(&path) {
-//         Ok(text) => text,
+// pub(crate) fn legacy_load_collections_cache_json(root: &Path) ->
+// Option<Vec<CollectionEntry>> {     let path =
+// root.join(COLLECTIONS_CACHE_FILE);     let text = match
+// fs::read_to_string(&path) {         Ok(text) => text,
 //         // A missing file is the expected state on a fresh install; only a
 //         // genuine I/O failure (permissions, an unreadable disk) is worth a
 //         // warning.
 //         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
 //         Err(e) => {
-//             warn!(path = %path.display(), error = %e, "collections cache not readable");
-//             return None;
+//             warn!(path = %path.display(), error = %e, "collections cache not
+// readable");             return None;
 //         }
 //     };
 //     serde_json::from_str(&text)
-//         .map_err(|e| warn!(path = %path.display(), error = %e, "collections cache malformed"))
-//         .ok()
+//         .map_err(|e| warn!(path = %path.display(), error = %e, "collections
+// cache malformed"))         .ok()
 // }
 
 // ── save_collections_cache
@@ -105,8 +105,8 @@ mod tests {
     use super::*;
 
     // fn test_dir(name: &str) -> std::path::PathBuf {
-    //     std::env::temp_dir().join(format!("dtrpg_collections_cache_test_{name}"))
-    // }
+    //     std::env::temp_dir().join(format!("
+    // dtrpg_collections_cache_test_{name}")) }
 
     // fn make_entry(id: u64, name: &str) -> CollectionEntry {
     //     CollectionEntry { id,
@@ -126,8 +126,8 @@ mod tests {
     //     let dir = test_dir("malformed");
     //     let _ = fs::remove_dir_all(&dir);
     //     fs::create_dir_all(&dir).unwrap();
-    //     fs::write(dir.join(COLLECTIONS_CACHE_FILE), b"not valid json { ").unwrap();
-    //     let result = load_collections_from_db(&dir);
+    //     fs::write(dir.join(COLLECTIONS_CACHE_FILE), b"not valid json {
+    // ").unwrap();     let result = load_collections_from_db(&dir);
     //     let _ = fs::remove_dir_all(&dir);
     //     assert!(result.is_none());
     // }
@@ -137,8 +137,8 @@ mod tests {
     //     let dir = test_dir("roundtrip");
     //     let _ = fs::remove_dir_all(&dir);
     //     fs::create_dir_all(&dir).unwrap();
-    //     let entries = vec![make_entry(1, "Favorites"), make_entry(2, "Wishlist")];
-    //     save_collections_to_db(&dir, &entries).unwrap();
+    //     let entries = vec![make_entry(1, "Favorites"), make_entry(2,
+    // "Wishlist")];     save_collections_to_db(&dir, &entries).unwrap();
 
     //     let loaded = load_collections_from_db(&dir);
     //     let _ = fs::remove_dir_all(&dir);

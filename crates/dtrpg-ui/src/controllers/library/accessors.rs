@@ -34,5 +34,4 @@ impl LibraryController {
     pub(super) fn index_root(&self) -> &PathBuf {
         &self.library.app_data_dir
     }
-
 }

@@ -11,7 +11,7 @@ use std::path::Path;
 use rusqlite::Connection;
 
 // use crate::data::collection::local::legacy_load_collections_cache_json;
-use crate::data::index::{IndexError};
+use crate::data::index::IndexError;
 // use crate::data::library_metadata::legacy_load_catalog_cache_json;
 
 /// Populates `conn` from the JSON caches under `root`, if present.
@@ -27,7 +27,8 @@ pub(super) fn migrate_json_caches(_: &mut Connection, _: &Path) -> Result<(), In
     // if let Some(catalog) = legacy_load_catalog_cache_json(root) {
     //     items::replace_all_items(conn, &catalog)?;
     // }
-    // if let Some(collection_entries) = legacy_load_collections_cache_json(root) {
+    // if let Some(collection_entries) =
+    // legacy_load_collections_cache_json(root) {
     //     collections::replace_all_collections(conn, &collection_entries)?;
     // }
     Ok(())
