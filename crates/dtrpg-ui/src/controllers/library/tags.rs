@@ -52,10 +52,10 @@ impl LibraryController {
     /// Reads the tags from the library index in the background and shows them.
     pub(super) fn load_tags(&mut self, cx: &mut Context<Self>) {
         let generation = self.library.begin_tag_read();
-        let cache_root = self.cache_root().clone();
+        let app_data_root = self.index_root().clone();
         cx.spawn(async move |this, async_cx| {
               let loaded = async_cx.background_executor()
-                                   .spawn(async move { Library::read_tags(&cache_root) })
+                                   .spawn(async move { Library::read_tags(&app_data_root) })
                                    .await;
               this.update(async_cx, |ctrl, cx| match loaded {
                       Ok(library) => ctrl.show_tags(library, generation, cx),
@@ -139,7 +139,7 @@ impl LibraryController {
     fn edit_tags(&mut self, edit: TagEdit, cx: &mut Context<Self>) {
         let affected = self.library.items_affected_by_tag_edit(&edit);
         let collections = self.library.collections();
-        let cache_root = self.cache_root().clone();
+        let cache_root = self.index_root().clone();
         cx.spawn(async move |this, async_cx| {
               let outcome =
                   async_cx.background_executor()

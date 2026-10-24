@@ -25,8 +25,8 @@ impl Library {
     /// # Errors
     ///
     /// Returns [`IndexError`] if the index cannot be opened or read.
-    pub fn read_tags(cache_root: &Path) -> Result<TagLibrary, IndexError> {
-        TagLibrary::load(&LibraryIndex::open_and_migrate(cache_root)?)
+    pub fn read_tags(app_data_root: &Path) -> Result<TagLibrary, IndexError> {
+        TagLibrary::load(&LibraryIndex::open_and_migrate(app_data_root)?)
     }
 
     /// Starts a read or an edit of the tags and returns its generation, to

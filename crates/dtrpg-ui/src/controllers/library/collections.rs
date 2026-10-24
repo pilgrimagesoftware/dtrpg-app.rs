@@ -8,7 +8,7 @@ impl LibraryController {
     /// them.
     pub fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
-        let cache_root = dtrpg_core::data::paths::index_dir();
+        let index_root = dtrpg_core::data::paths::index_dir();
         let weak_activity = self.activity.downgrade();
         let activity_id = self.activity.update(cx, |a, cx| {
                                            a.start(&t!("activity.loading_collections"), None, cx)
@@ -24,7 +24,7 @@ impl LibraryController {
                                       "load_collections: fetched {} entries",
                                       entries.len());
                       let to_save = entries.clone();
-                      let save_root = cache_root.clone();
+                      let save_root = index_root.clone();
                       async_cx
                         .background_executor()
                         .spawn(async move {
