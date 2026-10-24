@@ -57,11 +57,11 @@ jobs:
       # and Build run with below.
       - name: rustfmt toolchain (nightly)
         run: |
-            rustup toolchain install nightly --profile minimal --component rustfmt
+            rustup toolchain install nightly-2026-09-21 --profile minimal --component rustfmt
 
       - name: Check formatting
         run: |
-            cargo +nightly fmt --check
+            make fmt-check
 
       - name: Size check
         # OS-independent source-tree check; one leg is enough.
