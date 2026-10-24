@@ -38,7 +38,7 @@ fn load_malformed_json_returns_none() {
     let dir = test_dir("malformed");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join(CATALOG_CACHE_FILE), b"not valid json { ").unwrap();
+    fs::write(dir.join(LIBRARY_CACHE_FILE), b"not valid json { ").unwrap();
     let result = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
     assert!(result.is_none());
@@ -194,7 +194,7 @@ fn load_dedupes_stale_repeated_file_records() {
     // Bypass `save_catalog_cache` (which would go through the current,
     // already-deduped write path) to simulate JSON written by an older
     // build that had not yet deduplicated file records.
-    fs::write(dir.join(CATALOG_CACHE_FILE),
+    fs::write(dir.join(LIBRARY_CACHE_FILE),
               serde_json::to_string(&vec![item]).unwrap()).unwrap();
 
     let loaded = load_library_db(&dir);
@@ -217,7 +217,7 @@ fn load_dedupes_whole_items_repeated_verbatim() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let item = make_item("c1");
-    fs::write(dir.join(CATALOG_CACHE_FILE),
+    fs::write(dir.join(LIBRARY_CACHE_FILE),
               serde_json::to_string(&vec![item.clone(), item.clone(), item]).unwrap()).unwrap();
 
     let loaded = load_library_db(&dir);
@@ -242,7 +242,7 @@ fn load_dedupes_republished_items_by_product_id() {
     old_item.product_id = 42;
     let mut new_item = make_item("new-id");
     new_item.product_id = 42;
-    fs::write(dir.join(CATALOG_CACHE_FILE),
+    fs::write(dir.join(LIBRARY_CACHE_FILE),
               serde_json::to_string(&vec![old_item, new_item]).unwrap()).unwrap();
 
     let loaded = load_library_db(&dir);
@@ -265,7 +265,7 @@ fn load_does_not_dedupe_distinct_items_with_unknown_product_id() {
     let item_b = make_item("a2");
     assert_eq!(item_a.product_id, 0);
     assert_eq!(item_b.product_id, 0);
-    fs::write(dir.join(CATALOG_CACHE_FILE),
+    fs::write(dir.join(LIBRARY_CACHE_FILE),
               serde_json::to_string(&vec![item_a, item_b]).unwrap()).unwrap();
 
     let loaded = load_library_db(&dir);

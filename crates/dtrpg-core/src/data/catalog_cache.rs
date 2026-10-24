@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
-use crate::data::constants::{CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, STALE_SECS};
+use crate::data::constants::{LIBRARY_CACHE_FILE, LIBRARY_METADATA_CACHE_FILE, STALE_SECS};
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;
 
@@ -100,7 +100,7 @@ impl CacheMetadata {
 /// Returns `None` on any error (missing file, malformed JSON). Callers that
 /// receive `None` should treat the cache as stale.
 pub fn load_library_metadata(root: &Path) -> Option<CacheMetadata> {
-    let path = root.join(CATALOG_CACHE_METADATA_FILE);
+    let path = root.join(LIBRARY_METADATA_CACHE_FILE);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
         // A missing file is the expected state on a fresh install (or any time
@@ -130,7 +130,7 @@ pub fn load_library_metadata(root: &Path) -> Option<CacheMetadata> {
 /// nothing has actually been cached yet. A file that already exists — with
 /// real data, or one that fails to parse — is left untouched.
 pub fn ensure_cache_metadata_exists(root: &Path) {
-    let path = root.join(CATALOG_CACHE_METADATA_FILE);
+    let path = root.join(LIBRARY_METADATA_CACHE_FILE);
     if path.exists() {
         return;
     }
@@ -167,7 +167,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
                                last_item_check_batch_secs,
                                last_fresh_install_request_secs };
     let json = serde_json::to_string(&meta)?;
-    fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
+    fs::write(root.join(LIBRARY_METADATA_CACHE_FILE), &json)?;
     Ok(())
 }
 
@@ -184,7 +184,7 @@ pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), Cata
                                    last_fresh_install_request_secs: None, });
     meta.last_item_check_batch_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
-    fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
+    fs::write(root.join(LIBRARY_METADATA_CACHE_FILE), &json)?;
     Ok(())
 }
 
@@ -203,7 +203,7 @@ pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
                                    last_fresh_install_request_secs: None, });
     meta.last_fresh_install_request_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
-    fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
+    fs::write(root.join(LIBRARY_METADATA_CACHE_FILE), &json)?;
     Ok(())
 }
 
@@ -253,7 +253,7 @@ pub fn load_library_db(root: &Path) -> Option<Vec<LibraryItem>> {
 ///
 /// Returns `None` on any error (missing file, malformed JSON).
 pub(crate) fn legacy_load_catalog_cache_json(root: &Path) -> Option<Vec<LibraryItem>> {
-    let path = root.join(CATALOG_CACHE_FILE);
+    let path = root.join(LIBRARY_CACHE_FILE);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
         // A missing file is the expected state on a fresh install; only a

@@ -11,7 +11,7 @@ use crate::data::catalog_cache::{
     load_library_metadata, save_catalog_cache, save_fresh_install_request_timestamp,
 };
 use crate::data::constants::{
-    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
+    LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS, LIBRARY_CHECKPOINT_PAGE_INTERVAL,
     CATALOG_SYNC_MAX_ATTEMPTS, CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
     CATALOG_SYNC_RETRY_MAX_DELAY_SECS, DTRPG_API_HOST,
 };
@@ -219,9 +219,9 @@ impl Library {
                                   // fetch finishes, and a quit in between
                                   // would keep the shrunken copy.
                                   let checkpoint_due =
-                                      pages_since_checkpoint >= CATALOG_CHECKPOINT_PAGE_INTERVAL
+                                      pages_since_checkpoint >= LIBRARY_CHECKPOINT_PAGE_INTERVAL
                                       || last_checkpoint_at.elapsed()
-                                         >= std::time::Duration::from_secs(CATALOG_CHECKPOINT_MIN_INTERVAL_SECS);
+                                         >= std::time::Duration::from_secs(LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS);
                                   if catalog_was_empty && checkpoint_due {
                     if let Err(e) = save_catalog_cache(&self.cache_dir, &live_items.borrow()) {
                         tracing::warn!(error = %e, "failed to checkpoint catalog cache");

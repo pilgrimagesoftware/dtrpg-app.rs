@@ -29,10 +29,10 @@ pub const APP_NAME: &str = "dtrpg";
 pub const MACOS_BUNDLE_ID: &str = "com.pilgrimagesoftware.dtrpg";
 
 pub const COLLECTIONS_CACHE_FILE: &str = "collections.json";
-pub const COLLECTIONS_CACHE_TMP: &str = "collections.json.tmp";
-pub const CATALOG_CACHE_FILE: &str = "library.json";
-pub const CATALOG_CACHE_TMP: &str = "library.json.tmp";
-pub const CATALOG_CACHE_METADATA_FILE: &str = "library_meta.json";
+pub const COLLECTIONS_CACHE_TMPFILE: &str = "collections.json.tmp";
+pub const LIBRARY_CACHE_FILE: &str = "library.json";
+pub const LIBRARY_CACHE_TMPFILE: &str = "library.json.tmp";
+pub const LIBRARY_METADATA_CACHE_FILE: &str = "library_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
 /// 7 days in seconds — caches older than this are considered stale.
@@ -40,16 +40,16 @@ pub const STALE_SECS: u64 = 7 * 24 * 60 * 60;
 
 /// Number of live catalog pages received before the accumulating page buffer
 /// is checkpointed to disk, whichever of this or
-/// [`CATALOG_CHECKPOINT_MIN_INTERVAL_SECS`] elapses first.
+/// [`LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS`] elapses first.
 ///
 /// See `catalog-cache-checkpointing`: without a periodic checkpoint, an app
 /// quit or crash partway through a large live load leaves nothing on disk
 /// even though many pages may already have been fetched.
-pub const CATALOG_CHECKPOINT_PAGE_INTERVAL: u32 = 5;
+pub const LIBRARY_CHECKPOINT_PAGE_INTERVAL: u32 = 5;
 
 /// Minimum time between catalog cache checkpoints during a live load, in
 /// seconds — see [`CATALOG_CHECKPOINT_PAGE_INTERVAL`].
-pub const CATALOG_CHECKPOINT_MIN_INTERVAL_SECS: u64 = 10;
+pub const LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS: u64 = 10;
 
 /// Minimum interval between user-requested full catalog reloads ("Catalog >
 /// Reload"), keyed off `CacheMetadata::saved_at_secs`.
