@@ -9,7 +9,6 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px,
 };
-use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::tag::Tag;
@@ -300,6 +299,7 @@ fn pick_app_and_begin_add(
 // ── Helpers
 // ───────────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 /// Derives a display-friendly application name from the path.
 fn app_name_from_path(path: &Path) -> String {
     path.file_stem()
