@@ -16,9 +16,9 @@ use crate::ui::views::sidebar_smart::SmartCollectionRow;
 use crate::ui::widgets::suppress_selection_outside_text;
 use crate::view_models::agent_display::exposed_tools;
 
-pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
-                               cx: &mut Context<LibraryRootView>)
-                               -> impl IntoElement {
+pub(super) fn render_root_view(
+    view: &mut LibraryRootView, window: &mut gpui::Window, cx: &mut Context<LibraryRootView>,
+) -> impl IntoElement {
     // `Root` (gpui-kit, wrapping this view — see `gpui_kit::open_window`
     // in `ui/app/mod.rs`) renders its own dialog/sheet/notification
     // layers automatically via its own `Render` impl; this view does
@@ -36,80 +36,86 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
 
     let snap = view.controller.read(cx).snapshot();
     let tags = snap.tags;
-    let (filter,
-         counts,
-         publishers,
-         collections,
-         collections_loaded,
-         catalog_loading,
-         catalog_ids,
-         total_count,
-         total_mb,
-         matched_count,
-         sort,
-         sort_direction,
-         collection_sort,
-         collection_sort_direction,
-         group_by,
-         presentation,
-         bulk_selection_mode,
-         bulk_selected_ids,
-         bulk_selection_count,
-         bulk_items) = (snap.filter,
-                        snap.counts,
-                        snap.publishers,
-                        snap.collections,
-                        snap.collections_loaded,
-                        snap.catalog_loading,
-                        snap.catalog_ids,
-                        snap.total_count,
-                        snap.total_mb,
-                        snap.matched_count,
-                        snap.sort,
-                        snap.sort_direction,
-                        snap.collection_sort,
-                        snap.collection_sort_direction,
-                        snap.group_by,
-                        snap.presentation,
-                        snap.bulk_selection_mode,
-                        snap.bulk_selected_ids,
-                        snap.bulk_selection_count,
-                        snap.items);
+    let (
+        filter,
+        counts,
+        publishers,
+        collections,
+        collections_loaded,
+        catalog_loading,
+        catalog_ids,
+        total_count,
+        total_mb,
+        matched_count,
+        sort,
+        sort_direction,
+        collection_sort,
+        collection_sort_direction,
+        group_by,
+        presentation,
+        bulk_selection_mode,
+        bulk_selected_ids,
+        bulk_selection_count,
+        bulk_items,
+    ) = (
+        snap.filter,
+        snap.counts,
+        snap.publishers,
+        snap.collections,
+        snap.collections_loaded,
+        snap.catalog_loading,
+        snap.catalog_ids,
+        snap.total_count,
+        snap.total_mb,
+        snap.matched_count,
+        snap.sort,
+        snap.sort_direction,
+        snap.collection_sort,
+        snap.collection_sort_direction,
+        snap.group_by,
+        snap.presentation,
+        snap.bulk_selection_mode,
+        snap.bulk_selected_ids,
+        snap.bulk_selection_count,
+        snap.items,
+    );
 
     let settings_snap = view.settings.read(cx).snapshot();
     let activity_snap = view.activity.read(cx).snapshot();
-    let notices: Vec<_> = view.auth_state
-                              .read(cx)
-                              .active_notices()
-                              .into_iter()
-                              .cloned()
-                              .collect();
+    let notices: Vec<_> = view
+        .auth_state
+        .read(cx)
+        .active_notices()
+        .into_iter()
+        .cloned()
+        .collect();
 
     let theme = cx.global::<LibriTheme>().clone();
     let colors = &theme.colors;
 
-    let bulk_action_bar =
-        bulk_selection_mode.then(|| {
-                               render_bulk_action_bar(bulk_selection_count,
-                                                      &bulk_selected_ids,
-                                                      &bulk_items,
-                                                      &collections,
-                                                      lib_entity.clone(),
-                                                      view.bulk_pattern_input.clone(),
-                                                      view.bulk_pattern_field.clone(),
-                                                      colors)
-                           });
+    let bulk_action_bar = bulk_selection_mode.then(|| {
+        render_bulk_action_bar(
+            bulk_selection_count,
+            &bulk_selected_ids,
+            &bulk_items,
+            &collections,
+            lib_entity.clone(),
+            view.bulk_pattern_input.clone(),
+            view.bulk_pattern_field.clone(),
+            colors,
+        )
+    });
 
-    let publisher_search =
-        crate::ui::views::sidebar_view::SidebarSectionSearch { open:  snap.publisher_search_open,
-                                                               query: snap.publisher_search_query,
-                                                               input: view.publisher_search_input
-                                                                          .clone(), };
-    let collection_search =
-        crate::ui::views::sidebar_view::SidebarSectionSearch { open:  snap.collection_search_open,
-                                                               query: snap.collection_search_query,
-                                                               input: view.collection_search_input
-                                                                          .clone(), };
+    let publisher_search = crate::ui::views::sidebar_view::SidebarSectionSearch {
+        open: snap.publisher_search_open,
+        query: snap.publisher_search_query,
+        input: view.publisher_search_input.clone(),
+    };
+    let collection_search = crate::ui::views::sidebar_view::SidebarSectionSearch {
+        open: snap.collection_search_open,
+        query: snap.collection_search_query,
+        input: view.collection_search_input.clone(),
+    };
     let smart_rows = {
         let ctrl = view.controller.read(cx);
         ctrl.smart_collections()
@@ -121,56 +127,62 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
             })
             .collect::<Vec<_>>()
     };
-    let sidebar = render_sidebar(filter.clone(),
-                                 counts,
-                                 publishers,
-                                 collections,
-                                 collections_loaded,
-                                 catalog_loading,
-                                 catalog_ids,
-                                 collection_sort,
-                                 collection_sort_direction,
-                                 lib_entity.clone(),
-                                 view.collection_name_input.clone(),
-                                 publisher_search,
-                                 collection_search,
-                                 tags,
-                                 smart_rows,
-                                 snap.collection_cloud.clone(),
-                                 snap.sidebar_open);
+    let sidebar = render_sidebar(
+        filter.clone(),
+        counts,
+        publishers,
+        collections,
+        collections_loaded,
+        catalog_loading,
+        catalog_ids,
+        collection_sort,
+        collection_sort_direction,
+        lib_entity.clone(),
+        view.collection_name_input.clone(),
+        publisher_search,
+        collection_search,
+        tags,
+        smart_rows,
+        snap.collection_cloud.clone(),
+        snap.sidebar_open,
+    );
     let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
     let filters_toggle =
         render_filters_toggle(view.filters_open, search_query.terms().len(), cx.entity());
-    let toolbar = render_toolbar(&filter,
-                                 snap.filter_count,
-                                 matched_count,
-                                 total_count,
-                                 &snap.search_query,
-                                 view.search_input.clone(),
-                                 sort,
-                                 sort_direction,
-                                 group_by,
-                                 presentation,
-                                 bulk_selection_mode,
-                                 lib_entity.clone(),
-                                 filters_toggle,
-                                 colors);
+    let toolbar = render_toolbar(
+        &filter,
+        snap.filter_count,
+        matched_count,
+        total_count,
+        &snap.search_query,
+        view.search_input.clone(),
+        sort,
+        sort_direction,
+        group_by,
+        presentation,
+        bulk_selection_mode,
+        lib_entity.clone(),
+        filters_toggle,
+        colors,
+    );
     let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
     let filters_column = view.filters_open.then(|| {
-                                              let ctrl = view.controller.read(cx);
-                                              render_filters_column(
+        let ctrl = view.controller.read(cx);
+        render_filters_column(
             &without_hidden_values(&ctrl.visible_facets(), ctrl.filter_value_choices()),
             &search_query,
             &view.search_input,
             &view.controller,
             colors,
         )
-                                          });
-    let title_bar = render_title_bar(&settings_snap.auth,
-                                     settings_entity.clone(),
-                                     colors,
-                                     view.menu_bar.clone(),
-                                     cx);
+    });
+    let title_bar = render_title_bar(
+        &settings_snap.auth,
+        settings_entity.clone(),
+        colors,
+        view.menu_bar.clone(),
+        cx,
+    );
     let banner = render_notification_banner(notices, auth_entity, cx.entity(), colors);
 
     let alert_snap = view.activity.read(cx).alert_snapshot();
@@ -200,30 +212,35 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
 
     // The footer under the sidebar is as wide as the sidebar is now (it can be
     // dragged), and level with the status bar beside it.
-    let sidebar_width = view.resize_state
-                            .read(cx)
-                            .sizes()
-                            .first()
-                            .map_or(view.sidebar_width, |size| size.as_f32());
-    let sidebar_footer = render_sidebar_footer(&SidebarFooterData { titles: total_count,
-                                                                    total_mb,
-                                                                    pages: snap.total_pages,
-                                                                    locations: snap.root_usage
-                                                                                   .len() },
-                                               colors).w(px(sidebar_width))
-                                                      .flex_none()
-                                                      .bg(cx.theme().sidebar)
-                                                      .border_t_1()
-                                                      .border_r_1()
-                                                      .border_color(colors.border);
-    let bottom_row = div().w_full()
-                          .flex()
-                          .child(sidebar_footer)
-                          .child(div().flex_1()
-                                      .min_w_0()
-                                      .flex()
-                                      .items_center()
-                                      .child(status_bar));
+    let sidebar_width = view
+        .resize_state
+        .read(cx)
+        .sizes()
+        .first()
+        .map_or(view.sidebar_width, |size| size.as_f32());
+    let sidebar_footer = render_sidebar_footer(
+        &SidebarFooterData {
+            titles: total_count,
+            total_mb,
+            pages: snap.total_pages,
+            locations: snap.root_usage.len(),
+        },
+        colors,
+    )
+    .w(px(sidebar_width))
+    .flex_none()
+    .bg(cx.theme().sidebar)
+    .border_t_1()
+    .border_r_1()
+    .border_color(colors.border);
+    let bottom_row = div().w_full().flex().child(sidebar_footer).child(
+        div()
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .items_center()
+            .child(status_bar),
+    );
 
     let catalog_content = div()
         .flex_1()
@@ -265,21 +282,21 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     // The Insights page takes the place of the catalog and its toolbar.
     let page: AnyElement = if filter == SidebarFilter::Insights {
         render_insights(&lib_entity, colors, cx).into_any_element()
-    }
-    else {
+    } else {
         catalog_content.into_any_element()
     };
 
     // Settings renders in its own window (see `settings_window_view`), not
     // as an overlay here, so the main content area no longer
     // branches on `settings_snap.is_open`.
-    let main_content = div().flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .relative()
-                            .bg(surface)
-                            .child(page);
+    let main_content = div()
+        .flex_1()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .relative()
+        .bg(surface)
+        .child(page);
 
     let sidebar_col = div().size_full().relative().child(sidebar);
 
@@ -306,8 +323,9 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let search_input_for_focus = view.search_input.clone();
     let sidebar_initial = view.sidebar_width;
     let selected_item = view.controller.read(cx).selected_item();
-    let inspector_pane = selected_item.as_ref()
-                                      .map(|item| render_inspector_pane(view, item, window, cx));
+    let inspector_pane = selected_item
+        .as_ref()
+        .map(|item| render_inspector_pane(view, item, window, cx));
 
     div()
         .size_full()
@@ -406,32 +424,32 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                 .flex()
                 .flex_col()
                 .child(title_bar)
-                .child(
-                    div().flex_1().min_h_0().child(
-                        h_resizable("main-layout")
-                            .with_state(&view.resize_state)
-                            .child(
-                                resizable_panel()
-                                    .size(px(sidebar_initial))
-                                    .size_range(px(SIDEBAR_MIN_WIDTH)..px(SIDEBAR_MAX_WIDTH))
-                                    .child(sidebar_col),
-                            )
-                            .child(
-                                resizable_panel()
-                                    .size_range(px(280.)..Pixels::MAX)
-                                    .child(main_content),
-                            )
-                            .child(
-                                resizable_panel()
-                                    .visible(inspector_pane.is_some())
-                                    .size(px(view.inspector_width))
-                                    .size_range(
-                                        px(INSPECTOR_PANE_MIN_WIDTH)..px(INSPECTOR_PANE_MAX_WIDTH),
-                                    )
-                                    .children(inspector_pane),
-                            ),
-                    ),
-                )
+                .child(div().flex_1().min_h_0().child({
+                    let mut layout = h_resizable("main-layout")
+                        .with_state(&view.resize_state)
+                        .child(
+                            resizable_panel()
+                                .size(px(sidebar_initial))
+                                .size_range(px(SIDEBAR_MIN_WIDTH)..px(SIDEBAR_MAX_WIDTH))
+                                .child(sidebar_col),
+                        )
+                        .child(
+                            resizable_panel()
+                                .size_range(px(280.)..Pixels::MAX)
+                                .child(main_content),
+                        );
+                    if let Some(pane) = inspector_pane {
+                        layout = layout.child(
+                            resizable_panel()
+                                .size(px(view.inspector_width))
+                                .size_range(
+                                    px(INSPECTOR_PANE_MIN_WIDTH)..px(INSPECTOR_PANE_MAX_WIDTH),
+                                )
+                                .child(pane),
+                        );
+                    }
+                    layout
+                }))
                 .child(bottom_row),
         )
 }
@@ -441,8 +459,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
 fn render_filters_toggle(open: bool, applied: usize, root: Entity<LibraryRootView>) -> AnyElement {
     let tooltip = if applied == 0 {
         t!("filters.toggle_tooltip").to_string()
-    }
-    else {
+    } else {
         t!("filters.toggle_tooltip_applied", n = applied).to_string()
     };
     let button = Button::new("filters-toggle")
@@ -459,7 +476,8 @@ fn render_filters_toggle(open: bool, applied: usize, root: Entity<LibraryRootVie
     if applied == 0 {
         return button.into_any_element();
     }
-    gpui_kit::component::badge::Badge::new().count(applied)
-                                            .child(button)
-                                            .into_any_element()
+    gpui_kit::component::badge::Badge::new()
+        .count(applied)
+        .child(button)
+        .into_any_element()
 }

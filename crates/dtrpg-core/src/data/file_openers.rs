@@ -17,7 +17,7 @@ pub struct FileOpenerEntry {
     /// File extension without a leading dot, lower-cased (e.g. `"pdf"`).
     pub extension: String,
     /// Absolute path to the application used to open files of this type.
-    pub app_path:  PathBuf,
+    pub app_path: PathBuf,
 }
 
 /// Outcome of calling [`FileOpenerConfig::add`].
@@ -46,21 +46,21 @@ pub struct FileOpenerConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CatalogViewPrefs {
     #[serde(default)]
-    sort:             Option<String>,
+    sort: Option<String>,
     /// What the catalog is grouped by, as [`GroupBy`] names it.
     #[serde(default)]
-    group_by:         Option<String>,
+    group_by: Option<String>,
     /// The optional list columns that are shown, by [`ListColumn::key`].
     #[serde(default)]
-    list_columns:     Option<Vec<String>>,
+    list_columns: Option<Vec<String>>,
     /// Whether the catalog was grouped by publisher, as saved before
     /// `group_by` existed. Read when `group_by` is absent; never written.
     #[serde(default)]
-    grouped:          Option<bool>,
+    grouped: Option<bool>,
     #[serde(default)]
-    presentation:     Option<String>,
+    presentation: Option<String>,
     #[serde(default)]
-    filter:           Option<String>,
+    filter: Option<String>,
     #[serde(default)]
     filter_publisher: Option<String>,
 }
@@ -82,9 +82,10 @@ impl CatalogViewPrefs {
     }
 
     /// Builds preferences from the controller's current view state.
-    pub fn from_state(filter: &SidebarFilter, sort: SortMethod, group_by: GroupBy,
-                      presentation: CatalogPresentation, list_columns: &[ListColumn])
-                      -> Self {
+    pub fn from_state(
+        filter: &SidebarFilter, sort: SortMethod, group_by: GroupBy,
+        presentation: CatalogPresentation, list_columns: &[ListColumn],
+    ) -> Self {
         let (filter_name, filter_publisher) = match filter {
             SidebarFilter::AllTitles => (Some("AllTitles"), None),
             SidebarFilter::RecentlyUpdated => (Some("RecentlyUpdated"), None),
@@ -103,23 +104,31 @@ impl CatalogViewPrefs {
             | SidebarFilter::Insights
             | SidebarFilter::Tag { .. } => (None, None),
         };
-        Self { sort: Some(match sort {
-                              SortMethod::Title => "Title",
-                              SortMethod::Publisher => "Publisher",
-                              SortMethod::DateAdded => "DateAdded",
-                              SortMethod::PageCount => "PageCount",
-                              SortMethod::Custom { .. } => "Custom",
-                          }.to_string()),
-               group_by: Some(group_by.to_string()),
-               list_columns: Some(list_columns.iter().map(|c| c.key().to_owned()).collect()),
-               grouped: None,
-               presentation: Some(match presentation {
-                                      CatalogPresentation::List => "List",
-                                      CatalogPresentation::Thumbs => "Thumbs",
-                                      CatalogPresentation::Grid => "Grid",
-                                  }.to_string()),
-               filter: filter_name.map(str::to_string),
-               filter_publisher }
+        Self {
+            sort: Some(
+                match sort {
+                    SortMethod::Title => "Title",
+                    SortMethod::Publisher => "Publisher",
+                    SortMethod::DateAdded => "DateAdded",
+                    SortMethod::PageCount => "PageCount",
+                    SortMethod::Custom { .. } => "Custom",
+                }
+                .to_string(),
+            ),
+            group_by: Some(group_by.to_string()),
+            list_columns: Some(list_columns.iter().map(|c| c.key().to_owned()).collect()),
+            grouped: None,
+            presentation: Some(
+                match presentation {
+                    CatalogPresentation::List => "List",
+                    CatalogPresentation::Thumbs => "Thumbs",
+                    CatalogPresentation::Grid => "Grid",
+                }
+                .to_string(),
+            ),
+            filter: filter_name.map(str::to_string),
+            filter_publisher,
+        }
     }
 
     /// Resolves the persisted sort method, defaulting (with a `WARN` log)
@@ -132,8 +141,10 @@ impl CatalogViewPrefs {
             Some("DateAdded") => SortMethod::DateAdded,
             Some("PageCount") => SortMethod::PageCount,
             Some(other) => {
-                tracing::warn!(value = other,
-                               "unrecognized catalog sort preference; using default");
+                tracing::warn!(
+                    value = other,
+                    "unrecognized catalog sort preference; using default"
+                );
                 SortMethod::default()
             }
         }
@@ -148,10 +159,12 @@ impl CatalogViewPrefs {
             None if self.grouped == Some(true) => GroupBy::Publisher,
             None => GroupBy::default(),
             Some(name) => name.parse().unwrap_or_else(|_| {
-                                          tracing::warn!(value = name,
-                                                         "unrecognized catalog grouping preference; using default");
-                                          GroupBy::default()
-                                      }),
+                tracing::warn!(
+                    value = name,
+                    "unrecognized catalog grouping preference; using default"
+                );
+                GroupBy::default()
+            }),
         }
     }
 
@@ -159,13 +172,13 @@ impl CatalogViewPrefs {
     /// Absent values mean the defaults; a name that is not a choosable column
     /// is ignored.
     pub fn to_list_columns(&self) -> Vec<ListColumn> {
-        let Some(keys) = &self.list_columns
-        else {
+        let Some(keys) = &self.list_columns else {
             return ListColumn::DEFAULT_CHOSEN.to_vec();
         };
-        ListColumn::CHOOSABLE.into_iter()
-                             .filter(|column| keys.iter().any(|key| key == column.key()))
-                             .collect()
+        ListColumn::CHOOSABLE
+            .into_iter()
+            .filter(|column| keys.iter().any(|key| key == column.key()))
+            .collect()
     }
 
     /// Resolves the persisted presentation mode, defaulting (with a `WARN`
@@ -177,8 +190,10 @@ impl CatalogViewPrefs {
             Some("Thumbs") => CatalogPresentation::Thumbs,
             Some("Grid") => CatalogPresentation::Grid,
             Some(other) => {
-                tracing::warn!(value = other,
-                               "unrecognized catalog presentation preference; using default");
+                tracing::warn!(
+                    value = other,
+                    "unrecognized catalog presentation preference; using default"
+                );
                 CatalogPresentation::default()
             }
         }
@@ -200,8 +215,10 @@ impl CatalogViewPrefs {
                 None => SidebarFilter::AllTitles,
             },
             Some(other) => {
-                tracing::warn!(value = other,
-                               "unrecognized catalog filter preference; using default");
+                tracing::warn!(
+                    value = other,
+                    "unrecognized catalog filter preference; using default"
+                );
                 SidebarFilter::AllTitles
             }
         }
@@ -222,12 +239,10 @@ pub(crate) struct AppConfigFile {
 /// Loads the shared app config file from disk, returning defaults if the
 /// file is absent or unparseable.
 pub(crate) fn load_app_config() -> AppConfigFile {
-    let Some(path) = config_path()
-    else {
+    let Some(path) = config_path() else {
         return AppConfigFile::default();
     };
-    let Ok(text) = std::fs::read_to_string(&path)
-    else {
+    let Ok(text) = std::fs::read_to_string(&path) else {
         return AppConfigFile::default();
     };
     toml::from_str(&text).unwrap_or_default()
@@ -236,8 +251,7 @@ pub(crate) fn load_app_config() -> AppConfigFile {
 /// Saves the shared app config file to disk, creating parent directories if
 /// needed. Silently ignores I/O errors.
 pub(crate) fn save_app_config(cfg: &AppConfigFile) {
-    let Some(path) = config_path()
-    else {
+    let Some(path) = config_path() else {
         return;
     };
     if let Some(parent) = path.parent() {
@@ -258,7 +272,9 @@ impl FileOpenerConfig {
     /// Loads the config from disk, returning a default if the file is absent or
     /// unparseable.
     pub fn load() -> Self {
-        Self { entries: load_app_config().file_openers, }
+        Self {
+            entries: load_app_config().file_openers,
+        }
     }
 
     /// Saves the config to disk, creating parent directories if needed.
@@ -293,11 +309,14 @@ impl FileOpenerConfig {
     /// Adds `entry`, normalizing the extension.  Replaces an existing entry for
     /// the same extension.  Returns whether the entry was new or a replacement.
     pub fn add(&mut self, entry: FileOpenerEntry) -> AddOutcome {
-        let normalized = FileOpenerEntry { extension: normalize_ext(&entry.extension),
-                                           app_path:  entry.app_path, };
-        if let Some(existing) = self.entries
-                                    .iter_mut()
-                                    .find(|e| e.extension == normalized.extension)
+        let normalized = FileOpenerEntry {
+            extension: normalize_ext(&entry.extension),
+            app_path: entry.app_path,
+        };
+        if let Some(existing) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.extension == normalized.extension)
         {
             existing.app_path = normalized.app_path;
             return AddOutcome::Replaced;
@@ -343,15 +362,10 @@ fn normalize_ext(ext: &str) -> String {
     ext.trim().trim_start_matches('.').to_lowercase()
 }
 
-/// Returns the path to `~/.config/dtrpg/app_config.toml` (macOS/Linux) or
-/// `%APPDATA%\dtrpg\app_config.toml` (Windows).
+/// Returns the path to the shared app config file under the platform
+/// preferences directory.
 pub(crate) fn config_path() -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
-    let base = std::env::var("APPDATA").ok().map(PathBuf::from)?;
-    #[cfg(not(target_os = "windows"))]
-    let base = std::env::var("HOME").ok()
-                                    .map(|h| PathBuf::from(h).join(".config"))?;
-    Some(base.join("dtrpg").join("app_config.toml"))
+    Some(crate::data::paths::app_preferences_dir().join("app_config.toml"))
 }
 
 #[cfg(test)]

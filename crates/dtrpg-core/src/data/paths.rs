@@ -49,8 +49,9 @@ const APP_DIR_NAME: &str = APP_NAME;
 /// Falls back to the current directory if the platform data directory cannot be
 /// determined.
 pub fn app_data_dir() -> PathBuf {
-    dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
-                    .join(APP_DIR_NAME)
+    dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(APP_DIR_NAME)
 }
 
 /// Returns the directory for regenerable application cache data: catalog
@@ -68,8 +69,9 @@ pub fn app_data_dir() -> PathBuf {
 /// Falls back to the current directory if the platform cache directory cannot
 /// be determined.
 pub fn app_cache_dir() -> PathBuf {
-    dirs::cache_dir().unwrap_or_else(|| PathBuf::from("."))
-                     .join(APP_DIR_NAME)
+    dirs::cache_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(APP_DIR_NAME)
 }
 
 /// Returns the directory for small user preference files.
@@ -79,8 +81,9 @@ pub fn app_cache_dir() -> PathBuf {
 /// Caches respectively). On Linux and Windows, `dirs` has no separate
 /// preferences concept, so this falls back to the platform config directory.
 pub fn app_preferences_dir() -> PathBuf {
-    dirs::preference_dir().unwrap_or_else(|| PathBuf::from("."))
-                          .join(APP_DIR_NAME)
+    dirs::preference_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(APP_DIR_NAME)
 }
 
 /// Returns the platform default directory for downloaded catalog content.
@@ -89,8 +92,9 @@ pub fn app_preferences_dir() -> PathBuf {
 /// Always named with the plain app name — this is user-visible content, not an
 /// app-managed location, so it does not use the macOS bundle identifier.
 pub fn default_download_dir() -> PathBuf {
-    dirs::download_dir().unwrap_or_else(|| PathBuf::from("."))
-                        .join(APP_NAME)
+    dirs::download_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(APP_NAME)
 }
 
 /// Returns the directory used for cached catalog/collections metadata.
@@ -119,6 +123,15 @@ pub fn covers_dir() -> PathBuf {
 /// caches or small preference records. Contains one `*.toml` file per theme.
 pub fn themes_dir() -> PathBuf {
     app_data_dir().join("themes")
+}
+
+/// Returns the directory used for the library index database.
+///
+/// Lives under [`app_data_dir`] because the SQLite index is the single source
+/// of truth for the catalog and is not regenerable from the network alone
+/// (it must survive cache clears).
+pub fn index_dir() -> PathBuf {
+    app_data_dir()
 }
 
 #[cfg(test)]
