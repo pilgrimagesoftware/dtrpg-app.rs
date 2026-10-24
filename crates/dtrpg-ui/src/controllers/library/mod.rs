@@ -51,7 +51,7 @@ mod attention;
 mod auto_summary;
 mod bulk_selection;
 mod controller;
-mod catalog_sync;
+mod sync;
 mod checks;
 mod collection_links;
 mod collections;
