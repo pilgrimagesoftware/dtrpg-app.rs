@@ -93,15 +93,6 @@ pub fn default_download_dir() -> PathBuf {
                         .join(APP_NAME)
 }
 
-/// Returns the directory used for cached catalog/collections metadata.
-///
-/// Always lives under [`app_cache_dir`], independent of the user's chosen
-/// download location — cache lifetime is tied to the app installation, not to
-/// where the user stores downloaded files.
-pub fn cache_dir() -> PathBuf {
-    app_cache_dir().join("metadata")
-}
-
 /// Returns the directory used for cached cover thumbnail image bytes.
 ///
 /// Always lives under [`app_cache_dir`] — cover thumbnails are regenerable
@@ -152,11 +143,6 @@ mod tests {
     #[test]
     fn default_download_dir_ends_with_app_name() {
         assert!(default_download_dir().ends_with(APP_NAME));
-    }
-
-    #[test]
-    fn cache_dir_is_under_app_cache_dir() {
-        assert_eq!(cache_dir(), app_cache_dir().join("metadata"));
     }
 
     #[test]

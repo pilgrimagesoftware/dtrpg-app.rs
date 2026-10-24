@@ -181,7 +181,7 @@ fn only_one_comparison_runs_at_a_time(cx: &mut TestAppContext) {
 #[test]
 fn a_tag_added_to_a_file_outside_libri_reaches_the_library() {
     use dtrpg_core::data::index::LibraryIndex;
-    use dtrpg_core::data::library_metadata::save_catalog_cache;
+    use dtrpg_core::data::library_metadata::save_library_to_db;
     use dtrpg_core::platform::{FileTag, Platform, PlatformIntegration};
     use dtrpg_core::services::tag_projection::{SyncSettings, reconcile_with_index};
 
@@ -189,7 +189,7 @@ fn a_tag_added_to_a_file_outside_libri_reaches_the_library() {
     let cache = tempfile::tempdir().unwrap();
     let storage = StorageConfig::for_test(storage_root.path().to_path_buf());
     let catalog = vec![item_with_files("a", 1, 1)];
-    save_catalog_cache(cache.path(), &catalog).unwrap();
+    save_library_to_db(cache.path(), &catalog).unwrap();
     let path = put_on_disk(&storage, &catalog[0], 0);
     // What Finder does: tag the file, with no one asking Libri.
     Platform.write_tags(&path, &[FileTag::plain("from finder")])

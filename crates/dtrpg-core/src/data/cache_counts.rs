@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::data::avatar::avatar_cached;
 use crate::data::library_metadata::{LibraryMetadata, load_library_metadata};
-use crate::data::paths::{cache_dir, covers_dir};
+use crate::data::paths::covers_dir;
 
 /// Per-type counts of regenerable app cache data.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -29,14 +29,14 @@ pub struct CacheCounts {
 
 impl CacheCounts {
     /// Reads the counts from disk: a cache-metadata sidecar read (no full
-    /// catalog parse), one `read_dir` of the covers directory, and one avatar
+    /// library parse), one `read_dir` of the covers directory, and one avatar
     /// `exists()` check. It touches disk, so call it when the page is opened or
     /// the cache changes, never while drawing.
     #[must_use]
     pub fn read() -> Self {
         let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
                                                               .unwrap_or(0);
-        Self::from_parts(load_library_metadata(&cache_dir()).as_ref(),
+        Self::from_parts(load_library_metadata(&crate::data::paths::app_data_dir()).as_ref(),
                          cover_thumbnails,
                          avatar_cached())
     }
@@ -57,12 +57,12 @@ impl CacheCounts {
     }
 }
 
-/// Counts for the cache under `cache` and `covers`, for tests that build their
-/// own folders.
+/// Counts for the cache under `app_data` and `covers`, for tests that build
+/// their own folders.
 #[cfg(test)]
-fn read_from(cache: &Path, covers: &Path, avatar_cached: bool) -> CacheCounts {
+fn read_from(app_data: &Path, covers: &Path, avatar_cached: bool) -> CacheCounts {
     let cover_thumbnails = std::fs::read_dir(covers).map(Iterator::count).unwrap_or(0);
-    CacheCounts::from_parts(load_library_metadata(cache).as_ref(),
+    CacheCounts::from_parts(load_library_metadata(app_data).as_ref(),
                             cover_thumbnails,
                             avatar_cached)
 }

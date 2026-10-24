@@ -228,8 +228,8 @@ impl Library {
             return false;
         };
 
-        let is_fresh = load_library_metadata(&self.cache_dir).as_ref()
-                                                             .is_some_and(|m| !m.is_stale());
+        let is_fresh = load_library_metadata(&self.app_data_dir).as_ref()
+                                                                .is_some_and(|m| !m.is_stale());
         if !is_fresh {
             return false;
         }

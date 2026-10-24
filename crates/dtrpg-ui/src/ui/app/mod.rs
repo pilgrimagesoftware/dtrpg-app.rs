@@ -376,7 +376,7 @@ pub fn setup(cx: &mut App) {
 
     // The View menu's items are the same: without a fallback they are disabled
     // whenever focus is somewhere the library view's handlers do not reach.
-    cx.on_action::<ReloadCatalog>(|_, cx| update_library(cx, |ctrl, cx| ctrl.reload_catalog(cx)));
+    cx.on_action::<ReloadCatalog>(|_, cx| update_library(cx, |ctrl, cx| ctrl.reload_library(cx)));
     cx.on_action::<RefreshThumbnails>(|_, cx| {
           update_library(cx, |ctrl, cx| ctrl.refresh_all_thumbnails(cx));
       });

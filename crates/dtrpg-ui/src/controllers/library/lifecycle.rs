@@ -50,7 +50,7 @@ impl LibraryController {
                                collections_service,
                                activity,
                                dtrpg_core::data::paths::index_dir(),
-                               cache_dir(),
+                               dtrpg_core::data::paths::app_cache_dir(),
                                SmartCollectionStore::load())
     }
 

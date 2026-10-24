@@ -129,7 +129,7 @@ pub fn load_library_metadata(root: &Path) -> Option<LibraryMetadata> {
 /// [`CacheMetadata::is_stale`] to report `true`, correctly reflecting that
 /// nothing has actually been cached yet. A file that already exists — with
 /// real data, or one that fails to parse — is left untouched.
-pub fn ensure_cache_metadata_exists(root: &Path) {
+pub fn ensure_library_metadata_exists(root: &Path) {
     let path = root.join(LIBRARY_METADATA_CACHE_FILE);
     if path.exists() {
         return;
@@ -153,7 +153,7 @@ pub fn ensure_cache_metadata_exists(root: &Path) {
 /// Preserves the existing `last_item_check_batch_secs` from the file being
 /// overwritten, if any — a catalog cache write is unrelated to the per-item
 /// check-batch cooldown, so it must not reset it.
-pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), CatalogCacheError> {
+pub fn save_library_metadata(root: &Path, item_count: usize) -> Result<(), LibraryDbError> {
     let saved_at_secs = SystemTime::now().duration_since(UNIX_EPOCH)
                                          .unwrap_or(Duration::ZERO)
                                          .as_secs();
@@ -175,7 +175,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// timestamp, preserving the rest of the existing cache metadata (or using
 /// zeroed placeholders if no metadata file exists yet — a check batch can
 /// run before any catalog has ever been successfully synced).
-pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
+pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), LibraryDbError> {
     let mut meta =
         load_library_metadata(root).unwrap_or(LibraryMetadata { saved_at_secs:                   0,
                                                                 item_count:                      0,
@@ -196,7 +196,7 @@ pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), Cata
 /// fresh-install request happens before any catalog has ever been
 /// successfully synced).
 pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
-                                            -> Result<(), CatalogCacheError> {
+                                            -> Result<(), LibraryDbError> {
     let mut meta =
         load_library_metadata(root).unwrap_or(LibraryMetadata { saved_at_secs:                   0,
                                                                 item_count:                      0,
@@ -216,7 +216,7 @@ pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
 
 /// Errors that can occur when writing the catalog cache.
 #[derive(Debug, Error)]
-pub enum CatalogCacheError {
+pub enum LibraryDbError {
     /// An I/O error occurred while reading or writing the cache metadata
     /// sidecar.
     #[error("catalog cache I/O error: {0}")]
@@ -229,10 +229,10 @@ pub enum CatalogCacheError {
     Index(#[from] IndexError),
 }
 
-// ── load_catalog_cache
+// ── load_library_db
 // ────────────────────────────────────────────────────────
 
-/// Reads the catalog from the library index at `root`, migrating it from
+/// Reads the library from the index at `root`, migrating it from
 /// `{root}/catalog_cache.json` first if the index doesn't exist yet.
 ///
 /// Returns `None` on any error (including a missing cache and no index) so
@@ -320,7 +320,7 @@ fn dedupe_items(items: Vec<LibraryItem>) -> Vec<LibraryItem> {
 /// Returns [`CatalogCacheError::Index`] if the index cannot be opened or
 /// written. Returns [`CatalogCacheError::Io`] or
 /// [`CatalogCacheError::Json`] if the metadata sidecar cannot be updated.
-pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), CatalogCacheError> {
+pub fn save_library_to_db(root: &Path, items: &[LibraryItem]) -> Result<(), LibraryDbError> {
     let mut deduped: Vec<LibraryItem> = items.to_vec();
     for item in &mut deduped {
         item.dedupe_files();
@@ -329,7 +329,7 @@ pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), Cata
 
     let mut index = LibraryIndex::open_and_migrate(root)?;
     index.replace_all_items(&deduped)?;
-    save_cache_metadata(root, deduped.len())?;
+    save_library_metadata(root, deduped.len())?;
     Ok(())
 }
 

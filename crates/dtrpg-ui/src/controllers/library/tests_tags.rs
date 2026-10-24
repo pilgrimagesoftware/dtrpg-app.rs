@@ -7,7 +7,7 @@
 
 use dtrpg_core::data::activity::ActivityStatus;
 use dtrpg_core::data::index::LibraryIndex;
-use dtrpg_core::data::library_metadata::save_catalog_cache;
+use dtrpg_core::data::library_metadata::save_library_to_db;
 use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::data::tag_library::TagLibrary;
 use dtrpg_core::services::network_monitor::NetworkMonitor;
@@ -243,7 +243,7 @@ fn saved_catalog_with_a_tag(fixture: &Fixture, ids: &[&str]) {
                            .enumerate()
                            .map(|(n, id)| item_numbered(id, n as u64 + 1))
                            .collect();
-    save_catalog_cache(&fixture.cache, &items).unwrap();
+    save_library_to_db(&fixture.cache, &items).unwrap();
     index(fixture).add_tag("a", "solo").unwrap();
 }
 

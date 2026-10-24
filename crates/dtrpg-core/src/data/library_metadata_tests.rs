@@ -106,7 +106,7 @@ fn save_cache_writes_metadata() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let items = vec![make_item("b1"), make_item("b2"), make_item("b3")];
-    save_catalog_cache(&dir, &items).unwrap();
+    save_library_to_db(&dir, &items).unwrap();
 
     let meta = load_library_metadata(&dir);
     let _ = fs::remove_dir_all(&dir);
@@ -122,7 +122,7 @@ fn ensure_cache_metadata_exists_writes_a_stale_default_when_missing() {
     let _ = fs::remove_dir_all(&dir);
     let _ = fs::remove_dir_all(&dir);
 
-    ensure_cache_metadata_exists(&dir);
+    ensure_library_metadata_exists(&dir);
     let meta = load_library_metadata(&dir);
     let _ = fs::remove_dir_all(&dir);
 
@@ -137,9 +137,9 @@ fn ensure_cache_metadata_exists_leaves_a_real_file_untouched() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let items = vec![make_item("b1")];
-    save_catalog_cache(&dir, &items).unwrap();
+    save_library_to_db(&dir, &items).unwrap();
 
-    ensure_cache_metadata_exists(&dir);
+    ensure_library_metadata_exists(&dir);
     let meta = load_library_metadata(&dir);
     let _ = fs::remove_dir_all(&dir);
 
@@ -154,7 +154,7 @@ fn save_then_load_round_trips() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let items = vec![make_item("a1"), make_item("a2")];
-    save_catalog_cache(&dir, &items).unwrap();
+    save_library_to_db(&dir, &items).unwrap();
 
     let loaded = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);

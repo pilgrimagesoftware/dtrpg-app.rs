@@ -325,7 +325,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
              this_entity_for_report_bug.update(cx, |view, cx| view.show_report_feature_bug(cx));
          })
          .on_action(move |_: &ReloadCatalog, _, cx| {
-             controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));
+             controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_library(cx));
          })
          .on_action(move |_: &RefreshThumbnails, _, cx| {
              controller_for_refresh_thumbnails.update(cx, |ctrl, cx| {

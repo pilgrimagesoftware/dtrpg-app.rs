@@ -140,8 +140,8 @@ impl LibraryController {
     /// [`reload_cooldown_active`]: if the on-disk cache was written more
     /// recently than `FORCE_RELOAD_COOLDOWN_SECS`, this is a silent no-op —
     /// no network fetch, no change to `catalog_loading` or the catalog.
-    pub fn reload_catalog(&mut self, cx: &mut Context<Self>) {
-        let meta = load_library_metadata(&cache_dir());
+    pub fn reload_library(&mut self, cx: &mut Context<Self>) {
+        let meta = load_library_metadata(&dtrpg_core::data::paths::app_data_dir());
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                                               .map(|d| d.as_secs())
                                               .unwrap_or_default();
@@ -186,7 +186,7 @@ impl LibraryController {
             self.thumbnail_processed = 0;
             self.activity.update(cx, |a, cx| a.complete(id, cx));
         }
-        self.reload_catalog(cx);
+        self.reload_library(cx);
     }
 
     /// Emits `LibraryChanged` to trigger a UI re-render without modifying
