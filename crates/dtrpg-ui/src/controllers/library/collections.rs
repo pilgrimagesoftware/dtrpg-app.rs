@@ -11,24 +11,21 @@ impl LibraryController {
         let cache_root = dtrpg_core::data::paths::index_dir();
         let weak_activity = self.activity.downgrade();
         let activity_id = self.activity.update(cx, |a, cx| {
-            a.start(&t!("activity.loading_collections"), None, cx)
-        });
+                                           a.start(&t!("activity.loading_collections"), None, cx)
+                                       });
         tracing::debug!("load_collections: starting collections fetch");
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.list_collections() })
-                .await;
-            match result {
-                Ok(entries) => {
-                    tracing::debug!(
-                        count = entries.len(),
-                        "load_collections: fetched {} entries",
-                        entries.len()
-                    );
-                    let to_save = entries.clone();
-                    let save_root = cache_root.clone();
-                    async_cx
+              let result = async_cx.background_executor()
+                                   .spawn(async move { collections_service.list_collections() })
+                                   .await;
+              match result {
+                  Ok(entries) => {
+                      tracing::debug!(count = entries.len(),
+                                      "load_collections: fetched {} entries",
+                                      entries.len());
+                      let to_save = entries.clone();
+                      let save_root = cache_root.clone();
+                      async_cx
                         .background_executor()
                         .spawn(async move {
                             if let Err(e) = save_collections_cache(&save_root, &to_save) {
@@ -36,36 +33,36 @@ impl LibraryController {
                             }
                         })
                         .await;
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.apply_collections(entries, cx);
-                    })
-                    .ok();
-                    weak_activity
-                        .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                        .ok();
-                }
-                Err(e) => {
-                    // Session errors are expected when starting before auth
-                    // completes
-                    // (see `start_load_inner`'s matching treatment for the
-                    // catalog fetch); quietly complete
-                    // rather than surfacing a user-facing error.
-                    if e.kind == CollectionsServiceErrorKind::Session {
-                        tracing::warn!(error = %e,
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.apply_collections(entries, cx);
+                          })
+                          .ok();
+                      weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                   .ok();
+                  }
+                  Err(e) => {
+                      // Session errors are expected when starting before auth
+                      // completes
+                      // (see `start_load_inner`'s matching treatment for the
+                      // catalog fetch); quietly complete
+                      // rather than surfacing a user-facing error.
+                      if e.kind == CollectionsServiceErrorKind::Session {
+                          tracing::warn!(error = %e,
                                       "collections load skipped: no authenticated session");
-                        weak_activity
-                            .update(async_cx, |a, cx| a.complete(activity_id, cx))
-                            .ok();
-                    } else {
-                        tracing::warn!(error = %e, "collections load failed");
-                        weak_activity
-                            .update(async_cx, |a, cx| a.error(activity_id, e.to_string(), cx))
-                            .ok();
-                    }
-                }
-            }
-        })
-        .detach();
+                          weak_activity.update(async_cx, |a, cx| a.complete(activity_id, cx))
+                                       .ok();
+                      }
+                      else {
+                          tracing::warn!(error = %e, "collections load failed");
+                          weak_activity.update(async_cx, |a, cx| {
+                                           a.error(activity_id, e.to_string(), cx)
+                                       })
+                                       .ok();
+                      }
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Brings what depends on which items are in which collections up to date:
@@ -77,16 +74,13 @@ impl LibraryController {
     }
 
     /// Stores the fetched collections and emits a change event.
-    pub(super) fn apply_collections(
-        &mut self, mut collections: Vec<CollectionEntry>, cx: &mut Context<Self>,
-    ) {
+    pub(super) fn apply_collections(&mut self, mut collections: Vec<CollectionEntry>,
+                                    cx: &mut Context<Self>) {
         let catalog_ids = self.catalog_ids_scan();
-        sort_collections(
-            &mut collections,
-            self.collection_sort,
-            self.collection_sort_direction,
-            &catalog_ids,
-        );
+        sort_collections(&mut collections,
+                         self.collection_sort,
+                         self.collection_sort_direction,
+                         &catalog_ids);
         self.library.set_collections(collections);
         self.refresh_collection_cloud();
         // Refresh collection_members if the current filter is a Collection
@@ -138,10 +132,9 @@ impl LibraryController {
     /// threw away everything fetched so far on each launch, because the quiet
     /// sign-in at startup comes through this method. Signing out is what
     /// forgets the library (see [`forget_library`](Self::forget_library)).
-    pub fn replace_service(
-        &mut self, service: Box<dyn LibraryService>,
-        collections_service: Box<dyn CollectionsService>, cx: &mut Context<Self>,
-    ) {
+    pub fn replace_service(&mut self, service: Box<dyn LibraryService>,
+                           collections_service: Box<dyn CollectionsService>,
+                           cx: &mut Context<Self>) {
         self.install_services(service, collections_service, cx);
         // Collections are loaded as the first stage of `start_load`, sharing
         // its single activity item rather than starting a separate one.
@@ -152,10 +145,9 @@ impl LibraryController {
     /// without starting a load. [`replace_service`](Self::replace_service)
     /// is this followed by the load; tests call this alone, so that they do
     /// not start a background load that outlives them.
-    pub(super) fn install_services(
-        &mut self, service: Box<dyn LibraryService>,
-        collections_service: Box<dyn CollectionsService>, cx: &mut Context<Self>,
-    ) {
+    pub(super) fn install_services(&mut self, service: Box<dyn LibraryService>,
+                                   collections_service: Box<dyn CollectionsService>,
+                                   cx: &mut Context<Self>) {
         tracing::debug!("replace_service: installing authenticated services");
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
@@ -180,47 +172,44 @@ impl LibraryController {
 
     /// As [`Self::create_collection`], and calls `done` with the new entry, or
     /// the reason it could not be made, once the create call has finished.
-    pub fn create_collection_then(
-        &mut self, name: String, done: impl FnOnce(Result<CollectionEntry, String>) + 'static,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn create_collection_then(&mut self, name: String,
+                                  done: impl FnOnce(Result<CollectionEntry, String>) + 'static,
+                                  cx: &mut Context<Self>) {
         let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.create_collection(&name) })
-                .await;
+              let result =
+                  async_cx.background_executor()
+                          .spawn(async move { collections_service.create_collection(&name) })
+                          .await;
 
-            match result {
-                Ok(entry) => {
-                    let created = entry.clone();
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.library.push_collection(entry);
-                        ctrl.activity
-                            .update(cx, |a, cx| a.complete(activity_id, cx));
-                        cx.emit(LibraryChanged);
-                    })
-                    .ok();
-                    done(Ok(created));
-                }
-                Err(e) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.activity.update(cx, |a, cx| {
-                            a.error(activity_id, e.to_string(), cx);
-                        });
-                        cx.emit(CollectionCreateFailed {
-                            message: e.message.clone(),
-                        });
-                    })
-                    .ok();
-                    done(Err(e.message));
-                }
-            }
-        })
-        .detach();
+              match result {
+                  Ok(entry) => {
+                      let created = entry.clone();
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.library.push_collection(entry);
+                              ctrl.activity
+                                  .update(cx, |a, cx| a.complete(activity_id, cx));
+                              cx.emit(LibraryChanged);
+                          })
+                          .ok();
+                      done(Ok(created));
+                  }
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.activity.update(cx, |a, cx| {
+                                               a.error(activity_id, e.to_string(), cx);
+                                           });
+                              cx.emit(CollectionCreateFailed { message: e.message.clone(), });
+                          })
+                          .ok();
+                      done(Err(e.message));
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Creates a new collection with the given name and, once the create call
@@ -234,45 +223,42 @@ impl LibraryController {
     /// dialog, so a single user action both creates the collection and adds
     /// the current item to it. On create failure, only
     /// [`CollectionCreateFailed`] is emitted — no add is attempted.
-    pub fn create_collection_and_add_member(
-        &mut self, name: String, item_id: u64, product_id: u64, cx: &mut Context<Self>,
-    ) {
+    pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
+                                            product_id: u64, cx: &mut Context<Self>) {
         let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.create_collection(&name) })
-                .await;
+              let result =
+                  async_cx.background_executor()
+                          .spawn(async move { collections_service.create_collection(&name) })
+                          .await;
 
-            match result {
-                Ok(entry) => {
-                    let collection_id = entry.id;
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.library.push_collection(entry);
-                        ctrl.activity
-                            .update(cx, |a, cx| a.complete(activity_id, cx));
-                        cx.emit(LibraryChanged);
-                        ctrl.add_item_to_collection(collection_id, item_id, product_id, cx);
-                    })
-                    .ok();
-                }
-                Err(e) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.activity.update(cx, |a, cx| {
-                            a.error(activity_id, e.to_string(), cx);
-                        });
-                        cx.emit(CollectionCreateFailed {
-                            message: e.message.clone(),
-                        });
-                    })
-                    .ok();
-                }
-            }
-        })
-        .detach();
+              match result {
+                  Ok(entry) => {
+                      let collection_id = entry.id;
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.library.push_collection(entry);
+                              ctrl.activity
+                                  .update(cx, |a, cx| a.complete(activity_id, cx));
+                              cx.emit(LibraryChanged);
+                              ctrl.add_item_to_collection(collection_id, item_id, product_id, cx);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.activity.update(cx, |a, cx| {
+                                               a.error(activity_id, e.to_string(), cx);
+                                           });
+                              cx.emit(CollectionCreateFailed { message: e.message.clone(), });
+                          })
+                          .ok();
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Deletes the collection with the given id via the service, then removes
@@ -285,38 +271,37 @@ impl LibraryController {
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { collections_service.delete_collection(id) })
-                .await;
-            match result {
-                Ok(()) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.library.remove_collection(id);
-                        if let SidebarFilter::Collection(cid, _) = &ctrl.filter
-                            && *cid == id
-                        {
-                            ctrl.filter = SidebarFilter::default();
-                            ctrl.collection_members.clear();
-                        }
-                        ctrl.membership_changed();
-                        ctrl.activity
-                            .update(cx, |a, cx| a.complete(activity_id, cx));
-                        cx.emit(LibraryChanged);
-                    })
-                    .ok();
-                }
-                Err(e) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.activity.update(cx, |a, cx| {
-                            a.error(activity_id, e.to_string(), cx);
-                        });
-                    })
-                    .ok();
-                }
-            }
-        })
-        .detach();
+              let result = async_cx.background_executor()
+                                   .spawn(async move { collections_service.delete_collection(id) })
+                                   .await;
+              match result {
+                  Ok(()) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.library.remove_collection(id);
+                              if let SidebarFilter::Collection(cid, _) = &ctrl.filter
+                                 && *cid == id
+                              {
+                                  ctrl.filter = SidebarFilter::default();
+                                  ctrl.collection_members.clear();
+                              }
+                              ctrl.membership_changed();
+                              ctrl.activity
+                                  .update(cx, |a, cx| a.complete(activity_id, cx));
+                              cx.emit(LibraryChanged);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.activity.update(cx, |a, cx| {
+                                               a.error(activity_id, e.to_string(), cx);
+                                           });
+                          })
+                          .ok();
+                  }
+              }
+          })
+          .detach();
     }
 }
 

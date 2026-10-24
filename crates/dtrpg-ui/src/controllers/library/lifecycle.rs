@@ -14,10 +14,10 @@ impl LibraryController {
     /// # Panics
     ///
     /// Does not panic; service errors are reflected in [`pane_state`].
-    pub fn new(
-        service: Box<dyn LibraryService>, collections_service: Box<dyn CollectionsService>,
-        activity: Entity<ActivityController>, cx: &mut Context<Self>,
-    ) -> Self {
+    pub fn new(service: Box<dyn LibraryService>,
+               collections_service: Box<dyn CollectionsService>,
+               activity: Entity<ActivityController>, cx: &mut Context<Self>)
+               -> Self {
         let (mut ctrl, work_events, sync_events) =
             Self::build(service, collections_service, activity);
         ctrl.start_work_event_pump(work_events, cx);
@@ -42,27 +42,26 @@ impl LibraryController {
     /// Reads saved preferences from disk, but loads no catalog and starts no
     /// timers or event loop, so tests can build a controller and drive it
     /// themselves.
-    pub(super) fn build(
-        service: Box<dyn LibraryService>, collections_service: Box<dyn CollectionsService>,
-        activity: Entity<ActivityController>,
-    ) -> (Self, JobEvents, LibraryEvents) {
-        Self::build_with_cache_root(
-            service,
-            collections_service,
-            activity,
-            dtrpg_core::data::paths::index_dir(),
-            SmartCollectionStore::load(),
-        )
+    pub(super) fn build(service: Box<dyn LibraryService>,
+                        collections_service: Box<dyn CollectionsService>,
+                        activity: Entity<ActivityController>)
+                        -> (Self, JobEvents, LibraryEvents) {
+        Self::build_with_cache_root(service,
+                                    collections_service,
+                                    activity,
+                                    dtrpg_core::data::paths::index_dir(),
+                                    SmartCollectionStore::load())
     }
 
     /// Builds the controller against `cache_root` instead of the real cache
     /// directory, so tests get an isolated library index instead of the
     /// user's real one.
-    pub(super) fn build_with_cache_root(
-        service: Box<dyn LibraryService>, collections_service: Box<dyn CollectionsService>,
-        activity: Entity<ActivityController>, cache_root: PathBuf,
-        smart_collections: SmartCollectionStore,
-    ) -> (Self, JobEvents, LibraryEvents) {
+    pub(super) fn build_with_cache_root(service: Box<dyn LibraryService>,
+                                        collections_service: Box<dyn CollectionsService>,
+                                        activity: Entity<ActivityController>,
+                                        cache_root: PathBuf,
+                                        smart_collections: SmartCollectionStore)
+                                        -> (Self, JobEvents, LibraryEvents) {
         let vm = LibraryViewModel::new(service);
         let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
         let view_prefs = dtrpg_core::data::file_openers::CatalogViewPrefs::load();
@@ -75,71 +74,69 @@ impl LibraryController {
             Library::open(cache_root, &storage).expect("failed to open the library session");
         let library = Arc::new(library);
 
-        let ctrl = Self {
-            vm,
-            activity,
-            filter: view_prefs.to_filter(),
-            search_query: String::new(),
-            search_epoch: 0,
-            sort: view_prefs.to_sort(),
-            sort_direction: SortDirection::default(),
-            collection_sort: prefs.collection_sort(),
-            collection_sort_direction: prefs.collection_sort_direction(),
-            sidebar_open: SidebarOpen::saved(),
-            group_by: view_prefs.to_group_by(),
-            list_columns: view_prefs.to_list_columns(),
-            presentation: view_prefs.to_presentation(),
-            selection: Selection::default(),
-            collections_service: Arc::from(collections_service),
-            collection_members: HashSet::new(),
-            smart_collections,
-            smart_counts: HashMap::new(),
-            match_tracker: MatchTracker::default(),
-            filter_choices: prefs.filter_value_choices(),
-            known_filter_values: HashMap::new(),
-            failed_downloads: HashSet::new(),
-            insights: None,
-            insights_computing: false,
-            root_usage: Arc::new(Vec::new()),
-            collection_cloud: Arc::new(HashMap::new()),
-            root_title_counts: HashMap::new(),
-            item_locations: HashMap::new(),
-            library,
-            agent_link: None,
-            cache_counts: dtrpg_core::data::cache_counts::CacheCounts::default(),
-            thumbnail_activity_id: None,
-            thumbnail_processed: 0,
-            thumbnail_refresh_active: false,
-            thumbnail_refresh_pending: HashSet::new(),
-            thumbnail_refresh_succeeded: 0,
-            thumbnail_refresh_failed: 0,
-            catalog_loading: true,
-            catalog_activity_id: None,
-            catalog_progress_total: None,
-            publisher_search_open: false,
-            publisher_search_query: String::new(),
-            collection_search_open: false,
-            collection_search_query: String::new(),
-            selected_item_file: HashMap::new(),
-            inspector_tabs: HashMap::new(),
-            inspector_contents: HashMap::new(),
-            inspector_summaries: HashMap::new(),
-            inspector_selected_entries: HashMap::new(),
-            inspector_extractions: HashMap::new(),
-            inspector_preview: HashMap::new(),
-            inspector_selected_archive: HashMap::new(),
-            inspector_collapsed_dirs: HashMap::new(),
-            inspector_filter_inputs: HashMap::new(),
-            file_info_cache: HashMap::new(),
-            file_tag_sync_running: false,
-            storage_override: None,
-            file_tags_reconciled: false,
-            max_concurrent_downloads: storage.max_concurrent_downloads(),
-            recently_updated_window_days: storage.recently_updated_window_days(),
-            pending_download: None,
-            bulk_selection_mode: false,
-            bulk_selected_ids: HashSet::new(),
-        };
+        let ctrl = Self { vm,
+                          activity,
+                          filter: view_prefs.to_filter(),
+                          search_query: String::new(),
+                          search_epoch: 0,
+                          sort: view_prefs.to_sort(),
+                          sort_direction: SortDirection::default(),
+                          collection_sort: prefs.collection_sort(),
+                          collection_sort_direction: prefs.collection_sort_direction(),
+                          sidebar_open: SidebarOpen::saved(),
+                          group_by: view_prefs.to_group_by(),
+                          list_columns: view_prefs.to_list_columns(),
+                          presentation: view_prefs.to_presentation(),
+                          selection: Selection::default(),
+                          collections_service: Arc::from(collections_service),
+                          collection_members: HashSet::new(),
+                          smart_collections,
+                          smart_counts: HashMap::new(),
+                          match_tracker: MatchTracker::default(),
+                          filter_choices: prefs.filter_value_choices(),
+                          known_filter_values: HashMap::new(),
+                          failed_downloads: HashSet::new(),
+                          insights: None,
+                          insights_computing: false,
+                          root_usage: Arc::new(Vec::new()),
+                          collection_cloud: Arc::new(HashMap::new()),
+                          root_title_counts: HashMap::new(),
+                          item_locations: HashMap::new(),
+                          library,
+                          agent_link: None,
+                          cache_counts: dtrpg_core::data::cache_counts::CacheCounts::default(),
+                          thumbnail_activity_id: None,
+                          thumbnail_processed: 0,
+                          thumbnail_refresh_active: false,
+                          thumbnail_refresh_pending: HashSet::new(),
+                          thumbnail_refresh_succeeded: 0,
+                          thumbnail_refresh_failed: 0,
+                          catalog_loading: true,
+                          catalog_activity_id: None,
+                          catalog_progress_total: None,
+                          publisher_search_open: false,
+                          publisher_search_query: String::new(),
+                          collection_search_open: false,
+                          collection_search_query: String::new(),
+                          selected_item_file: HashMap::new(),
+                          inspector_tabs: HashMap::new(),
+                          inspector_contents: HashMap::new(),
+                          inspector_summaries: HashMap::new(),
+                          inspector_selected_entries: HashMap::new(),
+                          inspector_extractions: HashMap::new(),
+                          inspector_preview: HashMap::new(),
+                          inspector_selected_archive: HashMap::new(),
+                          inspector_collapsed_dirs: HashMap::new(),
+                          inspector_filter_inputs: HashMap::new(),
+                          file_info_cache: HashMap::new(),
+                          file_tag_sync_running: false,
+                          storage_override: None,
+                          file_tags_reconciled: false,
+                          max_concurrent_downloads: storage.max_concurrent_downloads(),
+                          recently_updated_window_days: storage.recently_updated_window_days(),
+                          pending_download: None,
+                          bulk_selection_mode: false,
+                          bulk_selected_ids: HashSet::new() };
         (ctrl, work_events, sync_events)
     }
 
@@ -175,16 +172,15 @@ impl LibraryController {
     /// which closes the channel.
     pub(super) fn start_work_event_pump(&self, mut events: JobEvents, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-            while let Some(event) = events.recv().await {
-                let alive = this
-                    .update(async_cx, |ctrl, cx| ctrl.handle_work_event(event, cx))
-                    .is_ok();
-                if !alive {
-                    break;
-                }
-            }
-        })
-        .detach();
+              while let Some(event) = events.recv().await {
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.handle_work_event(event, cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Starts a background loop that calls
@@ -198,22 +194,21 @@ impl LibraryController {
     /// once the controller entity is dropped (`this.update` starts failing).
     pub(super) fn start_periodic_check_batch_timer(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-            loop {
-                async_cx
+              loop {
+                  async_cx
                     .background_executor()
                     .timer(std::time::Duration::from_secs(
                         dtrpg_core::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
                     ))
                     .await;
-                let alive = this
-                    .update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
-                    .is_ok();
-                if !alive {
-                    break;
-                }
-            }
-        })
-        .detach();
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Starts a background loop that re-runs the catalog staleness check
@@ -231,22 +226,21 @@ impl LibraryController {
     /// The loop exits once the controller entity is dropped.
     pub(super) fn start_periodic_catalog_refresh_timer(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-            loop {
-                async_cx
+              loop {
+                  async_cx
                     .background_executor()
                     .timer(std::time::Duration::from_secs(
                         dtrpg_core::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
                     ))
                     .await;
-                let alive = this
-                    .update(async_cx, |ctrl, cx| ctrl.start_load(cx))
-                    .is_ok();
-                if !alive {
-                    break;
-                }
-            }
-        })
-        .detach();
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Spawns a background task to load collections and the catalog — from
@@ -289,28 +283,27 @@ impl LibraryController {
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-            let verifications = async_cx
-                .background_executor()
-                .spawn(async move {
-                    let storage = StorageConfig::load();
-                    catalog
+              let verifications = async_cx.background_executor()
+                                          .spawn(async move {
+                                              let storage = StorageConfig::load();
+                                              catalog
                         .iter()
                         .filter_map(|item| {
                             let collection_ids = collection_ids_for_item(item, &collections);
                             find_presence_changes_in_collections(item, &storage, &collection_ids)
                         })
                         .collect::<Vec<_>>()
-                })
-                .await;
+                                          })
+                                          .await;
 
-            this.update(async_cx, |ctrl, cx| {
-                ctrl.library.end_verifying(&ids);
-                ctrl.apply_verifications(&verifications);
-                cx.emit(LibraryChanged);
-            })
-            .ok();
-        })
-        .detach();
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.library.end_verifying(&ids);
+                      ctrl.apply_verifications(&verifications);
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     /// Applies one catalog-sync event from `Library`, updating only this
@@ -334,10 +327,8 @@ impl LibraryController {
                         .update(cx, |a, cx| a.update_label(id, label, cx));
                 }
             }
-            LibraryEvent::CachePrepopulated {
-                items,
-                force_reload,
-            } => {
+            LibraryEvent::CachePrepopulated { items,
+                                              force_reload, } => {
                 // Also when nothing was appended: the catalog may already be
                 // stored, and the views have to be built from it either way.
                 self.react_to_prepopulated_items(&items, cx);
@@ -378,7 +369,8 @@ impl LibraryController {
                 cx.emit(LibraryChanged);
                 if quiet {
                     self.complete_catalog_activity(cx);
-                } else if let Some(id) = self.catalog_activity_id.take() {
+                }
+                else if let Some(id) = self.catalog_activity_id.take() {
                     self.activity.update(cx, |a, cx| a.error(id, message, cx));
                 }
             }
@@ -393,7 +385,8 @@ impl LibraryController {
 
     /// Updates the catalog-sync activity item's label for `stage`.
     fn sync_stage_label(&mut self, stage: SyncStage, cx: &mut Context<Self>) {
-        let Some(id) = self.catalog_activity_id else {
+        let Some(id) = self.catalog_activity_id
+        else {
             return;
         };
         let label = match stage {
@@ -416,19 +409,17 @@ impl LibraryController {
     /// Starts a loop that applies each catalog-sync event to the controller,
     /// for as long as the controller lives. See [`Self::start_work_event_pump`]
     /// for the same pattern applied to the work queue's events.
-    pub(super) fn start_catalog_sync_event_pump(
-        &self, mut events: LibraryEvents, cx: &mut Context<Self>,
-    ) {
+    pub(super) fn start_catalog_sync_event_pump(&self, mut events: LibraryEvents,
+                                                cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-            while let Some(event) = events.recv().await {
-                let alive = this
-                    .update(async_cx, |ctrl, cx| ctrl.handle_sync_event(event, cx))
-                    .is_ok();
-                if !alive {
-                    break;
-                }
-            }
-        })
-        .detach();
+              while let Some(event) = events.recv().await {
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.handle_sync_event(event, cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
     }
 }
