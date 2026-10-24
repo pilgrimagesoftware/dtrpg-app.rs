@@ -67,15 +67,18 @@ jobs:
         # OS-independent source-tree check; one leg is enough.
         if: runner.os == 'Linux'
         run: |
-          make size-check
+            make size-check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: |
+            cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
         # A hung test otherwise holds a runner for hours.
         timeout-minutes: 15
-        run: cargo test --workspace
+        run: |
+            cargo test --workspace
 
       - name: Build
-        run: cargo build --workspace
+        run: |
+            cargo build --workspace
