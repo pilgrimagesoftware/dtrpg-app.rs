@@ -49,6 +49,10 @@ pub struct UiStateFile {
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
     pub settings_page_ix:       Option<usize>,
+    /// Whether the filters column beside the catalog is open (`true`) or
+    /// collapsed (`false`).
+    #[serde(default)]
+    pub filters_open:           Option<bool>,
     /// Position and size the library window was closed at, so it reopens
     /// there instead of always resetting to the default placement.
     pub library_window_bounds:  Option<WindowBoundsPref>,
@@ -171,6 +175,18 @@ impl UiState {
     /// Persist the active settings page index.
     pub fn save_settings_page_ix(&mut self, ix: usize) {
         self.data.settings_page_ix = Some(ix);
+        self.flush();
+    }
+
+    /// Whether the filters column beside the catalog is open (defaults to
+    /// `false`).
+    pub fn filters_open(&self) -> bool {
+        self.data.filters_open.unwrap_or(false)
+    }
+
+    /// Persist the filters column open state.
+    pub fn save_filters_open(&mut self, open: bool) {
+        self.data.filters_open = Some(open);
         self.flush();
     }
 

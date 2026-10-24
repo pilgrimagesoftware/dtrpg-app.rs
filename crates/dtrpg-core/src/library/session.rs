@@ -37,6 +37,10 @@ pub struct Library {
     /// Shared connectivity monitor consulted before network requests.
     pub network_monitor:       Arc<NetworkMonitor>,
     /// Directory the library index database lives in.
+    pub app_data_root:         PathBuf,
+    /// Directory that user preferences live in.
+    pub prefs_root:            PathBuf,
+    /// Directory that cached files live in.
     pub cache_root:            PathBuf,
     /// Catalog-sync single-flight state: the current generation, whether a
     /// sync is running, and whether a follow-up was requested while busy.
@@ -74,9 +78,10 @@ impl Library {
     /// # Errors
     ///
     /// Returns [`IndexError`] if the index cannot be opened or migrated.
-    pub fn open(cache_root: PathBuf, storage: &StorageConfig)
+    pub fn open(app_data_root: PathBuf, prefs_root: PathBuf, cache_root: PathBuf,
+                storage: &StorageConfig)
                 -> Result<(Self, JobEvents, LibraryEvents), IndexError> {
-        let index = LibraryIndex::open_and_migrate(&cache_root)?;
+        let index = LibraryIndex::open_and_migrate(&app_data_root)?;
         let network_monitor = Arc::new(NetworkMonitor::new());
         let cover_fetcher = Arc::new(CoverFetcher::new(
             Arc::new(HttpCoverTransport::new(Arc::clone(&network_monitor))),
@@ -89,6 +94,8 @@ impl Library {
                    work,
                    cover_fetcher,
                    network_monitor,
+                   app_data_root,
+                   prefs_root,
                    cache_root,
                    sync_state: Mutex::new(SyncState::default()),
                    events,

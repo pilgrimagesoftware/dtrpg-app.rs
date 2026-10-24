@@ -250,6 +250,7 @@ impl LibraryRootView {
         let inspector_width =
             restored_inspector_width(ui_state.detail_width(), INSPECTOR_PANE_DEFAULT_WIDTH);
         let resize_state = cx.new(|_| ResizableState::default());
+        let filters_open = ui_state.filters_open();
 
         // Dragging a divider (or squeezing the window) reports sizes on every
         // frame, so they are saved once the drag has stopped.
@@ -295,7 +296,7 @@ impl LibraryRootView {
                catalog_view,
                inspector,
                inspector_width,
-               filters_open: false,
+               filters_open,
                resize_state,
                sidebar_width,
                save_debounce: Debounce::new(),

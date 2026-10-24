@@ -15,8 +15,8 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
                                    settings: &Entity<SettingsController>) {
     let email_initial = settings.read(cx).email_draft().to_owned();
     let email_input = cx.new(|cx| {
-                            let mut state = InputState::new(window, cx)
-            .placeholder(t!("settings.email_placeholder").to_string());
+                            let mut state =
+            InputState::new(window, cx).placeholder(t!("settings.email_placeholder").to_string());
                             if !email_initial.is_empty() {
                                 state = state.default_value(&email_initial);
                             }
@@ -81,8 +81,8 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
 
     let theme_editor_input = cx.new(|cx| {
                                    gpui_kit::component::input::EditorState::new(window, cx)
-                                        .language("toml")
-                                        .line_number(false)
+            .language("toml")
+            .line_number(false)
                                });
     settings.update(cx, |ctrl, _cx| {
                 ctrl.set_theme_editor_input(theme_editor_input)
@@ -285,9 +285,8 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
       .detach();
 
     let collection_search_input = cx.new(|cx| {
-                                        InputState::new(window, cx)
-            .placeholder(t!("search.collections_placeholder").to_string())
-                                    });
+        InputState::new(window, cx).placeholder(t!("search.collections_placeholder").to_string())
+    });
     let controller_for_collection_search = controller.clone();
     cx.subscribe(&collection_search_input,
                  move |_this, input_entity, event: &InputEvent, cx| {

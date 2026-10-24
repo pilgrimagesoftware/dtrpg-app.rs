@@ -19,14 +19,14 @@ impl Library {
         Arc::clone(&self.tags.lock().unwrap_or_else(PoisonError::into_inner))
     }
 
-    /// Reads the tags from the library index under `cache_root`. Blocking:
+    /// Reads the tags from the library index under `root`. Blocking:
     /// call it off the UI thread.
     ///
     /// # Errors
     ///
     /// Returns [`IndexError`] if the index cannot be opened or read.
-    pub fn read_tags(cache_root: &Path) -> Result<TagLibrary, IndexError> {
-        TagLibrary::load(&LibraryIndex::open_and_migrate(cache_root)?)
+    pub fn read_tags(root: &Path) -> Result<TagLibrary, IndexError> {
+        TagLibrary::load(&LibraryIndex::open_and_migrate(root)?)
     }
 
     /// Starts a read or an edit of the tags and returns its generation, to
