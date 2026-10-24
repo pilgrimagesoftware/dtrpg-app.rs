@@ -56,6 +56,19 @@ download and spend), a switch for each tool, the config to copy into the agent, 
 the latest calls it made. It is off until you turn it on. See
 [Using Libri from an AI agent]({{ '/latest/mcp/' | relative_url }}).
 
+The page also shows how the agent reaches Libri. **Transport** reads *stdio + local
+socket*: standard input and output for a desktop agent, and a local socket for the
+few requests that need the running app. **Bind address** names that socket - a file
+in Libri's data folder, or a named pipe on Windows. Both are fixed: Libri opens no
+network port, so there is nothing to choose and no way to reach it from another
+machine.
+
+Under the config box, **Rotate token** writes a fresh token for the local socket. Do
+it if you think a copy of the token file has got out. Agents read the token from that
+file on every request, so a running agent keeps working without reconfiguration; a
+copy of the old token stops working at once. Next to **Recent activity**, **Open full
+log** opens the whole log of agent calls in your default text app.
+
 ### Summaries
 
 The first section of the page sets how summaries of your titles are written. They

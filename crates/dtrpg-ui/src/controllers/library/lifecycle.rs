@@ -78,6 +78,7 @@ impl LibraryController {
                           activity,
                           filter: view_prefs.to_filter(),
                           search_query: String::new(),
+                          search_epoch: 0,
                           sort: view_prefs.to_sort(),
                           sort_direction: SortDirection::default(),
                           collection_sort: prefs.collection_sort(),
@@ -91,6 +92,7 @@ impl LibraryController {
                           collection_members: HashSet::new(),
                           smart_collections,
                           smart_counts: HashMap::new(),
+                          match_tracker: MatchTracker::default(),
                           filter_choices: prefs.filter_value_choices(),
                           known_filter_values: HashMap::new(),
                           failed_downloads: HashSet::new(),
@@ -340,6 +342,7 @@ impl LibraryController {
                 self.catalog_loading = false;
                 cx.emit(LibraryChanged);
                 self.complete_catalog_activity(cx);
+                self.run_smart_actions(cx);
                 self.verify_catalog_downloads(cx);
             }
             LibraryEvent::SkippedFreshCache => {
@@ -349,6 +352,7 @@ impl LibraryController {
                 self.enqueue_stored_thumbnails(cx);
                 cx.emit(LibraryChanged);
                 self.complete_catalog_activity(cx);
+                self.run_smart_actions(cx);
                 self.verify_catalog_downloads(cx);
             }
             LibraryEvent::FullyLoaded { items } => {
@@ -357,6 +361,7 @@ impl LibraryController {
                 cx.emit(LibraryChanged);
                 self.complete_catalog_activity(cx);
                 self.begin_tag_sync(false, cx);
+                self.run_smart_actions(cx);
                 self.verify_catalog_downloads(cx);
             }
             LibraryEvent::Failed { message, quiet } => {

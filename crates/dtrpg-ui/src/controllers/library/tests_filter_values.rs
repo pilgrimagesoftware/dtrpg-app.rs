@@ -3,6 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::util::search::Field;
 use gpui::TestAppContext;
 
@@ -21,6 +22,11 @@ fn the_sections_list_the_values_the_catalog_has_with_the_noise_hidden(cx: &mut T
                                items);
 
     let sections = fixture.controller.update(cx, |ctrl, _| {
+                                         // The controller starts from the
+                                         // choices saved on this
+                                         // machine; the test must not depend on
+                                         // them.
+                                         ctrl.filter_choices = FilterValueChoices::default();
                                          ctrl.refresh_known_filter_values();
                                          ctrl.filter_value_sections()
                                      });

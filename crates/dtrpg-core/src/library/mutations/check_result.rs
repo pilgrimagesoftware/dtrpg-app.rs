@@ -46,6 +46,13 @@ pub fn apply_check_result(item: &mut LibraryItem,
                     .iter()
                     .map(|f| (Arc::clone(&f.id), f.downloaded))
                     .collect();
+            // The detail endpoint answers with the ordered product alone, so
+            // `filters` comes back empty and neither `line` nor `kind`
+            // resolves — where the list fetch, with `getFilters=1`, resolved
+            // both. Keep what the list fetch got rather than letting a blank
+            // detail response clear the System the inspector shows.
+            let line = Arc::clone(&item.line);
+            let kind = Arc::clone(&item.kind);
             *item = fresh;
             item.id = id;
             item.numeric_id = numeric_id;
@@ -55,6 +62,10 @@ pub fn apply_check_result(item: &mut LibraryItem,
                 if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
                     file.downloaded = downloaded;
                 }
+            }
+            if item.filters.is_empty() {
+                item.line = line;
+                item.kind = kind;
             }
             item.recompute_status();
             item.is_available = true;
@@ -75,6 +86,7 @@ mod tests {
     use super::apply_check_result;
     use crate::data::enums::ItemStatus;
     use crate::data::library::{LibraryItem, LibraryItemFile};
+    use crate::data::product_filter::ProductFilter;
     use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
     fn item(id: &str, title: &str) -> LibraryItem {
@@ -139,6 +151,42 @@ mod tests {
         assert_eq!(existing.numeric_id, 111);
         assert_eq!(existing.order_product_id, 222);
         assert_eq!(existing.product_id, 333);
+    }
+
+    #[test]
+    fn ok_result_keeps_the_system_and_type_a_filterless_detail_response_cannot_resolve() {
+        // Regression (issue #486): selecting an item fetched its detail, and
+        // that response carries no `filters` where the list fetch does. Taking
+        // `line`/`kind` off it wholesale blanked the System the inspector had
+        // briefly shown from the list.
+        let mut existing = item("b1", "Title");
+        existing.line = "Pathfinder".into();
+        existing.kind = "Adventure".into();
+
+        let fresh = item("b1", "Title");
+        assert!(fresh.filters.is_empty());
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert_eq!(existing.line.as_ref(), "Pathfinder");
+        assert_eq!(existing.kind.as_ref(), "Adventure");
+    }
+
+    #[test]
+    fn ok_result_takes_the_system_from_a_detail_response_that_carries_filters() {
+        let mut existing = item("b1", "Title");
+        existing.line = "Stale System".into();
+
+        let mut fresh = item("b1", "Title");
+        fresh.filters = vec![ProductFilter { id:        1,
+                                             parent_id: 0,
+                                             category:  "Rule System".into(),
+                                             name:      "Dungeons & Dragons".into(), }];
+        fresh.line = "Dungeons & Dragons".into();
+
+        apply_check_result(&mut existing, Ok(fresh), SystemTime::now());
+
+        assert_eq!(existing.line.as_ref(), "Dungeons & Dragons");
     }
 
     #[test]

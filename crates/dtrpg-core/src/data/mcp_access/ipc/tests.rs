@@ -49,6 +49,44 @@ fn a_request_with_the_wrong_token_is_refused() {
 }
 
 #[test]
+fn a_rotated_token_works_at_once_and_the_old_one_stops_working() {
+    let folder = tempfile::tempdir().unwrap();
+    let endpoint = IpcEndpoint::at(folder.path());
+    let (sender, receiver) = mpsc::channel();
+    let listener = IpcListener::start(&endpoint, sender).unwrap();
+    answer_in_background(receiver);
+    let stale = std::fs::read_to_string(endpoint.token_path()).unwrap();
+
+    let fresh = listener.rotate_token().unwrap();
+
+    assert_ne!(fresh, stale);
+    assert_eq!(std::fs::read_to_string(endpoint.token_path()).unwrap(),
+               fresh);
+    // The agent reads the token file on every request, so it keeps working.
+    let reply = run(send_request(&endpoint,
+                                 AppRequest::CreateCollection { name: "Solo".to_owned(), }));
+    assert!(matches!(reply.unwrap(), AppReply::Done { .. }));
+    // A copy of the old token, still in hand somewhere, no longer answers.
+    std::fs::write(endpoint.token_path(), &stale).unwrap();
+    let stale_reply = run(send_request(&endpoint,
+                                       AppRequest::CreateCollection { name: "Solo".to_owned(), }));
+    assert!(matches!(stale_reply.unwrap(), AppReply::Failed { .. }));
+}
+
+#[test]
+fn the_bind_display_names_where_the_socket_is() {
+    let folder = tempfile::tempdir().unwrap();
+    let endpoint = IpcEndpoint::at(folder.path());
+
+    let display = endpoint.bind_display();
+
+    #[cfg(unix)]
+    assert!(display.ends_with("agent.sock"), "{display}");
+    #[cfg(not(unix))]
+    assert!(display.starts_with("libri-agent-"), "{display}");
+}
+
+#[test]
 fn nothing_listening_means_the_app_is_not_running() {
     let folder = tempfile::tempdir().unwrap();
     let endpoint = IpcEndpoint::at(folder.path());

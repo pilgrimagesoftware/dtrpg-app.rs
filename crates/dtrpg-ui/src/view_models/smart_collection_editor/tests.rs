@@ -108,3 +108,15 @@ fn a_draft_made_from_a_manual_collection_is_that_collection_by_name_and_can_be_s
     assert_eq!(draft.equivalent_query_text().as_deref(),
                Some("collection:\"solo play\""));
 }
+
+#[test]
+fn the_on_match_switches_start_off_and_can_be_turned_on() {
+    let mut draft = SmartCollectionDraft::new();
+    assert!(!draft.download_new_matches() && !draft.mirror_as_symlinks());
+
+    draft.set_download_new_matches(true);
+    draft.set_mirror_as_symlinks(true);
+
+    let saved = draft.into_collection();
+    assert!(saved.download_new_matches && saved.mirror_as_symlinks);
+}

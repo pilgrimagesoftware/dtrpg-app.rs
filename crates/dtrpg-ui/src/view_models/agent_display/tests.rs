@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use rust_i18n::t;
+
 use super::*;
 
 fn entry(summary: &str, denied: bool) -> AuditEntry {
@@ -45,6 +47,42 @@ fn every_tool_and_scope_has_text() {
     }
     for scope in McpScope::ALL {
         assert_ne!(scope_label(scope), "agent.scope_read");
+    }
+}
+
+/// The Agent & MCP page's own strings: every `t!` key the page shows.
+const PAGE_KEYS: [&str; 8] = ["agent.rotate_token",
+                              "agent.rotate_note",
+                              "agent.transport_title",
+                              "agent.transport_value",
+                              "agent.transport_note",
+                              "agent.bind_title",
+                              "agent.bind_note",
+                              "agent.open_log"];
+
+#[test]
+fn the_page_strings_resolve_rather_than_falling_back_to_their_key() {
+    for key in PAGE_KEYS {
+        assert_ne!(t!(key).to_string(), key.to_string(), "{key} has no text");
+    }
+}
+
+#[test]
+fn the_page_strings_are_written_in_every_locale() {
+    // A missing de/fr string falls back to English at runtime; the stub
+    // locales are meant to carry real text, so check the catalogues on disk.
+    for locale in ["en", "de", "fr"] {
+        let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("i18n")
+                                                                   .join(format!("{locale}.yaml"));
+        let text = std::fs::read_to_string(&file)
+                       .unwrap_or_else(|error| panic!("could not read {locale}.yaml: {error}"));
+        for key in PAGE_KEYS {
+            let suffix = key.rsplit('.')
+                            .next()
+                            .unwrap_or_else(|| panic!("malformed key {key}"));
+            assert!(text.contains(&format!("  {suffix}:")),
+                    "{locale}.yaml lacks {key}");
+        }
     }
 }
 

@@ -46,7 +46,7 @@ pub(crate) fn card_row(first: bool, colors: &ColorTokens) -> Div {
 }
 
 /// How wide the field of a [`field_row`] is.
-const FIELD_WIDTH: f32 = 140.0;
+pub(crate) const FIELD_WIDTH: f32 = 140.0;
 
 /// A setting with a title and a note on the left and its field on the right,
 /// in the layout of a switch row. `id` names the note.

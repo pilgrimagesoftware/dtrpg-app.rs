@@ -9,6 +9,7 @@
 use dtrpg_core::util::search::Field;
 use gpui::prelude::*;
 use gpui::{App, Entity, SharedString, div, px};
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
@@ -99,14 +100,16 @@ fn render_section(section: &FilterValueSection, library: &Entity<LibraryControll
          .child(div().text_xs()
                      .text_color(colors.text_secondary)
                      .child(field_heading(section.field)))
-         .child(div().id(SharedString::from(format!("filter-values-{}", section.field.keyword())))
-                     .max_h(px(CHIP_ROW_HEIGHT * VISIBLE_CHIP_ROWS))
-                     .overflow_y_scroll()
-                     .child(div().flex()
-                                 .flex_wrap()
-                                 .gap(px(6.0))
-                                 .children(shown)
-                                 .children(hidden)))
+         .child(div().max_h(px(CHIP_ROW_HEIGHT * VISIBLE_CHIP_ROWS))
+                     .child(div().id(SharedString::from(format!("filter-values-{}",
+                                                                section.field.keyword())))
+                                 .size_full()
+                                 .overflow_y_scrollbar()
+                                 .child(div().flex()
+                                             .flex_wrap()
+                                             .gap(px(6.0))
+                                             .children(shown)
+                                             .children(hidden))))
 }
 
 /// Renders the filter values section, or nothing while the catalog has no

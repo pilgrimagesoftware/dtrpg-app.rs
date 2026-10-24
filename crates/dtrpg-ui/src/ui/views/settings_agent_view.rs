@@ -1,9 +1,11 @@
 //! The Agent & MCP page: whether agents may use Libri, what they may do, which
 //! tools they have, how to connect one, and what they have done.
 
+use std::path::PathBuf;
+
 use dtrpg_core::data::mcp_access::{McpScope, McpTool};
 use gpui::prelude::*;
-use gpui::{ClipboardItem, Entity, Hsla, SharedString, div, px};
+use gpui::{AnyElement, ClipboardItem, Entity, Hsla, SharedString, div, px};
 use gpui_kit::component::Icon;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::switch::Switch;
@@ -12,11 +14,13 @@ use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
+use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::settings_native_view::switch_row;
 use crate::ui::views::settings_summaries_view::render_summaries;
 use crate::ui::widgets::{selectable_note, selectable_text, small_caps_text};
+use crate::util::item_opener::ItemOpener;
 use crate::view_models::agent_display::{
     AgentPageData, agent_config_json, exposed_tools, scope_label, summary_label, time_label,
     tool_description,
@@ -186,8 +190,11 @@ fn tools_table(entity: &Entity<SettingsController>, data: &AgentPageData, colors
 }
 
 /// The config an agent needs, in a box, with an icon button inside it that
-/// copies it.
-fn connect_block(command_path: &str, colors: &ColorTokens, mono_font: &str) -> impl IntoElement {
+/// copies it and a button under the box that rotates the token agents
+/// carry.
+fn connect_block(command_path: &str, colors: &ColorTokens, mono_font: &str,
+                 library: Entity<LibraryController>)
+                 -> impl IntoElement {
     let config = agent_config_json(command_path);
     let copied = config.clone();
     div().flex()
@@ -214,6 +221,13 @@ fn connect_block(command_path: &str, colors: &ColorTokens, mono_font: &str) -> i
                                             .on_click(move |_, _, cx| {
                                                 cx.write_to_clipboard(ClipboardItem::new_string(copied.clone()));
                                             }))))
+         .child(Button::new("agent-rotate-token")
+                    .ghost()
+                    .label(t!("agent.rotate_token").to_string())
+                    .tooltip(t!("agent.rotate_note").to_string())
+                    .on_click(move |_, _, cx| {
+                        library.update(cx, |ctrl, _| ctrl.rotate_agent_token());
+                    }))
 }
 
 /// Where the log is kept, so a person can open it.
@@ -226,6 +240,72 @@ fn log_location(log_path: &str, colors: &ColorTokens) -> impl IntoElement {
                      .child(t!("agent.log_location").to_string()))
          .child(selectable_text("agent-log-path", log_path.to_owned()).text_xs()
                                                                       .text_color(colors.text_primary))
+}
+
+/// An info row: a title and a note on the left, a fixed value on the right.
+/// Hand-rolled because
+/// [`crate::ui::views::settings_card::field_row`]'s 140-pixel field would
+/// cut a socket path in half.
+fn info_row(id: &str, title: String, note: &'static str, value: AnyElement, colors: &ColorTokens)
+            -> AnyElement {
+    div().flex()
+         .flex_col()
+         .gap(px(4.0))
+         .child(div().flex()
+                     .items_start()
+                     .justify_between()
+                     .gap(px(12.0))
+                     .child(div().text_sm()
+                                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                                 .text_color(colors.text_primary)
+                                 .child(title))
+                     .child(value))
+         .child(selectable_note(id.to_owned(), t!(note).to_string(), colors))
+         .into_any_element()
+}
+
+/// The Transport and Bind address rows. Both are facts, not controls: the
+/// server runs on stdio plus the local socket, and a socket is reachable
+/// only from this machine, so there is nothing to choose and no way to
+/// expose it to a network. The mockup's dropdown would be decoration.
+fn transport_rows(data: &AgentPageData, colors: &ColorTokens, mono_font: &str) -> AnyElement {
+    let transport: AnyElement = div().text_xs()
+                                     .text_color(colors.text_primary)
+                                     .child(t!("agent.transport_value").to_string())
+                                     .into_any_element();
+    let bind: AnyElement = selectable_text("agent-bind-value", data.bind_display.clone()).text_xs()
+                                                                                          .font_family(mono_font.to_string())
+                                                                                          .max_w(px(360.0))
+                                                                                          .text_color(colors.text_primary)
+                                                                                          .into_any_element();
+    div().flex()
+         .flex_col()
+         .gap(px(16.0))
+         .child(info_row("agent-info-transport",
+                         t!("agent.transport_title").to_string(),
+                         "agent.transport_note",
+                         transport,
+                         colors))
+         .child(info_row("agent-info-bind",
+                         t!("agent.bind_title").to_string(),
+                         "agent.bind_note",
+                         bind,
+                         colors))
+         .into_any_element()
+}
+
+/// Opens the activity log with the system's default app. A log that was
+/// never written has nothing to open, so say so in the log rather than
+/// opening an empty editor.
+fn open_agent_log(log_path: &str) {
+    let path = PathBuf::from(log_path);
+    if !path.exists() {
+        tracing::warn!(path = %path.display(), "the agent log does not exist yet");
+        return;
+    }
+    if let Err(error) = ItemOpener::open(&path) {
+        tracing::warn!(%error, "could not open the agent log");
+    }
 }
 
 /// The latest calls, newest first.
@@ -266,10 +346,12 @@ fn activity_rows(data: &AgentPageData, colors: &ColorTokens) -> impl IntoElement
 
 /// Renders the Agent & MCP page.
 pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageData,
-                            colors: &ColorTokens, label_font: &str, mono_font: &str)
+                            colors: &ColorTokens, label_font: &str, mono_font: &str,
+                            library: Entity<LibraryController>)
                             -> impl IntoElement + 'static + use<> {
     let enable_entity = entity.clone();
     let refresh_entity = entity.clone();
+    let log_path = data.log_path.clone();
     let enable_note = if data.settings.enabled {
         t!("agent.enable_note_on",
            exposed = exposed_tools(&data.settings),
@@ -298,26 +380,34 @@ pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageD
                                                 ctrl.set_mcp_enabled(checked, cx);
                                             });
                            }))
+         .child(transport_rows(&data, colors, mono_font))
          .child(div().h(px(1.0)).bg(colors.border))
          .child(heading(t!("agent.scopes_heading").to_string(), colors, label_font))
          .child(scope_rows(&entity, &data, colors))
          .child(heading(t!("agent.tools_heading").to_string(), colors, label_font))
          .child(tools_table(&entity, &data, colors))
          .child(heading(t!("agent.connect_heading").to_string(), colors, label_font))
-         .child(connect_block(&data.command_path, colors, mono_font))
+         .child(connect_block(&data.command_path, colors, mono_font, library))
          .child(div().flex()
                      .items_center()
                      .justify_between()
                      .child(heading(t!("agent.activity_heading").to_string(), colors, label_font))
-                     .child(Button::new("agent-refresh-activity")
-                                .ghost()
-                                .icon(Icon::empty().path("icons/refresh-cw.svg"))
-                                .tooltip(t!("agent.activity_refresh").to_string())
-                                .on_click(move |_, _, cx| {
-                                    refresh_entity.update(cx, |ctrl, cx| {
-                                                      ctrl.refresh_mcp_activity(cx);
-                                                  });
-                                })))
+                     .child(div().flex()
+                                 .items_center()
+                                 .gap(px(4.0))
+                                 .child(Button::new("agent-open-log")
+                                            .ghost()
+                                            .label(t!("agent.open_log").to_string())
+                                            .on_click(move |_, _, _| open_agent_log(&log_path)))
+                                 .child(Button::new("agent-refresh-activity")
+                                            .ghost()
+                                            .icon(Icon::empty().path("icons/refresh-cw.svg"))
+                                            .tooltip(t!("agent.activity_refresh").to_string())
+                                            .on_click(move |_, _, cx| {
+                                                refresh_entity.update(cx, |ctrl, cx| {
+                                                                  ctrl.refresh_mcp_activity(cx);
+                                                              });
+                                            }))))
          .child(activity_rows(&data, colors))
          .child(log_location(&data.log_path, colors))
 }

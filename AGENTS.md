@@ -104,7 +104,11 @@ process: `docs/adr/README.md`. `/adr "<title>"` scaffolds a new record from
 - Locks are `std::sync::Mutex`: this app has no poisoning hazard across an
   `.await` boundary to design around, so no extra crate is pulled in for it.
   `tokio::sync::Mutex` only where a guard is held across an `.await`.
-- No I/O on the render path - GPUI re-renders per keystroke.
+- No I/O on the render path - GPUI re-renders per keystroke. Whole-catalog
+  reads carry a `_scan` suffix and trip the render guard
+  (`controllers/library/tests_render_guard.rs`); instrument a new whole-table
+  index query with `catalog_scan!()` and `#[track_caller]` on it and the
+  wrappers over it. Rationale: `docs/adr/0010-guard-the-render-path-against-catalog-scans.md`.
 - Off-thread results have to reach a frame. A new cache, dirty flag or
   `spawn_blocking` result belongs on a poll tick that the view checks each
   frame, and a clearing read (`take_changed`, `take_dirty`) must not be

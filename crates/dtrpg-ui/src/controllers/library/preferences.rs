@@ -7,7 +7,7 @@ impl LibraryController {
     /// Returns distinct publisher names currently present in the catalog for
     /// placement-rule auto-completion.
     pub fn publisher_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.all_items()
+        let mut names: Vec<String> = self.all_items_scan()
                                          .into_iter()
                                          .map(|item| item.publisher.to_string())
                                          .collect();

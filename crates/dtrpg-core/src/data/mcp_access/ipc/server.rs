@@ -2,6 +2,7 @@
 
 use std::io;
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use interprocess::local_socket::tokio::prelude::*;
 use interprocess::local_socket::{ListenerOptions, tokio::Stream};
@@ -30,7 +31,9 @@ pub struct Incoming {
 /// [`IpcListener::start`]; dropping the listener stops it.
 #[derive(Debug)]
 pub struct IpcListener {
-    task: JoinHandle<()>,
+    endpoint: IpcEndpoint,
+    token:    Arc<Mutex<String>>,
+    task:     JoinHandle<()>,
 }
 
 impl IpcListener {
@@ -43,7 +46,7 @@ impl IpcListener {
     /// cannot be set up.
     pub fn start(endpoint: &IpcEndpoint, requests: Sender<Incoming>) -> io::Result<Self> {
         let runtime = runtime::handle()?;
-        let token = endpoint.write_token()?;
+        let token = endpoint.rotate_token()?;
         // A socket file left by a run that crashed would stop the bind.
         #[cfg(unix)]
         match std::fs::remove_file(endpoint.socket_path()) {
@@ -61,11 +64,15 @@ impl IpcListener {
             std::fs::set_permissions(endpoint.socket_path(),
                                      std::fs::Permissions::from_mode(0o600))?;
         }
+        let token = Arc::new(Mutex::new(token));
+        let token_for_task = token.clone();
         let task = runtime.spawn(async move {
                        loop {
                            match listener.accept().await {
                                Ok(stream) => {
-                                   tokio::spawn(serve(stream, token.clone(), requests.clone()));
+                                   tokio::spawn(serve(stream,
+                                                      token_for_task.clone(),
+                                                      requests.clone()));
                                }
                                Err(error) => {
                                    tracing::warn!(%error, "could not accept an agent request");
@@ -73,7 +80,24 @@ impl IpcListener {
                            }
                        }
                    });
-        Ok(Self { task })
+        Ok(Self { endpoint: endpoint.clone(),
+                  token,
+                  task })
+    }
+
+    /// Writes a new token and starts accepting only requests that carry it.
+    /// A copy of the old token, however it was kept, stops working. The
+    /// agent reads the token from the file on each request, so a running
+    /// agent needs nothing more.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token file cannot be written. The old token
+    /// stays in force.
+    pub fn rotate_token(&self) -> io::Result<String> {
+        let fresh = self.endpoint.rotate_token()?;
+        *self.token.lock().unwrap_or_else(PoisonError::into_inner) = fresh.clone();
+        Ok(fresh)
     }
 }
 
@@ -85,7 +109,7 @@ impl Drop for IpcListener {
 
 /// Reads one request from `stream`, hands it to the app and writes back the
 /// answer.
-async fn serve(stream: Stream, token: String, requests: Sender<Incoming>) {
+async fn serve(stream: Stream, token: Arc<Mutex<String>>, requests: Sender<Incoming>) {
     let (reader, mut writer) = stream.split();
     let mut line = String::new();
     let read = BufReader::new(reader.take(MAX_REQUEST_BYTES)).read_line(&mut line)
@@ -105,12 +129,15 @@ async fn serve(stream: Stream, token: String, requests: Sender<Incoming>) {
 }
 
 /// The answer to the request in `line`: the app's, or a refusal.
-async fn answer(line: &str, token: &str, requests: &Sender<Incoming>) -> AppReply {
+async fn answer(line: &str, token: &Arc<Mutex<String>>, requests: &Sender<Incoming>) -> AppReply {
     let Ok(envelope) = serde_json::from_str::<Envelope>(line)
     else {
         return AppReply::failed("not a request Libri understands");
     };
-    if envelope.token != token {
+    // Read the current token without holding the lock across the await
+    // below, so a rotation cannot stall the request being answered.
+    let current = token.lock().unwrap_or_else(PoisonError::into_inner).clone();
+    if envelope.token != current {
         return AppReply::failed("the request did not carry Libri's token");
     }
     let (reply, answer) = oneshot::channel();

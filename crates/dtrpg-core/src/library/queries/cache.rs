@@ -48,8 +48,10 @@ impl Library {
                      ..filter }
     }
 
-    /// Recomputes the filtered, sorted item cache (and its grouped view, the
-    /// sidebar facet counts, and the catalog's product-id set) from `view`.
+    /// Recomputes the filtered, sorted item cache (and its grouped view and
+    /// the sidebar facet counts) from `view`. The catalog's product-id set
+    /// rides with [`Self::refresh_section_counts`], called here, so this stays
+    /// off any whole-catalog item read.
     ///
     /// Called by the controller at every mutation site that changes the
     /// filter, search query, sort, or group-by setting, so render-path
@@ -100,7 +102,6 @@ impl Library {
 
         let items = self.overlaid_items(matched);
         let grouped = self.build_grouped_cache(view, now_secs, untagged_label, &collection_ids);
-        let catalog_ids = self.compute_catalog_ids();
         let facets = Arc::new(self.count_facets(view, now_secs, &query, &collection_ids));
 
         let mut cache = self.query_cache
@@ -108,7 +109,6 @@ impl Library {
                             .unwrap_or_else(PoisonError::into_inner);
         cache.items = Some(Arc::new(items));
         cache.grouped = grouped;
-        cache.catalog_ids = Arc::new(catalog_ids);
         cache.facets = facets;
     }
 
@@ -224,6 +224,19 @@ impl Library {
             }
             Err(error) => tracing::warn!(%error, "could not total the catalog's pages"),
         }
+        let ids = self.index
+                      .lock()
+                      .unwrap_or_else(PoisonError::into_inner)
+                      .catalog_product_ids();
+        match ids {
+            Ok(ids) => {
+                self.query_cache
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .catalog_ids = Arc::new(ids);
+            }
+            Err(error) => tracing::warn!(%error, "could not collect the catalog's product ids"),
+        }
     }
 
     /// Refreshes both sidebar facet lists (section counts and publishers),
@@ -261,14 +274,16 @@ impl Library {
     /// Includes both `order_product_id` and `product_id` since the product
     /// list items API returns `productId` (not `orderProductId`) in its
     /// response. Prefer [`Self::cached_catalog_ids`] on a render path — this
-    /// recomputes from a fresh `all_items()` scan every call.
+    /// recomputes from a fresh `all_items_scan()` call every time.
     #[must_use]
-    pub fn catalog_ids(&self) -> HashSet<u64> {
+    #[track_caller]
+    pub fn catalog_ids_scan(&self) -> HashSet<u64> {
         self.compute_catalog_ids()
     }
 
+    #[track_caller]
     fn compute_catalog_ids(&self) -> HashSet<u64> {
-        let all = self.all_items();
+        let all = self.all_items_scan();
         let mut ids = HashSet::with_capacity(all.len() * 2);
         for item in &all {
             if item.order_product_id > 0 {
@@ -282,7 +297,8 @@ impl Library {
     }
 
     /// The product-id set computed by the most recent `invalidate_cache`
-    /// call. Cheap: a render path should use this, not [`Self::catalog_ids`].
+    /// call. Cheap: a render path should use this, not
+    /// [`Self::catalog_ids_scan`].
     #[must_use]
     pub fn cached_catalog_ids(&self) -> Arc<HashSet<u64>> {
         Arc::clone(&self.query_cache

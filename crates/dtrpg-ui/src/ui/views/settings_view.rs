@@ -35,6 +35,7 @@ use crate::ui::views::{
     settings_storage_view::{StoragePageData, render_storage_section},
     settings_theme_editor::ThemeEditorData,
 };
+use crate::ui::widgets::suppress_selection_outside_text;
 use crate::view_models::agent_display::AgentPageData;
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
@@ -78,7 +79,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
                              native: NativePreferencesFile,
-                             filter_values: Vec<FilterValueSection>)
+                             filter_values: Vec<FilterValueSection>,
+                             text_scale_input: Option<Entity<InputState>>)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -105,7 +107,11 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                                   .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
-        1 => render_appearance_section(library, colors, theme, theme_editor).into_any_element(),
+        1 => render_appearance_section(library,
+                                       colors,
+                                       theme,
+                                       theme_editor,
+                                       text_scale_input).into_any_element(),
         2 => render_storage_section(entity.clone(), colors, storage).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
@@ -116,7 +122,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                   agent,
                                   colors,
                                   &theme.fonts.label_font,
-                                  &theme.fonts.mono_font).into_any_element(),
+                                  &theme.fonts.mono_font,
+                                  library).into_any_element(),
         5 => render_advanced_section(entity.clone(),
                                      native,
                                      colors,
@@ -163,6 +170,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
 
     div().id("settings-window-root")
          .track_focus(focus_handle)
+         .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
          .on_key_down(move |event, _window, cx| {
              if event.keystroke.key == "escape" {
                  entity_escape.update(cx, |ctrl, cx| ctrl.close(cx));

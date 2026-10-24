@@ -132,7 +132,7 @@ impl Library {
             }
             TagEdit::SetColor { tag, .. } => {
                 let having = self.tags().items_with(tag);
-                self.all_items()
+                self.all_items_scan()
                     .into_iter()
                     .filter(|item| having.contains(&item.id))
                     .collect()

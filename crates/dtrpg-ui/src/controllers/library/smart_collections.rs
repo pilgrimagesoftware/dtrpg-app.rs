@@ -49,6 +49,12 @@ impl LibraryController {
 
     /// Replaces the smart collection that has `collection`'s id.
     pub fn update_smart_collection(&mut self, collection: SmartCollection, cx: &mut Context<Self>) {
+        self.match_tracker.forget(collection.id);
+        if let Some(before) = self.smart_collections.get(collection.id).cloned()
+           && (before.name != collection.name || !collection.mirror_as_symlinks)
+        {
+            self.remove_mirror(&before, cx);
+        }
         if let Err(error) = self.smart_collections.update(collection) {
             tracing::error!(%error, "could not save the smart collection");
         }
@@ -58,6 +64,10 @@ impl LibraryController {
     /// Deletes the smart collection with `id`. If it was on show, the catalog
     /// goes back to all titles.
     pub fn delete_smart_collection(&mut self, id: u64, cx: &mut Context<Self>) {
+        self.match_tracker.forget(id);
+        if let Some(before) = self.smart_collections.get(id).cloned() {
+            self.remove_mirror(&before, cx);
+        }
         if let Err(error) = self.smart_collections.remove(id) {
             tracing::error!(%error, "could not save the smart collections");
         }
@@ -72,6 +82,7 @@ impl LibraryController {
     fn smart_collections_changed(&mut self, cx: &mut Context<Self>) {
         self.refresh_smart_collections();
         self.invalidate_cache();
+        self.run_smart_actions(cx);
         cx.emit(LibraryChanged);
     }
 

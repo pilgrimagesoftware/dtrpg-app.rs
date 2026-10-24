@@ -197,6 +197,10 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
                      }
                  })
       .detach();
+    wiring_number_inputs::subscribe_concurrency_step(window,
+                                                     cx,
+                                                     &max_concurrent_downloads_input,
+                                                     settings);
     settings.update(cx, |ctrl, _cx| {
                 ctrl.set_max_concurrent_downloads_input(max_concurrent_downloads_input)
             });
@@ -242,7 +246,7 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
                      if matches!(event, InputEvent::Change) {
                          let value = input_entity.read(cx).value().to_string();
                          controller_for_search.update(cx, |ctrl, cx| {
-                                                  ctrl.set_search_query(value, cx);
+                                                  ctrl.set_search_query_debounced(value, cx);
                                               });
                      }
                  })

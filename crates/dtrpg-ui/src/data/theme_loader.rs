@@ -17,11 +17,11 @@ use crate::data::theme_catalog::ThemeId;
 
 #[derive(Debug, Deserialize)]
 struct ThemeToml {
-    name:    String,
+    name: String,
     /// Light or dark declaration; drives fixed semantic colors and the
     /// fallback base for missing palette keys. Defaults to light.
     #[serde(default)]
-    mode:    Option<String>,
+    mode: Option<String>,
     /// Palette fields live flat alongside `name`/`mode` in the file; flatten
     /// collects them so a theme file needs no nested table.
     #[serde(flatten)]
@@ -32,45 +32,45 @@ struct ThemeToml {
 #[derive(Debug, Default, Deserialize)]
 pub(super) struct FontsToml {
     #[serde(default)]
-    pub(super) body_font:  Option<String>,
+    pub(super) body_font: Option<String>,
     #[serde(default)]
     pub(super) value_font: Option<String>,
     #[serde(default)]
     pub(super) label_font: Option<String>,
     #[serde(default)]
-    pub(super) mono_font:  Option<String>,
+    pub(super) mono_font: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub(super) struct PaletteToml {
     #[serde(default)]
-    pub(super) desktop_bg:     Option<String>,
+    pub(super) desktop_bg: Option<String>,
     #[serde(default)]
-    pub(super) surface:        Option<String>,
+    pub(super) surface: Option<String>,
     #[serde(default)]
-    pub(super) surface_alt:    Option<String>,
+    pub(super) surface_alt: Option<String>,
     #[serde(default)]
-    pub(super) hover:          Option<String>,
+    pub(super) hover: Option<String>,
     #[serde(default)]
-    pub(super) text_primary:   Option<String>,
+    pub(super) text_primary: Option<String>,
     #[serde(default)]
     pub(super) text_secondary: Option<String>,
     #[serde(default)]
-    pub(super) text_tertiary:  Option<String>,
+    pub(super) text_tertiary: Option<String>,
     #[serde(default)]
-    pub(super) border:         Option<String>,
+    pub(super) border: Option<String>,
     #[serde(default)]
-    pub(super) border_strong:  Option<String>,
+    pub(super) border_strong: Option<String>,
     #[serde(default)]
-    pub(super) accent:         Option<String>,
+    pub(super) accent: Option<String>,
     #[serde(default)]
-    pub(super) accent_soft:    Option<String>,
+    pub(super) accent_soft: Option<String>,
     #[serde(default)]
-    pub(super) accent_on:      Option<String>,
+    pub(super) accent_on: Option<String>,
     #[serde(default)]
-    pub(super) shadow:         Option<String>,
+    pub(super) shadow: Option<String>,
     #[serde(default)]
-    pub(super) scrim:          Option<String>,
+    pub(super) scrim: Option<String>,
 }
 
 /// Loads a theme's colors by id: a built-in id reads its embedded TOML, any
@@ -115,7 +115,7 @@ pub fn theme_source(id: &ThemeId) -> Option<String> {
 ///
 /// Returns `None` for an id containing path separators or `..` (a persisted
 /// id is never trusted as a filesystem path).
-pub(super) fn user_theme_path(id: &str) -> Option<PathBuf> {
+pub(crate) fn user_theme_path(id: &str) -> Option<PathBuf> {
     if id.contains(['/', '\\']) || id.is_empty() || id.contains("..") {
         return None;
     }
@@ -154,27 +154,30 @@ pub fn rebuild_previews(ids: impl IntoIterator<Item = ThemeId>) {
 /// palette rather than reading files, keeping the render path filesystem-free;
 /// a miss is transient because any catalog refresh repopulates the cache.
 pub fn preview(id: &ThemeId) -> ColorTokens {
-    PREVIEWS.read()
-            .unwrap_or_else(|e| e.into_inner())
-            .get(id.as_str())
-            .cloned()
-            .unwrap_or_else(|| compiled_default(id))
+    PREVIEWS
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(id.as_str())
+        .cloned()
+        .unwrap_or_else(|| compiled_default(id))
 }
 
 /// Loads a theme from an arbitrary TOML file.
 /// Returns None if parsing fails.
 pub fn load_from_path(path: &PathBuf) -> Option<ColorTokens> {
-    std::fs::read_to_string(path).ok()
-                                 .and_then(|s| parse_theme_toml(&s).ok())
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| parse_theme_toml(&s).ok())
 }
 
 pub(super) fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
     let theme: ThemeToml = toml::from_str(s)?;
     let palette = theme.palette;
-    let mode = theme.mode
-                    .as_deref()
-                    .and_then(|m| m.parse().ok())
-                    .unwrap_or(ThemeMode::Light);
+    let mode = theme
+        .mode
+        .as_deref()
+        .and_then(|m| m.parse().ok())
+        .unwrap_or(ThemeMode::Light);
     let semantic = semantic_colors(mode);
     let defaults = fallback_base(&theme.name, mode);
     let tokens = ColorTokens {
@@ -221,14 +224,12 @@ pub(super) fn parse_hex(s: &str) -> Option<Hsla> {
         let g = u8::from_str_radix(&s[2..4], 16).ok()?;
         let b = u8::from_str_radix(&s[4..6], 16).ok()?;
         Some(hex(r, g, b))
-    }
-    else if s.len() == 3 {
+    } else if s.len() == 3 {
         let r = u8::from_str_radix(&s[0..1], 16).ok()?;
         let g = u8::from_str_radix(&s[1..2], 16).ok()?;
         let b = u8::from_str_radix(&s[2..3], 16).ok()?;
         Some(hex(r * 17, g * 17, b * 17))
-    }
-    else {
+    } else {
         None
     }
 }
@@ -336,8 +337,10 @@ mod tests {
     #[test]
     fn unknown_user_id_falls_back_to_parchment() {
         let loaded = super::load(&ThemeId::from("no-such-theme"));
-        assert_eq!(loaded.surface,
-                   crate::data::theme::parchment_colors().surface);
+        assert_eq!(
+            loaded.surface,
+            crate::data::theme::parchment_colors().surface
+        );
     }
 
     #[test]
@@ -346,8 +349,10 @@ mod tests {
         // resolve to the parchment fallback rather than reading arbitrary
         // files.
         for id in ["../secrets", "..", "a/b", "a\\b", ""] {
-            assert!(super::load_user_theme(id).is_none(),
-                    "id {id:?} must be rejected");
+            assert!(
+                super::load_user_theme(id).is_none(),
+                "id {id:?} must be rejected"
+            );
         }
     }
 
@@ -356,16 +361,20 @@ mod tests {
         for id in ["parchment", "ink"] {
             let source = super::theme_source(&ThemeId::from(id))
                 .unwrap_or_else(|| panic!("builtin {id} must have a source"));
-            assert!(source.contains("name ="),
-                    "embedded source for {id} must declare a name");
+            assert!(
+                source.contains("name ="),
+                "embedded source for {id} must declare a name"
+            );
         }
     }
 
     #[test]
     fn theme_source_rejects_traversal_ids() {
         for id in ["../secrets", "..", "a/b", "a\\b", ""] {
-            assert!(super::theme_source(&ThemeId::from(id)).is_none(),
-                    "id {id:?} must be rejected");
+            assert!(
+                super::theme_source(&ThemeId::from(id)).is_none(),
+                "id {id:?} must be rejected"
+            );
         }
     }
 
@@ -381,8 +390,10 @@ mod tests {
         // An id no preview was built for resolves to the compiled default
         // (parchment) instead of touching the filesystem.
         let preview = super::preview(&ThemeId::from("no-such-theme"));
-        assert_eq!(preview.surface,
-                   crate::data::theme::parchment_colors().surface);
+        assert_eq!(
+            preview.surface,
+            crate::data::theme::parchment_colors().surface
+        );
     }
 
     #[test]
@@ -391,23 +402,37 @@ mod tests {
             let key = ThemeId::from(id);
             let loaded = super::load(&key);
             let compiled = super::compiled_default(&key);
-            let fields = [("desktop_bg", loaded.desktop_bg, compiled.desktop_bg),
-                          ("surface", loaded.surface, compiled.surface),
-                          ("surface_alt", loaded.surface_alt, compiled.surface_alt),
-                          ("hover", loaded.hover, compiled.hover),
-                          ("text_primary", loaded.text_primary, compiled.text_primary),
-                          ("text_secondary", loaded.text_secondary, compiled.text_secondary),
-                          ("text_tertiary", loaded.text_tertiary, compiled.text_tertiary),
-                          ("border", loaded.border, compiled.border),
-                          ("border_strong", loaded.border_strong, compiled.border_strong),
-                          ("accent", loaded.accent, compiled.accent),
-                          ("accent_soft", loaded.accent_soft, compiled.accent_soft),
-                          ("accent_on", loaded.accent_on, compiled.accent_on),
-                          ("shadow", loaded.shadow, compiled.shadow),
-                          ("scrim", loaded.scrim, compiled.scrim),
-                          ("error", loaded.error, compiled.error),
-                          ("warning_bg", loaded.warning_bg, compiled.warning_bg),
-                          ("warning_text", loaded.warning_text, compiled.warning_text)];
+            let fields = [
+                ("desktop_bg", loaded.desktop_bg, compiled.desktop_bg),
+                ("surface", loaded.surface, compiled.surface),
+                ("surface_alt", loaded.surface_alt, compiled.surface_alt),
+                ("hover", loaded.hover, compiled.hover),
+                ("text_primary", loaded.text_primary, compiled.text_primary),
+                (
+                    "text_secondary",
+                    loaded.text_secondary,
+                    compiled.text_secondary,
+                ),
+                (
+                    "text_tertiary",
+                    loaded.text_tertiary,
+                    compiled.text_tertiary,
+                ),
+                ("border", loaded.border, compiled.border),
+                (
+                    "border_strong",
+                    loaded.border_strong,
+                    compiled.border_strong,
+                ),
+                ("accent", loaded.accent, compiled.accent),
+                ("accent_soft", loaded.accent_soft, compiled.accent_soft),
+                ("accent_on", loaded.accent_on, compiled.accent_on),
+                ("shadow", loaded.shadow, compiled.shadow),
+                ("scrim", loaded.scrim, compiled.scrim),
+                ("error", loaded.error, compiled.error),
+                ("warning_bg", loaded.warning_bg, compiled.warning_bg),
+                ("warning_text", loaded.warning_text, compiled.warning_text),
+            ];
             for (name, l, c) in fields {
                 assert_eq!(l, c, "mismatch in {:?} field {}", key, name);
             }

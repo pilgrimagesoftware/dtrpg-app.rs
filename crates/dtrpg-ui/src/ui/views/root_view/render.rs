@@ -13,6 +13,7 @@ use crate::ui::views::filters_column::{
 use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
+use crate::ui::widgets::suppress_selection_outside_text;
 use crate::view_models::agent_display::exposed_tools;
 
 pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Window,
@@ -113,9 +114,11 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
         let ctrl = view.controller.read(cx);
         ctrl.smart_collections()
             .iter()
-            .map(|collection| SmartCollectionRow { id:    collection.id,
-                                                   name:  collection.name.as_str().into(),
-                                                   count: ctrl.smart_collection_count(collection.id), })
+            .map(|collection| SmartCollectionRow {
+                id: collection.id,
+                name: collection.name.as_str().into(),
+                count: ctrl.smart_collection_count(collection.id),
+            })
             .collect::<Vec<_>>()
     };
     let sidebar = render_sidebar(filter.clone(),
@@ -153,15 +156,16 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  filters_toggle,
                                  colors);
     let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
-    let filters_column =
-        view.filters_open.then(|| {
-                             let ctrl = view.controller.read(cx);
-                             render_filters_column(&without_hidden_values(&ctrl.visible_facets(),
-                                                     ctrl.filter_value_choices()),
-                                                   &search_query,
-                                                   &view.search_input,
-                                                   colors)
-                         });
+    let filters_column = view.filters_open.then(|| {
+                                              let ctrl = view.controller.read(cx);
+                                              render_filters_column(
+            &without_hidden_values(&ctrl.visible_facets(), ctrl.filter_value_choices()),
+            &search_query,
+            &view.search_input,
+            &view.controller,
+            colors,
+        )
+                                          });
     let title_bar = render_title_bar(&settings_snap.auth,
                                      settings_entity.clone(),
                                      colors,
@@ -172,28 +176,27 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let alert_snap = view.activity.read(cx).alert_snapshot();
     let current_locale =
         crate::i18n::Locale::from_code(&rust_i18n::locale()).unwrap_or(crate::i18n::Locale::En);
-    let status_bar = render_status_bar(StatusBarSnapshot { total_count,
-                                                           total_mb,
-                                                           section_label:
-                                                               crate::ui::views::toolbar_view::section_title_for(&filter),
-                                                           section_count: matched_count,
-                                                           theme_key: theme.id.clone(),
-                                                           current_locale,
-                                                           agent_enabled:
-                                                               settings_snap.mcp.enabled,
-                                                           agent_exposed:
-                                                               exposed_tools(&settings_snap.mcp),
-                                                           roots: snap.root_usage.clone(),
-                                                           downloading:
-                                                               view.controller
-                                                                   .read(cx)
-                                                                   .live_availability()
-                                                                   .downloading },
-                                       lib_entity.clone(),
-                                       ActivityBarData { entity:     activity_entity.clone(),
-                                                         snap:       &activity_snap,
-                                                         alert_snap: &alert_snap, },
-                                       colors);
+    let status_bar = render_status_bar(
+        StatusBarSnapshot {
+            total_count,
+            total_mb,
+            section_label: crate::ui::views::toolbar_view::section_title_for(&filter),
+            section_count: matched_count,
+            theme_key: theme.id.clone(),
+            current_locale,
+            agent_enabled: settings_snap.mcp.enabled,
+            agent_exposed: exposed_tools(&settings_snap.mcp),
+            roots: snap.root_usage.clone(),
+            downloading: view.controller.read(cx).live_availability().downloading,
+        },
+        lib_entity.clone(),
+        ActivityBarData {
+            entity: activity_entity.clone(),
+            snap: &activity_snap,
+            alert_snap: &alert_snap,
+        },
+        colors,
+    );
 
     // The footer under the sidebar is as wide as the sidebar is now (it can be
     // dragged), and level with the status bar beside it.
@@ -213,34 +216,48 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                                       .border_t_1()
                                                       .border_r_1()
                                                       .border_color(colors.border);
-    let bottom_row = div().flex().child(sidebar_footer).child(div().flex_1()
-                                                                   .min_w_0()
-                                                                   .flex()
-                                                                   .items_center()
-                                                                   .child(status_bar));
+    let bottom_row = div().w_full()
+                          .flex()
+                          .child(sidebar_footer)
+                          .child(div().flex_1()
+                                      .min_w_0()
+                                      .flex()
+                                      .items_center()
+                                      .child(status_bar));
 
-    let catalog_content =
-        div().flex_1()
-             .min_h_0()
-             .flex()
-             .flex_col()
-             .child(toolbar)
-             .children(chips)
-             .children(bulk_action_bar)
-             .child(banner)
-             .child(div().flex_1()
-                         .min_h_0()
-                         .flex()
-                         .children(filters_column)
-                         // A column, so the catalog view's own `flex_1` has a height to fill:
-                         // as a plain box it collapsed to nothing and the whole content
-                         // area went blank.
-                         .child(div().flex_1()
-                                     .min_w_0()
-                                     .min_h_0()
-                                     .flex()
-                                     .flex_col()
-                                     .child(view.catalog_view.clone())));
+    let catalog_content = div()
+        .flex_1()
+        .min_h_0()
+        .flex()
+        .flex_col()
+        .child(toolbar)
+        .children(chips)
+        .children(bulk_action_bar)
+        .child(banner)
+        .child(
+            div().flex_1().min_h_0().flex().child(
+                h_resizable("filters-layout")
+                    .child(
+                        resizable_panel()
+                            .visible(view.filters_open)
+                            .size(px(220.))
+                            .size_range(px(160.)..px(420.))
+                            .flex_none()
+                            .children(filters_column),
+                    )
+                    .child(
+                        resizable_panel().child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .min_h_0()
+                                .flex()
+                                .flex_col()
+                                .child(view.catalog_view.clone()),
+                        ),
+                    ),
+            ),
+        );
 
     let surface = colors.surface;
     let text_primary = colors.text_primary;
@@ -298,6 +315,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
         .text_color(text_primary)
         .relative()
         .track_focus(&view.root_focus)
+        .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
         .on_action(move |_: &ShowSettings, _, cx| {
             this_entity.update(cx, |view, cx| view.show_settings(cx));
         })
@@ -334,8 +352,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
             });
         })
         .on_action(move |_: &SortByTitle, _, cx| {
-            controller_for_sort_title
-                .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
+            controller_for_sort_title.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
         })
         .on_action(move |_: &SortByPublisher, _, cx| {
             controller_for_sort_publisher
@@ -383,7 +400,6 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
         .on_action(move |_: &ShowAlertHistory, _, cx| {
             this_entity_for_alert_history.update(cx, |view, cx| view.show_alert_history(cx));
         })
-
         .child(
             div()
                 .size_full()
@@ -409,8 +425,9 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                 resizable_panel()
                                     .visible(inspector_pane.is_some())
                                     .size(px(view.inspector_width))
-                                    .size_range(px(INSPECTOR_PANE_MIN_WIDTH)
-                                                ..px(INSPECTOR_PANE_MAX_WIDTH))
+                                    .size_range(
+                                        px(INSPECTOR_PANE_MIN_WIDTH)..px(INSPECTOR_PANE_MAX_WIDTH),
+                                    )
                                     .children(inspector_pane),
                             ),
                     ),
@@ -428,17 +445,17 @@ fn render_filters_toggle(open: bool, applied: usize, root: Entity<LibraryRootVie
     else {
         t!("filters.toggle_tooltip_applied", n = applied).to_string()
     };
-    let button = Button::new("filters-toggle").icon(gpui_kit::component::Icon::empty()
-                                                        .path("icons/sliders-horizontal.svg"))
-                                              .ghost()
-                                              .selected(open)
-                                              .tooltip(tooltip)
-                                              .on_click(move |_, _, cx| {
-                                                  root.update(cx, |view, cx| {
-                                                          view.filters_open = !view.filters_open;
-                                                          cx.notify();
-                                                      });
-                                              });
+    let button = Button::new("filters-toggle")
+        .icon(gpui_kit::component::Icon::empty().path("icons/sliders-horizontal.svg"))
+        .ghost()
+        .selected(open)
+        .tooltip(tooltip)
+        .on_click(move |_, _, cx| {
+            root.update(cx, |view, cx| {
+                view.filters_open = !view.filters_open;
+                cx.notify();
+            });
+        });
     if applied == 0 {
         return button.into_any_element();
     }

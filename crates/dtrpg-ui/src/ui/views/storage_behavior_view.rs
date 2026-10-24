@@ -4,6 +4,7 @@
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, div, px};
+use gpui_kit::component::Sizable as _;
 use gpui_kit::component::input::{InputState, NumberInput};
 use rust_i18n::t;
 
@@ -81,7 +82,7 @@ fn concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<InputSt
                    colors: &ColorTokens)
                    -> AnyElement {
     let field: AnyElement = match input {
-        Some(input_state) => NumberInput::new(&input_state).into_any_element(),
+        Some(input_state) => NumberInput::new(&input_state).small().into_any_element(),
         None => div().text_sm()
                      .text_color(colors.text_primary)
                      .child(max_concurrent_downloads.to_string())

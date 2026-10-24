@@ -37,6 +37,7 @@ impl Library {
     /// # }
     /// ```
     #[must_use]
+    #[track_caller]
     pub fn smart_collection_member_ids(&self, collection: &SmartCollection) -> HashSet<u64> {
         let tags = self.tags();
         let mut ids = HashSet::new();
@@ -51,9 +52,10 @@ impl Library {
     /// catalog, and the first few titles in alphabetical order. This is the
     /// "Matches N of M titles" and the preview list of the editor.
     #[must_use]
+    #[track_caller]
     pub fn smart_collection_preview(&self, collection: &SmartCollection) -> SmartPreview {
         let tags = self.tags();
-        let items = self.all_items();
+        let items = self.all_items_scan();
         let mut titles: Vec<Arc<str>> =
             items.iter()
                  .filter(|item| collection.contains(item, tags.tag_names_of(&item.id)))
@@ -70,10 +72,11 @@ impl Library {
     /// How many catalog items belong to each of `collections`, in the same
     /// order, reading the catalog once for all of them.
     #[must_use]
+    #[track_caller]
     pub fn smart_collection_counts(&self, collections: &[SmartCollection]) -> Vec<usize> {
         let tags = self.tags();
         let mut counts = vec![0; collections.len()];
-        for item in self.all_items() {
+        for item in self.all_items_scan() {
             let item_tags = tags.tag_names_of(&item.id);
             for (count, collection) in counts.iter_mut().zip(collections) {
                 *count += usize::from(collection.contains(&item, item_tags));
@@ -83,10 +86,19 @@ impl Library {
     }
 
     /// The catalog items that belong to `collection`.
+    #[must_use]
+    #[track_caller]
+    pub fn smart_collection_members(&self, collection: &SmartCollection)
+                                    -> Vec<crate::data::library::LibraryItem> {
+        self.members_of(collection, &self.tags())
+    }
+
+    /// The catalog items that belong to `collection`.
+    #[track_caller]
     fn members_of(&self, collection: &SmartCollection,
                   tags: &crate::data::tag_library::TagLibrary)
                   -> Vec<crate::data::library::LibraryItem> {
-        self.all_items()
+        self.all_items_scan()
             .into_iter()
             .filter(|item| collection.contains(item, tags.tag_names_of(&item.id)))
             .collect()

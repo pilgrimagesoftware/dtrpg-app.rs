@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use rusqlite::{Connection, params};
 
 use super::{IndexError, LibraryIndex};
+use crate::catalog_scan;
 
 /// Replaces what is recorded for `item_id` with `locations`, pairs of a file's
 /// name and the name of the location it is in.
@@ -36,7 +37,9 @@ fn clear(conn: &Connection, item_id: &str) -> rusqlite::Result<()> {
 
 /// The names of the locations each item has files in, by item id, without
 /// repeats and in name order. Items with no recorded file are left out.
+#[track_caller]
 fn by_item(conn: &Connection) -> rusqlite::Result<HashMap<String, Vec<String>>> {
+    catalog_scan!();
     let mut statement = conn.prepare(
                                      "SELECT DISTINCT item_id, location FROM file_locations
          ORDER BY item_id, location",
@@ -64,7 +67,9 @@ fn of_item(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<String>> {
 
 /// The ids of downloaded items that have no recorded file location: those
 /// downloaded before locations were recorded.
+#[track_caller]
 fn downloaded_without_location(conn: &Connection) -> rusqlite::Result<Vec<String>> {
+    catalog_scan!();
     let mut statement = conn.prepare(
                                      "SELECT id FROM items
          WHERE status = 'downloaded'
@@ -99,6 +104,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn file_locations_by_item(&self) -> Result<HashMap<String, Vec<String>>, IndexError> {
         Ok(by_item(&self.conn)?)
     }
@@ -117,6 +123,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn downloaded_items_without_location(&self) -> Result<Vec<String>, IndexError> {
         Ok(downloaded_without_location(&self.conn)?)
     }

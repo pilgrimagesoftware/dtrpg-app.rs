@@ -936,3 +936,47 @@ All five slices and the follow-up are merged (#365, #367, #374, #375, #376,
 #377, #378). The OpenSpec change is archived at
 `openspec/changes/archive/2026-10-21-adr-0002-controller-decomposition`.
 
+
+# UI v2 alignment: status at 2026-10-22
+
+Tracked by `openspec/changes/ui-v2-alignment` (slice n is issue 381 + n).
+
+## Done
+
+Slices 1 (domain), 2 (query language), 3 (library chrome), 7 (Insights) and 9
+(MCP, including the app-side request channel) are finished and their issues are
+closed. Also in: the `location:` and `collection:` search fields, smart
+collection Preview and seeding from a manual collection, the Summaries
+settings and Anthropic key (saved key wins over `ANTHROPIC_API_KEY`), density,
+the inline placement-rule editor with its suggestion popup, cache details in
+Insights, and the status bar and sidebar footer as in the mockups.
+
+## Not done
+
+- #387 Slice 6: smart collection on-match actions (download new matches
+  automatically, mirror matches to a folder of symlinks).
+- #389 Slice 8: Storage behaviour toggles and cloud-placeholder toggles (nothing
+  backs them yet, so none are shown); Agent page "Open full log"; Storage
+  manifest.
+- #439 Appearance: theme file viewer, "imported" badge on theme cards, intro
+  line, "Typography & density" heading.
+- #385 Slice 4: inspector parity.
+- #470 Status bar is not flush with the bottom edge or the full window width.
+- #471 Sidebar resize is jerky and opens a closed inspector.
+- `ui-v2-alignment` housekeeping: decide the open questions in `design.md`; set
+  type, project, milestone, size and effort on the slice issues; recapture
+  `upgrade-a-collection.png` in `dtrpg-design`.
+- Open OpenSpec changes with no tasks done: `file-openers-table-view`,
+  `focus-email-input-on-account-tab-open`, `simplify-catalog-status-indicators`,
+  `use-hovercard-catalog-tooltips` (probably stale; decide whether to drop).
+
+## Known simplifications
+
+- The theme picker and notification bell stay in the status bar although the
+  mockup omits them.
+- The activity button no longer shows a progress circle (the panel still does).
+- The MCP `add_to_collection` reply says "adding", not the final result.
+- The key field, popup and status bar layout are GPUI and cannot run in the
+  development container, so CI building them is the only automated check.
+- The pinned nightly `rustfmt` is not installed locally, so CI's format check
+  can differ from a local run.

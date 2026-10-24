@@ -13,7 +13,7 @@ use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
-use dtrpg_core::data::smart_collection::SmartCollectionStore;
+use dtrpg_core::data::smart_collection::{MatchTracker, SmartCollectionStore};
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::library::{
@@ -70,6 +70,7 @@ mod inspector_archive;
 mod lifecycle;
 mod preferences;
 mod selection;
+mod smart_actions;
 mod smart_collections;
 mod storage_usage;
 mod tags;
@@ -94,6 +95,10 @@ mod tests_filter_values;
 mod tests_insights;
 #[cfg(test)]
 mod tests_inspector;
+#[cfg(test)]
+mod tests_render_guard;
+#[cfg(test)]
+mod tests_search_debounce;
 #[cfg(test)]
 mod tests_sign_in;
 #[cfg(test)]
@@ -229,6 +234,10 @@ pub struct LibraryController {
     pub filter:                    SidebarFilter,
     /// Text search query.
     pub search_query:              String,
+    /// Bumps with every typed search query, so the settle task applies only
+    /// the last keystroke of a burst (see
+    /// [`Self::set_search_query_debounced`]).
+    search_epoch:                  u64,
     /// Current sort method.
     pub sort:                      SortMethod,
     /// Current sort direction.
@@ -283,6 +292,8 @@ pub struct LibraryController {
     /// How many items each smart collection holds, by collection id, as of
     /// the last change to the catalog or the collections.
     smart_counts:                  HashMap<u64, usize>,
+    /// What each smart collection matched when its on-match actions last ran.
+    match_tracker:                 MatchTracker,
     /// Headless library session: owns the index, work queue, cover fetcher,
     /// network monitor, and (since Slice 2) the catalog-sync state machine.
     /// `Arc` since catalog-sync runs on a background thread while the

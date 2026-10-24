@@ -35,6 +35,21 @@ pub fn open_manage_tags_dialog(window: &mut Window, cx: &mut App,
               let item_title = item_title.clone();
               dialog.w(px(360.))
                     .overlay_closable(true)
+                    // Enter dispatches the `Confirm` action, which runs this callback.
+                    // Without it the dialog's default handler closes the dialog on
+                    // Enter, so the tag the user just typed was never created and the
+                    // dialog vanished with nothing to show for it (issue #485).
+                    // Returning `false` leaves the dialog open when there is nothing to
+                    // add. See `LibraryRootView::show_add_collection_dialog` for the
+                    // same pattern.
+                    .on_ok({
+                        let controller = controller.clone();
+                        let new_tag_input = new_tag_input.clone();
+                        let item_id = item_id.clone();
+                        move |_, window, cx| {
+                            add_tag_from_input(&controller, &new_tag_input, &item_id, window, cx)
+                        }
+                    })
                     .content(move |content, _window, cx| {
                         render_content(content,
                                        cx,
@@ -44,6 +59,24 @@ pub fn open_manage_tags_dialog(window: &mut Window, cx: &mut App,
                                        &item_title)
                     })
           });
+}
+
+/// Adds the tag currently typed in `input` to `item_id` and clears the field,
+/// returning whether there was anything to add.
+///
+/// Shared by the row's confirm button and the dialog's Enter handler so the two
+/// cannot drift: an empty (or whitespace-only) field is not a tag, so it adds
+/// nothing and the caller keeps the dialog open.
+fn add_tag_from_input(controller: &Entity<LibraryController>, input: &Entity<InputState>,
+                      item_id: &Arc<str>, window: &mut Window, cx: &mut App)
+                      -> bool {
+    let name = input.read(cx).value().trim().to_string();
+    if name.is_empty() {
+        return false;
+    }
+    controller.update(cx, |ctrl, cx| ctrl.add_tag(item_id, &name, cx));
+    input.update(cx, |st, cx| st.set_value("", window, cx));
+    true
 }
 
 fn render_content(content: DialogContent, cx: &mut App, controller: &Entity<LibraryController>,
@@ -61,24 +94,27 @@ fn render_content(content: DialogContent, cx: &mut App, controller: &Entity<Libr
         let controller = controller.clone();
         let item_id = item_id.clone();
         let name = entry.name.clone();
-        rows = rows.child(div().flex()
-                               .items_center()
-                               .gap(px(8.0))
-                               .child(Checkbox::new(("manage-tags-row", ix)).label(entry.name
-                                                                                    .to_string())
-                                                                           .checked(checked)
-                                                                           .on_click(move |new_checked,
-                                                                                           _window,
-                                                                                           cx| {
-                                                                               controller.update(cx, |ctrl, cx| {
-                                    if *new_checked {
-                                        ctrl.add_tag(&item_id, &name, cx);
-                                    } else {
-                                        ctrl.remove_tag(&item_id, &name, cx);
-                                    }
-                                });
-                                                                           }))
-                               .child(tag_dot(entry.color, colors.text_tertiary)));
+        rows = rows.child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.0))
+                .child(
+                    Checkbox::new(("manage-tags-row", ix))
+                        .label(entry.name.to_string())
+                        .checked(checked)
+                        .on_click(move |new_checked, _window, cx| {
+                            controller.update(cx, |ctrl, cx| {
+                                if *new_checked {
+                                    ctrl.add_tag(&item_id, &name, cx);
+                                } else {
+                                    ctrl.remove_tag(&item_id, &name, cx);
+                                }
+                            });
+                        }),
+                )
+                .child(tag_dot(entry.color, colors.text_tertiary)),
+        );
     }
     if entries.is_empty() {
         rows = rows.child(div().text_sm()
@@ -96,26 +132,22 @@ fn render_content(content: DialogContent, cx: &mut App, controller: &Entity<Libr
              .child(div().flex_1().child(Input::new(new_tag_input)))
              .child(Button::new("manage-tags-new").label(t!("tags.new_confirm").to_string())
                                                   .on_click(move |_, window, cx| {
-                                                      let name =
-                                                          input.read(cx).value().trim().to_string();
-                                                      if name.is_empty() {
-                                                          return;
-                                                      }
-                                                      controller.update(cx, |ctrl, cx| {
-                                                                    ctrl.add_tag(&item_id, &name,
-                                                                                 cx);
-                                                                });
-                                                      input.update(cx, |st, cx| {
-                                                               st.set_value("", window, cx)
-                                                           });
+                                                      add_tag_from_input(&controller,
+                                                                         &input,
+                                                                         &item_id,
+                                                                         window,
+                                                                         cx);
                                                   }))
     };
 
-    content.child(DialogHeader::new().px_4()
-                                     .pt_4()
-                                     .child(DialogTitle::new().child(t!("tags.manage_dialog_title",
-                                                                        title = item_title.to_string())
-                                                                      .to_string())))
-           .child(div().px_4().py_2().child(rows))
-           .child(div().px_4().pb_4().child(new_tag_row))
+    content
+        .child(
+            DialogHeader::new().px_4().pt_4().child(
+                DialogTitle::new().child(
+                    t!("tags.manage_dialog_title", title = item_title.to_string()).to_string(),
+                ),
+            ),
+        )
+        .child(div().px_4().py_2().child(rows))
+        .child(div().px_4().pb_4().child(new_tag_row))
 }

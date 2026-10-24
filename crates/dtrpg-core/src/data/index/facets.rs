@@ -4,7 +4,7 @@
 //!
 //! Issue #355 (tasks 3-4 of `catalog-reads-from-index`): the catalog-load and
 //! per-item status-change paths fetched every item
-//! (`LibraryController::all_items()`) just to count them per publisher and
+//! (`LibraryController::all_items_scan()`) just to count them per publisher and
 //! per smart section.
 
 use std::sync::Arc;
@@ -12,6 +12,7 @@ use std::sync::Arc;
 use rusqlite::Connection;
 
 use super::items;
+use crate::catalog_scan;
 use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::SectionCounts;
@@ -30,7 +31,9 @@ use crate::data::library::SectionCounts;
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
+#[track_caller]
 pub(super) fn publisher_counts(conn: &Connection) -> Result<Vec<(Arc<str>, usize)>, IndexError> {
+    catalog_scan!();
     let mut stmt = conn
         .prepare("SELECT publisher, COUNT(*) FROM items GROUP BY publisher ORDER BY publisher")?;
     let mut counts: Vec<(Arc<str>, usize)> = stmt.query_map([], |row| {
@@ -51,6 +54,7 @@ pub(super) fn publisher_counts(conn: &Connection) -> Result<Vec<(Arc<str>, usize
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if any constituent query fails.
+#[track_caller]
 pub(super) fn section_counts(conn: &Connection, now_secs: i64, window_days: u32)
                              -> Result<SectionCounts, IndexError> {
     Ok(SectionCounts { all:              items::count_all(conn)?,
@@ -68,6 +72,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn total_size_mb(&self) -> Result<f64, IndexError> {
         items::total_size_mb(&self.conn)
     }
@@ -77,6 +82,7 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
+    #[track_caller]
     pub fn total_pages(&self) -> Result<u64, IndexError> {
         items::total_pages(&self.conn)
     }

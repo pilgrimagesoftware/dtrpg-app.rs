@@ -111,3 +111,80 @@ fn editing_the_rules_updates_the_count(cx: &mut TestAppContext) {
 
     assert_eq!(counts.1, 0, "no item has that publisher any more");
 }
+
+/// `publisher_collection` with the download action set to `download`.
+fn auto_download(download: bool) -> SmartCollection {
+    SmartCollection { download_new_matches: download,
+                      ..publisher_collection() }
+}
+
+/// Adds the collection, then records that it matched nothing, as if its one
+/// member had just started to match, and runs the actions.
+fn start_matching(fixture: &Fixture, cx: &mut TestAppContext, collection: SmartCollection) {
+    fixture.controller.update(cx, |ctrl, cx| {
+                          let id = ctrl.add_smart_collection(collection, cx);
+                          ctrl.match_tracker
+                              .observe(id, std::collections::HashSet::new());
+                          ctrl.run_smart_actions(cx);
+                      });
+}
+
+fn is_downloading(fixture: &Fixture, cx: &mut TestAppContext, id: &str) -> bool {
+    fixture.controller
+           .read_with(cx, |ctrl, _| ctrl.is_downloading(id))
+}
+
+#[gpui::test]
+fn an_item_that_starts_to_match_is_downloaded(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               3,
+                               two_items());
+
+    start_matching(&fixture, cx, auto_download(true));
+
+    assert!(is_downloading(&fixture, cx, "first"));
+}
+
+#[gpui::test]
+fn an_item_that_does_not_match_is_not_downloaded(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               3,
+                               two_items());
+
+    start_matching(&fixture, cx, auto_download(true));
+
+    assert!(!is_downloading(&fixture, cx, "second"));
+}
+
+#[gpui::test]
+fn nothing_is_downloaded_when_the_action_is_off(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               3,
+                               two_items());
+
+    start_matching(&fixture, cx, auto_download(false));
+
+    assert!(!is_downloading(&fixture, cx, "first"));
+}
+
+#[gpui::test]
+fn what_a_collection_already_holds_is_not_downloaded_when_the_action_is_added(cx: &mut TestAppContext)
+{
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               3,
+                               two_items());
+
+    fixture.controller.update(cx, |ctrl, cx| {
+                          ctrl.add_smart_collection(auto_download(true), cx);
+                      });
+
+    assert!(!is_downloading(&fixture, cx, "first"));
+}

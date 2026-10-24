@@ -167,10 +167,10 @@ fn materialize_button(item: &LibraryItem, controller: Entity<LibraryController>)
 
 /// The menu at the end of the row: show the files in the file manager, remove
 /// the download, and fetch the cover again.
-fn more_menu(item: &LibraryItem, storage_root_path: &Path, is_downloaded: bool,
+fn more_menu(item: &LibraryItem, _storage_root_path: &Path, is_downloaded: bool,
              controller: Entity<LibraryController>)
              -> impl IntoElement {
-    let item_path = dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
+    let item_path = resolved_item_dir(&StorageConfig::load(), item);
     let has_cover = item.detail_cover_url.is_some() || item.cover_url.is_some();
     let item_id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -185,25 +185,33 @@ fn more_menu(item: &LibraryItem, storage_root_path: &Path, is_downloaded: bool,
                                      let remove_controller = controller.clone();
                                      let remove_id = Arc::clone(&item_id);
                                      let remove_title = title.clone();
-                                     menu.item(PopupMenuItem::new(platform_reveal_label())
-                                               .disabled(!is_downloaded)
-                                               .on_click(move |_, _, _| reveal(&reveal_path)))
-                                         .item(PopupMenuItem::new(t!("catalog.action_remove_download"))
-                                               .disabled(!is_downloaded)
-                                               .on_click(move |_, window, cx| {
-                                                   confirm_remove_download(window,
-                                                                           cx,
-                                                                           remove_controller.clone(),
-                                                                           Arc::clone(&remove_id),
-                                                                           remove_title.clone());
-                                               }))
-                                         .item(PopupMenuItem::new(t!("detail.refresh_thumbnail_tooltip"))
-                                               .disabled(!has_cover)
-                                               .on_click(move |_, _, cx| {
-                                                   refresh_controller.update(cx, |ctrl, cx| {
-                                                       ctrl.refresh_detail_cover(Arc::clone(&refresh_id), cx);
-                                                   });
-                                               }))
+                                     menu.item(
+                PopupMenuItem::new(platform_reveal_label())
+                    .disabled(!is_downloaded)
+                    .on_click(move |_, _, _| reveal(&reveal_path)),
+            )
+            .item(
+                PopupMenuItem::new(t!("catalog.action_remove_download"))
+                    .disabled(!is_downloaded)
+                    .on_click(move |_, window, cx| {
+                        confirm_remove_download(
+                            window,
+                            cx,
+                            remove_controller.clone(),
+                            Arc::clone(&remove_id),
+                            remove_title.clone(),
+                        );
+                    }),
+            )
+            .item(
+                PopupMenuItem::new(t!("detail.refresh_thumbnail_tooltip"))
+                    .disabled(!has_cover)
+                    .on_click(move |_, _, cx| {
+                        refresh_controller.update(cx, |ctrl, cx| {
+                            ctrl.refresh_detail_cover(Arc::clone(&refresh_id), cx);
+                        });
+                    }),
+            )
                                  })
 }
 

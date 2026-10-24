@@ -76,7 +76,7 @@ impl LibraryController {
     /// Stores the fetched collections and emits a change event.
     pub(super) fn apply_collections(&mut self, mut collections: Vec<CollectionEntry>,
                                     cx: &mut Context<Self>) {
-        let catalog_ids = self.catalog_ids();
+        let catalog_ids = self.catalog_ids_scan();
         sort_collections(&mut collections,
                          self.collection_sort,
                          self.collection_sort_direction,

@@ -78,6 +78,9 @@ impl LibraryController {
         self.refresh_tag_filter();
         self.refresh_smart_collections();
         self.invalidate_cache();
+        if !self.catalog_loading {
+            self.run_smart_actions(cx);
+        }
         cx.emit(LibraryChanged);
     }
 
