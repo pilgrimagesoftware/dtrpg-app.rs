@@ -12,7 +12,7 @@ pub mod insights;
 mod jobs;
 mod mutations;
 mod queries;
-mod session;
+mod library;
 mod sync;
 
 pub use jobs::{CheckJob, CheckResult, DownloadJob, DownloadKey, DownloadSubmission, ThumbnailJob};
@@ -21,5 +21,5 @@ pub use mutations::{
     revert_added_member,
 };
 pub use queries::{Facets, SmartPreview, ViewState};
-pub use session::Library;
+pub use library::Library;
 pub use sync::{LibraryEvent, LibraryEvents, SyncStage, reload_cooldown_active};

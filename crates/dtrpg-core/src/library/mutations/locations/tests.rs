@@ -52,9 +52,10 @@ fn storage() -> StorageConfig {
 }
 
 fn open_library(items: &[LibraryItem]) -> Arc<Library> {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let datadir = tempfile::tempdir().expect("tempdatadir");
+    let cachedir = tempfile::tempdir().expect("tempcachedir");
     let (library, _work_events, _sync_events) =
-        Library::open(dir.keep(), &storage()).expect("open library");
+        Library::open(datadir.keep(), cachedir.keep(), &storage()).expect("open library");
     library.index
            .lock()
            .unwrap()

@@ -43,9 +43,10 @@ fn test_storage_config() -> StorageConfig {
 }
 
 fn open_library() -> Arc<Library> {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let datadir = tempfile::tempdir().expect("tempdatadir");
+    let cachedir = tempfile::tempdir().expect("tempcachedir");
     let (library, _work_events, _sync_events) =
-        Library::open(dir.keep(), &test_storage_config()).expect("open library");
+        Library::open(datadir.keep(), cachedir.keep(), &test_storage_config()).expect("open library");
     Arc::new(library)
 }
 

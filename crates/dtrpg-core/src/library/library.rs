@@ -36,8 +36,10 @@ pub struct Library {
     pub cover_fetcher:         Arc<CoverFetcher>,
     /// Shared connectivity monitor consulted before network requests.
     pub network_monitor:       Arc<NetworkMonitor>,
-    /// Directory the library index database lives in.
-    pub cache_root:            PathBuf,
+    /// Directory where application data lives.
+    pub app_data_dir: PathBuf,
+    /// Directory where cached data lives.
+    pub cache_dir:            PathBuf,
     /// Catalog-sync single-flight state: the current generation, whether a
     /// sync is running, and whether a follow-up was requested while busy.
     pub(super) sync_state:     Mutex<SyncState>,
@@ -68,15 +70,15 @@ pub struct Library {
 }
 
 impl Library {
-    /// Opens the library at `cache_root` and constructs its queue and
+    /// Opens the library at `app_data_dir` and constructs its queue and
     /// fetchers.
     ///
     /// # Errors
     ///
     /// Returns [`IndexError`] if the index cannot be opened or migrated.
-    pub fn open(cache_root: PathBuf, storage: &StorageConfig)
+    pub fn open(app_data_dir: PathBuf, cache_dir: PathBuf, storage: &StorageConfig)
                 -> Result<(Self, JobEvents, LibraryEvents), IndexError> {
-        let index = LibraryIndex::open_and_migrate(&cache_root)?;
+        let index = LibraryIndex::open_and_migrate(&app_data_dir)?;
         let network_monitor = Arc::new(NetworkMonitor::new());
         let cover_fetcher = Arc::new(CoverFetcher::new(
             Arc::new(HttpCoverTransport::new(Arc::clone(&network_monitor))),
@@ -89,7 +91,8 @@ impl Library {
                    work,
                    cover_fetcher,
                    network_monitor,
-                   cache_root,
+                   app_data_dir,
+                   cache_dir,
                    sync_state: Mutex::new(SyncState::default()),
                    events,
                    query_cache: Mutex::new(QueryCache::default()),

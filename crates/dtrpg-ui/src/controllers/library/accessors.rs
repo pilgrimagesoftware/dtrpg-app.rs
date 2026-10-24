@@ -32,6 +32,6 @@ impl LibraryController {
 
     /// Path to the directory that holds the library index database.
     pub(super) fn cache_root(&self) -> &PathBuf {
-        &self.library.cache_root
+        &self.library.cache_dir
     }
 }

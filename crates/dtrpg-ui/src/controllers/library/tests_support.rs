@@ -396,15 +396,18 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
                            -> Fixture {
     cx.update(|cx| cx.set_global(CoverCache::new()));
     let covers = tempfile::tempdir().unwrap();
+    let app_dir = tempfile::tempdir().unwrap();
+    let app_dir_path = app_dir.path().to_path_buf();
     let cache = tempfile::tempdir().unwrap();
     let cache_path = cache.path().to_path_buf();
     let activity = cx.new(|_| ActivityController::new());
     let controller =
         cx.new(|cx| {
-              let (mut ctrl, events, sync_events) = LibraryController::build_with_cache_root(
+              let (mut ctrl, events, sync_events) = LibraryController::build_with_roots(
             Box::new(SharedLibrary(Arc::clone(&library))),
             Box::new(UnusedCollections),
             activity.clone(),
+            app_dir_path.clone(),
             cache_path.clone(),
             SmartCollectionStore::load_or_set_aside(cache_path.join("smart_collections.toml")),
         );

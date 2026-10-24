@@ -59,8 +59,9 @@ mod tests {
     use crate::library::Library;
 
     fn open_library() -> Library {
-        let dir = tempfile::tempdir().expect("tempdir");
-        Library::open(dir.keep(), &StorageConfig::for_test(std::env::temp_dir())).expect("open")
+        let datadir = tempfile::tempdir().expect("tempdatadir");
+        let cachedir = tempfile::tempdir().expect("tempcachedir");
+        Library::open(datadir.keep(), cachedir.keep(), &StorageConfig::for_test(std::env::temp_dir())).expect("open")
                                                                                  .0
     }
 

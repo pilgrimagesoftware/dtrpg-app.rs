@@ -140,7 +140,7 @@ impl Library {
     /// stages can decide whether a live fetch is still needed.
     fn prepopulate_from_cache(&self, force_reload: bool, generation: u64)
                               -> Option<Vec<LibraryItem>> {
-        let cached = load_catalog_cache(&self.cache_root).map(dedupe_by_product_id);
+        let cached = load_catalog_cache(&self.cache_dir).map(dedupe_by_product_id);
         if let Some(items) = cached.as_ref()
            && self.is_current(generation)
         {
@@ -183,7 +183,7 @@ impl Library {
     fn sync_collections(&self, collections_service: &Arc<dyn CollectionsService>, generation: u64) {
         self.emit(LibraryEvent::Stage(SyncStage::Collections));
 
-        if let Some(entries) = load_collections_cache(&self.cache_root)
+        if let Some(entries) = load_collections_cache(&self.cache_dir)
            && self.is_current(generation)
         {
             self.emit(LibraryEvent::CollectionsChanged(entries));
@@ -191,7 +191,7 @@ impl Library {
 
         match collections_service.list_collections() {
             Ok(entries) => {
-                if let Err(e) = save_collections_cache(&self.cache_root, &entries) {
+                if let Err(e) = save_collections_cache(&self.cache_dir, &entries) {
                     tracing::warn!(error = %e, "failed to save collections cache");
                 }
                 if self.is_current(generation) {
@@ -228,7 +228,7 @@ impl Library {
             return false;
         };
 
-        let is_fresh = load_cache_metadata(&self.cache_root).as_ref()
+        let is_fresh = load_cache_metadata(&self.cache_dir).as_ref()
                                                             .is_some_and(|m| !m.is_stale());
         if !is_fresh {
             return false;

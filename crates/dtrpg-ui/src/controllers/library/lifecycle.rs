@@ -46,11 +46,12 @@ impl LibraryController {
         service: Box<dyn LibraryService>, collections_service: Box<dyn CollectionsService>,
         activity: Entity<ActivityController>,
     ) -> (Self, JobEvents, LibraryEvents) {
-        Self::build_with_cache_root(
+        Self::build_with_roots(
             service,
             collections_service,
             activity,
             dtrpg_core::data::paths::index_dir(),
+            cache_dir(),
             SmartCollectionStore::load(),
         )
     }
@@ -58,9 +59,10 @@ impl LibraryController {
     /// Builds the controller against `cache_root` instead of the real cache
     /// directory, so tests get an isolated library index instead of the
     /// user's real one.
-    pub(super) fn build_with_cache_root(
+    pub(super) fn build_with_roots(
         service: Box<dyn LibraryService>, collections_service: Box<dyn CollectionsService>,
-        activity: Entity<ActivityController>, cache_root: PathBuf,
+        activity: Entity<ActivityController>,
+        app_dir_root: PathBuf, cache_root: PathBuf,
         smart_collections: SmartCollectionStore,
     ) -> (Self, JobEvents, LibraryEvents) {
         let vm = LibraryViewModel::new(service);
@@ -72,7 +74,7 @@ impl LibraryController {
         // without one.
         #[allow(clippy::expect_used)]
         let (library, work_events, sync_events) =
-            Library::open(cache_root, &storage).expect("failed to open the library session");
+            Library::open(app_dir_root, cache_root, &storage).expect("failed to open the library session");
         let library = Arc::new(library);
 
         let ctrl = Self {
