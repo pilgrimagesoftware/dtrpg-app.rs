@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use crate::data::avatar::avatar_cached;
-use crate::data::catalog_cache::{CacheMetadata, load_cache_metadata};
+use crate::data::catalog_cache::{CacheMetadata, load_library_metadata};
 use crate::data::paths::{cache_dir, covers_dir};
 
 /// Per-type counts of regenerable app cache data.
@@ -36,7 +36,7 @@ impl CacheCounts {
     pub fn read() -> Self {
         let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
                                                               .unwrap_or(0);
-        Self::from_parts(load_cache_metadata(&cache_dir()).as_ref(),
+        Self::from_parts(load_library_metadata(&cache_dir()).as_ref(),
                          cover_thumbnails,
                          avatar_cached())
     }
@@ -62,7 +62,7 @@ impl CacheCounts {
 #[cfg(test)]
 fn read_from(cache: &Path, covers: &Path, avatar_cached: bool) -> CacheCounts {
     let cover_thumbnails = std::fs::read_dir(covers).map(Iterator::count).unwrap_or(0);
-    CacheCounts::from_parts(load_cache_metadata(cache).as_ref(),
+    CacheCounts::from_parts(load_library_metadata(cache).as_ref(),
                             cover_thumbnails,
                             avatar_cached)
 }

@@ -23,8 +23,8 @@ use std::sync::{Arc, PoisonError};
 
 use super::merge::{dedupe_by_product_id, partial_fetch_since, should_attempt_partial_fetch};
 use super::types::{LibraryEvent, SyncStage};
-use crate::data::catalog_cache::load_cache_metadata;
-use crate::data::catalog_cache::load_catalog_cache;
+use crate::data::catalog_cache::load_library_metadata;
+use crate::data::catalog_cache::load_library_db;
 use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
 use crate::data::library::LibraryItem;
 use crate::library::Library;
@@ -76,7 +76,7 @@ impl Library {
 
         let this = Arc::clone(self);
         drop(handle.spawn_blocking(move || {
-                       this.run_catalog_sync(&service,
+                       this.run_library_sync(&service,
                                              &collections_service,
                                              force_reload,
                                              generation);
@@ -119,10 +119,10 @@ impl Library {
         self.emit(LibraryEvent::Finished { reload_requested });
     }
 
-    fn run_catalog_sync(&self, service: &Arc<dyn LibraryService>,
+    fn run_library_sync(&self, service: &Arc<dyn LibraryService>,
                         collections_service: &Arc<dyn CollectionsService>, force_reload: bool,
                         generation: u64) {
-        let cached = self.prepopulate_from_cache(force_reload, generation);
+        let cached = self.prepopulate_from_local_db(force_reload, generation);
         self.sync_collections(collections_service, generation);
 
         if self.try_skip_or_partial_fetch(service, force_reload, &cached, generation) {
@@ -138,9 +138,9 @@ impl Library {
     /// Pre-populates the index from the on-disk cache, ahead of any network
     /// call. Returns the cached items (deduped, possibly empty) so later
     /// stages can decide whether a live fetch is still needed.
-    fn prepopulate_from_cache(&self, force_reload: bool, generation: u64)
+    fn prepopulate_from_local_db(&self, force_reload: bool, generation: u64)
                               -> Option<Vec<LibraryItem>> {
-        let cached = load_catalog_cache(&self.cache_dir).map(dedupe_by_product_id);
+        let cached = load_library_db(&self.app_data_dir).map(dedupe_by_product_id);
         if let Some(items) = cached.as_ref()
            && self.is_current(generation)
         {
@@ -183,7 +183,7 @@ impl Library {
     fn sync_collections(&self, collections_service: &Arc<dyn CollectionsService>, generation: u64) {
         self.emit(LibraryEvent::Stage(SyncStage::Collections));
 
-        if let Some(entries) = load_collections_cache(&self.cache_dir)
+        if let Some(entries) = load_collections_cache(&self.app_data_dir)
            && self.is_current(generation)
         {
             self.emit(LibraryEvent::CollectionsChanged(entries));
@@ -191,7 +191,7 @@ impl Library {
 
         match collections_service.list_collections() {
             Ok(entries) => {
-                if let Err(e) = save_collections_cache(&self.cache_dir, &entries) {
+                if let Err(e) = save_collections_cache(&self.app_data_dir, &entries) {
                     tracing::warn!(error = %e, "failed to save collections cache");
                 }
                 if self.is_current(generation) {
@@ -228,7 +228,7 @@ impl Library {
             return false;
         };
 
-        let is_fresh = load_cache_metadata(&self.cache_dir).as_ref()
+        let is_fresh = load_library_metadata(&self.cache_dir).as_ref()
                                                             .is_some_and(|m| !m.is_stale());
         if !is_fresh {
             return false;

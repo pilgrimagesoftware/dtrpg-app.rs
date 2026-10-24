@@ -141,7 +141,7 @@ impl LibraryController {
     /// recently than `FORCE_RELOAD_COOLDOWN_SECS`, this is a silent no-op —
     /// no network fetch, no change to `catalog_loading` or the catalog.
     pub fn reload_catalog(&mut self, cx: &mut Context<Self>) {
-        let meta = load_cache_metadata(&cache_dir());
+        let meta = load_library_metadata(&cache_dir());
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                                               .map(|d| d.as_secs())
                                               .unwrap_or_default();

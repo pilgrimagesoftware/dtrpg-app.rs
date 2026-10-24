@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use dtrpg_core::data::catalog_cache::{load_cache_metadata, save_check_batch_timestamp};
+use dtrpg_core::data::catalog_cache::{load_library_metadata, save_check_batch_timestamp};
 use dtrpg_core::data::collection::CollectionEntry;
 use dtrpg_core::data::collections_cache::save_collections_cache;
 use dtrpg_core::data::cover_cache::load_cached_cover;

@@ -99,7 +99,7 @@ impl CacheMetadata {
 ///
 /// Returns `None` on any error (missing file, malformed JSON). Callers that
 /// receive `None` should treat the cache as stale.
-pub fn load_cache_metadata(root: &Path) -> Option<CacheMetadata> {
+pub fn load_library_metadata(root: &Path) -> Option<CacheMetadata> {
     let path = root.join(CATALOG_CACHE_METADATA_FILE);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
@@ -157,7 +157,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
     let saved_at_secs = SystemTime::now().duration_since(UNIX_EPOCH)
                                          .unwrap_or(Duration::ZERO)
                                          .as_secs();
-    let existing = load_cache_metadata(root);
+    let existing = load_library_metadata(root);
     let last_item_check_batch_secs = existing.as_ref().and_then(|m| m.last_item_check_batch_secs);
     let last_fresh_install_request_secs = existing.as_ref()
                                                   .and_then(|m| m.last_fresh_install_request_secs);
@@ -177,7 +177,7 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// run before any catalog has ever been successfully synced).
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
     let mut meta =
-        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+        load_library_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
                                    item_count:                      0,
                                    schema_version:                  0,
                                    last_item_check_batch_secs:      None,
@@ -196,7 +196,7 @@ pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), Cata
 pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
                                             -> Result<(), CatalogCacheError> {
     let mut meta =
-        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+        load_library_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
                                    item_count:                      0,
                                    schema_version:                  0,
                                    last_item_check_batch_secs:      None,
@@ -234,7 +234,7 @@ pub enum CatalogCacheError {
 /// Returns `None` on any error (including a missing cache and no index) so
 /// callers can fall through to the live API fetch without surfacing errors
 /// to the user.
-pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
+pub fn load_library_db(root: &Path) -> Option<Vec<LibraryItem>> {
     let index = LibraryIndex::open_and_migrate(root)
         .map_err(|e| warn!(root = %root.display(), error = %e, "library index not openable"))
         .ok()?;

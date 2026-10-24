@@ -8,7 +8,7 @@ use std::sync::{Arc, PoisonError};
 use super::merge::{fresh_install_request_gated, reconcile_catalog};
 use super::types::{LibraryEvent, SyncStage};
 use crate::data::catalog_cache::{
-    load_cache_metadata, save_catalog_cache, save_fresh_install_request_timestamp,
+    load_library_metadata, save_catalog_cache, save_fresh_install_request_timestamp,
 };
 use crate::data::constants::{
     CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
@@ -68,7 +68,7 @@ impl Library {
         }
 
         let last_request =
-            load_cache_metadata(&self.cache_dir).and_then(|m| m.last_fresh_install_request_secs);
+            load_library_metadata(&self.cache_dir).and_then(|m| m.last_fresh_install_request_secs);
         let now_secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                                                    .unwrap_or_default()
                                                    .as_secs();

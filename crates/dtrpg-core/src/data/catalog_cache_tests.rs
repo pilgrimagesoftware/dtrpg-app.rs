@@ -30,7 +30,7 @@ fn make_item(id: &str) -> LibraryItem {
 #[test]
 fn load_missing_file_returns_none() {
     let dir = std::path::PathBuf::from("/nonexistent/dtrpg_cache_surely_missing");
-    assert!(load_catalog_cache(&dir).is_none());
+    assert!(load_library_db(&dir).is_none());
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn load_malformed_json_returns_none() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join(CATALOG_CACHE_FILE), b"not valid json { ").unwrap();
-    let result = load_catalog_cache(&dir);
+    let result = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
     assert!(result.is_none());
 }
@@ -97,7 +97,7 @@ fn metadata_without_schema_version_field_defaults_to_stale() {
 #[test]
 fn missing_metadata_returns_none() {
     let dir = std::path::PathBuf::from("/nonexistent/dtrpg_meta_surely_missing");
-    assert!(load_cache_metadata(&dir).is_none());
+    assert!(load_library_metadata(&dir).is_none());
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn save_cache_writes_metadata() {
     let items = vec![make_item("b1"), make_item("b2"), make_item("b3")];
     save_catalog_cache(&dir, &items).unwrap();
 
-    let meta = load_cache_metadata(&dir);
+    let meta = load_library_metadata(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let meta = meta.unwrap();
@@ -123,7 +123,7 @@ fn ensure_cache_metadata_exists_writes_a_stale_default_when_missing() {
     let _ = fs::remove_dir_all(&dir);
 
     ensure_cache_metadata_exists(&dir);
-    let meta = load_cache_metadata(&dir);
+    let meta = load_library_metadata(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let meta = meta.unwrap();
@@ -140,7 +140,7 @@ fn ensure_cache_metadata_exists_leaves_a_real_file_untouched() {
     save_catalog_cache(&dir, &items).unwrap();
 
     ensure_cache_metadata_exists(&dir);
-    let meta = load_cache_metadata(&dir);
+    let meta = load_library_metadata(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let meta = meta.unwrap();
@@ -156,7 +156,7 @@ fn save_then_load_round_trips() {
     let items = vec![make_item("a1"), make_item("a2")];
     save_catalog_cache(&dir, &items).unwrap();
 
-    let loaded = load_catalog_cache(&dir);
+    let loaded = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let loaded = loaded.unwrap();
@@ -197,7 +197,7 @@ fn load_dedupes_stale_repeated_file_records() {
     fs::write(dir.join(CATALOG_CACHE_FILE),
               serde_json::to_string(&vec![item]).unwrap()).unwrap();
 
-    let loaded = load_catalog_cache(&dir);
+    let loaded = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let loaded = loaded.unwrap();
@@ -220,7 +220,7 @@ fn load_dedupes_whole_items_repeated_verbatim() {
     fs::write(dir.join(CATALOG_CACHE_FILE),
               serde_json::to_string(&vec![item.clone(), item.clone(), item]).unwrap()).unwrap();
 
-    let loaded = load_catalog_cache(&dir);
+    let loaded = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let loaded = loaded.unwrap();
@@ -245,7 +245,7 @@ fn load_dedupes_republished_items_by_product_id() {
     fs::write(dir.join(CATALOG_CACHE_FILE),
               serde_json::to_string(&vec![old_item, new_item]).unwrap()).unwrap();
 
-    let loaded = load_catalog_cache(&dir);
+    let loaded = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     let loaded = loaded.unwrap();
@@ -268,7 +268,7 @@ fn load_does_not_dedupe_distinct_items_with_unknown_product_id() {
     fs::write(dir.join(CATALOG_CACHE_FILE),
               serde_json::to_string(&vec![item_a, item_b]).unwrap()).unwrap();
 
-    let loaded = load_catalog_cache(&dir);
+    let loaded = load_library_db(&dir);
     let _ = fs::remove_dir_all(&dir);
 
     assert_eq!(loaded.unwrap().len(), 2);
