@@ -61,8 +61,10 @@ mod tests {
     fn open_library() -> Library {
         let datadir = tempfile::tempdir().expect("tempdatadir");
         let cachedir = tempfile::tempdir().expect("tempcachedir");
-        Library::open(datadir.keep(), cachedir.keep(), &StorageConfig::for_test(std::env::temp_dir())).expect("open")
-                                                                                 .0
+        Library::open(datadir.keep(),
+                      cachedir.keep(),
+                      &StorageConfig::for_test(std::env::temp_dir())).expect("open")
+                                                                     .0
     }
 
     fn tags_of_a(tag: &str) -> TagLibrary {

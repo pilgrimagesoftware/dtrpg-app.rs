@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::LibraryEvent;
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::storage::StorageConfig;

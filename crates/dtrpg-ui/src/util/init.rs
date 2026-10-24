@@ -1,5 +1,5 @@
-use dtrpg_core::data::library_metadata::ensure_cache_metadata_exists;
 use dtrpg_core::data::constants::DEFAULT_UI_TEXT_SIZE;
+use dtrpg_core::data::library_metadata::ensure_cache_metadata_exists;
 use dtrpg_core::data::paths::cache_dir;
 use dtrpg_core::data::ui_preferences::UiPreferences;
 use gpui::{App, px};

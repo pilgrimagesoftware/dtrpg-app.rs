@@ -22,9 +22,9 @@ const EDITOR_HEIGHT: f32 = 320.0;
 /// What the theme editor needs from the settings window.
 pub struct ThemeEditorData {
     /// The editor's text, once the root view has attached it.
-    pub input: Option<Entity<EditorState>>,
+    pub input:    Option<Entity<EditorState>>,
     /// Why the last save failed, if it did.
-    pub error: Option<String>,
+    pub error:    Option<String>,
     /// The settings controller, which holds the error.
     pub settings: Entity<SettingsController>,
 }
@@ -37,81 +37,71 @@ pub fn load_theme_editor(editor: &Entity<EditorState>, window: &mut Window, cx: 
     let active = cx.global::<crate::data::theme::LibriTheme>().id.clone();
     let source = theme_loader::theme_source(&active).unwrap_or_default();
     editor.update(cx, |state, cx| {
-        if state.value().as_ref() != source {
-            state.set_value(source, window, cx);
-        }
-    });
+              if state.value().as_ref() != source {
+                  state.set_value(source, window, cx);
+              }
+          });
 }
 
 /// Renders the Theme file section: a note on what can be done with this theme,
 /// the editor, the save and revert buttons for a user theme, and what the file
 /// accepts.
-pub fn render_theme_editor(
-    data: ThemeEditorData, library: Entity<LibraryController>, theme_id: &ThemeId,
-    colors: &ColorTokens,
-) -> impl IntoElement + 'static + use<> {
+pub fn render_theme_editor(data: ThemeEditorData, library: Entity<LibraryController>,
+                           theme_id: &ThemeId, colors: &ColorTokens)
+                           -> impl IntoElement + 'static + use<> {
     let built_in = theme_source::is_builtin(theme_id);
     let name = theme_label(theme_id);
     let note = if built_in {
         t!("settings.theme_editor_built_in", name = name).to_string()
-    } else {
+    }
+    else {
         t!("settings.theme_editor_user", name = name).to_string()
     };
     let path = if built_in {
         None
-    } else {
+    }
+    else {
         theme_loader::user_theme_path(theme_id.as_str())
     };
-    let editor = data
-        .input
-        .clone()
-        .map(|input| Editor::new(&input).h(px(EDITOR_HEIGHT)).readonly(true));
-    let _buttons = (!built_in).then(|| {
-        data.input
-            .clone()
-            .map(|input| edit_buttons(input, library, data.settings.clone()))
-    });
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(10.0))
-        .child(section_heading(
-            t!("settings.theme_editor_title").to_string(),
-            colors,
-        ))
-        .child(selectable_note("theme-editor-note", note, colors))
-        .children(path.map(|p| {
-            div()
-                .text_xs()
-                .text_color(colors.text_secondary)
-                .child(p.display().to_string())
-        }))
-        .children(editor)
-        .children(data.error.map(|message| {
-            div()
-                .text_xs()
-                .text_color(colors.error)
-                .child(t!("settings.theme_editor_not_saved", message = message).to_string())
-        }))
-        .children(_buttons.flatten())
-        .child(selectable_note(
-            "theme-editor-help",
-            t!("settings.theme_editor_help").to_string(),
-            colors,
-        ))
-        .child(
-            div()
-                .text_xs()
-                .text_color(colors.text_secondary)
-                .child("Unknown keys are ignored."),
-        )
+    let editor = data.input
+                     .clone()
+                     .map(|input| Editor::new(&input).h(px(EDITOR_HEIGHT)).readonly(true));
+    let _buttons =
+        (!built_in).then(|| {
+                       data.input
+                           .clone()
+                           .map(|input| edit_buttons(input, library, data.settings.clone()))
+                   });
+    div().flex()
+         .flex_col()
+         .gap(px(10.0))
+         .child(section_heading(t!("settings.theme_editor_title").to_string(), colors))
+         .child(selectable_note("theme-editor-note", note, colors))
+         .children(path.map(|p| {
+                           div().text_xs()
+                                .text_color(colors.text_secondary)
+                                .child(p.display().to_string())
+                       }))
+         .children(editor)
+         .children(data.error.map(|message| {
+                                 div().text_xs()
+                                      .text_color(colors.error)
+                                      .child(t!("settings.theme_editor_not_saved",
+                                                message = message).to_string())
+                             }))
+         .children(_buttons.flatten())
+         .child(selectable_note("theme-editor-help",
+                                t!("settings.theme_editor_help").to_string(),
+                                colors))
+         .child(div().text_xs()
+                     .text_color(colors.text_secondary)
+                     .child("Unknown keys are ignored."))
 }
 
 /// The save and revert icon buttons.
-fn edit_buttons(
-    input: Entity<EditorState>, library: Entity<LibraryController>,
-    settings: Entity<SettingsController>,
-) -> impl IntoElement {
+fn edit_buttons(input: Entity<EditorState>, library: Entity<LibraryController>,
+                settings: Entity<SettingsController>)
+                -> impl IntoElement {
     let revert_input = input.clone();
     let revert_settings = settings.clone();
     div()

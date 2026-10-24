@@ -7,15 +7,15 @@ use std::sync::{Arc, PoisonError};
 
 use super::merge::{fresh_install_request_gated, reconcile_catalog};
 use super::types::{LibraryEvent, SyncStage};
+use crate::data::constants::{
+    CATALOG_SYNC_MAX_ATTEMPTS, CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
+    CATALOG_SYNC_RETRY_MAX_DELAY_SECS, DTRPG_API_HOST, LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS,
+    LIBRARY_CHECKPOINT_PAGE_INTERVAL,
+};
+use crate::data::library::LibraryItem;
 use crate::data::library_metadata::{
     load_library_metadata, save_catalog_cache, save_fresh_install_request_timestamp,
 };
-use crate::data::constants::{
-    LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS, LIBRARY_CHECKPOINT_PAGE_INTERVAL,
-    CATALOG_SYNC_MAX_ATTEMPTS, CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
-    CATALOG_SYNC_RETRY_MAX_DELAY_SECS, DTRPG_API_HOST,
-};
-use crate::data::library::LibraryItem;
 use crate::library::Library;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 

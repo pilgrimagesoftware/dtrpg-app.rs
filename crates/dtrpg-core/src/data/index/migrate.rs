@@ -10,9 +10,9 @@ use std::path::Path;
 
 use rusqlite::Connection;
 
-use crate::data::library_metadata::legacy_load_catalog_cache_json;
-use crate::data::collections_cache::legacy_load_collections_cache_json;
-use crate::data::index::{IndexError, collections, items};
+// use crate::data::collection::local::legacy_load_collections_cache_json;
+use crate::data::index::{IndexError};
+// use crate::data::library_metadata::legacy_load_catalog_cache_json;
 
 /// Populates `conn` from the JSON caches under `root`, if present.
 ///
@@ -23,12 +23,12 @@ use crate::data::index::{IndexError, collections, items};
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if writing the migrated data fails.
-pub(super) fn migrate_json_caches(conn: &mut Connection, root: &Path) -> Result<(), IndexError> {
-    if let Some(catalog) = legacy_load_catalog_cache_json(root) {
-        items::replace_all_items(conn, &catalog)?;
-    }
-    if let Some(collection_entries) = legacy_load_collections_cache_json(root) {
-        collections::replace_all_collections(conn, &collection_entries)?;
-    }
+pub(super) fn migrate_json_caches(_: &mut Connection, _: &Path) -> Result<(), IndexError> {
+    // if let Some(catalog) = legacy_load_catalog_cache_json(root) {
+    //     items::replace_all_items(conn, &catalog)?;
+    // }
+    // if let Some(collection_entries) = legacy_load_collections_cache_json(root) {
+    //     collections::replace_all_collections(conn, &collection_entries)?;
+    // }
     Ok(())
 }

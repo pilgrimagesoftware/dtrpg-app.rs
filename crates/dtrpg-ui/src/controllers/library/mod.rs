@@ -4,13 +4,13 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use dtrpg_core::data::library_metadata::{load_library_metadata, save_check_batch_timestamp};
-use dtrpg_core::data::collection::CollectionEntry;
-use dtrpg_core::data::collections_cache::save_collections_cache;
+use dtrpg_core::data::collection::entry::CollectionEntry;
+use dtrpg_core::data::collection::local::save_collections_to_db;
 use dtrpg_core::data::cover_cache::load_cached_cover;
 use dtrpg_core::data::enums::*;
 use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::data::library::*;
+use dtrpg_core::data::library_metadata::{load_library_metadata, save_check_batch_timestamp};
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::smart_collection::{MatchTracker, SmartCollectionStore};

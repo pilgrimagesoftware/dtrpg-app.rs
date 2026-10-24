@@ -23,10 +23,10 @@ use std::sync::{Arc, PoisonError};
 
 use super::merge::{dedupe_by_product_id, partial_fetch_since, should_attempt_partial_fetch};
 use super::types::{LibraryEvent, SyncStage};
-use crate::data::library_metadata::load_library_metadata;
-use crate::data::library_metadata::load_library_db;
-use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
+use crate::data::collection::local::{load_collections_from_db, save_collections_to_db};
 use crate::data::library::LibraryItem;
+use crate::data::library_metadata::load_library_db;
+use crate::data::library_metadata::load_library_metadata;
 use crate::library::Library;
 use crate::services::LibraryService;
 use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
@@ -139,7 +139,7 @@ impl Library {
     /// call. Returns the cached items (deduped, possibly empty) so later
     /// stages can decide whether a live fetch is still needed.
     fn prepopulate_from_local_db(&self, force_reload: bool, generation: u64)
-                              -> Option<Vec<LibraryItem>> {
+                                 -> Option<Vec<LibraryItem>> {
         let cached = load_library_db(&self.app_data_dir).map(dedupe_by_product_id);
         if let Some(items) = cached.as_ref()
            && self.is_current(generation)
@@ -183,7 +183,7 @@ impl Library {
     fn sync_collections(&self, collections_service: &Arc<dyn CollectionsService>, generation: u64) {
         self.emit(LibraryEvent::Stage(SyncStage::Collections));
 
-        if let Some(entries) = load_collections_cache(&self.app_data_dir)
+        if let Some(entries) = load_collections_from_db(&self.app_data_dir)
            && self.is_current(generation)
         {
             self.emit(LibraryEvent::CollectionsChanged(entries));
@@ -191,7 +191,7 @@ impl Library {
 
         match collections_service.list_collections() {
             Ok(entries) => {
-                if let Err(e) = save_collections_cache(&self.app_data_dir, &entries) {
+                if let Err(e) = save_collections_to_db(&self.app_data_dir, &entries) {
                     tracing::warn!(error = %e, "failed to save collections cache");
                 }
                 if self.is_current(generation) {
@@ -229,7 +229,7 @@ impl Library {
         };
 
         let is_fresh = load_library_metadata(&self.cache_dir).as_ref()
-                                                            .is_some_and(|m| !m.is_stale());
+                                                             .is_some_and(|m| !m.is_stale());
         if !is_fresh {
             return false;
         }

@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::util::matching::member_ids_contain;
 
 /// What [`remove_member`] took out of a collection, and what it needs to put

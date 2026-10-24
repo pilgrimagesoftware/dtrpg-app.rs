@@ -9,9 +9,9 @@ impl LibraryController {
     /// is in the catalog.
     fn catalog_item_for_member(&self, item_id: u64, product_id: u64) -> Option<LibraryItem> {
         self.all_items_scan().into_iter().find(|item| {
-            collection_member_id(item) == item_id
-                || (product_id > 0 && item.product_id == product_id)
-        })
+                                             collection_member_id(item) == item_id
+                                             || (product_id > 0 && item.product_id == product_id)
+                                         })
     }
 
     /// Removes the links to a downloaded item from the folder of the collection
@@ -21,20 +21,21 @@ impl LibraryController {
     /// decides where its files are expected to be. Only links that point at the
     /// item's files are removed. Does nothing for an item that is not in the
     /// catalog or not downloaded.
-    fn unlink_item_from_removed_collection(
-        &self, item_id: u64, product_id: u64, collection_name: Arc<str>,
-        collections_before: Arc<Vec<CollectionEntry>>, cx: &mut Context<Self>,
-    ) {
-        let Some(item) = self.catalog_item_for_member(item_id, product_id) else {
+    fn unlink_item_from_removed_collection(&self, item_id: u64, product_id: u64,
+                                           collection_name: Arc<str>,
+                                           collections_before: Arc<Vec<CollectionEntry>>,
+                                           cx: &mut Context<Self>) {
+        let Some(item) = self.catalog_item_for_member(item_id, product_id)
+        else {
             return;
         };
         let storage = self.storage_override.clone();
         cx.background_executor()
-            .spawn(async move {
-                let storage = storage.unwrap_or_else(|| Arc::new(StorageConfig::load()));
-                unlink_item_from_collection(&storage, &item, &collections_before, &collection_name);
-            })
-            .detach();
+          .spawn(async move {
+              let storage = storage.unwrap_or_else(|| Arc::new(StorageConfig::load()));
+              unlink_item_from_collection(&storage, &item, &collections_before, &collection_name);
+          })
+          .detach();
     }
 
     /// Puts the files of the item that are already on disk in the folder of the
@@ -42,26 +43,27 @@ impl LibraryController {
     /// had been a member then, when "Create collections" is on.
     ///
     /// Does nothing for an item that is not in the catalog or not downloaded.
-    fn link_item_into_added_collection(
-        &self, item_id: u64, product_id: u64, collection_id: u64, cx: &mut Context<Self>,
-    ) {
-        let Some(item) = self.catalog_item_for_member(item_id, product_id) else {
+    fn link_item_into_added_collection(&self, item_id: u64, product_id: u64, collection_id: u64,
+                                       cx: &mut Context<Self>) {
+        let Some(item) = self.catalog_item_for_member(item_id, product_id)
+        else {
             return;
         };
         let collections = self.library.collections();
-        let Some(collection) = collections.iter().find(|c| c.id == collection_id) else {
+        let Some(collection) = collections.iter().find(|c| c.id == collection_id)
+        else {
             return;
         };
         let collection_name = Arc::clone(&collection.name);
         let storage = self.storage_override.clone();
         cx.background_executor()
-            .spawn(async move {
-                let storage = storage.unwrap_or_else(|| Arc::new(StorageConfig::load()));
-                if storage.create_collections() {
-                    link_item_into_collection(&storage, &item, &collections, &collection_name);
-                }
-            })
-            .detach();
+          .spawn(async move {
+              let storage = storage.unwrap_or_else(|| Arc::new(StorageConfig::load()));
+              if storage.create_collections() {
+                  link_item_into_collection(&storage, &item, &collections, &collection_name);
+              }
+          })
+          .detach();
     }
 
     /// Adds `item_id` (an item's `order_product_id`/`product_id`) as a member
@@ -79,12 +81,10 @@ impl LibraryController {
     /// service. On failure the optimistic update is rolled back and
     /// [`CollectionMemberAddFailed`] is emitted so the window can show an
     /// error notification.
-    pub fn add_item_to_collection(
-        &mut self, collection_id: u64, item_id: u64, product_id: u64, cx: &mut Context<Self>,
-    ) {
-        let Some(collection_name) =
-            self.library
-                .add_collection_member(collection_id, item_id, product_id)
+    pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64, product_id: u64,
+                                  cx: &mut Context<Self>) {
+        let Some(collection_name) = self.library
+                                        .add_collection_member(collection_id, item_id, product_id)
         else {
             return;
         };
@@ -167,19 +167,16 @@ impl LibraryController {
     /// service. On failure the optimistic update is rolled back and
     /// [`CollectionMemberRemoveFailed`] is emitted so the window can show an
     /// error notification.
-    pub fn remove_item_from_collection(
-        &mut self, collection_id: u64, item_id: u64, product_id: u64, cx: &mut Context<Self>,
-    ) {
+    pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
+                                       product_id: u64, cx: &mut Context<Self>) {
         let collections_before = self.library.collections();
         // Whichever id(s) are actually present are removed and remembered, so
         // that a failed removal restores exactly what was there before rather
         // than introducing an id that was never actually cached.
-        let Some(RemovedMember {
-            collection_name,
-            removed_ids,
-        }) = self
-            .library
-            .remove_collection_member(collection_id, item_id, product_id)
+        let Some(RemovedMember { collection_name,
+                                 removed_ids, }) =
+            self.library
+                .remove_collection_member(collection_id, item_id, product_id)
         else {
             return;
         };

@@ -13,7 +13,7 @@ use std::{
 };
 
 use dtrpg_core::{
-    data::collection::CollectionEntry,
+    data::collection::entry::CollectionEntry,
     services::{
         LibraryServiceError,
         collections::CollectionsServiceError,

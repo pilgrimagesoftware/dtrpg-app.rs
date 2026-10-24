@@ -83,10 +83,10 @@ mod tests {
     #[test]
     fn the_metadata_gives_the_item_count_and_the_two_times() {
         let metadata = LibraryMetadata { saved_at_secs:                   1_000,
-                                       item_count:                      42,
-                                       schema_version:                  0,
-                                       last_item_check_batch_secs:      Some(2_000),
-                                       last_fresh_install_request_secs: None, };
+                                         item_count:                      42,
+                                         schema_version:                  0,
+                                         last_item_check_batch_secs:      Some(2_000),
+                                         last_fresh_install_request_secs: None, };
 
         let counts = CacheCounts::from_parts(Some(&metadata), 7, true);
 

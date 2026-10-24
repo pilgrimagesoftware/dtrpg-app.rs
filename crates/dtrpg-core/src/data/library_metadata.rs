@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
-use crate::data::constants::{LIBRARY_CACHE_FILE, LIBRARY_METADATA_CACHE_FILE, STALE_SECS};
+use crate::data::constants::{LIBRARY_METADATA_CACHE_FILE, STALE_SECS};
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;
 
@@ -135,10 +135,10 @@ pub fn ensure_cache_metadata_exists(root: &Path) {
         return;
     }
     let meta = LibraryMetadata { saved_at_secs:                   0,
-                               item_count:                      0,
-                               schema_version:                  0,
-                               last_item_check_batch_secs:      None,
-                               last_fresh_install_request_secs: None, };
+                                 item_count:                      0,
+                                 schema_version:                  0,
+                                 last_item_check_batch_secs:      None,
+                                 last_fresh_install_request_secs: None, };
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -162,10 +162,10 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
     let last_fresh_install_request_secs = existing.as_ref()
                                                   .and_then(|m| m.last_fresh_install_request_secs);
     let meta = LibraryMetadata { saved_at_secs,
-                               item_count,
-                               schema_version: CACHE_SCHEMA_VERSION,
-                               last_item_check_batch_secs,
-                               last_fresh_install_request_secs };
+                                 item_count,
+                                 schema_version: CACHE_SCHEMA_VERSION,
+                                 last_item_check_batch_secs,
+                                 last_fresh_install_request_secs };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(LIBRARY_METADATA_CACHE_FILE), &json)?;
     Ok(())
@@ -178,10 +178,12 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
     let mut meta =
         load_library_metadata(root).unwrap_or(LibraryMetadata { saved_at_secs:                   0,
-                                   item_count:                      0,
-                                   schema_version:                  0,
-                                   last_item_check_batch_secs:      None,
-                                   last_fresh_install_request_secs: None, });
+                                                                item_count:                      0,
+                                                                schema_version:                  0,
+                                                                last_item_check_batch_secs:
+                                                                    None,
+                                                                last_fresh_install_request_secs:
+                                                                    None, });
     meta.last_item_check_batch_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(LIBRARY_METADATA_CACHE_FILE), &json)?;
@@ -197,10 +199,12 @@ pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
                                             -> Result<(), CatalogCacheError> {
     let mut meta =
         load_library_metadata(root).unwrap_or(LibraryMetadata { saved_at_secs:                   0,
-                                   item_count:                      0,
-                                   schema_version:                  0,
-                                   last_item_check_batch_secs:      None,
-                                   last_fresh_install_request_secs: None, });
+                                                                item_count:                      0,
+                                                                schema_version:                  0,
+                                                                last_item_check_batch_secs:
+                                                                    None,
+                                                                last_fresh_install_request_secs:
+                                                                    None, });
     meta.last_fresh_install_request_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(LIBRARY_METADATA_CACHE_FILE), &json)?;
@@ -244,39 +248,39 @@ pub fn load_library_db(root: &Path) -> Option<Vec<LibraryItem>> {
          .filter(|items| !items.is_empty())
 }
 
-/// Reads the legacy JSON catalog cache directly from
-/// `{root}/catalog_cache.json`, without touching the index.
-///
-/// Used only by [`crate::data::index::LibraryIndex::open_and_migrate`] to
-/// seed a newly created index from an existing install's cache; no other
-/// caller should read the JSON file directly once the index exists.
-///
-/// Returns `None` on any error (missing file, malformed JSON).
-pub(crate) fn legacy_load_catalog_cache_json(root: &Path) -> Option<Vec<LibraryItem>> {
-    let path = root.join(LIBRARY_CACHE_FILE);
-    let text = match fs::read_to_string(&path) {
-        Ok(text) => text,
-        // A missing file is the expected state on a fresh install; only a
-        // genuine I/O failure (permissions, an unreadable disk) is worth a
-        // warning.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
-        Err(e) => {
-            warn!(path = %path.display(), error = %e, "catalog cache not readable");
-            return None;
-        }
-    };
-    let mut items: Vec<LibraryItem> = serde_json::from_str(&text)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache malformed"))
-        .ok()?;
-    // Cache written before file records were deduplicated by id (see
-    // `LibraryItem::dedupe_files`) may still have entries repeated verbatim —
-    // clean them up on load rather than requiring a full cache wipe.
-    for item in &mut items {
-        item.dedupe_files();
-    }
-    items = dedupe_items(items);
-    Some(items)
-}
+// /// Reads the legacy JSON catalog cache directly from
+// /// `{root}/catalog_cache.json`, without touching the index.
+// ///
+// /// Used only by [`crate::data::index::LibraryIndex::open_and_migrate`] to
+// /// seed a newly created index from an existing install's cache; no other
+// /// caller should read the JSON file directly once the index exists.
+// ///
+// /// Returns `None` on any error (missing file, malformed JSON).
+// pub(crate) fn legacy_load_catalog_cache_json(root: &Path) ->
+// Option<Vec<LibraryItem>> {     let path = root.join(LIBRARY_CACHE_FILE);
+//     let text = match fs::read_to_string(&path) {
+//         Ok(text) => text,
+//         // A missing file is the expected state on a fresh install; only a
+//         // genuine I/O failure (permissions, an unreadable disk) is worth a
+//         // warning.
+//         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+//         Err(e) => {
+//             warn!(path = %path.display(), error = %e, "catalog cache not
+// readable");             return None;
+//         }
+//     };
+//     let mut items: Vec<LibraryItem> = serde_json::from_str(&text)
+//         .map_err(|e| warn!(path = %path.display(), error = %e, "catalog cache
+// malformed"))         .ok()?;
+//     // Cache written before file records were deduplicated by id (see
+//     // `LibraryItem::dedupe_files`) may still have entries repeated verbatim
+// —     // clean them up on load rather than requiring a full cache wipe.
+//     for item in &mut items {
+//         item.dedupe_files();
+//     }
+//     items = dedupe_items(items);
+//     Some(items)
+// }
 
 /// Collapses whole-item duplicates from `items`, keyed first by `id` (an
 /// identical entry repeated verbatim — the symptom of a stale catalog-sync

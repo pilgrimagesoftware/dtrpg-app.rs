@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::library::SectionCounts;
 use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::util::filter::SidebarFilter;

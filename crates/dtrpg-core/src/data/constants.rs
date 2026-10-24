@@ -30,9 +30,9 @@ pub const MACOS_BUNDLE_ID: &str = "com.pilgrimagesoftware.dtrpg";
 
 pub const COLLECTIONS_CACHE_FILE: &str = "collections.json";
 pub const COLLECTIONS_CACHE_TMPFILE: &str = "collections.json.tmp";
-pub const LIBRARY_CACHE_FILE: &str = "library.json";
-pub const LIBRARY_CACHE_TMPFILE: &str = "library.json.tmp";
-pub const LIBRARY_METADATA_CACHE_FILE: &str = "library_meta.json";
+// pub const LIBRARY_CACHE_FILE: &str = "library.json";
+// pub const LIBRARY_CACHE_TMPFILE: &str = "library.json.tmp";
+pub const LIBRARY_METADATA_CACHE_FILE: &str = "library.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
 /// 7 days in seconds — caches older than this are considered stale.

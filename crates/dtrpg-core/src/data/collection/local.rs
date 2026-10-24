@@ -7,14 +7,12 @@
 //! [`crate::data::index::LibraryIndex`] instead of reading or writing
 //! `collections_cache.json` directly.
 
-use std::fs;
 use std::path::Path;
 
 use thiserror::Error;
 use tracing::warn;
 
-use crate::data::collection::CollectionEntry;
-use crate::data::constants::COLLECTIONS_CACHE_FILE;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::index::{IndexError, LibraryIndex};
 
 // ── CollectionsCacheError
@@ -34,7 +32,7 @@ pub enum CollectionsCacheError {
     Index(#[from] IndexError),
 }
 
-// ── load_collections_cache
+// ── load_collections_from_db
 // ────────────────────────────────────────────────────
 
 /// Reads the collection list from the library index at `root`, migrating it
@@ -44,7 +42,7 @@ pub enum CollectionsCacheError {
 /// Returns `None` on any error (including nothing cached and no index) so
 /// callers can fall through to the live API fetch without surfacing errors
 /// to the user.
-pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
+pub fn load_collections_from_db(root: &Path) -> Option<Vec<CollectionEntry>> {
     let index = LibraryIndex::open_and_migrate(root)
         .map_err(|e| warn!(root = %root.display(), error = %e, "library index not openable"))
         .ok()?;
@@ -54,31 +52,31 @@ pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
          .filter(|entries| !entries.is_empty())
 }
 
-/// Reads the legacy JSON collections cache directly from
-/// `{root}/collections_cache.json`, without touching the index.
-///
-/// Used only by [`crate::data::index::LibraryIndex::open_and_migrate`] to
-/// seed a newly created index from an existing install's cache; no other
-/// caller should read the JSON file directly once the index exists.
-///
-/// Returns `None` on any error (missing file, malformed JSON).
-pub(crate) fn legacy_load_collections_cache_json(root: &Path) -> Option<Vec<CollectionEntry>> {
-    let path = root.join(COLLECTIONS_CACHE_FILE);
-    let text = match fs::read_to_string(&path) {
-        Ok(text) => text,
-        // A missing file is the expected state on a fresh install; only a
-        // genuine I/O failure (permissions, an unreadable disk) is worth a
-        // warning.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
-        Err(e) => {
-            warn!(path = %path.display(), error = %e, "collections cache not readable");
-            return None;
-        }
-    };
-    serde_json::from_str(&text)
-        .map_err(|e| warn!(path = %path.display(), error = %e, "collections cache malformed"))
-        .ok()
-}
+// /// Reads the legacy JSON collections cache directly from
+// /// `{root}/collections_cache.json`, without touching the index.
+// ///
+// /// Used only by [`crate::data::index::LibraryIndex::open_and_migrate`] to
+// /// seed a newly created index from an existing install's cache; no other
+// /// caller should read the JSON file directly once the index exists.
+// ///
+// /// Returns `None` on any error (missing file, malformed JSON).
+// pub(crate) fn legacy_load_collections_cache_json(root: &Path) -> Option<Vec<CollectionEntry>> {
+//     let path = root.join(COLLECTIONS_CACHE_FILE);
+//     let text = match fs::read_to_string(&path) {
+//         Ok(text) => text,
+//         // A missing file is the expected state on a fresh install; only a
+//         // genuine I/O failure (permissions, an unreadable disk) is worth a
+//         // warning.
+//         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+//         Err(e) => {
+//             warn!(path = %path.display(), error = %e, "collections cache not readable");
+//             return None;
+//         }
+//     };
+//     serde_json::from_str(&text)
+//         .map_err(|e| warn!(path = %path.display(), error = %e, "collections cache malformed"))
+//         .ok()
+// }
 
 // ── save_collections_cache
 // ────────────────────────────────────────────────────
@@ -90,7 +88,7 @@ pub(crate) fn legacy_load_collections_cache_json(root: &Path) -> Option<Vec<Coll
 ///
 /// Returns [`CollectionsCacheError::Index`] if the index cannot be opened or
 /// written.
-pub fn save_collections_cache(root: &Path, entries: &[CollectionEntry])
+pub fn save_collections_to_db(root: &Path, entries: &[CollectionEntry])
                               -> Result<(), CollectionsCacheError> {
     let mut index = LibraryIndex::open_and_migrate(root)?;
     index.replace_all_collections(entries)?;
@@ -120,7 +118,7 @@ mod tests {
     #[test]
     fn load_missing_file_returns_none() {
         let dir = std::path::PathBuf::from("/nonexistent/dtrpg_collections_cache_surely_missing");
-        assert!(load_collections_cache(&dir).is_none());
+        assert!(load_collections_from_db(&dir).is_none());
     }
 
     #[test]
@@ -129,7 +127,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(COLLECTIONS_CACHE_FILE), b"not valid json { ").unwrap();
-        let result = load_collections_cache(&dir);
+        let result = load_collections_from_db(&dir);
         let _ = fs::remove_dir_all(&dir);
         assert!(result.is_none());
     }
@@ -140,9 +138,9 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let entries = vec![make_entry(1, "Favorites"), make_entry(2, "Wishlist")];
-        save_collections_cache(&dir, &entries).unwrap();
+        save_collections_to_db(&dir, &entries).unwrap();
 
-        let loaded = load_collections_cache(&dir);
+        let loaded = load_collections_from_db(&dir);
         let _ = fs::remove_dir_all(&dir);
 
         let loaded = loaded.unwrap();

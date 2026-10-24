@@ -5,11 +5,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::data::library_metadata::LibraryMetadata;
 use crate::data::constants::{
     CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS, FORCE_RELOAD_COOLDOWN_SECS,
 };
 use crate::data::library::LibraryItem;
+use crate::data::library_metadata::LibraryMetadata;
 use crate::util::datetime::epoch_to_rfc3339;
 
 /// Reconciles `existing` (the current catalog) against `live` (a fresh live

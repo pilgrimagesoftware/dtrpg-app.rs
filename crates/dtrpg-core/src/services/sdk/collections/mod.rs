@@ -8,7 +8,7 @@ use std::sync::Arc;
 pub use self::gateway::SdkCollectionsGateway;
 use self::gateway::{HttpSdkCollectionsGateway, UnavailableCollectionsGateway};
 use crate::{
-    data::{collection::CollectionEntry, token_status::TokenStatusHandle},
+    data::{collection::entry::CollectionEntry, token_status::TokenStatusHandle},
     services::{
         LoginTokens,
         collections::{CollectionsService, CollectionsServiceError, CollectionsServiceErrorKind},

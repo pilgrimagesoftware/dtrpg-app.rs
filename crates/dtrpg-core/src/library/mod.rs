@@ -10,16 +10,16 @@
 
 pub mod insights;
 mod jobs;
+mod library;
 mod mutations;
 mod queries;
-mod library;
 mod sync;
 
 pub use jobs::{CheckJob, CheckResult, DownloadJob, DownloadKey, DownloadSubmission, ThumbnailJob};
+pub use library::Library;
 pub use mutations::{
     RemovedMember, add_member, apply_check_result, remove_member, restore_removed_member,
     revert_added_member,
 };
 pub use queries::{Facets, SmartPreview, ViewState};
-pub use library::Library;
 pub use sync::{LibraryEvent, LibraryEvents, SyncStage, reload_cooldown_active};

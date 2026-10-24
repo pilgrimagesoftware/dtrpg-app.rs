@@ -37,9 +37,9 @@ pub struct Library {
     /// Shared connectivity monitor consulted before network requests.
     pub network_monitor:       Arc<NetworkMonitor>,
     /// Directory where application data lives.
-    pub app_data_dir: PathBuf,
+    pub app_data_dir:          PathBuf,
     /// Directory where cached data lives.
-    pub cache_dir:            PathBuf,
+    pub cache_dir:             PathBuf,
     /// Catalog-sync single-flight state: the current generation, whether a
     /// sync is running, and whether a follow-up was requested while busy.
     pub(super) sync_state:     Mutex<SyncState>,

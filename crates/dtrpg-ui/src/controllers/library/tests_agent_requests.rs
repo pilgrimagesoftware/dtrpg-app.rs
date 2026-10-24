@@ -4,7 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::mcp_access::AppReply;
 use gpui::TestAppContext;
 

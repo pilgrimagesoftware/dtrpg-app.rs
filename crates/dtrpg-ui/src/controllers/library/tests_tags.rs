@@ -6,8 +6,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use dtrpg_core::data::activity::ActivityStatus;
-use dtrpg_core::data::library_metadata::save_catalog_cache;
 use dtrpg_core::data::index::LibraryIndex;
+use dtrpg_core::data::library_metadata::save_catalog_cache;
 use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::data::tag_library::TagLibrary;
 use dtrpg_core::services::network_monitor::NetworkMonitor;

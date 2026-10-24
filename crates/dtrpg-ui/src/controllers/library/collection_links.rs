@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::library::LibraryItem;
 use dtrpg_core::data::storage::{StorageConfig, collection_dir};
 
