@@ -28,11 +28,11 @@ pub const APP_NAME: &str = "dtrpg";
 /// as the keyring service namespace via [`KEYRING_SERVICE`].
 pub const MACOS_BUNDLE_ID: &str = "com.pilgrimagesoftware.dtrpg";
 
-pub const COLLECTIONS_CACHE_FILE: &str = "collections_cache.json";
-pub const COLLECTIONS_CACHE_TMP: &str = "collections_cache.json.tmp";
-pub const CATALOG_CACHE_FILE: &str = "catalog_cache.json";
-pub const CATALOG_CACHE_TMP: &str = "catalog_cache.json.tmp";
-pub const CATALOG_CACHE_METADATA_FILE: &str = "catalog_cache_meta.json";
+pub const COLLECTIONS_CACHE_FILE: &str = "collections.json";
+pub const COLLECTIONS_CACHE_TMP: &str = "collections.json.tmp";
+pub const CATALOG_CACHE_FILE: &str = "library.json";
+pub const CATALOG_CACHE_TMP: &str = "library.json.tmp";
+pub const CATALOG_CACHE_METADATA_FILE: &str = "library_meta.json";
 pub const AVATAR_CACHE_FILE: &str = "avatar";
 
 /// 7 days in seconds — caches older than this are considered stale.
