@@ -3,8 +3,10 @@
 use super::*;
 
 fn entry(ext: &str, path: &str) -> FileOpenerEntry {
-    FileOpenerEntry { extension: ext.to_owned(),
-                      app_path:  PathBuf::from(path), }
+    FileOpenerEntry {
+        extension: ext.to_owned(),
+        app_path: PathBuf::from(path),
+    }
 }
 
 fn config_with(entries: Vec<FileOpenerEntry>) -> FileOpenerConfig {
@@ -17,26 +19,36 @@ fn config_with(entries: Vec<FileOpenerEntry>) -> FileOpenerConfig {
 #[test]
 fn find_override_exact_match() {
     let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-    assert_eq!(cfg.find_override("pdf"),
-               Some(Path::new("/Applications/Preview.app")));
+    assert_eq!(
+        cfg.find_override("pdf"),
+        Some(Path::new("/Applications/Preview.app"))
+    );
 }
 
 #[test]
 fn find_override_case_insensitive() {
     let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-    assert_eq!(cfg.find_override("PDF"),
-               Some(Path::new("/Applications/Preview.app")));
-    assert_eq!(cfg.find_override("Pdf"),
-               Some(Path::new("/Applications/Preview.app")));
+    assert_eq!(
+        cfg.find_override("PDF"),
+        Some(Path::new("/Applications/Preview.app"))
+    );
+    assert_eq!(
+        cfg.find_override("Pdf"),
+        Some(Path::new("/Applications/Preview.app"))
+    );
 }
 
 #[test]
 fn find_override_dot_prefixed_input() {
     let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-    assert_eq!(cfg.find_override(".pdf"),
-               Some(Path::new("/Applications/Preview.app")));
-    assert_eq!(cfg.find_override(".PDF"),
-               Some(Path::new("/Applications/Preview.app")));
+    assert_eq!(
+        cfg.find_override(".pdf"),
+        Some(Path::new("/Applications/Preview.app"))
+    );
+    assert_eq!(
+        cfg.find_override(".PDF"),
+        Some(Path::new("/Applications/Preview.app"))
+    );
 }
 
 #[test]
@@ -78,8 +90,10 @@ fn add_duplicate_replaces() {
     let result = cfg.add(entry("pdf", "/Applications/Acrobat.app"));
     assert_eq!(result, AddOutcome::Replaced);
     assert_eq!(cfg.entries().len(), 1);
-    assert_eq!(cfg.entries()[0].app_path,
-               PathBuf::from("/Applications/Acrobat.app"));
+    assert_eq!(
+        cfg.entries()[0].app_path,
+        PathBuf::from("/Applications/Acrobat.app")
+    );
 }
 
 // ── validate_all
@@ -87,8 +101,10 @@ fn add_duplicate_replaces() {
 
 #[test]
 fn validate_all_flags_missing_paths() {
-    let cfg = config_with(vec![entry("pdf", "/nonexistent/Preview.app"),
-                               entry("epub", "/nonexistent/Calibre.app"),]);
+    let cfg = config_with(vec![
+        entry("pdf", "/nonexistent/Preview.app"),
+        entry("epub", "/nonexistent/Calibre.app"),
+    ]);
     let stale = cfg.validate_all();
     assert_eq!(stale.len(), 2);
 }
@@ -114,11 +130,13 @@ fn prefs_from(toml_text: &str) -> CatalogViewPrefs {
 #[allow(clippy::expect_used)] // A fixture that cannot be written should fail loudly.
 fn every_grouping_survives_being_saved_and_loaded() {
     for group_by in [GroupBy::None, GroupBy::Publisher, GroupBy::Tag] {
-        let saved = CatalogViewPrefs::from_state(&SidebarFilter::AllTitles,
-                                                 SortMethod::Title,
-                                                 group_by,
-                                                 CatalogPresentation::Grid,
-                                                 &ListColumn::DEFAULT_CHOSEN);
+        let saved = CatalogViewPrefs::from_state(
+            &SidebarFilter::AllTitles,
+            SortMethod::Title,
+            group_by,
+            CatalogPresentation::Grid,
+            &ListColumn::DEFAULT_CHOSEN,
+        );
         let text = toml::to_string(&saved).expect("preferences serialize");
 
         assert_eq!(prefs_from(&text).to_group_by(), group_by);
@@ -127,18 +145,24 @@ fn every_grouping_survives_being_saved_and_loaded() {
 
 #[test]
 fn a_catalog_saved_as_grouped_before_there_was_a_choice_is_grouped_by_publisher() {
-    assert_eq!(prefs_from("grouped = true").to_group_by(),
-               GroupBy::Publisher);
+    assert_eq!(
+        prefs_from("grouped = true").to_group_by(),
+        GroupBy::Publisher
+    );
     assert_eq!(prefs_from("grouped = false").to_group_by(), GroupBy::None);
     assert_eq!(prefs_from("").to_group_by(), GroupBy::None);
 }
 
 #[test]
 fn the_grouping_wins_over_the_old_setting_and_an_unknown_one_means_none() {
-    assert_eq!(prefs_from("group_by = \"Tag\"\ngrouped = true").to_group_by(),
-               GroupBy::Tag);
-    assert_eq!(prefs_from("group_by = \"Planet\"").to_group_by(),
-               GroupBy::None);
+    assert_eq!(
+        prefs_from("group_by = \"Tag\"\ngrouped = true").to_group_by(),
+        GroupBy::Tag
+    );
+    assert_eq!(
+        prefs_from("group_by = \"Planet\"").to_group_by(),
+        GroupBy::None
+    );
 }
 
 // ── List columns
@@ -148,16 +172,20 @@ fn the_grouping_wins_over_the_old_setting_and_an_unknown_one_means_none() {
 #[allow(clippy::expect_used)] // A fixture that cannot be written should fail loudly.
 fn the_chosen_columns_survive_being_saved_and_loaded() {
     let chosen = [ListColumn::Tags, ListColumn::Pages];
-    let saved = CatalogViewPrefs::from_state(&SidebarFilter::AllTitles,
-                                             SortMethod::Title,
-                                             GroupBy::None,
-                                             CatalogPresentation::List,
-                                             &chosen);
+    let saved = CatalogViewPrefs::from_state(
+        &SidebarFilter::AllTitles,
+        SortMethod::Title,
+        GroupBy::None,
+        CatalogPresentation::List,
+        &chosen,
+    );
     let text = toml::to_string(&saved).expect("preferences serialize");
 
     // Back in their usual order, not the order they were chosen in.
-    assert_eq!(prefs_from(&text).to_list_columns(),
-               [ListColumn::Pages, ListColumn::Tags]);
+    assert_eq!(
+        prefs_from(&text).to_list_columns(),
+        [ListColumn::Pages, ListColumn::Tags]
+    );
 }
 
 #[test]
@@ -175,14 +203,20 @@ fn a_saved_name_that_is_not_a_choosable_column_is_ignored() {
 
 #[test]
 fn the_columns_shown_are_status_and_title_the_chosen_ones_in_order_then_open() {
-    assert_eq!(ListColumn::shown(&[ListColumn::Tags, ListColumn::Publisher]),
-               [ListColumn::Status,
-                ListColumn::Title,
-                ListColumn::Publisher,
-                ListColumn::Tags,
-                ListColumn::Open]);
-    assert_eq!(ListColumn::shown(&[]),
-               [ListColumn::Status, ListColumn::Title, ListColumn::Open]);
+    assert_eq!(
+        ListColumn::shown(&[ListColumn::Tags, ListColumn::Publisher]),
+        [
+            ListColumn::Status,
+            ListColumn::Title,
+            ListColumn::Publisher,
+            ListColumn::Tags,
+            ListColumn::Open
+        ]
+    );
+    assert_eq!(
+        ListColumn::shown(&[]),
+        [ListColumn::Status, ListColumn::Title, ListColumn::Open]
+    );
 }
 
 #[test]

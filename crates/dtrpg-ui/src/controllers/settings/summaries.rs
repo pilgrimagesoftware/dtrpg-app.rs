@@ -4,7 +4,7 @@
 use chrono::Local;
 use dtrpg_core::credentials::{anthropic_key_status, save_anthropic_api_key};
 use dtrpg_core::data::index::LibraryIndex;
-use dtrpg_core::data::paths::cache_dir;
+
 use dtrpg_core::data::summary_settings::SummaryProviderKind;
 use dtrpg_core::util::datetime::start_of_month_secs;
 use gpui_kit::component::input::InputState;
@@ -69,12 +69,12 @@ impl SettingsController {
 /// and where the API key can come from. Reads the index and the keychain, so it
 /// runs when the page opens, never while drawing.
 pub(super) fn read_summary_page(key_input: Option<Entity<InputState>>) -> SummaryPage {
-    let tokens_used =
-        LibraryIndex::open_and_migrate(&cache_dir()).and_then(|index| {
-                                                        index.tokens_used_since(start_of_month_secs(Local::now()))
-                                                    })
-                                                    .unwrap_or_default();
-    SummaryPage { tokens_used,
-                  key: anthropic_key_status(),
-                  key_input }
+    let tokens_used = LibraryIndex::open_and_migrate(&dtrpg_core::data::paths::index_dir())
+        .and_then(|index| index.tokens_used_since(start_of_month_secs(Local::now())))
+        .unwrap_or_default();
+    SummaryPage {
+        tokens_used,
+        key: anthropic_key_status(),
+        key_input,
+    }
 }
