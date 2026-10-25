@@ -6,7 +6,7 @@
 use std::sync::*;
 
 use dtrpg_core::data::library::LibraryItem;
-use dtrpg_core::work::{JobId, Outcome, Priority, ResultSlot};
+use dtrpg_core::work::Priority;
 use gpui::TestAppContext;
 
 use super::support::*;

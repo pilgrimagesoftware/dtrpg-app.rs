@@ -4,9 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::*;
 
 use dtrpg_core::data::storage::collection_dir;
 use dtrpg_core::services::collections::CollectionsServiceError;

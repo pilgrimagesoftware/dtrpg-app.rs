@@ -32,7 +32,7 @@ use gpui::{AppContext, Entity, TestAppContext};
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
-use crate::ui::library::cover::{CoverCache, detail_cache_key};
+use crate::ui::library::cover::{CoverCache};
 use crate::util::file_presence::resolved_file_path;
 
 pub(super) const WAIT: Duration = Duration::from_secs(5);
