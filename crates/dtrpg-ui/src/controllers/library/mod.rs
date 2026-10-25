@@ -49,83 +49,32 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 mod agent_requests;
 mod attention;
 mod auto_summary;
-mod bulk_selection;
-mod catalog_sync;
+mod sync;
 mod checks;
-mod collection_links;
 mod collections;
 mod concurrency;
 mod core;
-mod detail;
-mod download_dispatch;
-mod download_sheet;
-mod downloads;
-mod file_tags;
-mod filter_values;
-mod filtering;
+mod download;
+mod filter;
 mod helpers;
 mod insights;
-mod inspector_actions;
-mod inspector_archive;
+mod inspector;
+mod tests;
 mod lifecycle;
 mod preferences;
-mod selection;
-mod smart_actions;
-mod smart_collections;
+mod select;
+mod smart;
 mod storage_usage;
 mod tags;
 mod theme_files;
 mod thumbnails;
 
-#[cfg(test)]
-mod tests_attention;
-#[cfg(test)]
-mod tests_availability;
-#[cfg(test)]
-mod tests_checks;
-#[cfg(test)]
-mod tests_collection_links;
-#[cfg(test)]
-mod tests_downloads;
-#[cfg(test)]
-mod tests_file_tags;
-#[cfg(test)]
-mod tests_filter_values;
-#[cfg(test)]
-mod tests_insights;
-#[cfg(test)]
-mod tests_inspector;
-#[cfg(test)]
-mod tests_render_guard;
-#[cfg(test)]
-mod tests_search_debounce;
-#[cfg(test)]
-mod tests_sign_in;
-#[cfg(test)]
-mod tests_smart_collections;
-
-#[cfg(test)]
-#[path = "tests_agent_requests.rs"]
-mod tests_agent_requests;
-#[cfg(test)]
-mod tests_startup;
-#[cfg(test)]
-mod tests_support;
-#[cfg(test)]
-mod tests_tags;
-#[cfg(test)]
-mod tests_thumbnails;
-#[cfg(test)]
-mod tests_ui;
-#[cfg(test)]
-mod tests_view_cache;
-
 // Re-export the free helpers so `super::*` sees them in the split impl
 // modules and the tests keep addressing them by their original path.
 // `create_collections_symlinks` lives with the download code that uses it, but
 // the dispatch path in `download_dispatch` reaches it through `super::*`.
-pub(crate) use self::downloads::create_collections_symlinks;
-pub use self::filter_values::{CHOOSABLE_FILTER_FIELDS, FilterValueSection};
+pub(crate) use self::download::downloads::create_collections_symlinks;
+pub use self::filter::values::{CHOOSABLE_FILTER_FIELDS, FilterValueSection};
 pub(crate) use self::helpers::*;
 pub use self::insights::LiveAvailability;
 
@@ -419,7 +368,4 @@ pub struct LibraryController {
 
 mod accessors;
 
-#[path = "pending_download.rs"]
-mod pending_download;
-
-use pending_download::PendingDownloadRequest;
+use download::pending::PendingDownloadRequest;
