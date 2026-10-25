@@ -50,28 +50,28 @@ impl LibraryController {
     }
 
     /// Reads the tags from the library index in the background and shows them.
-    pub(super) fn load_tags(&mut self, cx: &mut Context<Self>) {
+    pub fn load_tags(&mut self, cx: &mut Context<Self>) {
         let generation = self.library.begin_tag_read();
         let app_data_root = self.index_root().clone();
         cx.spawn(async move |this, async_cx| {
-              let loaded = async_cx.background_executor()
-                                   .spawn(async move { Library::read_tags(&app_data_root) })
-                                   .await;
-              this.update(async_cx, |ctrl, cx| match loaded {
-                      Ok(library) => ctrl.show_tags(library, generation, cx),
-                      Err(error) => {
-                          tracing::warn!(%error, "could not read tags from the library index");
-                      }
-                  })
-                  .ok();
-          })
-          .detach();
+            let loaded = async_cx
+                .background_executor()
+                .spawn(async move { Library::read_tags(&app_data_root) })
+                .await;
+            this.update(async_cx, |ctrl, cx| match loaded {
+                Ok(library) => ctrl.show_tags(library, generation, cx),
+                Err(error) => {
+                    tracing::warn!(%error, "could not read tags from the library index");
+                }
+            })
+            .ok();
+        })
+        .detach();
     }
 
     /// Shows `library`, unless something newer has been asked for since
     /// `generation`, and keeps a tag filter on what it now holds.
-    pub(super) fn show_tags(&mut self, library: TagLibrary, generation: u64,
-                            cx: &mut Context<Self>) {
+    pub fn show_tags(&mut self, library: TagLibrary, generation: u64, cx: &mut Context<Self>) {
         if !self.library.set_tags_if_current(library, generation) {
             return;
         }
@@ -87,8 +87,7 @@ impl LibraryController {
     /// Rebuilds an active tag filter from the tags as they are now, or drops it
     /// if no item has the tag any more.
     fn refresh_tag_filter(&mut self) {
-        let SidebarFilter::Tag { name, .. } = &self.filter
-        else {
+        let SidebarFilter::Tag { name, .. } = &self.filter else {
             return;
         };
         let tags = self.library.tags();
@@ -101,8 +100,7 @@ impl LibraryController {
     /// Shows only the items that have the tag called `name`.
     pub fn filter_by_tag(&mut self, name: &str, cx: &mut Context<Self>) {
         let tags = self.library.tags();
-        let Some(entry) = tags.entry(name)
-        else {
+        let Some(entry) = tags.entry(name) else {
             return;
         };
         let filter = tag_filter(&entry.name, &tags);
@@ -111,23 +109,35 @@ impl LibraryController {
 
     /// Gives the item the tag called `name`.
     pub fn add_tag(&mut self, item_id: &str, name: &str, cx: &mut Context<Self>) {
-        self.edit_tags(TagEdit::Add { item_id: item_id.to_owned(),
-                                      tag:     name.to_owned(), },
-                       cx);
+        self.edit_tags(
+            TagEdit::Add {
+                item_id: item_id.to_owned(),
+                tag: name.to_owned(),
+            },
+            cx,
+        );
     }
 
     /// Takes the tag called `name` off the item.
     pub fn remove_tag(&mut self, item_id: &str, name: &str, cx: &mut Context<Self>) {
-        self.edit_tags(TagEdit::Remove { item_id: item_id.to_owned(),
-                                         tag:     name.to_owned(), },
-                       cx);
+        self.edit_tags(
+            TagEdit::Remove {
+                item_id: item_id.to_owned(),
+                tag: name.to_owned(),
+            },
+            cx,
+        );
     }
 
     /// Sets the color of the tag called `name`, or clears it with `None`.
     pub fn set_tag_color(&mut self, name: &str, color: Option<TagColor>, cx: &mut Context<Self>) {
-        self.edit_tags(TagEdit::SetColor { tag: name.to_owned(),
-                                           color },
-                       cx);
+        self.edit_tags(
+            TagEdit::SetColor {
+                tag: name.to_owned(),
+                color,
+            },
+            cx,
+        );
     }
 
     /// Makes an edit in the index in the background and writes the result to
@@ -141,25 +151,26 @@ impl LibraryController {
         let collections = self.library.collections();
         let cache_root = self.index_root().clone();
         cx.spawn(async move |this, async_cx| {
-              let outcome =
-                  async_cx.background_executor()
-                          .spawn(async move {
-                              let files: Vec<TaggedFile> =
-                                  files_on_disk(&affected, &collections, &StorageConfig::load());
-                              let settings = sync_settings(&NativePreferences::load());
-                              apply_tag_edit(&Platform, &cache_root, &edit, &files, settings)
-                          })
-                          .await;
-              this.update(async_cx, |ctrl, cx| ctrl.finish_tag_edit(outcome, cx))
-                  .ok();
-          })
-          .detach();
+            let outcome = async_cx
+                .background_executor()
+                .spawn(async move {
+                    let files: Vec<TaggedFile> =
+                        files_on_disk(&affected, &collections, &StorageConfig::load());
+                    let settings = sync_settings(&NativePreferences::load());
+                    apply_tag_edit(&Platform, &cache_root, &edit, &files, settings)
+                })
+                .await;
+            this.update(async_cx, |ctrl, cx| ctrl.finish_tag_edit(outcome, cx))
+                .ok();
+        })
+        .detach();
     }
 
     /// Reports what went wrong with an edit, then shows the tags the index now
     /// holds, which is the old tags if the edit failed.
-    pub(super) fn finish_tag_edit(&mut self, outcome: Result<TagEditOutcome, IndexError>,
-                                  cx: &mut Context<Self>) {
+    pub(super) fn finish_tag_edit(
+        &mut self, outcome: Result<TagEditOutcome, IndexError>, cx: &mut Context<Self>,
+    ) {
         match outcome {
             Ok(outcome) => {
                 for failure in &outcome.failures {
@@ -168,8 +179,11 @@ impl LibraryController {
                                    "could not give a file its tags");
                 }
                 if !outcome.failures.is_empty() {
-                    let label = t!("activity.tags_restore_failed",
-                                   count = outcome.failures.len()).to_string();
+                    let label = t!(
+                        "activity.tags_restore_failed",
+                        count = outcome.failures.len()
+                    )
+                    .to_string();
                     self.fail_note(&label, &label, cx);
                 }
             }
@@ -185,14 +199,16 @@ impl LibraryController {
     /// Adds a failed entry to the activity panel.
     fn fail_note(&self, label: &str, message: &str, cx: &mut Context<Self>) {
         self.activity.update(cx, |activity, cx| {
-                         let id = activity.start(label, None, cx);
-                         activity.error(id, message.to_owned(), cx);
-                     });
+            let id = activity.start(label, None, cx);
+            activity.error(id, message.to_owned(), cx);
+        });
     }
 }
 
 /// A filter to the items that have the tag called `name`.
 fn tag_filter(name: &Arc<str>, library: &TagLibrary) -> SidebarFilter {
-    SidebarFilter::Tag { name:  Arc::clone(name),
-                         items: Arc::new(library.items_with(name)), }
+    SidebarFilter::Tag {
+        name: Arc::clone(name),
+        items: Arc::new(library.items_with(name)),
+    }
 }

@@ -6,8 +6,9 @@
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use std::{
     collections::HashSet,
+    path::{Path, PathBuf},
     sync::{
-        Condvar, Mutex, Arc,
+        Arc, Condvar, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
@@ -15,14 +16,23 @@ use std::{
 
 use dtrpg_core::{
     data::collection::entry::CollectionEntry,
+    data::enums::ItemStatus,
+    data::library::{LibraryItem, LibraryItemFile},
+    data::smart_collection::SmartCollectionStore,
+    data::storage::StorageConfig,
     services::{
-        LibraryServiceError,
+        DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind,
+        collections::CollectionsService,
         collections::CollectionsServiceError,
+        collections::CollectionsServiceErrorKind,
         covers::{CoverFetchError, CoverFetcher, CoverTransport},
         network_monitor::NetworkMonitor,
     },
 };
-use gpui::TestAppContext;
+use gpui::{AppContext, Entity, TestAppContext};
+
+use crate::controllers::activity::ActivityController;
+use crate::controllers::library::LibraryController;
 
 use crate::util::file_presence::resolved_file_path;
 
@@ -38,13 +48,15 @@ const PNG: &[u8] = b"\x89PNG\r\n\x1a\n-cover";
 /// when each piece of work may finish.
 struct Permits {
     available: Mutex<usize>,
-    changed:   Condvar,
+    changed: Condvar,
 }
 
 impl Permits {
     fn new(available: usize) -> Self {
-        Self { available: Mutex::new(available),
-               changed:   Condvar::new(), }
+        Self {
+            available: Mutex::new(available),
+            changed: Condvar::new(),
+        }
     }
 
     fn release(&self, count: usize) {
@@ -65,12 +77,15 @@ impl Permits {
                 *available -= 1;
                 return true;
             }
-            assert!(Instant::now() < deadline,
-                    "no permit was released for {what}");
-            available = self.changed
-                            .wait_timeout(available, Duration::from_millis(5))
-                            .unwrap()
-                            .0;
+            assert!(
+                Instant::now() < deadline,
+                "no permit was released for {what}"
+            );
+            available = self
+                .changed
+                .wait_timeout(available, Duration::from_millis(5))
+                .unwrap()
+                .0;
         }
     }
 }
@@ -78,8 +93,8 @@ impl Permits {
 /// A cover transport that hands out one permit per request, and fails the URLs
 /// it is told to.
 pub(super) struct ScriptedTransport {
-    permits:  Permits,
-    failing:  HashSet<String>,
+    permits: Permits,
+    failing: HashSet<String>,
     requests: AtomicUsize,
 }
 
@@ -95,9 +110,11 @@ impl ScriptedTransport {
     }
 
     pub(super) fn with(permits: usize, failing: &[&str]) -> Arc<Self> {
-        Arc::new(Self { permits:  Permits::new(permits),
-                        failing:  failing.iter().map(|url| (*url).to_owned()).collect(),
-                        requests: AtomicUsize::new(0), })
+        Arc::new(Self {
+            permits: Permits::new(permits),
+            failing: failing.iter().map(|url| (*url).to_owned()).collect(),
+            requests: AtomicUsize::new(0),
+        })
     }
 
     pub(super) fn release(&self, count: usize) {
@@ -119,8 +136,10 @@ impl CoverTransport for ScriptedTransport {
         self.permits.take(url, || false);
         if self.failing.contains(url) {
             // No wait between attempts, so a failing fetch is quick.
-            return Err(CoverFetchError { message:     "boom".to_owned(),
-                                         retry_after: Some(Duration::ZERO), });
+            return Err(CoverFetchError {
+                message: "boom".to_owned(),
+                retry_after: Some(Duration::ZERO),
+            });
         }
         Ok(PNG.to_vec())
     }
@@ -130,17 +149,17 @@ impl CoverTransport for ScriptedTransport {
 /// a retry for chosen order products, and notice cancellation. It writes
 /// nothing to disk.
 pub(super) struct ScriptedLibrary {
-    permits:       Permits,
-    failing:       HashSet<u64>,
-    retrying:      HashSet<u64>,
-    started:       Mutex<Vec<u64>>,
-    cancelled:     Mutex<Vec<u64>>,
+    permits: Permits,
+    failing: HashSet<u64>,
+    retrying: HashSet<u64>,
+    started: Mutex<Vec<u64>>,
+    cancelled: Mutex<Vec<u64>>,
     check_permits: Permits,
-    missing:       HashSet<u64>,
-    erroring:      HashSet<u64>,
-    checked:       Mutex<Vec<u64>>,
+    missing: HashSet<u64>,
+    erroring: HashSet<u64>,
+    checked: Mutex<Vec<u64>>,
     /// A progress report every download makes as soon as it begins.
-    progress:      Option<(u64, Option<u64>)>,
+    progress: Option<(u64, Option<u64>)>,
 }
 
 impl ScriptedLibrary {
@@ -157,47 +176,53 @@ impl ScriptedLibrary {
     /// A service with `permits` to start, whose downloads fail for the
     /// `failing` order products and report a retry for the `retrying` ones.
     pub(super) fn with(permits: usize, failing: &[u64], retrying: &[u64]) -> Arc<Self> {
-        Arc::new(Self { permits:       Permits::new(permits),
-                        failing:       failing.iter().copied().collect(),
-                        retrying:      retrying.iter().copied().collect(),
-                        started:       Mutex::new(Vec::new()),
-                        cancelled:     Mutex::new(Vec::new()),
-                        check_permits: Permits::new(usize::MAX / 2),
-                        missing:       HashSet::new(),
-                        erroring:      HashSet::new(),
-                        checked:       Mutex::new(Vec::new()),
-                        progress:      None, })
+        Arc::new(Self {
+            permits: Permits::new(permits),
+            failing: failing.iter().copied().collect(),
+            retrying: retrying.iter().copied().collect(),
+            started: Mutex::new(Vec::new()),
+            cancelled: Mutex::new(Vec::new()),
+            check_permits: Permits::new(usize::MAX / 2),
+            missing: HashSet::new(),
+            erroring: HashSet::new(),
+            checked: Mutex::new(Vec::new()),
+            progress: None,
+        })
     }
 
     /// A service whose downloads each report `received` of `total` bytes as
     /// soon as they begin, then hold for a permit.
     pub(super) fn reporting(received: u64, total: Option<u64>) -> Arc<Self> {
-        Arc::new(Self { permits:       Permits::new(0),
-                        failing:       HashSet::new(),
-                        retrying:      HashSet::new(),
-                        started:       Mutex::new(Vec::new()),
-                        cancelled:     Mutex::new(Vec::new()),
-                        check_permits: Permits::new(usize::MAX / 2),
-                        missing:       HashSet::new(),
-                        erroring:      HashSet::new(),
-                        checked:       Mutex::new(Vec::new()),
-                        progress:      Some((received, total)), })
+        Arc::new(Self {
+            permits: Permits::new(0),
+            failing: HashSet::new(),
+            retrying: HashSet::new(),
+            started: Mutex::new(Vec::new()),
+            cancelled: Mutex::new(Vec::new()),
+            check_permits: Permits::new(usize::MAX / 2),
+            missing: HashSet::new(),
+            erroring: HashSet::new(),
+            checked: Mutex::new(Vec::new()),
+            progress: Some((received, total)),
+        })
     }
 
     /// A service whose availability checks hold for a permit each. The
     /// `missing` items are reported gone, and the `erroring` ones fail as if
     /// the network were down. Downloads finish immediately.
     pub(super) fn checking(check_permits: usize, missing: &[u64], erroring: &[u64]) -> Arc<Self> {
-        Arc::new(Self { permits:       Permits::new(usize::MAX / 2),
-                        failing:       HashSet::new(),
-                        retrying:      HashSet::new(),
-                        started:       Mutex::new(Vec::new()),
-                        cancelled:     Mutex::new(Vec::new()),
-                        check_permits: Permits::new(check_permits),
-                        missing:       missing.iter().copied().collect(),
-                        erroring:      erroring.iter().copied().collect(),
-                        checked:       Mutex::new(Vec::new()),
-                        progress:      None, })
+        Arc::new(Self {
+            permits: Permits::new(usize::MAX / 2),
+            failing: HashSet::new(),
+            retrying: HashSet::new(),
+            started: Mutex::new(Vec::new()),
+            cancelled: Mutex::new(Vec::new()),
+            check_permits: Permits::new(check_permits),
+            missing: missing.iter().copied().collect(),
+            erroring: erroring.iter().copied().collect(),
+            checked: Mutex::new(Vec::new()),
+            progress: None,
+        })
     }
 
     /// Lets one more availability check finish.
@@ -238,19 +263,25 @@ impl LibraryService for SharedLibrary {
         library.checked.lock().unwrap().push(id);
         library.check_permits.take("a check", || false);
         if library.missing.contains(&id) {
-            return Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "gone"));
+            return Err(LibraryServiceError::new(
+                LibraryServiceErrorKind::NotFound,
+                "gone",
+            ));
         }
         if library.erroring.contains(&id) {
-            return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network, "offline"));
+            return Err(LibraryServiceError::new(
+                LibraryServiceErrorKind::Network,
+                "offline",
+            ));
         }
         let mut fresh = bare_item("fresh");
         fresh.title = Arc::from(REFRESHED_TITLE);
         Ok(fresh)
     }
 
-    fn download_item(&self, order_product_id: u64, _index: u32, _dest: &Path,
-                     mut control: DownloadControl<'_>)
-                     -> Result<(), LibraryServiceError> {
+    fn download_item(
+        &self, order_product_id: u64, _index: u32, _dest: &Path, mut control: DownloadControl<'_>,
+    ) -> Result<(), LibraryServiceError> {
         let library = &self.0;
         library.started.lock().unwrap().push(order_product_id);
         if library.retrying.contains(&order_product_id) {
@@ -260,14 +291,20 @@ impl LibraryService for SharedLibrary {
             control.report_progress(received, total);
         }
         let go = library.permits.take("a download", || {
-                                    control.cancel_flag().load(Ordering::SeqCst)
-                                });
+            control.cancel_flag().load(Ordering::SeqCst)
+        });
         if !go {
             library.cancelled.lock().unwrap().push(order_product_id);
-            return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network, "cancelled"));
+            return Err(LibraryServiceError::new(
+                LibraryServiceErrorKind::Network,
+                "cancelled",
+            ));
         }
         if library.failing.contains(&order_product_id) {
-            return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network, "boom"));
+            return Err(LibraryServiceError::new(
+                LibraryServiceErrorKind::Network,
+                "boom",
+            ));
         }
         Ok(())
     }
@@ -289,13 +326,15 @@ impl CollectionsService for UnusedCollections {
         Err(unused())
     }
 
-    fn add_member(&self, _collection_id: u64, _item_id: u64)
-                  -> Result<(), CollectionsServiceError> {
+    fn add_member(
+        &self, _collection_id: u64, _item_id: u64,
+    ) -> Result<(), CollectionsServiceError> {
         Err(unused())
     }
 
-    fn remove_member(&self, _collection_id: u64, _item_id: u64)
-                     -> Result<(), CollectionsServiceError> {
+    fn remove_member(
+        &self, _collection_id: u64, _item_id: u64,
+    ) -> Result<(), CollectionsServiceError> {
         Err(unused())
     }
 }
@@ -309,20 +348,22 @@ pub(super) fn url_for(id: &str) -> Arc<str> {
 }
 
 fn bare_item(id: &str) -> LibraryItem {
-    LibraryItem::new(id,
-                     id,
-                     "Publisher",
-                     "Line",
-                     "Core",
-                     "PDF",
-                     0,
-                     0.0,
-                     2020,
-                     0,
-                     ItemStatus::Cloud,
-                     "#000000",
-                     "",
-                     None)
+    LibraryItem::new(
+        id,
+        id,
+        "Publisher",
+        "Line",
+        "Core",
+        "PDF",
+        0,
+        0.0,
+        2020,
+        0,
+        ItemStatus::Cloud,
+        "#000000",
+        "",
+        None,
+    )
 }
 
 /// An entry with a cover URL and no files.
@@ -343,28 +384,30 @@ pub(super) fn item_numbered(id: &str, numeric_id: u64) -> LibraryItem {
 pub(super) fn item_with_files(id: &str, order_product_id: u64, files: u32) -> LibraryItem {
     let mut item = bare_item(id);
     item.order_product_id = order_product_id;
-    item.files = (0..files).map(|index| LibraryItemFile { id: format!("{id}-{index}").into(),
-                                                          index,
-                                                          name:
-                                                              format!("File {index}.pdf").into(),
-                                                          format: "PDF".into(),
-                                                          size_mb: 1.0,
-                                                          downloaded: false,
-                                                          offloaded: false })
-                           .collect();
+    item.files = (0..files)
+        .map(|index| LibraryItemFile {
+            id: format!("{id}-{index}").into(),
+            index,
+            name: format!("File {index}.pdf").into(),
+            format: "PDF".into(),
+            size_mb: 1.0,
+            downloaded: false,
+            offloaded: false,
+        })
+        .collect();
     item
 }
 
 /// A real controller wired to the scripted fakes.
 pub(super) struct Fixture {
     pub(super) controller: Entity<LibraryController>,
-    pub(super) activity:   Entity<ActivityController>,
-    pub(super) transport:  Arc<ScriptedTransport>,
-    pub(super) library:    Arc<ScriptedLibrary>,
+    pub(super) activity: Entity<ActivityController>,
+    pub(super) transport: Arc<ScriptedTransport>,
+    pub(super) library: Arc<ScriptedLibrary>,
     /// The directory the catalog cache is saved to.
-    pub(super) cache:      PathBuf,
+    pub(super) cache: PathBuf,
     /// Keeps the temporary directories alive for the length of the test.
-    _dirs:                 Vec<tempfile::TempDir>,
+    _dirs: Vec<tempfile::TempDir>,
 }
 
 impl Fixture {
@@ -382,28 +425,28 @@ impl Fixture {
 
 /// Builds a controller holding entries with covers for `ids`, fetching covers
 /// through `transport` and running at most `limit` jobs at once.
-pub(super) fn fixture(cx: &mut TestAppContext, transport: Arc<ScriptedTransport>, limit: usize,
-                      ids: &[&str])
-                      -> Fixture {
+pub(super) fn fixture(
+    cx: &mut TestAppContext, transport: Arc<ScriptedTransport>, limit: usize, ids: &[&str],
+) -> Fixture {
     let items = ids.iter().map(|id| item_with_cover(id)).collect();
     fixture_with(cx, transport, ScriptedLibrary::open(), limit, items)
 }
 
 /// Builds a controller holding `items`, fetching covers through `transport`,
 /// downloading through `library`, and running at most `limit` jobs at once.
-pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTransport>,
-                           library: Arc<ScriptedLibrary>, limit: usize, items: Vec<LibraryItem>)
-                           -> Fixture {
+pub(super) fn fixture_with(
+    cx: &mut TestAppContext, transport: Arc<ScriptedTransport>, library: Arc<ScriptedLibrary>,
+    limit: usize, items: Vec<LibraryItem>,
+) -> Fixture {
     cx.update(|cx| cx.set_global(CoverCache::new()));
     let covers = tempfile::tempdir().unwrap();
     let app_dir = tempfile::tempdir().unwrap();
     let app_dir_path = app_dir.path().to_path_buf();
     let cache = tempfile::tempdir().unwrap();
     let cache_path = cache.path().to_path_buf();
-    let activity = cx.new(|_| super::super::ActivityController::new());
-    let controller =
-        cx.new(|cx| {
-              let (mut ctrl, events, sync_events) = super::super::LibraryController::build_with_roots(
+    let activity = cx.new(|_| ActivityController::new());
+    let controller = cx.new(|cx| {
+        let (mut ctrl, events, sync_events) = LibraryController::build_with_roots(
             Box::new(SharedLibrary(Arc::clone(&library))),
             Box::new(UnusedCollections),
             activity.clone(),
@@ -411,28 +454,31 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
             cache_path.clone(),
             SmartCollectionStore::load_or_set_aside(cache_path.join("smart_collections.toml")),
         );
-              // `ctrl.library` was just constructed above and not yet shared
-              // with anything else, so this is the one unique reference —
-              // `get_mut` can't fail.
-              #[allow(clippy::expect_used)]
-              let lib = Arc::get_mut(&mut ctrl.library).expect("library is not yet shared");
-              lib.cover_fetcher = Arc::new(CoverFetcher::new(Arc::clone(&transport)
-                                                             as Arc<dyn CoverTransport>,
-                                                             covers.path().to_path_buf()));
-              // A test must not wait on, or depend on, the real network.
-              lib.network_monitor = Arc::new(NetworkMonitor::fixed(true));
-              lib.work.set_limit(limit);
-              lib.index.lock().unwrap().replace_all_items(&items).unwrap();
-              ctrl.start_work_event_pump(events, cx);
-              ctrl.start_catalog_sync_event_pump(sync_events, cx);
-              ctrl
-          });
-    Fixture { controller,
-              activity,
-              transport,
-              library,
-              cache: cache_path,
-              _dirs: vec![covers, cache] }
+        // `ctrl.library` was just constructed above and not yet shared
+        // with anything else, so this is the one unique reference —
+        // `get_mut` can't fail.
+        #[allow(clippy::expect_used)]
+        let lib = Arc::get_mut(&mut ctrl.library).expect("library is not yet shared");
+        lib.cover_fetcher = Arc::new(CoverFetcher::new(
+            Arc::clone(&transport) as Arc<dyn CoverTransport>,
+            covers.path().to_path_buf(),
+        ));
+        // A test must not wait on, or depend on, the real network.
+        lib.network_monitor = Arc::new(NetworkMonitor::fixed(true));
+        lib.work.set_limit(limit);
+        lib.index.lock().unwrap().replace_all_items(&items).unwrap();
+        ctrl.start_work_event_pump(events, cx);
+        ctrl.start_catalog_sync_event_pump(sync_events, cx);
+        ctrl
+    });
+    Fixture {
+        controller,
+        activity,
+        transport,
+        library,
+        cache: cache_path,
+        _dirs: vec![covers, cache],
+    }
 }
 
 /// Lets the event loop run until `done` holds. Work runs on other threads, so
@@ -445,8 +491,10 @@ pub(super) fn wait_for(cx: &mut TestAppContext, mut done: impl FnMut(&mut TestAp
         if done(cx) {
             return;
         }
-        assert!(Instant::now() < deadline,
-                "condition not met within {WAIT:?}");
+        assert!(
+            Instant::now() < deadline,
+            "condition not met within {WAIT:?}"
+        );
         std::thread::sleep(Duration::from_millis(5));
     }
 }
@@ -462,9 +510,9 @@ pub(super) fn in_flight(cx: &mut TestAppContext, id: &str) -> bool {
 /// How many activity entries are running and how many have finished.
 pub(super) fn activity_counts(fixture: &Fixture, cx: &mut TestAppContext) -> (usize, usize) {
     fixture.activity.read_with(cx, |activity, _| {
-                        let snapshot = activity.snapshot();
-                        (snapshot.in_progress_count, snapshot.recent_count)
-                    })
+        let snapshot = activity.snapshot();
+        (snapshot.in_progress_count, snapshot.recent_count)
+    })
 }
 
 /// Puts the file of `item` at `index` on disk where the app would have put it.

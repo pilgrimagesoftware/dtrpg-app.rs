@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::sync::{Mutex, Arc};
-
+use crate::data::events::*;
 use gpui::TestAppContext;
 
 use super::{support::*, *};

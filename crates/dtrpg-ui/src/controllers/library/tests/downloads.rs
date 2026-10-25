@@ -10,8 +10,9 @@ use dtrpg_core::data::library::LibraryItem;
 use dtrpg_core::data::activity::ActivityStatus;
 use gpui::TestAppContext;
 use crate::data::events::*;
-use super::{support::*, *};
+use super::{support::*};
 use dtrpg_core::data::enums::ItemStatus;
+use rust_i18n::t;
 
 /// Order products, one per test entry, so the service can tell downloads apart.
 const A: u64 = 11;
