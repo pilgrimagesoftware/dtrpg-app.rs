@@ -10,7 +10,7 @@ use dtrpg_core::data::mcp_access::{
     AppReply, AuditLog, IpcEndpoint, IpcListener, McpScope, McpSettings, McpTool,
 };
 use dtrpg_core::data::summary::ContentSummary;
-use dtrpg_core::services::sdk::{RustSdkCollectionsService, SdkLibraryService};
+use dtrpg_core::services::sdk::{SdkCollectionsService, SdkLibraryService};
 use rmcp::handler::server::wrapper::Parameters;
 
 use crate::requests::{
@@ -57,7 +57,7 @@ fn server_with(name: &str, configure: impl FnOnce(&mut McpSettings)) -> (LibriMc
     let settings_path = dir.join("mcp.toml");
     configure(&mut McpSettings::load_from(&settings_path));
     let api = LibraryApi::new(Box::new(SdkLibraryService::unauthenticated()),
-                              Box::new(RustSdkCollectionsService::unauthenticated()),
+                              Box::new(SdkCollectionsService::unauthenticated()),
                               dir.clone());
     let access = Access::at(settings_path,
                             dir.join("audit.jsonl"),

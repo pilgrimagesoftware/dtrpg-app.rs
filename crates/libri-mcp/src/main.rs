@@ -15,7 +15,7 @@ mod tools_read;
 
 use dtrpg_core::api::LibraryApi;
 use dtrpg_core::data::paths::app_data_dir;
-use dtrpg_core::services::sdk::{RustSdkCollectionsService, SdkLibraryService};
+use dtrpg_core::services::sdk::{SdkCollectionsService, SdkLibraryService};
 use rmcp::ServiceExt;
 
 use crate::server::{Access, LibriMcpServer};
@@ -24,7 +24,7 @@ use crate::server::{Access, LibriMcpServer};
 #[allow(clippy::result_large_err)]
 async fn main() -> Result<(), rmcp::RmcpError> {
     let api = LibraryApi::new(Box::new(SdkLibraryService::unauthenticated()),
-                              Box::new(RustSdkCollectionsService::unauthenticated()),
+                              Box::new(SdkCollectionsService::unauthenticated()),
                               app_data_dir());
 
     let service = LibriMcpServer::new(api, Access::production()).serve(rmcp::transport::stdio())
