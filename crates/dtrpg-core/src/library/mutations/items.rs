@@ -113,12 +113,12 @@ impl Library {
 
     /// Removes every entry from the catalog index.
     pub fn clear_catalog(&self) {
-        let cleared = self.index
-                          .lock()
-                          .unwrap_or_else(PoisonError::into_inner)
-                          .replace_all_items(&[]);
-        if let Err(error) = cleared {
-            tracing::error!(%error, "failed to clear the library index");
+        let mut guard = self.index.lock().expect("index mutex locked");
+        let cleared = guard.replace_all_items(&[]);
+        drop(guard);
+        match cleared {
+            Ok(()) => {}
+            Err(error) => tracing::error!(%error, "failed to clear the library index"),
         }
     }
 
