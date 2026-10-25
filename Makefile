@@ -48,6 +48,9 @@ size-check:
 		exit 1; \
 	fi
 
+build:
+	cargo build --workspace
+
 lint:
 	cargo clippy --workspace --all-targets -- -D warnings
 
