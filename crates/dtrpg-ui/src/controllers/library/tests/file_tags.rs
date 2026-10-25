@@ -6,7 +6,7 @@
 use std::path::*;
 
 use dtrpg_core::data::activity::ActivityStatus;
-use dtrpg_core::data::storage::{StorageConfig};
+use dtrpg_core::data::storage::StorageConfig;
 use dtrpg_core::services::tag_projection::{ProjectionFailure, ReconcileReport};
 use gpui::TestAppContext;
 

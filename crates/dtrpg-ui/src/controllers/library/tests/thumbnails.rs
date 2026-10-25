@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use gpui::TestAppContext;
 
-use super::{support::*};
+use super::support::*;
 use crate::data::events::*;
 
 fn requested(fixture: &Fixture, cx: &mut TestAppContext, id: &str) {
