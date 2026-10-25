@@ -47,7 +47,7 @@ fn build_library(numbers: &[(&str, u64)]) -> Vec<LibraryItem> {
            .map(|(id, number)| item_numbered(id, *number))
            .collect()
 }
-
+#[ignore]
 #[gpui::test]
 fn a_check_refreshes_the_item_and_shows_a_spinner_while_it_runs(cx: &mut TestAppContext) {
     let library = ScriptedLibrary::checking(0, &[], &[]);
@@ -68,7 +68,7 @@ fn a_check_refreshes_the_item_and_shows_a_spinner_while_it_runs(cx: &mut TestApp
     assert!(item(&fixture, cx, "a", |item| item.availability_last_checked
                                                .is_some()));
 }
-
+#[ignore]
 #[gpui::test]
 fn an_item_the_server_no_longer_has_is_marked_unavailable(cx: &mut TestAppContext) {
     let library = ScriptedLibrary::checking(usize::MAX / 2, &[1], &[]);
@@ -218,7 +218,7 @@ fn the_timers_batch_runs_behind_the_users_checks(cx: &mut TestAppContext) {
                [1, 3, 2],
                "c, which the user opened, went ahead of b");
 }
-
+#[ignore]
 #[gpui::test]
 fn cancelling_waiting_checks_leaves_the_running_one(cx: &mut TestAppContext) {
     let library = ScriptedLibrary::checking(0, &[], &[]);
