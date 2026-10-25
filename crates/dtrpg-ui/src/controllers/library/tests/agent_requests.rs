@@ -1,6 +1,6 @@
 //! Tests that the app does what an agent asks for, and says no when it
 //! cannot. The socket and the settings check are tested where they live, in
-//! `dtrpg-core` and `dtrpg-mcp`.
+//! `dtrpg-core` and `libri-mcp`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

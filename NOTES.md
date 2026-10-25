@@ -19,7 +19,7 @@ Branch: `feature/libri-v2-crate-inversion`, off `develop`.
   more of it, not ahead of them).
 - Split the former single `dtrpg-core` binary into `dtrpg-desktop` (the
   GPUI app; `[[bin]] name = "Libri"`, cargo-packager metadata moved here
-  unchanged) and `dtrpg-mcp` (new stub binary; constructs a `LibraryApi`
+  unchanged) and `libri-mcp` (new stub binary; constructs a `LibraryApi`
   over the unauthenticated SDK services and prints proof it linked with no
   GPUI dependency — the actual MCP protocol surface is out of scope here).
 - `TokenStatusHandle` (plain data, moved to core) and its one GPUI `Global`
@@ -269,7 +269,7 @@ User docs are `docs/site/latest/tags.md`, `catalog.md`, `mcp.md`,
 | Reconcile files' tags with the index (launch and reload) | `dtrpg-core` `services/tag_projection`, `dtrpg-ui` `controllers/library/file_tags.rs` | #333, #337 |
 | Collection alias made on add, removed on remove | `controllers/library/collection_links.rs`, `collections.rs` | #338, #344 |
 | Tag colors are not read from files | `platform/tags.rs`, ADR 0009 | #339 |
-| MCP tools `list_tags`, `get_item_tags`, `set_tags`, `set_tag_color` | `dtrpg-mcp/src/main.rs` | #340 |
+| MCP tools `list_tags`, `get_item_tags`, `set_tags`, `set_tag_color` | `libri-mcp/src/main.rs` | #340 |
 | `tag:` / `-tag:` search | `dtrpg-core` `util/search.rs` | #341 |
 | Group by tag (`GroupBy` enum) | `data/enums.rs`, `util/publisher.rs`, `catalog_view.rs` | #345 |
 | List column chooser and Tags column (`ListColumn` enum) | `data/enums.rs`, `ui/views/list_columns.rs` | #346 |
@@ -363,7 +363,7 @@ make lint
 make test
 ```
 
-All three were clean at `7cb8e17` (481 `dtrpg-core` tests, 6 `dtrpg-mcp`, 339
+All three were clean at `7cb8e17` (481 `dtrpg-core` tests, 6 `libri-mcp`, 339
 `dtrpg-ui`, plus doctests).
 
 Process: `develop` is the source of truth. Work on a branch from it, open a

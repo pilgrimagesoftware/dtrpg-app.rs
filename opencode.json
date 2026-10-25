@@ -1,0 +1,12 @@
+{
+  "mcp": {
+    "servers": {
+      "libri": {
+        "type": "local",
+        "command": [
+          "/Applications/Libri.app/Contents/MacOS/libri-mcp"
+        ]
+      }
+    }
+  }
+}

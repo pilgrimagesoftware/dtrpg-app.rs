@@ -4,7 +4,7 @@
 //!
 //! No module here may depend on `gpui`. `dtrpg-ui` depends on this crate, not
 //! the other way round; the desktop app (`dtrpg-desktop`) and the MCP server
-//! (`dtrpg-mcp`) are both thin binaries on top of it.
+//! (`libri-mcp`) are both thin binaries on top of it.
 
 pub mod api;
 pub mod constants;

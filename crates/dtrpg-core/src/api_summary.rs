@@ -123,7 +123,7 @@ mod tests {
     use crate::data::enums::ItemStatus;
     use crate::data::index::LibraryIndex;
     use crate::data::library::LibraryItem;
-    use crate::services::sdk::{RustSdkCollectionsService, SdkLibraryService};
+    use crate::services::sdk::{SdkCollectionsService, SdkLibraryService};
 
     /// An API over a fresh index holding one item, `item-1`, plus the folder
     /// it lives in.
@@ -147,7 +147,7 @@ mod tests {
                                                   .replace_all_items(&[item])
                                                   .unwrap();
         let api = LibraryApi::new(Box::new(SdkLibraryService::unauthenticated()),
-                                  Box::new(RustSdkCollectionsService::unauthenticated()),
+                                  Box::new(SdkCollectionsService::unauthenticated()),
                                   dir.path());
         (api, dir)
     }

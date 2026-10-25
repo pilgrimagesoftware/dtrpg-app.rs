@@ -24,7 +24,7 @@ wired straight into the activity panel entity.
 Four things follow from where this lives:
 
 - **Nothing headless can schedule work.** The queue state is inside a GPUI
-  entity, so the MCP server (`dtrpg-mcp`) cannot download or fetch anything
+  entity, so the MCP server (`libri-mcp`) cannot download or fetch anything
   without linking GPUI. This is the same forcing function as ADR 0002.
 - **A user-initiated download waits behind a backlog.** Order is strictly
   FIFO, so a download the user just asked for queues behind every
@@ -138,7 +138,7 @@ This is a sketch of the contract, not final signatures.
   drops its three `VecDeque`s, its slot counters, and `available_slots`; it
   keeps view state (which items are checking or downloading, activity ids)
   keyed by `JobId`. The Storage settings page calls `set_limit`.
-- **`dtrpg-mcp`** submits the same jobs through `LibraryApi` and reads the
+- **`libri-mcp`** submits the same jobs through `LibraryApi` and reads the
   same events, with no window and no GPUI.
 - **`LibraryApi`** is the only public path to the queue, consistent with
   ADR 0002.
@@ -328,4 +328,3 @@ say.
 - **`LibraryApi` is not involved yet.** The queue still belongs to the desktop
   controller, and the MCP server has no download tool. When one is added, it
   can read the same `Progress` events.
-

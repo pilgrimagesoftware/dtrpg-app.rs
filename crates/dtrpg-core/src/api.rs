@@ -2,7 +2,7 @@
 //! outside this crate. See
 //! `docs/adr/0002-invert-crate-graph-and-add-library-facade.md`.
 //!
-//! Both the desktop UI (`dtrpg-desktop`) and the MCP server (`dtrpg-mcp`) go
+//! Both the desktop UI (`dtrpg-desktop`) and the MCP server (`libri-mcp`) go
 //! through this facade rather than reaching into `services`, `data`, or
 //! `credentials` directly, which is what keeps the two from drifting apart.
 //! This is an initial, minimal surface -- it grows as the goals that need it

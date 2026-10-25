@@ -5,7 +5,7 @@ use dtrpg_core::api::{LibraryApi, SummarizeError, provider_for};
 use dtrpg_core::data::paths::app_data_dir;
 use dtrpg_core::data::summary::ContentSummary;
 use dtrpg_core::data::summary_settings::{SummarySettings, SummarySettingsFile};
-use dtrpg_core::services::sdk::{RustSdkCollectionsService, SdkLibraryService};
+use dtrpg_core::services::sdk::{SdkCollectionsService, SdkLibraryService};
 
 use super::*;
 
@@ -16,7 +16,7 @@ fn summarize(item_id: &str, settings: &SummarySettingsFile)
              -> Result<ContentSummary, SummarizeError> {
     let provider = provider_for(settings)?;
     let api = LibraryApi::new(Box::new(SdkLibraryService::unauthenticated()),
-                              Box::new(RustSdkCollectionsService::unauthenticated()),
+                              Box::new(SdkCollectionsService::unauthenticated()),
                               app_data_dir());
     api.summarize_item(item_id, &StorageConfig::load(), settings, &*provider)
 }

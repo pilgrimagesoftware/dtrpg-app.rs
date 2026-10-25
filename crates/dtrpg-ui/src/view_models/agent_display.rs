@@ -11,7 +11,7 @@ use rust_i18n::t;
 use crate::view_models::summary_display::SummaryPage;
 
 /// The name of the MCP server program, as the build produces it.
-const SERVER_PROGRAM: &str = "dtrpg-mcp";
+const SERVER_PROGRAM: &str = "libri-mcp";
 
 /// Where the MCP server program is, given the folder the app runs from: the
 /// program next to the app. The server is built alongside the app, so it is
@@ -40,7 +40,7 @@ pub fn locate_mcp_server(app_dir: &Path) -> PathBuf {
 /// ```
 /// use dtrpg_ui::view_models::agent_display::agent_config_json;
 ///
-/// assert!(agent_config_json("/opt/libri/dtrpg-mcp").contains("\"command\": \"/opt/libri/dtrpg-mcp\""));
+/// assert!(agent_config_json("/opt/libri/libri-mcp").contains("\"command\": \"/opt/libri/libri-mcp\""));
 /// ```
 #[must_use]
 pub fn agent_config_json(command: &str) -> String {

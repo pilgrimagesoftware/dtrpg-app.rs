@@ -29,6 +29,6 @@ identified up front so the screens built on them are not blocked or reworked.
 
 By reading the mockups and the code: the views under
 `crates/dtrpg-ui/src/ui/views/`, the core types in `crates/dtrpg-core`, and the
-`dtrpg-mcp` tool list. The app was not run and compared visually, so "built"
+`libri-mcp` tool list. The app was not run and compared visually, so "built"
 means the feature exists in code, not that it matches the mockup pixel for
 pixel. Items I could not confirm from code are marked "unverified".

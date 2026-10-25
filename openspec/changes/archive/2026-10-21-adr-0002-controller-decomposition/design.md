@@ -18,7 +18,7 @@ The goal is to separate the library *session* (core) from the library *view*
 
 ```text
 +----------------------------+        +----------------------------+
-| dtrpg-desktop / dtrpg-ui   |        | dtrpg-mcp / headless tests   |
+| dtrpg-desktop / dtrpg-ui   |        | libri-mcp / headless tests   |
 |                            |        |                              |
 | LibraryController (view)   |        | Library (core)               |
 |   - selection              |<------>|   - LibraryIndex             |

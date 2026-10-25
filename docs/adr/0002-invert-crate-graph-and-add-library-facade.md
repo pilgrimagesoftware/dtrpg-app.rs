@@ -50,7 +50,7 @@ around.
 
 Two thin binary crates replace the current single binary: `dtrpg-desktop`
 (depends on `dtrpg-core` and `dtrpg-ui`, wires dependency injection and
-globals) and `dtrpg-mcp` (depends on `dtrpg-core` only, and must never link
+globals) and `libri-mcp` (depends on `dtrpg-core` only, and must never link
 `dtrpg-ui` or GPUI). The workspace grows from two crates to four.
 `platform`, `api`, `archive`, and `insight` live as modules inside
 `dtrpg-core`, not as further crates: Cargo's `[target.'cfg(...)'.dependencies]`

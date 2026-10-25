@@ -3,13 +3,13 @@ default-members = [
     "crates/dtrpg-core",
     "crates/dtrpg-ui",
     "crates/dtrpg-desktop",
-    "crates/dtrpg-mcp",
+    "crates/libri-mcp",
 ]
 members = [
     "crates/dtrpg-core",
     "crates/dtrpg-ui",
     "crates/dtrpg-desktop",
-    "crates/dtrpg-mcp",
+    "crates/libri-mcp",
 ]
 resolver = "2"
 

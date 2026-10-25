@@ -17,11 +17,11 @@ use crate::{
 };
 
 /// Collections service adapter backed by the Rust SDK.
-pub struct RustSdkCollectionsService {
+pub struct SdkCollectionsService {
     gateway: Box<dyn SdkCollectionsGateway>,
 }
 
-impl RustSdkCollectionsService {
+impl SdkCollectionsService {
     /// Creates a service from an SDK gateway implementation.
     pub fn new(gateway: Box<dyn SdkCollectionsGateway>) -> Self {
         Self { gateway }
@@ -51,7 +51,7 @@ impl RustSdkCollectionsService {
     }
 }
 
-impl CollectionsService for RustSdkCollectionsService {
+impl CollectionsService for SdkCollectionsService {
     fn list_collections(&self) -> Result<Vec<CollectionEntry>, CollectionsServiceError> {
         // Fetch all product list pages.
         let mut all_lists = Vec::new();
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn seeded_data_produces_correct_collection_entries() {
-        let service = RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
+        let service = SdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
         let collections = service.list_collections().expect("list collections");
 
         assert_eq!(collections.len(), 1);
@@ -316,17 +316,15 @@ mod tests {
 
     #[test]
     fn session_error_propagates() {
-        let service =
-            RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
+        let service = SdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
         let err = service.list_collections().expect_err("session error");
         assert_eq!(err.kind, CollectionsServiceErrorKind::Session);
     }
 
     #[test]
     fn items_with_missing_order_product_id_are_skipped() {
-        let service = RustSdkCollectionsService::new(Box::new(
-            FakeCollectionsGateway::items_with_missing_field(),
-        ));
+        let service =
+            SdkCollectionsService::new(Box::new(FakeCollectionsGateway::items_with_missing_field()));
         let collections = service.list_collections().expect("list collections");
         assert_eq!(collections.len(), 1);
         let member_ids = &collections[0].member_ids;
@@ -335,7 +333,7 @@ mod tests {
 
     #[test]
     fn create_collection_returns_correct_entry() {
-        let service = RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
+        let service = SdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
         let entry = service.create_collection("New List")
                            .expect("create collection");
 
@@ -346,8 +344,7 @@ mod tests {
 
     #[test]
     fn create_collection_propagates_session_error() {
-        let service =
-            RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
+        let service = SdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
         let err = service.create_collection("Anything")
                          .expect_err("session error");
         assert_eq!(err.kind, CollectionsServiceErrorKind::Session);

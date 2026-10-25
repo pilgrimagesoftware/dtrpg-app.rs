@@ -57,14 +57,14 @@ copyright = "Copyright (c) 2026 Pilgrimage Software"
 category = "Utility"
 # Build both the main app binary and the MCP server helper so that both are
 # present in target/<triple>/release/ when cargo-packager collects binaries.
-before-packaging-command = "cargo build --release --package dtrpg-desktop --features sentry && cargo build --release --package dtrpg-mcp"
+before-packaging-command = "cargo build --release --package dtrpg-desktop --features sentry && cargo build --release --package libri-mcp"
 icons = ["../../assets/icon/icon.png", "../../assets/icon/icon.icns", "../../assets/icon/icon.ico"]
 
 # The primary app binary plus the MCP helper that external agents (Claude,
 # Codex, etc.) launch via the documented `mcpServers` configuration.
 binaries = [
     { path = "Libri", main = true },
-    { path = "dtrpg-mcp", main = false },
+    { path = "libri-mcp", main = false },
 ]
 
 [package.metadata.packager.macos]
