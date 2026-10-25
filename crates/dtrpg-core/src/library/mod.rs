@@ -8,12 +8,14 @@
 //! mutations (Slice 5). It is the core side of the ADR 0002 controller
 //! decomposition.
 
+mod core;
 pub mod insights;
 mod jobs;
 mod mutations;
 mod queries;
-mod session;
 mod sync;
+
+pub use core::Library;
 
 pub use jobs::{CheckJob, CheckResult, DownloadJob, DownloadKey, DownloadSubmission, ThumbnailJob};
 pub use mutations::{
@@ -21,5 +23,4 @@ pub use mutations::{
     revert_added_member,
 };
 pub use queries::{Facets, SmartPreview, ViewState};
-pub use session::Library;
 pub use sync::{LibraryEvent, LibraryEvents, SyncStage, reload_cooldown_active};

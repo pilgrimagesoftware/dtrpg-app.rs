@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::constants::BULK_ACTION_CONFIRM_THRESHOLD;
 use dtrpg_core::data::enums::SelectionField;
 use dtrpg_core::data::library::LibraryItem;

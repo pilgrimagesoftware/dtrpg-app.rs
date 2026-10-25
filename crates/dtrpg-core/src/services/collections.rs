@@ -1,6 +1,6 @@
 //! Service trait and error types for collections access.
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 
 /// The type of failure returned by collections operations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -16,11 +16,11 @@ use crate::{
 };
 
 /// Library service adapter backed by the Rust SDK.
-pub struct RustSdkLibraryService {
+pub struct SdkLibraryService {
     gateway: Box<dyn SdkLibraryGateway>,
 }
 
-impl RustSdkLibraryService {
+impl SdkLibraryService {
     /// Creates a service from an SDK gateway implementation.
     pub fn new(gateway: Box<dyn SdkLibraryGateway>) -> Self {
         Self { gateway }
@@ -65,7 +65,7 @@ impl RustSdkLibraryService {
     }
 }
 
-impl LibraryService for RustSdkLibraryService {
+impl LibraryService for SdkLibraryService {
     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError> {
         let mut all_items: Vec<LibraryItem> = Vec::new();
         self.list_items_paged(&mut |page_items| all_items.extend(page_items), None)?;

@@ -6,8 +6,8 @@
 use std::path::Path;
 
 use crate::data::avatar::avatar_cached;
-use crate::data::catalog_cache::{CacheMetadata, load_cache_metadata};
-use crate::data::paths::{cache_dir, covers_dir};
+use crate::data::library_metadata::{LibraryMetadata, load_library_metadata};
+use crate::data::paths::covers_dir;
 
 /// Per-type counts of regenerable app cache data.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -29,14 +29,14 @@ pub struct CacheCounts {
 
 impl CacheCounts {
     /// Reads the counts from disk: a cache-metadata sidecar read (no full
-    /// catalog parse), one `read_dir` of the covers directory, and one avatar
+    /// library parse), one `read_dir` of the covers directory, and one avatar
     /// `exists()` check. It touches disk, so call it when the page is opened or
     /// the cache changes, never while drawing.
     #[must_use]
     pub fn read() -> Self {
         let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
                                                               .unwrap_or(0);
-        Self::from_parts(load_cache_metadata(&cache_dir()).as_ref(),
+        Self::from_parts(load_library_metadata(&crate::data::paths::app_data_dir()).as_ref(),
                          cover_thumbnails,
                          avatar_cached())
     }
@@ -44,7 +44,7 @@ impl CacheCounts {
     /// The counts for the given cache metadata, cover file count and avatar
     /// state.
     #[must_use]
-    pub fn from_parts(metadata: Option<&CacheMetadata>, cover_thumbnails: usize,
+    pub fn from_parts(metadata: Option<&LibraryMetadata>, cover_thumbnails: usize,
                       avatar_cached: bool)
                       -> Self {
         let secs = |secs: u64| i64::try_from(secs).unwrap_or(i64::MAX);
@@ -57,12 +57,12 @@ impl CacheCounts {
     }
 }
 
-/// Counts for the cache under `cache` and `covers`, for tests that build their
-/// own folders.
+/// Counts for the cache under `app_data` and `covers`, for tests that build
+/// their own folders.
 #[cfg(test)]
-fn read_from(cache: &Path, covers: &Path, avatar_cached: bool) -> CacheCounts {
+fn read_from(app_data: &Path, covers: &Path, avatar_cached: bool) -> CacheCounts {
     let cover_thumbnails = std::fs::read_dir(covers).map(Iterator::count).unwrap_or(0);
-    CacheCounts::from_parts(load_cache_metadata(cache).as_ref(),
+    CacheCounts::from_parts(load_library_metadata(app_data).as_ref(),
                             cover_thumbnails,
                             avatar_cached)
 }
@@ -82,11 +82,11 @@ mod tests {
 
     #[test]
     fn the_metadata_gives_the_item_count_and_the_two_times() {
-        let metadata = CacheMetadata { saved_at_secs:                   1_000,
-                                       item_count:                      42,
-                                       schema_version:                  0,
-                                       last_item_check_batch_secs:      Some(2_000),
-                                       last_fresh_install_request_secs: None, };
+        let metadata = LibraryMetadata { saved_at_secs:                   1_000,
+                                         item_count:                      42,
+                                         schema_version:                  0,
+                                         last_item_check_batch_secs:      Some(2_000),
+                                         last_fresh_install_request_secs: None, };
 
         let counts = CacheCounts::from_parts(Some(&metadata), 7, true);
 

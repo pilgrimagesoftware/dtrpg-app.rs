@@ -3,9 +3,9 @@
 //! ADR 0002 Slice 2, alongside the functions themselves.
 
 use super::merge::*;
-use crate::data::catalog_cache::CacheMetadata;
 use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, LibraryItemFile};
+use crate::data::library_metadata::LibraryMetadata;
 
 fn item(id: &str, title: &str) -> LibraryItem {
     LibraryItem::new(id,
@@ -155,12 +155,12 @@ mod reconcile_catalog_tests {
 mod reload_cooldown_tests {
     use super::*;
 
-    fn meta(saved_at_secs: u64) -> CacheMetadata {
-        CacheMetadata { saved_at_secs,
-                        item_count: 10,
-                        schema_version: 2,
-                        last_item_check_batch_secs: None,
-                        last_fresh_install_request_secs: None }
+    fn meta(saved_at_secs: u64) -> LibraryMetadata {
+        LibraryMetadata { saved_at_secs,
+                          item_count: 10,
+                          schema_version: 2,
+                          last_item_check_batch_secs: None,
+                          last_fresh_install_request_secs: None }
     }
 
     #[test]

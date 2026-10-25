@@ -11,7 +11,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;

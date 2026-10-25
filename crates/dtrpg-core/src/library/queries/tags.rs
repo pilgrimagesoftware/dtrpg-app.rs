@@ -25,8 +25,8 @@ impl Library {
     /// # Errors
     ///
     /// Returns [`IndexError`] if the index cannot be opened or read.
-    pub fn read_tags(cache_root: &Path) -> Result<TagLibrary, IndexError> {
-        TagLibrary::load(&LibraryIndex::open_and_migrate(cache_root)?)
+    pub fn read_tags(app_data_root: &Path) -> Result<TagLibrary, IndexError> {
+        TagLibrary::load(&LibraryIndex::open_and_migrate(app_data_root)?)
     }
 
     /// Starts a read or an edit of the tags and returns its generation, to
@@ -59,9 +59,12 @@ mod tests {
     use crate::library::Library;
 
     fn open_library() -> Library {
-        let dir = tempfile::tempdir().expect("tempdir");
-        Library::open(dir.keep(), &StorageConfig::for_test(std::env::temp_dir())).expect("open")
-                                                                                 .0
+        let datadir = tempfile::tempdir().expect("tempdatadir");
+        let cachedir = tempfile::tempdir().expect("tempcachedir");
+        Library::open(datadir.keep(),
+                      cachedir.keep(),
+                      &StorageConfig::for_test(std::env::temp_dir())).expect("open")
+                                                                     .0
     }
 
     fn tags_of_a(tag: &str) -> TagLibrary {

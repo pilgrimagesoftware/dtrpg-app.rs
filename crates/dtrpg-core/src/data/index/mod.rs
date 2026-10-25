@@ -32,7 +32,7 @@ pub use filtered_items::{FacetCount, ItemFilter};
 use rusqlite::Connection;
 use thiserror::Error;
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::library::{LibraryItem, SectionCounts};
 use crate::data::summary::ContentSummary;

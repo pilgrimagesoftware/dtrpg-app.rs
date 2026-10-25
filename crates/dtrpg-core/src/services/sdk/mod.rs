@@ -11,4 +11,4 @@ mod connection;
 pub mod library;
 
 pub use self::collections::RustSdkCollectionsService;
-pub use self::library::RustSdkLibraryService;
+pub use self::library::SdkLibraryService;

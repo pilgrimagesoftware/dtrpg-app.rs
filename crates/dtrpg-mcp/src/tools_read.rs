@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::index::{ItemFilter, LibraryIndex};
 use dtrpg_core::data::mcp_access::McpTool;
 use dtrpg_core::library::insights::Insights;

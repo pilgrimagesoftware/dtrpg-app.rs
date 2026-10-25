@@ -221,8 +221,9 @@ impl LibraryController {
     /// slow-running batch doesn't leave the cooldown window open to a second
     /// trigger firing mid-batch.
     fn request_check_batch_as(&mut self, priority: Priority, _cx: &mut Context<Self>) {
-        let root = self.cache_root().clone();
-        let last_batch_secs = load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
+        let root = self.index_root().clone();
+        let last_batch_secs =
+            load_library_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
         let now = std::time::SystemTime::now();
         let now_secs = now.duration_since(std::time::UNIX_EPOCH)
                           .map(|d| d.as_secs())

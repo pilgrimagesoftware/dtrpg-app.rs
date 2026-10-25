@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use rusqlite::{Connection, params};
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::index::IndexError;
 
 /// Replaces the entire collection list with `entries`, matching the on-disk

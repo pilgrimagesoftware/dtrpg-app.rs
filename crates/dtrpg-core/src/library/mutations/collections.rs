@@ -7,7 +7,7 @@ use std::sync::{Arc, PoisonError};
 use super::collection_members::{
     RemovedMember, add_member, remove_member, restore_removed_member, revert_added_member,
 };
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::library::Library;
 use crate::util::sort::{CollectionSortMethod, SortDirection, sort_collections};
 
@@ -152,9 +152,12 @@ mod tests {
     use crate::data::storage::StorageConfig;
 
     fn open_library() -> Library {
-        let dir = tempfile::tempdir().expect("tempdir");
-        Library::open(dir.keep(), &StorageConfig::for_test(std::env::temp_dir())).expect("open")
-                                                                                 .0
+        let datadir = tempfile::tempdir().expect("tempdatadir");
+        let cachedir = tempfile::tempdir().expect("tempcachedir");
+        Library::open(datadir.keep(),
+                      cachedir.keep(),
+                      &StorageConfig::for_test(std::env::temp_dir())).expect("open")
+                                                                     .0
     }
 
     fn collection(id: u64, member_ids: &[u64]) -> CollectionEntry {

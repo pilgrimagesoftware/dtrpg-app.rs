@@ -14,8 +14,8 @@ mod tools_change;
 mod tools_read;
 
 use dtrpg_core::api::LibraryApi;
-use dtrpg_core::data::paths::cache_dir;
-use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
+use dtrpg_core::data::paths::app_data_dir;
+use dtrpg_core::services::sdk::{RustSdkCollectionsService, SdkLibraryService};
 use rmcp::ServiceExt;
 
 use crate::server::{Access, LibriMcpServer};
@@ -23,9 +23,9 @@ use crate::server::{Access, LibriMcpServer};
 #[tokio::main]
 #[allow(clippy::result_large_err)]
 async fn main() -> Result<(), rmcp::RmcpError> {
-    let api = LibraryApi::new(Box::new(RustSdkLibraryService::unauthenticated()),
+    let api = LibraryApi::new(Box::new(SdkLibraryService::unauthenticated()),
                               Box::new(RustSdkCollectionsService::unauthenticated()),
-                              cache_dir());
+                              app_data_dir());
 
     let service = LibriMcpServer::new(api, Access::production()).serve(rmcp::transport::stdio())
                                                                 .await?;

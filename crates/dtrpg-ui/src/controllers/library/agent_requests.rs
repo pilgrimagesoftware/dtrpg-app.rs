@@ -10,7 +10,7 @@
 use std::sync::mpsc::{Receiver, channel};
 use std::time::Duration;
 
-use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::constants::AGENT_REQUEST_POLL_MS;
 use dtrpg_core::data::mcp_access::{
     AppReply, AppRequest, Incoming, IpcEndpoint, IpcListener, McpSettings,

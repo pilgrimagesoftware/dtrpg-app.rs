@@ -7,15 +7,15 @@ use std::sync::{Arc, PoisonError};
 
 use super::merge::{fresh_install_request_gated, reconcile_catalog};
 use super::types::{LibraryEvent, SyncStage};
-use crate::data::catalog_cache::{
-    load_cache_metadata, save_catalog_cache, save_fresh_install_request_timestamp,
-};
 use crate::data::constants::{
-    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
     CATALOG_SYNC_MAX_ATTEMPTS, CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
-    CATALOG_SYNC_RETRY_MAX_DELAY_SECS, DTRPG_API_HOST,
+    CATALOG_SYNC_RETRY_MAX_DELAY_SECS, DTRPG_API_HOST, LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS,
+    LIBRARY_CHECKPOINT_PAGE_INTERVAL,
 };
 use crate::data::library::LibraryItem;
+use crate::data::library_metadata::{
+    load_library_metadata, save_fresh_install_request_timestamp, save_library_to_db,
+};
 use crate::library::Library;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 
@@ -68,7 +68,9 @@ impl Library {
         }
 
         let last_request =
-            load_cache_metadata(&self.cache_root).and_then(|m| m.last_fresh_install_request_secs);
+            load_library_metadata(&self.app_data_dir).and_then(|m| {
+                                                         m.last_fresh_install_request_secs
+                                                     });
         let now_secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                                                    .unwrap_or_default()
                                                    .as_secs();
@@ -128,7 +130,7 @@ impl Library {
             }
         };
 
-        if let Err(e) = save_fresh_install_request_timestamp(&self.cache_root, now_secs) {
+        if let Err(e) = save_fresh_install_request_timestamp(&self.cache_dir, now_secs) {
             tracing::warn!(error = %e, "failed to save fresh-install request timestamp");
         }
         fresh_install_total
@@ -219,11 +221,11 @@ impl Library {
                                   // fetch finishes, and a quit in between
                                   // would keep the shrunken copy.
                                   let checkpoint_due =
-                                      pages_since_checkpoint >= CATALOG_CHECKPOINT_PAGE_INTERVAL
+                                      pages_since_checkpoint >= LIBRARY_CHECKPOINT_PAGE_INTERVAL
                                       || last_checkpoint_at.elapsed()
-                                         >= std::time::Duration::from_secs(CATALOG_CHECKPOINT_MIN_INTERVAL_SECS);
+                                         >= std::time::Duration::from_secs(LIBRARY_CHECKPOINT_MIN_INTERVAL_SECS);
                                   if catalog_was_empty && checkpoint_due {
-                    if let Err(e) = save_catalog_cache(&self.cache_root, &live_items.borrow()) {
+                    if let Err(e) = save_library_to_db(&self.cache_dir, &live_items.borrow()) {
                         tracing::warn!(error = %e, "failed to checkpoint catalog cache");
                     }
                     *checkpoint.borrow_mut() = (page_num, std::time::Instant::now());
