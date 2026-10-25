@@ -4,8 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::path::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::*;
 
 use dtrpg_core::data::storage::collection_dir;
@@ -15,7 +15,7 @@ use gpui::TestAppContext;
 use super::super::collection_links::root_of;
 #[cfg(unix)]
 use super::super::collection_links::{link_into_collection, unlink_from_collection};
-use super::{support::*, super::*};
+use super::{super::*, support::*};
 
 /// What the service says when asked to add a member.
 #[derive(Clone, Copy)]

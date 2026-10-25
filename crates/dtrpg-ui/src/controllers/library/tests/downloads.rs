@@ -5,14 +5,15 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::*;
-use dtrpg_core::data::library::LibraryItem;
 
 use dtrpg_core::data::activity::ActivityStatus;
-use gpui::TestAppContext;
-use crate::data::events::*;
-use super::{support::*};
 use dtrpg_core::data::enums::ItemStatus;
+use dtrpg_core::data::library::LibraryItem;
+use gpui::TestAppContext;
 use rust_i18n::t;
+
+use super::support::*;
+use crate::data::events::*;
 
 /// Order products, one per test entry, so the service can tell downloads apart.
 const A: u64 = 11;

@@ -5,16 +5,18 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::sync::*;
+
 use dtrpg_core::data::activity::ActivityStatus;
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::library_metadata::save_library_to_db;
 use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::data::tag_library::TagLibrary;
 use dtrpg_core::services::network_monitor::NetworkMonitor;
-use gpui::TestAppContext;
-use std::sync::*;
-use super::{support::*};
 use dtrpg_core::util::filter::SidebarFilter;
+use gpui::TestAppContext;
+
+use super::support::*;
 /// A controller whose catalog is items `a`, `b` and `c`, all of them in the
 /// library index too.
 fn fixture_with_index(cx: &mut TestAppContext) -> Fixture {

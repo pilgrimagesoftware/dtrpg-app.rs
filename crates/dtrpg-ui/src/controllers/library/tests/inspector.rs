@@ -6,9 +6,9 @@
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::summary::ContentSummary;
 use gpui::TestAppContext;
-use crate::view_models::inspector::{InspectorSummaryState};
 
-use super::{support::*};
+use super::support::*;
+use crate::view_models::inspector::InspectorSummaryState;
 
 /// A controller whose catalog is items `a` and `b`, both of them in the library
 /// index too.

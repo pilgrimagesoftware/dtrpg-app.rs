@@ -9,8 +9,8 @@ use dtrpg_core::data::mcp_access::AppReply;
 use gpui::TestAppContext;
 
 use super::super::agent_requests::created_reply;
-use super::support::*;
 use super::super::*;
+use super::support::*;
 
 /// The id of the collection the fixture holds.
 const COLLECTION_ID: u64 = 7;

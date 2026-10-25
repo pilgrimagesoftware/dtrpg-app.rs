@@ -3,11 +3,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::sync::{Mutex, Arc};
-use crate::data::events::*;
+use std::sync::{Arc, Mutex};
+
 use gpui::TestAppContext;
 
 use super::{support::*, *};
+use crate::data::events::*;
 
 fn requested(fixture: &Fixture, cx: &mut TestAppContext, id: &str) {
     let url = url_for(id);

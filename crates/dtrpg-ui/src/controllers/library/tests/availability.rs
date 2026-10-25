@@ -3,12 +3,13 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use gpui::TestAppContext;
 use std::sync::*;
-use dtrpg_core::work::{JobId, Outcome, Priority, ResultSlot};
-use dtrpg_core::data::library::LibraryItem;
 
-use super::{support::*};
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::work::{JobId, Outcome, Priority, ResultSlot};
+use gpui::TestAppContext;
+
+use super::support::*;
 
 fn check(fixture: &Fixture, cx: &mut TestAppContext, id: &str) {
     let id: Arc<str> = Arc::from(id);
