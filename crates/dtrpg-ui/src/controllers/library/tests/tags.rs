@@ -12,9 +12,9 @@ use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::data::tag_library::TagLibrary;
 use dtrpg_core::services::network_monitor::NetworkMonitor;
 use gpui::TestAppContext;
-
-use super::{support::*, *};
-
+use std::sync::*;
+use super::{support::*};
+use dtrpg_core::util::filter::SidebarFilter;
 /// A controller whose catalog is items `a`, `b` and `c`, all of them in the
 /// library index too.
 fn fixture_with_index(cx: &mut TestAppContext) -> Fixture {

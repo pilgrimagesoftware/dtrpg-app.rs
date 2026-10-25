@@ -6,15 +6,16 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::path::*;
+use std::sync::*;
 
 use dtrpg_core::data::storage::collection_dir;
 use dtrpg_core::services::collections::CollectionsServiceError;
 use gpui::TestAppContext;
 
-use super::super::collections::links::root_of;
+use super::super::collection_links::root_of;
 #[cfg(unix)]
-use super::super::collections::links::{link_into_collection, unlink_from_collection};
-use super::{support::*, *};
+use super::super::collection_links::{link_into_collection, unlink_from_collection};
+use super::{support::*, super::*};
 
 /// What the service says when asked to add a member.
 #[derive(Clone, Copy)]
@@ -223,7 +224,7 @@ fn a_link_is_made_in_the_collections_folder_and_making_it_again_is_harmless() {
 #[cfg(unix)]
 #[test]
 fn an_items_files_on_disk_are_linked_into_the_collection_it_is_in() {
-    use super::super::collections::links::link_item_into_collection;
+    use super::super::collection_links::link_item_into_collection;
 
     let root = tempfile::tempdir().unwrap();
     let storage = StorageConfig::for_test(root.path().to_path_buf());

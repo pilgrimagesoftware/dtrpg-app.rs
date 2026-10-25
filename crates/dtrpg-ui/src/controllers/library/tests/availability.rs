@@ -4,6 +4,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use gpui::TestAppContext;
+use std::sync::*;
+use dtrpg_core::work::{JobId, Outcome, Priority, ResultSlot};
+use dtrpg_core::data::library::LibraryItem;
 
 use super::{support::*};
 

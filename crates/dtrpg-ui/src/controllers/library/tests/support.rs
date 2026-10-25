@@ -3,10 +3,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use std::{
     collections::HashSet,
     sync::{
-        Condvar, Mutex,
+        Condvar, Mutex, Arc,
         atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
@@ -399,10 +400,10 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
     let app_dir_path = app_dir.path().to_path_buf();
     let cache = tempfile::tempdir().unwrap();
     let cache_path = cache.path().to_path_buf();
-    let activity = cx.new(|_| ActivityController::new());
+    let activity = cx.new(|_| super::super::ActivityController::new());
     let controller =
         cx.new(|cx| {
-              let (mut ctrl, events, sync_events) = LibraryController::build_with_roots(
+              let (mut ctrl, events, sync_events) = super::super::LibraryController::build_with_roots(
             Box::new(SharedLibrary(Arc::clone(&library))),
             Box::new(UnusedCollections),
             activity.clone(),

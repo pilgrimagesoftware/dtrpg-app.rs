@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 
 use gpui::TestAppContext;
 

@@ -6,7 +6,7 @@
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::summary::ContentSummary;
 use gpui::TestAppContext;
-use crate::controllers::library::inspector::{InspectorSummaryState, InspectorSummaryTab};
+use crate::view_models::inspector::{InspectorSummaryState};
 
 use super::{support::*};
 

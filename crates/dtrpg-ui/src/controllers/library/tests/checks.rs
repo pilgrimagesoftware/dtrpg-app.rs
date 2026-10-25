@@ -4,7 +4,7 @@
 mod item_check_tests {
     use std::time::{Duration, SystemTime};
 
-    use super::super::item_check_due;
+    use super::super::super::item_check_due;
 
     #[test]
     fn check_is_due_when_never_checked() {
@@ -32,7 +32,7 @@ mod check_batch_tests {
     use dtrpg_core::data::enums::ItemStatus;
     use dtrpg_core::data::library::LibraryItem;
 
-    use super::super::{check_batch_cooldown_active, select_check_batch};
+    use super::super::super::{check_batch_cooldown_active, select_check_batch};
 
     fn item(id: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -108,7 +108,7 @@ mod item_activity_tests {
 
     use dtrpg_core::data::enums::ItemActivity;
 
-    use super::super::item_activity_map;
+    use super::super::super::item_activity_map;
 
     fn ids(names: &[&str]) -> Vec<Arc<str>> {
         names.iter().map(|n| Arc::<str>::from(*n)).collect()
