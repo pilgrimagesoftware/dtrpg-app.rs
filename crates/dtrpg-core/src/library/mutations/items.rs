@@ -16,10 +16,11 @@ impl Library {
     /// in-memory result already stands, and the next catalog sync repairs the
     /// index.
     fn persist_item(&self, item: &LibraryItem, what: &str) {
-        let written = self.index
-                          .lock()
-                          .unwrap_or_else(PoisonError::into_inner)
-                          .replace_item(item);
+        let written = self
+            .index
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .replace_item(item);
         if let Err(error) = written {
             tracing::error!(%error, "failed to write {what} to the library index");
         }
@@ -36,7 +37,7 @@ impl Library {
         let mut changed = false;
         for verification in verifications {
             if let Some(mut item) = self.item_by_id(&verification.item_id)
-               && apply_presence_changes(&mut item, &verification.changes)
+                && apply_presence_changes(&mut item, &verification.changes)
             {
                 changed = true;
                 self.persist_item(&item, "item presence change");
@@ -49,11 +50,10 @@ impl Library {
     /// writes it to the index. Returns whether the entry exists.
     ///
     /// See [`apply_check_result`] for what each kind of result changes.
-    pub fn apply_availability_result(&self, item_id: &str,
-                                     result: Result<LibraryItem, LibraryServiceError>)
-                                     -> bool {
-        let Some(mut item) = self.item_by_id(item_id)
-        else {
+    pub fn apply_availability_result(
+        &self, item_id: &str, result: Result<LibraryItem, LibraryServiceError>,
+    ) -> bool {
+        let Some(mut item) = self.item_by_id(item_id) else {
             return false;
         };
         apply_check_result(&mut item, result, SystemTime::now());
@@ -75,8 +75,9 @@ impl Library {
     /// the flags alone. Either way the entry's status is derived again.
     /// Returns the entry as it now is, or `None` if it is no longer in the
     /// catalog.
-    pub fn record_download_result(&self, item_id: &str, file_index: u32, succeeded: bool)
-                                  -> Option<LibraryItem> {
+    pub fn record_download_result(
+        &self, item_id: &str, file_index: u32, succeeded: bool,
+    ) -> Option<LibraryItem> {
         let mut item = self.item_by_id(item_id)?;
         if succeeded && let Some(file) = item.files.get_mut(file_index as usize) {
             file.downloaded = true;
@@ -94,8 +95,7 @@ impl Library {
     /// `LibraryItem::recompute_status`): the flags are cleared first and
     /// the status is derived from them.
     pub fn clear_item_downloads(&self, item_id: &str) -> bool {
-        let Some(mut item) = self.item_by_id(item_id)
-        else {
+        let Some(mut item) = self.item_by_id(item_id) else {
             return false;
         };
         if item.status != ItemStatus::Downloaded {
@@ -113,7 +113,7 @@ impl Library {
 
     /// Removes every entry from the catalog index.
     pub fn clear_catalog(&self) {
-        let mut guard = self.index.lock().expect("index mutex locked");
+        let mut guard = self.index.lock().unwrap_or_else(PoisonError::into_inner);
         let cleared = guard.replace_all_items(&[]);
         drop(guard);
         match cleared {
