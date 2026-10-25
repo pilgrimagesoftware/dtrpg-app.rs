@@ -11,7 +11,7 @@ use dtrpg_core::data::collection::entry::CollectionEntry;
 use dtrpg_core::data::library::LibraryItem;
 use dtrpg_core::data::storage::{StorageConfig, collection_dir};
 
-use super::file_tags::files_on_disk;
+use super::tags::file::files_on_disk;
 
 /// The storage root a file downloaded to `dest` lives under: `dest` is
 /// `{root}/items/{publisher}/{file}`.

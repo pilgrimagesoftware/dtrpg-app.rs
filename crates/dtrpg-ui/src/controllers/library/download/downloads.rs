@@ -1,6 +1,6 @@
 //! Download queue management and request entry points.
 
-use super::super::collections::links::{link_into_collection, root_of};
+use super::super::collection_links::{link_into_collection, root_of};
 use super::super::*;
 
 impl LibraryController {

@@ -52,6 +52,7 @@ mod auto_summary;
 mod sync;
 mod checks;
 mod collections;
+mod collection_links;
 mod concurrency;
 mod core;
 mod download;
