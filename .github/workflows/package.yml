@@ -180,7 +180,7 @@ jobs:
           PAGER=cat hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" < <(yes) >/dev/null
           trap 'hdiutil detach "$mnt" -quiet || true' EXIT
           codesign --verify --deep --strict --verbose=2 "$mnt/Libri.app"
-          codesign -dv "$mnt/Libri.app"
+          codesign --force --deep --sign - "$mnt/Libri.app"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
