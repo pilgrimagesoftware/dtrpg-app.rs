@@ -48,7 +48,8 @@ use self::inspector_pane::render_inspector_pane;
 use self::panel_widths::{restored_inspector_width, restored_sidebar_width, save_panel_widths};
 use self::wiring_subscriptions::RootViewEntities;
 use crate::ui::actions::{
-    About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
+    About, AddCollection, CheckItemAvailability, FocusSearch, NewSmartCollection, RefreshThumbnails,
+    ReloadCatalog,
     ReportFeatureBug, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded,
     SortByPages, SortByPublisher, SortByTitle, SortDescending, ToggleGroupByPublisher,
     ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
