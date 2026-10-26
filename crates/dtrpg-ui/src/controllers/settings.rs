@@ -34,6 +34,7 @@ use crate::data::events::{
     StartupAuthBegun, StartupAuthFailed,
 };
 use crate::data::token_status_global::TokenStatusGlobal;
+use crate::view_models::agent_display::AgentHarness;
 pub use crate::view_models::rule_editor::{RuleEditor, RuleEditorType};
 use crate::view_models::summary_display::SummaryPage;
 
@@ -164,6 +165,8 @@ pub struct SettingsSnapshot {
     pub mcp_bind_display:               String,
     /// Where the log of agent calls is kept.
     pub mcp_log_path:                   String,
+    /// Which agent the Connect block shows the setup command for.
+    pub mcp_harness:                    AgentHarness,
     /// How summaries are made: provider, model, ceiling, and whether on
     /// download.
     pub summaries:                      SummarySettingsFile,
@@ -191,6 +194,7 @@ pub struct SettingsController {
     mcp_command_path:               String,
     mcp_bind_display:               String,
     mcp_log_path:                   String,
+    mcp_harness:                    AgentHarness,
     summaries:                      SummarySettings,
     summary_page:                   SummaryPage,
     storage_unavailable:            bool,
@@ -317,6 +321,7 @@ impl SettingsController {
                               mcp_command_path: agent::mcp_command_path(),
                               mcp_bind_display: agent::mcp_bind_display(),
                               mcp_log_path: AuditLog::open().path().display().to_string(),
+                              mcp_harness: AgentHarness::default(),
                               summaries: SummarySettings::load(),
                               summary_page: summaries::read_summary_page(None),
                               storage_unavailable,
@@ -371,6 +376,7 @@ impl SettingsController {
                mcp_command_path: String::new(),
                mcp_bind_display: String::new(),
                mcp_log_path: String::new(),
+               mcp_harness: AgentHarness::default(),
                summaries: SummarySettings::in_memory(),
                summary_page: SummaryPage::default(),
                storage_unavailable: false,
