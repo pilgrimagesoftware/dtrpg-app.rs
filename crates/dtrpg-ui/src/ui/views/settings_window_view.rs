@@ -161,6 +161,7 @@ impl Render for SettingsWindowView {
                                                   command_path: snap.mcp_command_path.clone(),
                                                   bind_display: snap.mcp_bind_display.clone(),
                                                   log_path:     snap.mcp_log_path.clone(),
+                                                  harness:      snap.mcp_harness,
                                                   summaries:    snap.summaries.clone(),
                                                   summary_page: snap.summary_page.clone(), },
                                   theme_editor,
