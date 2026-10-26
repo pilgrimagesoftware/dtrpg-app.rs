@@ -296,13 +296,26 @@ pub fn setup(cx: &mut App) {
       });
     cx.on_action::<HideApplication>(|_, cx| cx.hide());
     cx.on_action::<HideOthers>(|_, cx| cx.hide_other_apps());
-    // The real handler lives on `LibraryRootView` (opens the About dialog).
-    // This is a harmless fallback in case the action fires before any
-    // window has focus.
-    cx.on_action::<About>(|_, _cx| {});
-    // Same fallback shape, for the "Report a Feature/Bug" dialog — see
-    // `LibraryRootView`'s `ReportFeatureBug` handler.
-    cx.on_action::<ReportFeatureBug>(|_, _cx| {});
+    // About and "Report a Feature/Bug" open from the library view. Their
+    // element-level handlers sit on its root, so they only run while the
+    // library window has focus; these reach the same view from the Settings
+    // and other windows.
+    cx.on_action::<About>(|_, cx| {
+          let Some(view) = cx.try_global::<LibraryWindowHandle>()
+                             .map(|h| h.view.clone())
+          else {
+              return;
+          };
+          view.update(cx, |view, cx| view.show_about(cx));
+      });
+    cx.on_action::<ReportFeatureBug>(|_, cx| {
+          let Some(view) = cx.try_global::<LibraryWindowHandle>()
+                             .map(|h| h.view.clone())
+          else {
+              return;
+          };
+          view.update(cx, |view, cx| view.show_report_feature_bug(cx));
+      });
     cx.on_action::<Minimize>(|_, cx| {
           if let Some(win) = cx.active_window() {
               win.update(cx, |_, window, _| window.minimize_window()).ok();
