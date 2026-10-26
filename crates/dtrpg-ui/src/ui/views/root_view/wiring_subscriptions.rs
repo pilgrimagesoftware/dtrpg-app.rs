@@ -130,6 +130,14 @@ pub(super) fn wire_controller_subscriptions(window: &mut gpui::Window,
       })
       .detach();
 
+    // The menus' text comes from the active locale, which is not part of the
+    // library state they are otherwise rebuilt for.
+    cx.observe_global::<crate::i18n::ActiveLocale>(|this, cx| {
+          this.refresh_menus(cx);
+          cx.notify();
+      })
+      .detach();
+
     cx.subscribe(inspector,
                  |this, _inspector, event: &InspectorPopOutRequested, cx| {
                      this.pop_out_inspector(&event.item_id, cx);

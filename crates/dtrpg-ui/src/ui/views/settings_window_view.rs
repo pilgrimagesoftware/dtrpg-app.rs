@@ -60,6 +60,10 @@ impl SettingsWindowView {
               this.load_theme_editor(window, cx);
           })
           .detach();
+        // Every label here is looked up per render, so a language change only
+        // needs a redraw.
+        cx.observe_global::<crate::i18n::ActiveLocale>(|_, cx| cx.notify())
+          .detach();
         let view = Self { settings,
                           library,
                           file_opener_extension_input,

@@ -32,6 +32,7 @@ pub struct ViewMenuState {
     pub sort:           SortMethod,
     pub sort_direction: SortDirection,
     pub group_by:       GroupBy,
+    pub locale:         crate::i18n::Locale,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
