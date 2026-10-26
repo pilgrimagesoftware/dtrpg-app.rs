@@ -152,8 +152,10 @@ impl LibraryController {
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
-        self.library.clear_collections();
-        self.collection_members.clear();
+        // The collections stay on show, like the catalog: the load that
+        // follows replaces them. Clearing them here emptied the sidebar for a
+        // moment on every launch, because the quiet sign-in comes through this
+        // method after the cached list has already been shown.
         self.selection = Selection::default();
         self.invalidate_cache();
         self.activity.update(cx, |a, cx| a.clear(cx));
