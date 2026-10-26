@@ -4,6 +4,8 @@
 //! `wire_settings_inputs`) and the main window's own search/bulk/collection
 //! inputs (`build_misc_inputs`).
 
+use dtrpg_core::util::search::SearchQuery;
+
 use super::*;
 
 /// Builds every input and font-picker entity the Settings window's pages
@@ -241,15 +243,18 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
         cx.new(|cx| InputState::new(window, cx).placeholder(t!("search.placeholder").to_string()));
 
     let controller_for_search = controller.clone();
-    cx.subscribe(&search_input,
-                 move |_this, input_entity, event: &InputEvent, cx| {
-                     if matches!(event, InputEvent::Change) {
-                         let value = input_entity.read(cx).value().to_string();
-                         controller_for_search.update(cx, |ctrl, cx| {
-                                                  ctrl.set_search_query_debounced(value, cx);
-                                              });
-                     }
-                 })
+    cx.subscribe_in(&search_input,
+                    window,
+                    move |_this, input_entity, event: &InputEvent, window, cx| {
+                        if matches!(event, InputEvent::Change) {
+                            let typed = input_entity.read(cx).value().to_string();
+                            apply_typed_search(input_entity,
+                                               &controller_for_search,
+                                               &typed,
+                                               window,
+                                               cx);
+                        }
+                    })
       .detach();
 
     let bulk_pattern_input = cx.new(|cx| {
@@ -335,4 +340,31 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
                  file_opener_extension_input,
                  publisher_search_input,
                  collection_search_input }
+}
+
+/// Applies the text typed in the search box. The box holds the free text and
+/// the chips hold the terms, so the query is the chips' terms followed by the
+/// text. A `field:value` term the user finished typing (a space after it)
+/// moves out of the box and becomes a chip.
+fn apply_typed_search(input: &Entity<InputState>, controller: &Entity<LibraryController>,
+                      typed: &str, window: &mut gpui::Window, cx: &mut gpui::App) {
+    let mut query = SearchQuery::parse(&controller.read(cx).search_query);
+    let chips = SearchQuery::new("", query.terms().to_vec()).to_string();
+    let typed_query = SearchQuery::parse(typed);
+    if typed.ends_with(char::is_whitespace) && !typed_query.terms().is_empty() {
+        let mut terms = query.terms().to_vec();
+        terms.extend(typed_query.terms().iter().cloned());
+        query = SearchQuery::new(typed_query.free_text(), terms);
+        input.update(cx, |state, cx| {
+                 state.set_value(query.free_text(), window, cx)
+             });
+        controller.update(cx, |ctrl, cx| ctrl.set_search_query(query.to_string(), cx));
+        return;
+    }
+    let joined = [chips.as_str(), typed].iter()
+                                        .filter(|part| !part.is_empty())
+                                        .copied()
+                                        .collect::<Vec<_>>()
+                                        .join(" ");
+    controller.update(cx, |ctrl, cx| ctrl.set_search_query_debounced(joined, cx));
 }

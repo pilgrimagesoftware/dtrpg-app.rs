@@ -210,7 +210,8 @@ impl SearchQuery {
 
     /// The free-text part, always lower cased — see [`Self::parse`] for when
     /// it preserves the typed spacing verbatim vs. rejoining words.
-    pub(crate) fn free_text(&self) -> &str {
+    #[must_use]
+    pub fn free_text(&self) -> &str {
         &self.text
     }
 

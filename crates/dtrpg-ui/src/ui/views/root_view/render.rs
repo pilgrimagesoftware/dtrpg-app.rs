@@ -7,7 +7,7 @@ use gpui_kit::component::{ActiveTheme as _, Selectable as _};
 
 use super::panel_widths::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use super::*;
-use crate::ui::views::filters_column::render_filter_chips;
+use crate::ui::views::filters_column::render_search_box;
 use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
@@ -139,12 +139,12 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
     let filters_toggle =
         render_filters_toggle(view.filters_open, search_query.terms().len(), cx.entity());
+    let search_row = render_search_box(&search_query, &view.search_input, &lib_entity, colors);
     let toolbar = render_toolbar(&filter,
                                  snap.filter_count,
                                  matched_count,
                                  total_count,
                                  &snap.search_query,
-                                 view.search_input.clone(),
                                  sort,
                                  sort_direction,
                                  group_by,
@@ -153,7 +153,6 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  lib_entity.clone(),
                                  filters_toggle,
                                  colors);
-    let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
     let title_bar = render_title_bar(&settings_snap.auth,
                                      settings_entity.clone(),
                                      colors,
@@ -218,7 +217,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                .flex()
                                .flex_col()
                                .child(toolbar)
-                               .children(chips)
+                               .child(search_row)
                                .children(bulk_action_bar)
                                .child(banner)
                                .child(view.filters_pane.clone());
