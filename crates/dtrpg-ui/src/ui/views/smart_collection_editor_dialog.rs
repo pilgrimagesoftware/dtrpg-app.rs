@@ -14,7 +14,7 @@ use dtrpg_core::data::smart_collection::{MatchMode, Operator, Rule};
 use dtrpg_core::library::SmartPreview;
 use dtrpg_core::util::search::Field;
 use gpui::prelude::*;
-use gpui::{App, Entity, SharedString, Window, div, px};
+use gpui::{AnyElement, App, Entity, SharedString, Window, div, px};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::dialog::{DialogContent, DialogFooter, DialogHeader, DialogTitle};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
@@ -36,7 +36,7 @@ struct EditorState {
     /// The box for each rule's value, in the same order as the rules.
     value_inputs: Vec<Entity<InputState>>,
     /// What matches now: the counts and the first few titles.
-    preview:      SmartPreview,
+    preview:      Option<SmartPreview>,
     /// The mode and rules `preview` was worked out for; the count is only
     /// redone when they change, not for a new name or an on-match switch.
     previewed:    (MatchMode, Vec<Rule>),
@@ -70,11 +70,10 @@ pub fn open_smart_collection_editor(window: &mut Window, cx: &mut App,
                             .map(|rule| new_value_input(window, cx, &rule.value))
                             .collect();
     let collection = draft.collection().clone();
-    let preview = controller.read(cx).smart_collection_preview(&collection);
     let state = Rc::new(RefCell::new(EditorState { draft,
                                                    name_input: name_input.clone(),
                                                    value_inputs,
-                                                   preview,
+                                                   preview: None,
                                                    previewed: (collection.mode,
                                                                collection.rules),
                                                    generation: 0 }));
@@ -83,7 +82,8 @@ pub fn open_smart_collection_editor(window: &mut Window, cx: &mut App,
     for input in &inputs {
         watch_input(cx, input, &state, &controller);
     }
-    update(cx, &state, &controller);
+    // The first count starts at once; the box stays empty until it lands.
+    schedule_preview(cx, &state, &controller, 0, Duration::ZERO);
 
     window.open_dialog(cx, move |dialog, _window, _cx| {
               let (state, controller) = (state.clone(), controller.clone());
@@ -143,25 +143,36 @@ fn update(cx: &mut App, state: &SharedState, controller: &Entity<LibraryControll
         }
     };
     if let Some(generation) = generation {
-        schedule_preview(cx, state, controller, generation);
+        schedule_preview(cx, state, controller, generation, PREVIEW_DELAY);
     }
     cx.refresh_windows();
 }
 
-/// Counts the matches once typing has paused, unless a newer request came.
+/// Counts the matches on a background thread once typing has paused for
+/// `delay`, unless a newer request came, then stores the result and redraws.
 fn schedule_preview(cx: &mut App, state: &SharedState, controller: &Entity<LibraryController>,
-                    generation: u64) {
+                    generation: u64, delay: Duration) {
     let (state, controller) = (state.clone(), controller.clone());
     cx.spawn(async move |cx| {
-          cx.background_executor().timer(PREVIEW_DELAY).await;
+          cx.background_executor().timer(delay).await;
+          let Some((library, collection)) = cx.update(|cx| {
+                                                  let current = state.borrow();
+                                                  (current.generation == generation).then(|| {
+                                                      (controller.read(cx).library_handle(),
+                                                       current.draft.collection().clone())
+                                                  })
+                                              })
+          else {
+              return;
+          };
+          let preview = cx.background_executor()
+                          .spawn(async move { library.smart_collection_preview(&collection) })
+                          .await;
           cx.update(|cx| {
-                if state.borrow().generation != generation {
-                    return;
+                if state.borrow().generation == generation {
+                    state.borrow_mut().preview = Some(preview);
+                    cx.refresh_windows();
                 }
-                let collection = state.borrow().draft.collection().clone();
-                let preview = controller.read(cx).smart_collection_preview(&collection);
-                state.borrow_mut().preview = preview;
-                cx.refresh_windows();
             });
       })
       .detach();
@@ -293,8 +304,11 @@ fn render_rule_row(index: usize, state: &SharedState, controller: &Entity<Librar
 
 /// The box that says how many titles match now, with the first few of them
 /// in a list that scrolls.
-fn render_preview(state: &SharedState, colors: &ColorTokens) -> impl IntoElement {
-    let preview = state.borrow().preview.clone();
+fn render_preview(state: &SharedState, colors: &ColorTokens) -> AnyElement {
+    let Some(preview) = state.borrow().preview.clone()
+    else {
+        return div().into_any_element();
+    };
     let hidden = preview.matching.saturating_sub(preview.titles.len());
     v_flex().p(px(12.0))
             .gap(px(8.0))
@@ -321,6 +335,7 @@ fn render_preview(state: &SharedState, colors: &ColorTokens) -> impl IntoElement
                                                        count = hidden).to_string())
                                      }))
             })
+            .into_any_element()
 }
 
 /// A switch for an on-match action, which `on_change` turns on or off in the
