@@ -3,7 +3,7 @@
 use dtrpg_core::data::mcp_access::{McpScope, McpTool};
 
 use super::*;
-use crate::view_models::agent_display::locate_mcp_server;
+use crate::view_models::agent_display::{AgentHarness, locate_mcp_server};
 
 /// The index of the Agent & MCP page in the settings window.
 pub const AGENT_PAGE_IX: usize = 4;
@@ -28,6 +28,13 @@ impl SettingsController {
     /// Saves whether `tool` is on by itself.
     pub fn set_mcp_tool(&mut self, tool: McpTool, enabled: bool, cx: &mut Context<Self>) {
         self.mcp.save_tool(tool, enabled);
+        cx.notify();
+    }
+
+    /// Picks the agent the Connect block shows the setup command for. Not
+    /// saved: the page opens on the default again.
+    pub fn set_mcp_harness(&mut self, harness: AgentHarness, cx: &mut Context<Self>) {
+        self.mcp_harness = harness;
         cx.notify();
     }
 

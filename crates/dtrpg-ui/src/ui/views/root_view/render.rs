@@ -286,6 +286,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let this_entity = cx.entity();
     let this_entity_for_about = this_entity.clone();
     let this_entity_for_add = this_entity.clone();
+    let this_entity_for_smart = this_entity.clone();
     let this_entity_for_activity = this_entity.clone();
     let this_entity_for_alert_history = this_entity.clone();
     let this_entity_for_report_bug = this_entity.clone();
@@ -397,6 +398,14 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
              this_entity_for_add.update(cx, |view, cx| {
                                     view.show_add_collection_dialog(window, cx);
                                 });
+         })
+         // Handled here, inside the window's dispatch path: the app-level
+         // fallback runs while the window is already borrowed, so its own
+         // `window.update` fails and the menu item silently does nothing.
+         .on_action(move |_: &NewSmartCollection, window, cx| {
+             this_entity_for_smart.update(cx, |view, cx| {
+                                      view.show_smart_collection_editor(window, cx);
+                                  });
          })
          .on_action(move |_: &ShowActivity, _, cx| {
              this_entity_for_activity.update(cx, |view, cx| view.show_activity(cx));

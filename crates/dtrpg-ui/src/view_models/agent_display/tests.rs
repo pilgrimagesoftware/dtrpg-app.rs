@@ -116,3 +116,30 @@ fn the_server_is_looked_for_next_to_the_app() {
     assert_eq!(path.parent(), Some(Path::new("/opt/libri")));
     assert!(path.to_string_lossy().contains("libri-mcp"));
 }
+
+#[test]
+fn each_harness_gets_its_own_setup_text() {
+    let texts: Vec<String> = AgentHarness::ALL.iter()
+                                              .map(|h| h.setup_text("/opt/libri/libri-mcp"))
+                                              .collect();
+    assert_eq!(texts[0], "claude mcp add libri -- '/opt/libri/libri-mcp'");
+    assert!(texts[1].starts_with("codex mcp add libri"));
+    assert!(texts[2].starts_with("gemini mcp add libri"));
+    assert!(texts[3].starts_with("opencode mcp add libri"));
+    assert_eq!(texts[4], agent_config_json("/opt/libri/libri-mcp"));
+}
+
+#[test]
+fn a_path_with_spaces_and_quotes_is_one_shell_word() {
+    let text = AgentHarness::ClaudeCode.setup_text("/Users/o'neil/Libri App/libri-mcp");
+    assert_eq!(text,
+               "claude mcp add libri -- '/Users/o'\\''neil/Libri App/libri-mcp'");
+}
+
+#[test]
+fn every_harness_label_resolves() {
+    for harness in AgentHarness::ALL {
+        assert!(!harness.label().starts_with("agent."),
+                "{harness:?} has no label");
+    }
+}
