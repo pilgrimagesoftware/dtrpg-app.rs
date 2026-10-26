@@ -9,6 +9,7 @@ use gpui::{AnyElement, ClipboardItem, Entity, Hsla, SharedString, div, px};
 use gpui_kit::component::Icon;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::switch::Switch;
+use gpui_kit::component::tab::{Tab, TabBar};
 use gpui_kit::component::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
@@ -22,7 +23,7 @@ use crate::ui::views::settings_summaries_view::render_summaries;
 use crate::ui::widgets::{selectable_note, selectable_text, small_caps_text};
 use crate::util::item_opener::ItemOpener;
 use crate::view_models::agent_display::{
-    AgentPageData, agent_config_json, exposed_tools, scope_label, summary_label, time_label,
+    AgentHarness, AgentPageData, exposed_tools, scope_label, summary_label, time_label,
     tool_description,
 };
 
@@ -189,18 +190,41 @@ fn tools_table(entity: &Entity<SettingsController>, data: &AgentPageData, colors
                 .child(TableBody::new().children(rows))
 }
 
-/// The config an agent needs, in a box, with an icon button inside it that
-/// copies it and a button under the box that rotates the token agents
+/// The agent selector: one segment per harness.
+fn harness_selector(current: AgentHarness, entity: Entity<SettingsController>) -> impl IntoElement {
+    let selected = AgentHarness::ALL.iter()
+                                    .position(|h| *h == current)
+                                    .unwrap_or_default();
+    AgentHarness::ALL.into_iter()
+                     .fold(TabBar::new("agent-harness").segmented()
+                                                       .selected_index(selected),
+                           |bar, harness| bar.child(Tab::new().label(harness.label())))
+                     .on_click(move |ix, _, cx| {
+                         if let Some(harness) = AgentHarness::ALL.get(*ix).copied() {
+                             entity.update(cx, |ctrl, cx| ctrl.set_mcp_harness(harness, cx));
+                         }
+                     })
+}
+
+/// The setup for the chosen agent, in a box, with an icon button inside it
+/// that copies it and a button under the box that rotates the token agents
 /// carry.
-fn connect_block(command_path: &str, colors: &ColorTokens, mono_font: &str,
-                 library: Entity<LibraryController>)
+fn connect_block(entity: Entity<SettingsController>, data: &AgentPageData, colors: &ColorTokens,
+                 mono_font: &str, library: Entity<LibraryController>)
                  -> impl IntoElement {
-    let config = agent_config_json(command_path);
+    let config = data.harness.setup_text(&data.command_path);
     let copied = config.clone();
+    let note = if data.harness == AgentHarness::Other {
+        t!("agent.connect_note")
+    }
+    else {
+        t!("agent.connect_note_command")
+    };
     div().flex()
          .flex_col()
          .gap(px(8.0))
-         .child(selectable_note("agent-connect-note", t!("agent.connect_note").to_string(), colors))
+         .child(harness_selector(data.harness, entity))
+         .child(selectable_note("agent-connect-note", note.to_string(), colors))
          .child(div().relative()
                      .p(px(12.0))
                      .pr(px(48.0))
@@ -387,7 +411,7 @@ pub fn render_agent_section(entity: Entity<SettingsController>, data: AgentPageD
          .child(heading(t!("agent.tools_heading").to_string(), colors, label_font))
          .child(tools_table(&entity, &data, colors))
          .child(heading(t!("agent.connect_heading").to_string(), colors, label_font))
-         .child(connect_block(&data.command_path, colors, mono_font, library))
+         .child(connect_block(entity.clone(), &data, colors, mono_font, library))
          .child(div().flex()
                      .items_center()
                      .justify_between()
