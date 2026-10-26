@@ -7,6 +7,7 @@ pub mod cover_viewer_view;
 pub mod detail_panel_view;
 pub mod download_sheet_dialog;
 pub mod filters_column;
+pub mod filters_pane_view;
 pub mod insights_cache;
 pub mod insights_cards;
 pub mod insights_view;
