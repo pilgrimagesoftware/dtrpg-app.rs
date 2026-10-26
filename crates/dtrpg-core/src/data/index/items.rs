@@ -344,20 +344,6 @@ pub(super) fn total_size_mb(conn: &Connection) -> Result<f64, IndexError> {
            })?)
 }
 
-/// The sum of every item's page count.
-///
-/// # Errors
-///
-/// Returns [`IndexError::Sqlite`] if the query fails.
-#[track_caller]
-pub(super) fn total_pages(conn: &Connection) -> Result<u64, IndexError> {
-    catalog_scan!();
-    let pages: i64 = conn.query_row("SELECT COALESCE(SUM(pages), 0) FROM items", [], |row| {
-                             row.get(0)
-                         })?;
-    Ok(u64::try_from(pages).unwrap_or_default())
-}
-
 /// Counts items whose `status` matches `status`.
 ///
 /// # Errors

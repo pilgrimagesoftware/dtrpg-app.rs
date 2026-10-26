@@ -24,8 +24,10 @@ impl Library {
     pub(super) fn overlaid_items(&self, mut items: Vec<LibraryItem>) -> Vec<LibraryItem> {
         let mut locations = self.file_locations_by_item();
         let mut collections = self.collection_names_by_member();
+        let pages = self.file_pages_by_item();
         for item in &mut items {
             self.overlay_ephemeral_state(item);
+            item.pages = pages.get(item.id.as_ref()).copied().unwrap_or(item.pages);
             item.collections = collections.remove(&item.order_product_id)
                                           .unwrap_or_default();
             item.locations = locations.remove(&item.id)
@@ -66,6 +68,14 @@ impl Library {
                            .ok()
                            .flatten()?;
         self.overlay_ephemeral_state(&mut item);
+        item.pages = self.index
+                         .lock()
+                         .unwrap_or_else(PoisonError::into_inner)
+                         .file_pages_of(id)
+                         .map_err(|e| tracing::warn!(error = %e, "library index query failed"))
+                         .ok()
+                         .flatten()
+                         .unwrap_or(item.pages);
         item.locations = self.index
                              .lock()
                              .unwrap_or_else(PoisonError::into_inner)

@@ -13,6 +13,7 @@ mod functions;
 mod items;
 mod locations;
 mod migrate;
+mod pages;
 mod schema;
 mod summaries;
 mod tag_methods;

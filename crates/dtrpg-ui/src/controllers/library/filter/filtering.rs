@@ -31,6 +31,12 @@ impl LibraryController {
         self.library.visible_facets()
     }
 
+    /// The search text, which the filters column reads to show what is checked.
+    #[must_use]
+    pub fn search_query(&self) -> &str {
+        &self.search_query
+    }
+
     /// Returns the number of items in the filtered, sorted result set.
     ///
     /// Cheap: it does not copy the result set. The list asks for it several

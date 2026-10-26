@@ -145,6 +145,7 @@ impl LibraryController {
             self.library
                 .record_file_locations(&StorageConfig::load(), &item_id);
             self.refresh_root_title_counts();
+            self.count_pages(cx);
             if let Some(dest) = &dest {
                 create_collections_symlinks(dest,
                                             item.order_product_id,
