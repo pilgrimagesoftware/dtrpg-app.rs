@@ -82,8 +82,8 @@ fn count_label_for(filter: &SidebarFilter, filter_count: usize, matched_count: u
 /// Renders the toolbar row above the catalog.
 #[allow(clippy::too_many_arguments)]
 pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count: usize,
-                      total_count: usize, search_query: &str,
-                      sort: SortMethod, sort_direction: SortDirection, group_by: GroupBy,
+                      total_count: usize, search_query: &str, sort: SortMethod,
+                      sort_direction: SortDirection, group_by: GroupBy,
                       presentation: CatalogPresentation, selection_mode: bool,
                       entity: Entity<LibraryController>, filters_toggle: AnyElement,
                       colors: &ColorTokens)

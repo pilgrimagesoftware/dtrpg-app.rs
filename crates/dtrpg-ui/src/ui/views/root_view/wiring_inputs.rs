@@ -4,7 +4,7 @@
 //! `wire_settings_inputs`) and the main window's own search/bulk/collection
 //! inputs (`build_misc_inputs`).
 
-use dtrpg_core::util::search::SearchQuery;
+use dtrpg_core::util::search::{TypedSearch, apply_typed};
 
 use super::*;
 
@@ -246,14 +246,16 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
     cx.subscribe_in(&search_input,
                     window,
                     move |_this, input_entity, event: &InputEvent, window, cx| {
-                        if matches!(event, InputEvent::Change) {
-                            let typed = input_entity.read(cx).value().to_string();
-                            apply_typed_search(input_entity,
-                                               &controller_for_search,
-                                               &typed,
-                                               window,
-                                               cx);
-                        }
+                        let commit = match event {
+                            InputEvent::Change => false,
+                            InputEvent::PressEnter { .. } => true,
+                            _ => return,
+                        };
+                        apply_typed_search(input_entity,
+                                           &controller_for_search,
+                                           commit,
+                                           window,
+                                           cx);
                     })
       .detach();
 
@@ -342,29 +344,21 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
                  collection_search_input }
 }
 
-/// Applies the text typed in the search box. The box holds the free text and
-/// the chips hold the terms, so the query is the chips' terms followed by the
-/// text. A `field:value` term the user finished typing (a space after it)
-/// moves out of the box and becomes a chip.
+/// Applies the text in the search box. The box holds the free text and the
+/// chips hold the terms; a term becomes a chip only once it is committed (a
+/// space after it, or Enter), and then leaves the box. Until then it is just
+/// text and is searched as such.
 fn apply_typed_search(input: &Entity<InputState>, controller: &Entity<LibraryController>,
-                      typed: &str, window: &mut gpui::Window, cx: &mut gpui::App) {
-    let mut query = SearchQuery::parse(&controller.read(cx).search_query);
-    let chips = SearchQuery::new("", query.terms().to_vec()).to_string();
-    let typed_query = SearchQuery::parse(typed);
-    if typed.ends_with(char::is_whitespace) && !typed_query.terms().is_empty() {
-        let mut terms = query.terms().to_vec();
-        terms.extend(typed_query.terms().iter().cloned());
-        query = SearchQuery::new(typed_query.free_text(), terms);
-        input.update(cx, |state, cx| {
-                 state.set_value(query.free_text(), window, cx)
-             });
-        controller.update(cx, |ctrl, cx| ctrl.set_search_query(query.to_string(), cx));
-        return;
+                      commit: bool, window: &mut gpui::Window, cx: &mut gpui::App) {
+    let typed = input.read(cx).value().to_string();
+    let chips = controller.read(cx).search_chips().to_vec();
+    match apply_typed(&chips, &typed, commit) {
+        TypedSearch::Typing { query } => {
+            controller.update(cx, |ctrl, cx| ctrl.set_search_query_debounced(query, cx));
+        }
+        TypedSearch::Committed { chips, text } => {
+            input.update(cx, |state, cx| state.set_value(text.as_str(), window, cx));
+            controller.update(cx, |ctrl, cx| ctrl.set_search_chips(chips, &text, cx));
+        }
     }
-    let joined = [chips.as_str(), typed].iter()
-                                        .filter(|part| !part.is_empty())
-                                        .copied()
-                                        .collect::<Vec<_>>()
-                                        .join(" ");
-    controller.update(cx, |ctrl, cx| ctrl.set_search_query_debounced(joined, cx));
 }

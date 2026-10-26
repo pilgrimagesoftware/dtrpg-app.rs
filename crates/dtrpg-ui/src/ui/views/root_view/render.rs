@@ -139,7 +139,10 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
     let filters_toggle =
         render_filters_toggle(view.filters_open, search_query.terms().len(), cx.entity());
-    let search_row = render_search_box(&search_query, &view.search_input, &lib_entity, colors);
+    let search_row = render_search_box(view.controller.read(cx).search_chips(),
+                                       &view.search_input,
+                                       &lib_entity,
+                                       colors);
     let toolbar = render_toolbar(&filter,
                                  snap.filter_count,
                                  matched_count,

@@ -8,7 +8,7 @@
 use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::data::index::FacetCount;
 use dtrpg_core::library::Facets;
-use dtrpg_core::util::search::{Field, SearchQuery};
+use dtrpg_core::util::search::{Field, SearchQuery, Term, join};
 use gpui::{
     App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window, div,
     px,
@@ -24,9 +24,6 @@ use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
 use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
-
-/// The width of the search box, which has room for a few chips.
-const SEARCH_BOX_WIDTH: f32 = 420.0;
 
 /// The facets the column lists, in order, with the heading of each.
 const FACET_SECTIONS: [(Field, &str); 7] = [(Field::Availability, "filters.availability"),
@@ -187,19 +184,18 @@ pub fn render_filters_column(facets: &Facets, query: &SearchQuery,
                                  .children(sections)))
 }
 
-/// Renders the search box: the entry for the free text with a chip inside it
-/// for each `field:value` term of the search, each of which takes its term out
-/// of the search when pressed, and a button to save the terms as a smart
-/// collection while there are any.
-pub fn render_search_box(query: &SearchQuery, search_input: &Entity<InputState>,
-                         controller: &Entity<LibraryController>)
+/// Renders the row under the toolbar that holds the search box: the entry for
+/// the free text with a chip inside it for each committed `field:value` term
+/// of `chips`, each of which takes its term out of the search when pressed, and
+/// a button to save the search as a smart collection while there are chips.
+pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
+                         controller: &Entity<LibraryController>, colors: &ColorTokens)
                          -> impl IntoElement + use<> {
-    let mut input = Input::new(search_input).w(px(SEARCH_BOX_WIDTH))
-                                            .cleanable(true);
-    if !query.terms().is_empty() {
-        let chips = query.terms().iter().enumerate().map(|(ix, term)| {
+    let mut input = Input::new(search_input).w_full().cleanable(true);
+    if !chips.is_empty() {
+        let buttons = chips.iter().enumerate().map(|(ix, term)| {
             let term = term.clone();
-            let query = query.clone();
+            let all = chips.to_vec();
             let input = search_input.clone();
             let controller = controller.clone();
             Button::new(("filter-chip", ix)).outline()
@@ -207,30 +203,47 @@ pub fn render_search_box(query: &SearchQuery, search_input: &Entity<InputState>,
                                             .label(term.to_string())
                                             .icon(IconName::Close)
                                             .tooltip(t!("filters.remove_chip_tooltip"))
-                                            .on_click(move |_, window, cx| {
-                                                let next = query.without_term(&term);
-                                                set_search_text(&input, &controller, &next, window, cx);
+                                            .on_click(move |_, _, cx| {
+                                                let kept: Vec<Term> =
+                                                    all.iter().filter(|other| **other != term)
+                                                       .cloned()
+                                                       .collect();
+                                                let typed = input.read(cx).value().to_string();
+                                                controller.update(cx, |ctrl, cx| {
+                                                              ctrl.set_search_chips(kept, &typed, cx)
+                                                          });
                                             })
         });
-        let (save_query, save_controller) = (query.clone(), controller.clone());
+        let (save_chips, save_input, save_controller) =
+            (chips.to_vec(), search_input.clone(), controller.clone());
         let save = Button::new("filter-chips-save").ghost()
                                                    .compact()
                                                    .icon(IconName::Plus)
                                                    .tooltip(t!("filters.save_as_smart_collection_tooltip"))
                                                    .on_click(move |_, window, cx| {
+                                                       let typed =
+                                                           save_input.read(cx).value().to_string();
+                                                       let query = SearchQuery::parse(&join(&save_chips,
+                                                                                            &typed));
                                                        open_smart_collection_editor(window,
                                                                                     cx,
                                                                                     save_controller.clone(),
-                                                                                    SmartCollectionDraft::from_search(&save_query));
+                                                                                    SmartCollectionDraft::from_search(&query));
                                                    });
         input = input.prefix(div().flex()
                                   .items_center()
                                   .gap(px(4.0))
                                   .pl(px(4.0))
-                                  .children(chips))
+                                  .children(buttons))
                      .suffix(save);
     }
-    input
+    div().flex_none()
+         .px(px(18.0))
+         .py(px(8.0))
+         .border_b_1()
+         .border_color(colors.border)
+         .bg(colors.surface)
+         .child(input)
 }
 
 #[cfg(test)]
