@@ -13,12 +13,21 @@ const SUPPORTED: [&str; 3] = ["en", "fr", "de"];
 
 /// A supported UI locale, with its `rust_i18n` code and its endonym (the
 /// language's name in itself, not translated into the active locale).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Locale {
+    #[default]
     En,
     Fr,
     De,
 }
+
+/// The locale the user has switched to while the app runs.
+///
+/// Set whenever the locale changes so windows that build their text from
+/// `t!()` (the menus, the Settings window) can observe it and redraw.
+pub struct ActiveLocale(pub Locale);
+
+impl gpui::Global for ActiveLocale {}
 
 impl Locale {
     /// All supported locales, in the order they should appear in a picker.
