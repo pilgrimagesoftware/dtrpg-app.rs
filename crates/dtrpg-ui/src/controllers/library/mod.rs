@@ -60,6 +60,7 @@ mod helpers;
 mod insights;
 mod inspector;
 mod lifecycle;
+mod page_counts;
 mod preferences;
 mod select;
 mod smart;

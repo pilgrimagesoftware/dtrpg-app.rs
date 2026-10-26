@@ -37,8 +37,7 @@ impl FileInfo {
 /// parsed as a PDF.
 #[must_use]
 pub fn extract_pdf_page_count(path: &Path) -> Option<u32> {
-    let doc = lopdf::Document::load(path).ok()?;
-    u32::try_from(doc.get_pages().len()).ok()
+    dtrpg_core::util::pdf_pages::pdf_page_count(path)
 }
 
 /// Returns the number of entries in `path`'s Zip central directory, or

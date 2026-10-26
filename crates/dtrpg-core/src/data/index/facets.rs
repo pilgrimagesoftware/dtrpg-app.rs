@@ -76,16 +76,6 @@ impl LibraryIndex {
     pub fn total_size_mb(&self) -> Result<f64, IndexError> {
         items::total_size_mb(&self.conn)
     }
-
-    /// The sum of every item's page count.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IndexError::Sqlite`] if the query fails.
-    #[track_caller]
-    pub fn total_pages(&self) -> Result<u64, IndexError> {
-        items::total_pages(&self.conn)
-    }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -168,20 +158,6 @@ mod tests {
         index.replace_all_items(&[big, small]).unwrap();
 
         assert!((index.total_size_mb().unwrap() - 13.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn total_pages_sums_every_item_and_is_zero_for_an_empty_index() {
-        let mut first = item("first", "Paizo", ItemStatus::Cloud, None);
-        first.pages = 100;
-        let mut second = item("second", "Paizo", ItemStatus::Cloud, None);
-        second.pages = 24;
-        let mut index = LibraryIndex::open_in_memory().unwrap();
-        assert_eq!(index.total_pages().unwrap(), 0);
-
-        index.replace_all_items(&[first, second]).unwrap();
-
-        assert_eq!(index.total_pages().unwrap(), 124);
     }
 
     #[test]
