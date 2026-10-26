@@ -108,15 +108,27 @@ fn render_pending_card(app_path: &Path, extension_input: Entity<InputState>,
         })
         .child(div().w(px(110.0)).child(Input::new(&extension_input)))
         .child(
-            div().flex_1().min_w_0().child(
-                selectable_text(
-                    "file-opener-pending-app-name",
-                    app_path.to_string_lossy().into_owned(),
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .gap(px(2.0))
+                .child(
+                    selectable_text(
+                        "file-opener-pending-app-name",
+                        app_path.to_string_lossy().into_owned(),
+                    )
+                    .text_sm()
+                    .text_color(colors.text_secondary)
+                    .truncate(),
                 )
-                .text_sm()
-                .text_color(colors.text_secondary)
-                .truncate(),
-            ),
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(colors.text_tertiary)
+                        .child(t!("settings.file_opener_pending_hint")),
+                ),
         )
         .child(
             Button::new("cancel-pending-file-opener")
@@ -141,6 +153,8 @@ fn render_entry_card(entry: &FileOpenerEntry, entity: &Entity<SettingsController
     let missing = !entry.app_path.exists();
     let remove_entity = entity.clone();
     let remove_extension = extension.clone();
+    let change_entity = entity.clone();
+    let change_extension = extension.clone();
     card_shell(format!("file-opener-row-{extension}"), colors)
         .child(
             div()
@@ -172,6 +186,15 @@ fn render_entry_card(entry: &FileOpenerEntry, entity: &Entity<SettingsController
                                 .child(format!("⚠ {}", t!("settings.file_opener_app_not_found")))
                         })),
                 ),
+        )
+        .child(
+            Button::new(SharedString::from(format!("change-opener-{extension}")))
+                .ghost()
+                .icon(Icon::empty().path("icons/pencil.svg"))
+                .tooltip(t!("settings.file_opener_change_tooltip").to_string())
+                .on_click(move |_, window, cx| {
+                    pick_app_and_change(&change_entity, &change_extension, window, cx);
+                }),
         )
         .child(
             Button::new(SharedString::from(format!("remove-opener-{extension}")))
@@ -214,6 +237,36 @@ fn add_button(entity: Entity<SettingsController>, extension_input: Entity<InputS
                                   })
 }
 
+/// Shows the native application picker and returns the application chosen, or
+/// `None` if the dialog was cancelled.
+async fn pick_application() -> Option<PathBuf> {
+    rfd::AsyncFileDialog::new().add_filter(t!("settings.file_opener_app_filter_name").to_string(),
+                                           &["app"])
+                               .set_directory("/Applications")
+                               .pick_file()
+                               .await
+                               .map(|handle| handle.path().to_path_buf())
+}
+
+/// Runs the application picker and points the override for `extension` at the
+/// application chosen. Asynchronous for the reason given on
+/// [`pick_app_and_begin_add`].
+fn pick_app_and_change(entity: &Entity<SettingsController>, extension: &str,
+                       window: &mut Window, cx: &mut App) {
+    let (entity, extension) = (entity.clone(), extension.to_owned());
+    window.to_async(cx)
+          .spawn(async move |cx| {
+              let Some(app_path) = pick_application().await
+              else {
+                  return;
+              };
+              entity.update(cx, |ctrl, cx| {
+                        ctrl.change_file_opener_app(&extension, app_path, cx)
+                    });
+          })
+          .detach();
+}
+
 /// Runs the native application picker and, if an app was chosen, starts the
 /// inline "add file opener" flow: resets and focuses `extension_input`,
 /// reclaims OS key-window status (the native panel can steal it), and tells
@@ -232,19 +285,10 @@ fn pick_app_and_begin_add(entity: &Entity<SettingsController>,
     let extension_input = extension_input.clone();
     window.to_async(cx)
           .spawn(async move |cx| {
-              let picked = rfd::AsyncFileDialog::new()
-                .add_filter(
-                    t!("settings.file_opener_app_filter_name").to_string(),
-                    &["app"],
-                )
-                .set_directory("/Applications")
-                .pick_file()
-                .await;
-              let Some(handle) = picked
+              let Some(app_path) = pick_application().await
               else {
                   return;
               };
-              let app_path = handle.path().to_path_buf();
 
               cx.update(|window, cx| {
                     extension_input.update(cx, |state, cx| state.set_value("", window, cx));

@@ -25,6 +25,15 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
+    /// Points the existing entry for `extension` at a different application
+    /// and persists the change.
+    pub fn change_file_opener_app(&mut self, extension: &str, app_path: PathBuf,
+                                  cx: &mut Context<Self>) {
+        self.file_openers.update_app_path(extension, app_path);
+        self.file_openers.save();
+        cx.emit(SettingsChanged);
+    }
+
     /// Begins an in-place "add file opener" flow after the user has picked an
     /// application via the native file dialog.
     ///
