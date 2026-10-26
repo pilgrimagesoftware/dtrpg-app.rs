@@ -8,8 +8,9 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
-use dtrpg_core::data::smart_collection::{MatchMode, Operator};
+use dtrpg_core::data::smart_collection::{MatchMode, Operator, Rule};
 use dtrpg_core::library::SmartPreview;
 use dtrpg_core::util::search::Field;
 use gpui::prelude::*;
@@ -36,7 +37,17 @@ struct EditorState {
     value_inputs: Vec<Entity<InputState>>,
     /// What matches now: the counts and the first few titles.
     preview:      SmartPreview,
+    /// The mode and rules `preview` was worked out for; the count is only
+    /// redone when they change, not for a new name or an on-match switch.
+    previewed:    (MatchMode, Vec<Rule>),
+    /// Counts the requests for a new preview, so a waiting one can tell a
+    /// newer one came.
+    generation:   u64,
 }
+
+/// How long typing has to pause before the matches are counted again; the
+/// count reads the whole catalog, so doing it per keystroke stalls the window.
+const PREVIEW_DELAY: Duration = Duration::from_millis(250);
 
 /// The tallest the list of matching titles grows before it scrolls.
 const PREVIEW_LIST_HEIGHT: f32 = 140.0;
@@ -58,10 +69,15 @@ pub fn open_smart_collection_editor(window: &mut Window, cx: &mut App,
                             .iter()
                             .map(|rule| new_value_input(window, cx, &rule.value))
                             .collect();
+    let collection = draft.collection().clone();
+    let preview = controller.read(cx).smart_collection_preview(&collection);
     let state = Rc::new(RefCell::new(EditorState { draft,
                                                    name_input: name_input.clone(),
                                                    value_inputs,
-                                                   preview: SmartPreview::default() }));
+                                                   preview,
+                                                   previewed: (collection.mode,
+                                                               collection.rules),
+                                                   generation: 0 }));
     watch_input(cx, &name_input, &state, &controller);
     let inputs = state.borrow().value_inputs.clone();
     for input in &inputs {
@@ -101,10 +117,10 @@ fn watch_input(cx: &mut App, input: &Entity<InputState>, state: &SharedState,
       .detach();
 }
 
-/// Copies the text of the boxes into the draft, recounts the matches, and
-/// redraws the editor.
+/// Copies the text of the boxes into the draft, counts the matches again if
+/// the rules changed, and redraws the editor.
 fn update(cx: &mut App, state: &SharedState, controller: &Entity<LibraryController>) {
-    {
+    let generation = {
         let mut editor = state.borrow_mut();
         let name = editor.name_input.read(cx).value().to_string();
         editor.draft.set_name(&name);
@@ -115,10 +131,40 @@ fn update(cx: &mut App, state: &SharedState, controller: &Entity<LibraryControll
         for (index, value) in values.iter().enumerate() {
             editor.draft.set_value(index, value);
         }
-        let collection = editor.draft.collection().clone();
-        editor.preview = controller.read(cx).smart_collection_preview(&collection);
+        let collection = editor.draft.collection();
+        let query = (collection.mode, collection.rules.clone());
+        if editor.previewed == query {
+            None
+        }
+        else {
+            editor.previewed = query;
+            editor.generation += 1;
+            Some(editor.generation)
+        }
+    };
+    if let Some(generation) = generation {
+        schedule_preview(cx, state, controller, generation);
     }
     cx.refresh_windows();
+}
+
+/// Counts the matches once typing has paused, unless a newer request came.
+fn schedule_preview(cx: &mut App, state: &SharedState, controller: &Entity<LibraryController>,
+                    generation: u64) {
+    let (state, controller) = (state.clone(), controller.clone());
+    cx.spawn(async move |cx| {
+          cx.background_executor().timer(PREVIEW_DELAY).await;
+          cx.update(|cx| {
+                if state.borrow().generation != generation {
+                    return;
+                }
+                let collection = state.borrow().draft.collection().clone();
+                let preview = controller.read(cx).smart_collection_preview(&collection);
+                state.borrow_mut().preview = preview;
+                cx.refresh_windows();
+            });
+      })
+      .detach();
 }
 
 /// The label of a rule field in the field menu.
