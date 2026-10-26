@@ -90,12 +90,14 @@ impl LibraryIndex {
         Ok(set(&mut self.conn, item_id, locations)?)
     }
 
-    /// Forgets where `item_id`'s files are kept, for when they are removed.
+    /// Forgets where `item_id`'s files are kept, and their page counts, for
+    /// when they are removed.
     ///
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the write fails.
     pub fn clear_file_locations(&self, item_id: &str) -> Result<(), IndexError> {
+        super::pages::clear(&self.conn, item_id)?;
         Ok(clear(&self.conn, item_id)?)
     }
 
