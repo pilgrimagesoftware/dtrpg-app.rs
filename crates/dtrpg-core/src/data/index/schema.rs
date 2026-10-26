@@ -131,6 +131,18 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
             PRIMARY KEY (item_id, file_name)
         );
 
+        -- The page count of each downloaded file, read from the file. Kept apart
+        -- from `items.pages`, which the catalog sync rewrites (the store gives no
+        -- page count), and like `file_locations` it survives a sync. A file that
+        -- is not a PDF, or could not be read, is recorded with 0 so that it is
+        -- not read again.
+        CREATE TABLE IF NOT EXISTS file_pages (
+            item_id   TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            pages     INTEGER NOT NULL,
+            PRIMARY KEY (item_id, file_name)
+        );
+
         CREATE TABLE IF NOT EXISTS summaries (
             item_id    TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
             text       TEXT NOT NULL,

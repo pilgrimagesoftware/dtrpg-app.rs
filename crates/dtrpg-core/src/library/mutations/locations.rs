@@ -69,6 +69,18 @@ impl Library {
         }
     }
 
+    /// The pages in each downloaded item's files, by item id.
+    #[must_use]
+    #[track_caller]
+    pub fn file_pages_by_item(&self) -> HashMap<String, u32> {
+        self.index
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .file_pages_by_item()
+            .map_err(|error| tracing::warn!(%error, "library index query failed"))
+            .unwrap_or_default()
+    }
+
     /// The names of the storage locations each downloaded item has files in, by
     /// item id.
     #[must_use]

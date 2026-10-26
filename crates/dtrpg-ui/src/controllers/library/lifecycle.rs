@@ -333,6 +333,7 @@ impl LibraryController {
                 // stored, and the views have to be built from it either way.
                 self.react_to_prepopulated_items(&items, cx);
                 self.enqueue_stored_thumbnails(cx);
+                self.count_pages(cx);
                 self.begin_tag_sync(force_reload, cx);
             }
             LibraryEvent::CollectionsChanged(entries) => self.apply_collections(entries, cx),
