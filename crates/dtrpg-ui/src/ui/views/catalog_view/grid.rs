@@ -120,20 +120,7 @@ pub(super) fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image
                 ),
             ));
         }
-        if status == ItemStatus::Downloaded {
-            Badge::new().dot()
-                        .color(if item.is_offloaded() {
-                                   colors.warning_text
-                               }
-                               else {
-                                   gpui::green()
-                               })
-                        .child(inner)
-                        .into_any_element()
-        }
-        else {
-            inner.into_any_element()
-        }
+        inner.into_any_element()
     };
 
     let title_tooltip = title.clone();
