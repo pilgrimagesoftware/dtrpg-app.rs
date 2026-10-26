@@ -7,9 +7,7 @@ use gpui_kit::component::{ActiveTheme as _, Selectable as _};
 
 use super::panel_widths::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use super::*;
-use crate::ui::views::filters_column::{
-    render_filter_chips, render_filters_column, without_hidden_values,
-};
+use crate::ui::views::filters_column::render_filter_chips;
 use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
@@ -156,16 +154,6 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  filters_toggle,
                                  colors);
     let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
-    let filters_column = view.filters_open.then(|| {
-                                              let ctrl = view.controller.read(cx);
-                                              render_filters_column(
-            &without_hidden_values(&ctrl.visible_facets(), ctrl.filter_value_choices()),
-            &search_query,
-            &view.search_input,
-            &view.controller,
-            colors,
-        )
-                                          });
     let title_bar = render_title_bar(&settings_snap.auth,
                                      settings_entity.clone(),
                                      colors,
@@ -225,39 +213,15 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                       .items_center()
                                       .child(status_bar));
 
-    let catalog_content = div()
-        .flex_1()
-        .min_h_0()
-        .flex()
-        .flex_col()
-        .child(toolbar)
-        .children(chips)
-        .children(bulk_action_bar)
-        .child(banner)
-        .child(
-            div().flex_1().min_h_0().flex().child(
-                h_resizable("filters-layout")
-                    .child(
-                        resizable_panel()
-                            .visible(view.filters_open)
-                            .size(px(220.))
-                            .size_range(px(160.)..px(420.))
-                            .flex_none()
-                            .children(filters_column),
-                    )
-                    .child(
-                        resizable_panel().child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .min_h_0()
-                                .flex()
-                                .flex_col()
-                                .child(view.catalog_view.clone()),
-                        ),
-                    ),
-            ),
-        );
+    let catalog_content = div().flex_1()
+                               .min_h_0()
+                               .flex()
+                               .flex_col()
+                               .child(toolbar)
+                               .children(chips)
+                               .children(bulk_action_bar)
+                               .child(banner)
+                               .child(view.filters_pane.clone());
 
     let surface = colors.surface;
     let text_primary = colors.text_primary;
@@ -454,6 +418,8 @@ fn render_filters_toggle(open: bool, applied: usize, root: Entity<LibraryRootVie
         .on_click(move |_, _, cx| {
             root.update(cx, |view, cx| {
                 view.filters_open = !view.filters_open;
+                let open = view.filters_open;
+                view.filters_pane.update(cx, |pane, cx| pane.set_open(open, cx));
                 cx.notify();
             });
         });
