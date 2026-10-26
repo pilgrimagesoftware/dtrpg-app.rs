@@ -413,6 +413,8 @@ settings:
   file_opener_remove_confirm_description: "This file opener entry will be deleted."
   file_opener_app_not_found: "App not found"
   file_opener_app_filter_name: "Applications"
+  file_opener_pending_hint: "Press Enter to add, Escape to cancel"
+  file_opener_change_tooltip: "Change application"
   default_account_name: "DriveThruRPG Account"
   email_label: "Email"
   api_key_label: "API Key"
