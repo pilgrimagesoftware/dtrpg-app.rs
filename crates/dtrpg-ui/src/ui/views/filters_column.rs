@@ -16,7 +16,7 @@ use gpui::{
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::{Escape, IndentInline, Input, InputState};
 use gpui_kit::component::scroll::ScrollableElement as _;
 use rust_i18n::t;
 
@@ -264,11 +264,14 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
     let suggested = suggestion.read(cx).field();
     let (key_input, key_chips, key_controller, key_suggestion) =
         (search_input.clone(), chips.to_vec(), controller.clone(), suggestion.clone());
+    let escape_suggestion = suggestion.clone();
     // The completion popup is custom: gpui-kit's completion menu belongs to the
-    // multi-line code editor and the search box is a single-line input. Tab and
-    // Right take the suggestion and Escape drops it; they are read in the
-    // capture phase so the input's own handling of those keys does not see
-    // them.
+    // multi-line code editor and the search box is a single-line input. Tab
+    // reaches the box as the input's unhandled `IndentInline` (a raw key
+    // listener runs after the focus-next binding, so it is too late), and
+    // Escape as the input's propagated `Escape`. Both are passed on when
+    // there is nothing suggested. Right is left to the input: it moves the
+    // caret and does not propagate.
     div().flex_none()
          .relative()
          .px(px(18.0))
@@ -276,28 +279,28 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
          .border_b_1()
          .border_color(colors.border)
          .bg(colors.surface)
-         .capture_key_down(move |event, window, cx| {
+         .on_action(move |_: &IndentInline, window, cx| {
              let Some(field) = key_suggestion.read(cx).field()
              else {
+                 cx.propagate();
                  return;
              };
-             match event.keystroke.key.as_str() {
-                 "tab" | "right" => {
-                     let typed = key_input.read(cx).value().to_string();
-                     let completed = accept_key(&typed, field);
-                     key_input.update(cx, |state, cx| {
-                                  state.set_value(completed.as_str(), window, cx);
-                              });
-                     let query = join(&key_chips, &completed);
-                     key_controller.update(cx, |ctrl, cx| {
-                                       ctrl.set_search_query_debounced(query, cx)
-                                   });
-                     key_suggestion.update(cx, |state, cx| state.set(None, cx));
-                 }
-                 "escape" => key_suggestion.update(cx, |state, cx| state.set(None, cx)),
-                 _ => return,
+             let typed = key_input.read(cx).value().to_string();
+             let completed = accept_key(&typed, field);
+             key_input.update(cx, |state, cx| {
+                          state.set_value(completed.as_str(), window, cx)
+                      });
+             let query = join(&key_chips, &completed);
+             key_controller.update(cx, |ctrl, cx| ctrl.set_search_query_debounced(query, cx));
+             key_suggestion.update(cx, |state, cx| state.set(None, cx));
+         })
+         .on_action(move |_: &Escape, _, cx| {
+             if escape_suggestion.read(cx).field().is_some() {
+                 escape_suggestion.update(cx, |state, cx| state.set(None, cx));
              }
-             cx.stop_propagation();
+             else {
+                 cx.propagate();
+             }
          })
          .child(input)
          .children(suggested.map(|field| {
