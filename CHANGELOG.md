@@ -60,8 +60,6 @@
 - Refresh a location's volume space after changing the default folder
 - Show filter terms as chips inside the search box
 - Make a search chip only when its term is committed
-- Rearrange the files
-- Mod and use references
 
 
 ### Performance
