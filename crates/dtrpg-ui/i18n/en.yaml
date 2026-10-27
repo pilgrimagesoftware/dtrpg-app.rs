@@ -207,6 +207,8 @@ count:
 
 search:
   placeholder: "Search…"
+  complete_hint: "Tab to complete, Esc to dismiss"
+  clear_all_tooltip: "Clear the search"
   publishers_placeholder: "Search publishers…"
   collections_placeholder: "Search collections…"
 

@@ -1,7 +1,7 @@
 //! What typing in the search box does to a search: text stays text until the
 //! user commits it, and a committed `field:value` term becomes a chip.
 
-use super::{SearchQuery, Term};
+use super::{Field, SearchQuery, Term};
 
 /// The result of applying the text in the search box to a search whose chips
 /// are `chips`.
@@ -66,6 +66,55 @@ pub fn join(chips: &[Term], typed: &str) -> String {
     parts.join(" ")
 }
 
+/// The field whose keyword the word being typed at the end of `typed` is the
+/// start of, ignoring case, so `typ` suggests `type`. A word that already has
+/// its colon, or is the whole of a keyword, suggests nothing. A leading `-`
+/// (a negated term) is not part of the word.
+///
+/// # Examples
+///
+/// ```
+/// use dtrpg_core::util::search::{Field, suggest_key};
+///
+/// assert_eq!(suggest_key("moria TYP"), Some(Field::Type));
+/// assert_eq!(suggest_key("type:"), None);
+/// ```
+#[must_use]
+pub fn suggest_key(typed: &str) -> Option<Field> {
+    let word = typed.rsplit(char::is_whitespace).next().unwrap_or_default();
+    let word = word.strip_prefix('-').unwrap_or(word);
+    if word.is_empty() || word.contains(':') {
+        return None;
+    }
+    Field::ALL.into_iter().find(|field| {
+                                    let keyword = field.keyword();
+                                    keyword.len() > word.len()
+                                    && keyword.as_bytes()[..word.len()].eq_ignore_ascii_case(word.as_bytes())
+                                })
+}
+
+/// `typed` with the word being typed at its end completed to `field`'s
+/// keyword and a colon, keeping any `-` in front of it.
+///
+/// # Examples
+///
+/// ```
+/// use dtrpg_core::util::search::{Field, accept_key};
+///
+/// assert_eq!(accept_key("moria -ta", Field::Tag), "moria -tag:");
+/// ```
+#[must_use]
+pub fn accept_key(typed: &str, field: Field) -> String {
+    let start =
+        typed.rfind(char::is_whitespace)
+             .map_or(0, |ix| {
+                 ix + typed[ix..].chars().next().map_or(1, char::len_utf8)
+             });
+    let word = &typed[start..];
+    let sign = if word.starts_with('-') { "-" } else { "" };
+    format!("{}{sign}{}:", &typed[..start], field.keyword())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,5 +158,35 @@ mod tests {
         let chips = SearchQuery::parse("type:adventure").terms().to_vec();
         assert_eq!(apply_typed(&chips, "tag:so", false),
                    TypedSearch::Typing { query: "type:adventure tag:so".into(), });
+    }
+
+    #[test]
+    fn a_prefix_suggests_its_key_ignoring_case() {
+        assert_eq!(suggest_key("typ"), Some(Field::Type));
+        assert_eq!(suggest_key("TYP"), Some(Field::Type));
+        assert_eq!(suggest_key("moria -ta"), Some(Field::Tag));
+    }
+
+    #[test]
+    fn nothing_is_suggested_once_the_key_is_complete_or_unknown() {
+        assert_eq!(suggest_key("type"), None);
+        assert_eq!(suggest_key("type:adv"), None);
+        assert_eq!(suggest_key("zzz"), None);
+        assert_eq!(suggest_key("moria "), None);
+        assert_eq!(suggest_key(""), None);
+    }
+
+    #[test]
+    fn accepting_replaces_only_the_last_word() {
+        assert_eq!(accept_key("typ", Field::Type), "type:");
+        assert_eq!(accept_key("moria typ", Field::Type), "moria type:");
+        assert_eq!(accept_key("-pub", Field::Publisher), "-publisher:");
+    }
+
+    #[test]
+    fn an_accepted_key_is_not_a_chip_until_it_has_a_value_and_is_committed() {
+        let accepted = accept_key("typ", Field::Type);
+        assert!(matches!(apply_typed(&[], &accepted, false),
+                         TypedSearch::Typing { .. }));
     }
 }

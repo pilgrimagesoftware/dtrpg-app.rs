@@ -4,9 +4,10 @@
 //! `wire_settings_inputs`) and the main window's own search/bulk/collection
 //! inputs (`build_misc_inputs`).
 
-use dtrpg_core::util::search::{TypedSearch, apply_typed};
+use dtrpg_core::util::search::{TypedSearch, apply_typed, suggest_key};
 
 use super::*;
+use crate::ui::views::filters_column::SearchSuggestion;
 
 /// Builds every input and font-picker entity the Settings window's pages
 /// read, subscribes each to push its value into the `settings` controller,
@@ -227,6 +228,7 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
 /// and the sidebar/dialog inline inputs.
 pub(super) struct MiscInputs {
     pub(super) search_input:                Entity<InputState>,
+    pub(super) search_suggestion:           Entity<SearchSuggestion>,
     pub(super) bulk_pattern_input:          Entity<InputState>,
     pub(super) bulk_pattern_field:          Rc<Cell<SelectionField>>,
     pub(super) collection_name_input:       Entity<InputState>,
@@ -242,6 +244,10 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
     let search_input =
         cx.new(|cx| InputState::new(window, cx).placeholder(t!("search.placeholder").to_string()));
 
+    let search_suggestion = cx.new(|_| SearchSuggestion::default());
+    let suggestion_for_search = search_suggestion.clone();
+    cx.observe(&search_suggestion, |_this, _suggestion, cx| cx.notify())
+      .detach();
     let controller_for_search = controller.clone();
     cx.subscribe_in(&search_input,
                     window,
@@ -256,6 +262,10 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
                                            commit,
                                            window,
                                            cx);
+                        // Suggested once per change, not per frame.
+                        let typed = input_entity.read(cx).value().to_string();
+                        let next = suggest_key(&typed);
+                        suggestion_for_search.update(cx, |state, cx| state.set(next, cx));
                     })
       .detach();
 
@@ -336,6 +346,7 @@ pub(super) fn build_misc_inputs(window: &mut gpui::Window, cx: &mut Context<Libr
       .detach();
 
     MiscInputs { search_input,
+                 search_suggestion,
                  bulk_pattern_input,
                  bulk_pattern_field,
                  collection_name_input,
