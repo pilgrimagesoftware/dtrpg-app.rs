@@ -37,6 +37,13 @@ impl LibraryController {
         &self.search_query
     }
 
+    /// The terms committed as chips in the search box, as opposed to the one
+    /// still being typed.
+    #[must_use]
+    pub fn search_chips(&self) -> &[dtrpg_core::util::search::Term] {
+        &self.search_chips
+    }
+
     /// Returns the number of items in the filtered, sorted result set.
     ///
     /// Cheap: it does not copy the result set. The list asks for it several
@@ -114,7 +121,7 @@ impl LibraryController {
                       .await;
               let _ = this.update(async_cx, move |ctrl, cx| {
                               if ctrl.search_epoch == epoch {
-                                  ctrl.set_search_query(query, cx);
+                                  ctrl.apply_search_query(query, cx);
                               }
                           });
           })
@@ -126,6 +133,22 @@ impl LibraryController {
     /// immediate apply - a chip edit, the clear button - is never followed by
     /// a stale keystroke applying its older text.
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
+        self.search_chips = dtrpg_core::util::search::SearchQuery::parse(&query).terms()
+                                                                                .to_vec();
+        self.apply_search_query(query, cx);
+    }
+
+    /// Searches for `chips` (shown as chips in the search box) and the text
+    /// `typed` in front of them, which is searched as typed and makes no chip.
+    pub fn set_search_chips(&mut self, chips: Vec<dtrpg_core::util::search::Term>, typed: &str,
+                            cx: &mut Context<Self>) {
+        let query = dtrpg_core::util::search::join(&chips, typed);
+        self.search_chips = chips;
+        self.apply_search_query(query, cx);
+    }
+
+    /// Applies `query` without touching the chips.
+    fn apply_search_query(&mut self, query: String, cx: &mut Context<Self>) {
         self.search_epoch += 1;
         self.search_query = query;
         self.invalidate_cache();

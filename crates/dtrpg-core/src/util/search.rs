@@ -25,6 +25,9 @@ use crate::data::product_filter::{
 };
 
 mod parse;
+mod typed;
+
+pub use typed::{TypedSearch, apply_typed, join};
 
 /// The item property a [`Term`] tests.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -210,7 +213,8 @@ impl SearchQuery {
 
     /// The free-text part, always lower cased — see [`Self::parse`] for when
     /// it preserves the typed spacing verbatim vs. rejoining words.
-    pub(crate) fn free_text(&self) -> &str {
+    #[must_use]
+    pub fn free_text(&self) -> &str {
         &self.text
     }
 

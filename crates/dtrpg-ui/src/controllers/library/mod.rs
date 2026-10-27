@@ -189,6 +189,9 @@ pub struct LibraryController {
     /// the last keystroke of a burst (see
     /// [`Self::set_search_query_debounced`]).
     search_epoch:                  u64,
+    /// The `field:value` terms committed as chips in the search box. Kept apart
+    /// from `search_query`, which also holds the term being typed.
+    search_chips:                  Vec<dtrpg_core::util::search::Term>,
     /// Current sort method.
     pub sort:                      SortMethod,
     /// Current sort direction.
