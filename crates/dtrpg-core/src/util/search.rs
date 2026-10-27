@@ -27,7 +27,7 @@ use crate::data::product_filter::{
 mod parse;
 mod typed;
 
-pub use typed::{TypedSearch, apply_typed, join};
+pub use typed::{TypedSearch, accept_key, apply_typed, join, suggest_key};
 
 /// The item property a [`Term`] tests.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

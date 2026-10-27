@@ -190,6 +190,7 @@ count:
 
 search:
   placeholder: "Rechercher…"
+  complete_hint: "Tab pour compléter, Échap pour ignorer"
   publishers_placeholder: "Rechercher des éditeurs…"
   collections_placeholder: "Rechercher des collections…"
 

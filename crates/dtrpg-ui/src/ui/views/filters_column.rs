@@ -8,10 +8,10 @@
 use dtrpg_core::data::filter_value_choices::FilterValueChoices;
 use dtrpg_core::data::index::FacetCount;
 use dtrpg_core::library::Facets;
-use dtrpg_core::util::search::{Field, SearchQuery, Term, join};
+use dtrpg_core::util::search::{Field, SearchQuery, Term, accept_key, join};
 use gpui::{
-    App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window, div,
-    px,
+    App, Context, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled,
+    Window, deferred, div, px,
 };
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -184,12 +184,36 @@ pub fn render_filters_column(facets: &Facets, query: &SearchQuery,
                                  .children(sections)))
 }
 
+/// The filter key the word being typed in the search box could be completed
+/// to, kept as an entity so the box redraws only when it changes.
+#[derive(Default)]
+pub struct SearchSuggestion {
+    field: Option<Field>,
+}
+
+impl SearchSuggestion {
+    /// The field suggested, if any.
+    #[must_use]
+    pub const fn field(&self) -> Option<Field> {
+        self.field
+    }
+
+    /// Replaces the suggestion, redrawing only if it differs.
+    pub fn set(&mut self, field: Option<Field>, cx: &mut Context<Self>) {
+        if self.field != field {
+            self.field = field;
+            cx.notify();
+        }
+    }
+}
+
 /// Renders the row under the toolbar that holds the search box: the entry for
 /// the free text with a chip inside it for each committed `field:value` term
 /// of `chips`, each of which takes its term out of the search when pressed, and
 /// a button to save the search as a smart collection while there are chips.
 pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
-                         controller: &Entity<LibraryController>, colors: &ColorTokens)
+                         controller: &Entity<LibraryController>,
+                         suggestion: &Entity<SearchSuggestion>, colors: &ColorTokens, cx: &App)
                          -> impl IntoElement + use<> {
     let mut input = Input::new(search_input).w_full().cleanable(true);
     if !chips.is_empty() {
@@ -237,13 +261,66 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
                                   .children(buttons))
                      .suffix(save);
     }
+    let suggested = suggestion.read(cx).field();
+    let (key_input, key_chips, key_controller, key_suggestion) =
+        (search_input.clone(), chips.to_vec(), controller.clone(), suggestion.clone());
+    // The completion popup is custom: gpui-kit's completion menu belongs to the
+    // multi-line code editor and the search box is a single-line input. Tab and
+    // Right take the suggestion and Escape drops it; they are read in the
+    // capture phase so the input's own handling of those keys does not see
+    // them.
     div().flex_none()
+         .relative()
          .px(px(18.0))
          .py(px(8.0))
          .border_b_1()
          .border_color(colors.border)
          .bg(colors.surface)
+         .capture_key_down(move |event, window, cx| {
+             let Some(field) = key_suggestion.read(cx).field()
+             else {
+                 return;
+             };
+             match event.keystroke.key.as_str() {
+                 "tab" | "right" => {
+                     let typed = key_input.read(cx).value().to_string();
+                     let completed = accept_key(&typed, field);
+                     key_input.update(cx, |state, cx| {
+                                  state.set_value(completed.as_str(), window, cx);
+                              });
+                     let query = join(&key_chips, &completed);
+                     key_controller.update(cx, |ctrl, cx| {
+                                       ctrl.set_search_query_debounced(query, cx)
+                                   });
+                     key_suggestion.update(cx, |state, cx| state.set(None, cx));
+                 }
+                 "escape" => key_suggestion.update(cx, |state, cx| state.set(None, cx)),
+                 _ => return,
+             }
+             cx.stop_propagation();
+         })
          .child(input)
+         .children(suggested.map(|field| {
+                                deferred(div().absolute()
+                                              .top(px(46.0))
+                                              .left(px(18.0))
+                                              .px(px(10.0))
+                                              .py(px(6.0))
+                                              .flex()
+                                              .items_center()
+                                              .gap(px(10.0))
+                                              .rounded(px(6.0))
+                                              .border_1()
+                                              .border_color(colors.border)
+                                              .bg(colors.surface)
+                                              .shadow_md()
+                                              .child(div().text_sm()
+                                                          .text_color(colors.text_primary)
+                                                          .child(format!("{}:", field.keyword())))
+                                              .child(div().text_xs()
+                                                          .text_color(colors.text_tertiary)
+                                                          .child(t!("search.complete_hint"))))
+                            }))
 }
 
 #[cfg(test)]

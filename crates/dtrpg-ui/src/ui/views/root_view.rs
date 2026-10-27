@@ -58,6 +58,7 @@ use crate::ui::app::{
     install_menus, open_about_window, open_inspector_window, open_settings_window,
     save_library_window_bounds_soon,
 };
+use crate::ui::views::filters_column::SearchSuggestion;
 use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
 use crate::ui::views::{
@@ -178,6 +179,7 @@ pub struct LibraryRootView {
     pending_inspector_restores:  Vec<InspectorWindowPref>,
     /// Editable search input wired to the library controller's search query.
     search_input:                Entity<InputState>,
+    search_suggestion:           Entity<SearchSuggestion>,
     /// Draft name input for the "Create Collection" dialog.
     collection_name_input:       Entity<InputState>,
     /// Inline search input for the sidebar's Publishers section.
@@ -316,6 +318,7 @@ impl LibraryRootView {
                inspector_windows: HashMap::new(),
                pending_inspector_restores: inspector_windows::windows_to_reopen(),
                search_input: misc.search_input,
+               search_suggestion: misc.search_suggestion,
                collection_name_input: misc.collection_name_input,
                file_opener_extension_input: misc.file_opener_extension_input,
                publisher_search_input: misc.publisher_search_input,

@@ -142,7 +142,9 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let search_row = render_search_box(view.controller.read(cx).search_chips(),
                                        &view.search_input,
                                        &lib_entity,
-                                       colors);
+                                       &view.search_suggestion,
+                                       colors,
+                                       cx);
     let toolbar = render_toolbar(&filter,
                                  snap.filter_count,
                                  matched_count,
