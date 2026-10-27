@@ -10,8 +10,8 @@ use dtrpg_core::data::index::FacetCount;
 use dtrpg_core::library::Facets;
 use dtrpg_core::util::search::{Field, SearchQuery, Term, accept_key, join};
 use gpui::{
-    App, Context, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled,
-    Window, deferred, div, px,
+    App, Context, Entity, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    SharedString, Styled, Window, deferred, div, px,
 };
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -265,6 +265,8 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
     let (key_input, key_chips, key_controller, key_suggestion) =
         (search_input.clone(), chips.to_vec(), controller.clone(), suggestion.clone());
     let escape_suggestion = suggestion.clone();
+    let (pop_input, pop_chips, pop_controller, pop_suggestion) =
+        (search_input.clone(), chips.to_vec(), controller.clone(), suggestion.clone());
     // The completion popup is custom: gpui-kit's completion menu belongs to the
     // multi-line code editor and the search box is a single-line input. Tab
     // reaches the box as the input's unhandled `IndentInline` (a raw key
@@ -285,14 +287,13 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
                  cx.propagate();
                  return;
              };
-             let typed = key_input.read(cx).value().to_string();
-             let completed = accept_key(&typed, field);
-             key_input.update(cx, |state, cx| {
-                          state.set_value(completed.as_str(), window, cx)
-                      });
-             let query = join(&key_chips, &completed);
-             key_controller.update(cx, |ctrl, cx| ctrl.set_search_query_debounced(query, cx));
-             key_suggestion.update(cx, |state, cx| state.set(None, cx));
+             accept_suggestion(&key_input,
+                               &key_chips,
+                               &key_controller,
+                               &key_suggestion,
+                               field,
+                               window,
+                               cx);
          })
          .on_action(move |_: &Escape, _, cx| {
              if escape_suggestion.read(cx).field().is_some() {
@@ -304,7 +305,27 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
          })
          .child(input)
          .children(suggested.map(|field| {
-                                deferred(div().absolute()
+                                // `occlude` and the mouse-down handler keep the
+                                // click from
+                                // reaching the catalog drawn under the popup.
+                                deferred(div().id("search-suggestion")
+                                              .occlude()
+                                              .cursor_pointer()
+                                              .on_mouse_down(MouseButton::Left,
+                                                             move |_, window, cx| {
+                                                                 accept_suggestion(&pop_input,
+                                                                                   &pop_chips,
+                                                                                   &pop_controller,
+                                                                                   &pop_suggestion,
+                                                                                   field,
+                                                                                   window,
+                                                                                   cx);
+                                                                 pop_input.update(cx, |state, cx| {
+                                                                     state.focus(window, cx)
+                                                                 });
+                                                                 cx.stop_propagation();
+                                                             })
+                                              .absolute()
                                               .top(px(46.0))
                                               .left(px(18.0))
                                               .px(px(10.0))
@@ -324,6 +345,22 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
                                                           .text_color(colors.text_tertiary)
                                                           .child(t!("search.complete_hint"))))
                             }))
+}
+
+/// Completes the word being typed in the search box to `field`'s key, searches
+/// for the result and clears the suggestion.
+fn accept_suggestion(input: &Entity<InputState>, chips: &[Term],
+                     controller: &Entity<LibraryController>,
+                     suggestion: &Entity<SearchSuggestion>, field: Field, window: &mut Window,
+                     cx: &mut App) {
+    let typed = input.read(cx).value().to_string();
+    let completed = accept_key(&typed, field);
+    input.update(cx, |state, cx| {
+             state.set_value(completed.as_str(), window, cx)
+         });
+    let query = join(chips, &completed);
+    controller.update(cx, |ctrl, cx| ctrl.set_search_query_debounced(query, cx));
+    suggestion.update(cx, |state, cx| state.set(None, cx));
 }
 
 #[cfg(test)]
