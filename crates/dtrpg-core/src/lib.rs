@@ -14,6 +14,7 @@ pub mod library;
 pub mod logging;
 pub mod models;
 pub mod platform;
+pub mod report;
 pub mod runtime;
 pub mod scan_counter;
 pub mod services;

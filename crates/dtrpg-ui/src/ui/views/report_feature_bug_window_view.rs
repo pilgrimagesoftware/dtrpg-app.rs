@@ -1,19 +1,20 @@
 //! "Report a Feature/Bug" window: a kind selector (Bug/Feature Request), a
 //! subject, and a description field, with read-only diagnostic context
-//! (version, commit, build date, target) appended automatically. Submission
-//! opens the user's browser to a pre-filled GitHub "new issue" page — no
-//! background network call, no stored token.
+//! (version, commit, build date, target) appended automatically, an option to
+//! attach the application log, and screenshots to name in the report.
+//! Submission files the issue through `gh` when it is installed and signed in,
+//! and otherwise opens a pre-filled GitHub "new issue" page in the browser;
+//! see `dtrpg_core::report`.
 //!
 //! Its own window rather than a modal dialog, matching Knot's "Report an
-//! Issue…" window (see `openspec/specs/bug-reporting` in the Knot repo), but
-//! keeping `shared-report-feature-bug`'s browser-handoff submission
-//! mechanism rather than Knot's `gh`-CLI path — see
-//! `openspec/changes/define-shared-report-feature-bug` in the `dtrpg-app`
-//! meta-repo for that design decision, which this window does not revisit.
+//! Issue…" window (see `openspec/specs/bug-reporting` in the Knot repo).
 
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
+use dtrpg_core::platform::{Platform, PlatformIntegration as _};
+use dtrpg_core::report::{self, Outcome, Report, SystemGh};
 use gpui::prelude::*;
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, MouseButton, Render, Size, TitlebarOptions,
@@ -22,6 +23,7 @@ use gpui::{
 use gpui_kit::component::Disableable as _;
 use gpui_kit::component::Root;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
 use gpui_kit::component::radio::Radio;
 use gpui_kit::component::scroll::ScrollableElement;
@@ -31,9 +33,8 @@ use crate::build_info;
 use crate::data::theme::LibriTheme;
 use crate::ui::widgets::{selectable_text, suppress_selection_outside_text};
 
-const ISSUE_URL_BASE: &str = "https://github.com/pilgrimagesoftware/dtrpg-app.rs/issues/new";
 const WINDOW_WIDTH: f32 = 440.0;
-const WINDOW_HEIGHT: f32 = 480.0;
+const WINDOW_HEIGHT: f32 = 600.0;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ReportKind {
@@ -42,9 +43,8 @@ enum ReportKind {
 }
 
 impl ReportKind {
-    /// Prefix applied to the composed issue title — there is no authenticated
-    /// API call to apply a GitHub label with, so the kind is encoded as plain
-    /// text instead (per `shared-report-feature-bug`'s design decision).
+    /// Prefix applied to the composed issue title — the kind is encoded as
+    /// plain text because applying a label needs triage permission.
     fn title_prefix(self) -> &'static str {
         match self {
             ReportKind::Bug => "[Bug]",
@@ -53,11 +53,24 @@ impl ReportKind {
     }
 }
 
+/// Where a submission stands, shown under the form.
+#[derive(Clone, Default, PartialEq, Eq)]
+enum Status {
+    #[default]
+    Idle,
+    Submitting,
+    /// `gh` could not file the issue, with its message.
+    Failed(String),
+}
+
 /// Root view for the "Report a Feature/Bug" window.
 pub struct ReportFeatureBugWindowView {
     kind:         Rc<RefCell<ReportKind>>,
     subject:      Entity<InputState>,
     description:  Entity<TextareaState>,
+    attach_log:   Rc<RefCell<bool>>,
+    screenshots:  Rc<RefCell<Vec<PathBuf>>>,
+    status:       Rc<RefCell<Status>>,
     focus_handle: FocusHandle,
 }
 
@@ -68,16 +81,19 @@ impl ReportFeatureBugWindowView {
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window, cx);
         let subject = cx.new(|cx| {
-                            InputState::new(window, cx).placeholder(t!("report.subject_placeholder")
-                                                                     .to_string())
-                        });
+            InputState::new(window, cx).placeholder(t!("report.subject_placeholder").to_string())
+        });
         let description = cx.new(|cx| {
-                                TextareaState::new(window, cx).rows(6)
-                         .placeholder(t!("report.description_placeholder").to_string())
+                                TextareaState::new(window, cx)
+                .rows(6)
+                .placeholder(t!("report.description_placeholder").to_string())
                             });
         Self { kind: Rc::new(RefCell::new(ReportKind::Bug)),
                subject,
                description,
+               attach_log: Rc::default(),
+               screenshots: Rc::default(),
+               status: Rc::default(),
                focus_handle }
     }
 }
@@ -96,27 +112,26 @@ impl Focusable for ReportFeatureBugWindowView {
 pub fn open_report_feature_bug_window(cx: &mut App) -> WindowHandle<Root> {
     let window_size = Size { width:  px(WINDOW_WIDTH),
                              height: px(WINDOW_HEIGHT), };
-    let (window, _view) =
-        gpui_kit::open_window(WindowOptions {
-                                  // Same chrome pattern as `open_settings_window`: hide the
-                                  // native title text but keep the macOS traffic lights, and
-                                  // disable minimize/resize since the content scrolls its own
-                                  // overflow.
-                                  titlebar: Some(TitlebarOptions {
-                                      appears_transparent: true,
-                                      traffic_light_position: Some(point(px(12.0), px(6.0))),
-                                      ..Default::default()
-                                  }),
-                                  window_bounds: Some(WindowBounds::centered(window_size, cx)),
-                                  is_resizable: false,
-                                  is_minimizable: false,
-                                  ..Default::default()
-                              },
-                              cx,
-                              move |window, cx| {
-                                  cx.new(|cx| ReportFeatureBugWindowView::new(window, cx))
-                              })
-                  .expect("failed to open report feature/bug window");
+    let (window, _view) = gpui_kit::open_window(
+        WindowOptions {
+            // Same chrome pattern as `open_settings_window`: hide the
+            // native title text but keep the macOS traffic lights, and
+            // disable minimize/resize since the content scrolls its own
+            // overflow.
+            titlebar: Some(TitlebarOptions {
+                appears_transparent: true,
+                traffic_light_position: Some(point(px(12.0), px(6.0))),
+                ..Default::default()
+            }),
+            window_bounds: Some(WindowBounds::centered(window_size, cx)),
+            is_resizable: false,
+            is_minimizable: false,
+            ..Default::default()
+        },
+        cx,
+        move |window, cx| cx.new(|cx| ReportFeatureBugWindowView::new(window, cx)),
+    )
+    .expect("failed to open report feature/bug window");
     // `gpui_kit::open_window` wraps the view in a `Root`, so the window's
     // root entity type is always `Root` — see `open_settings_window`'s
     // matching comment.
@@ -146,21 +161,27 @@ impl Render for ReportFeatureBugWindowView {
         let kind_row = {
             let kind_bug = self.kind.clone();
             let kind_feature = self.kind.clone();
-            div().flex()
-                 .gap(px(16.0))
-                 .child(Radio::new("report-kind-bug").label(t!("report.kind_bug").to_string())
-                                                     .checked(current_kind == ReportKind::Bug)
-                                                     .on_click(move |_, window, _cx| {
-                                                         *kind_bug.borrow_mut() = ReportKind::Bug;
-                                                         window.refresh();
-                                                     }))
-                 .child(Radio::new("report-kind-feature")
-                         .label(t!("report.kind_feature").to_string())
-                         .checked(current_kind == ReportKind::Feature)
-                         .on_click(move |_, window, _cx| {
-                             *kind_feature.borrow_mut() = ReportKind::Feature;
-                             window.refresh();
-                         }))
+            div()
+                .flex()
+                .gap(px(16.0))
+                .child(
+                    Radio::new("report-kind-bug")
+                        .label(t!("report.kind_bug").to_string())
+                        .checked(current_kind == ReportKind::Bug)
+                        .on_click(move |_, window, _cx| {
+                            *kind_bug.borrow_mut() = ReportKind::Bug;
+                            window.refresh();
+                        }),
+                )
+                .child(
+                    Radio::new("report-kind-feature")
+                        .label(t!("report.kind_feature").to_string())
+                        .checked(current_kind == ReportKind::Feature)
+                        .on_click(move |_, window, _cx| {
+                            *kind_feature.borrow_mut() = ReportKind::Feature;
+                            window.refresh();
+                        }),
+                )
         };
 
         let diagnostics =
@@ -181,10 +202,12 @@ impl Render for ReportFeatureBugWindowView {
                                         t!("report.diagnostics_platform",
                                            target = build_info::TARGET).to_string()));
 
+        let status = self.status.borrow().clone();
+        let submitting = status == Status::Submitting;
         let buttons = {
-            let subject = self.subject.clone();
-            let description = self.description.clone();
-            let kind = self.kind.clone();
+            let inputs = (self.subject.clone(), self.description.clone());
+            let choices = (self.kind.clone(), self.attach_log.clone(), self.screenshots.clone());
+            let status_cell = self.status.clone();
             div().flex()
                  .justify_end()
                  .gap_2()
@@ -195,25 +218,85 @@ impl Render for ReportFeatureBugWindowView {
                                                     }))
                  .child(Button::new("report-submit").label(t!("report.submit").to_string())
                                                     .primary()
-                                                    .disabled(!enabled)
+                                                    .disabled(!enabled || submitting)
                                                     .on_click(move |_, window, cx| {
-                                                        let subject_value =
-                                                            subject.read(cx).value().to_string();
-                                                        let description_value = description.read(cx)
-                                                                                           .value()
-                                                                                           .to_string();
-                                                        if !fields_filled(&subject_value,
-                                                                          &description_value)
-                                                        {
+                                                        let subject =
+                                                            inputs.0.read(cx).value().to_string();
+                                                        let description =
+                                                            inputs.1.read(cx).value().to_string();
+                                                        if !fields_filled(&subject, &description) {
                                                             return;
                                                         }
-                                                        let url =
-                                                            build_github_issue_url(*kind.borrow(),
-                                                                                   &subject_value,
-                                                                                   &description_value);
-                                                        cx.open_url(&url);
-                                                        window.remove_window();
+                                                        let kind = *choices.0.borrow();
+                                                        let attach_log = *choices.1.borrow();
+                                                        let screenshots =
+                                                            choices.2.borrow().clone();
+                                                        *status_cell.borrow_mut() =
+                                                            Status::Submitting;
+                                                        window.refresh();
+                                                        start_submit(
+                                window,
+                                cx,
+                                Request {
+                                    title: format!("{} {subject}", kind.title_prefix()),
+                                    description,
+                                    attach_log,
+                                    screenshots,
+                                },
+                                status_cell.clone(),
+                            );
                                                     }))
+        };
+
+        let options = {
+            let attach_log = self.attach_log.clone();
+            let screenshots = self.screenshots.clone();
+            let chosen = screenshots.borrow().len();
+            let log_on = *attach_log.borrow();
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    Checkbox::new("report-attach-log")
+                        .label(t!("report.attach_log").to_string())
+                        .checked(log_on)
+                        .on_click(move |_, window, _cx| {
+                            let on = !*attach_log.borrow();
+                            *attach_log.borrow_mut() = on;
+                            window.refresh();
+                        }),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(
+                            Button::new("report-add-screenshots")
+                                .outline()
+                                .label(t!("report.attach_screenshots").to_string())
+                                .on_click(move |_, window, cx| {
+                                    pick_screenshots(window, cx, screenshots.clone());
+                                }),
+                        )
+                        .children((chosen > 0).then(|| {
+                            div()
+                                .text_xs()
+                                .text_color(colors.text_secondary)
+                                .child(t!("report.screenshots_chosen", count = chosen).to_string())
+                        })),
+                )
+        };
+
+        let status_line = match status {
+            Status::Idle => None,
+            Status::Submitting => {
+                Some((t!("report.submitting").to_string(), colors.text_secondary))
+            }
+            Status::Failed(error) => {
+                Some((t!("report.failed", error = error).to_string(), colors.warning_text))
+            }
         };
 
         // Reserves vertical clearance for the macOS traffic light buttons
@@ -269,49 +352,86 @@ impl Render for ReportFeatureBugWindowView {
                                      .child(Input::new(&self.subject).w_full())
                                      .child(label(t!("report.description_label").to_string()))
                                      .child(Textarea::new(&self.description).w_full().h(px(120.0)))
-                                     .child(diagnostics)))
+                                     .child(options)
+                                     .child(diagnostics)
+                                     .children(status_line.map(|(text, color)| {
+                                                              div().text_xs()
+                                                                   .text_color(color)
+                                                                   .child(text)
+                                                          }))))
              .child(div().px_4().pb_4().child(buttons))
     }
 }
 
-/// The GitHub new-issue URL: the kind-prefixed subject as the issue title,
-/// and the description with this build's version/commit/build-date/target
-/// appended to the body so a report always carries the exact build it came
-/// from.
-fn build_github_issue_url(kind: ReportKind, subject: &str, description: &str) -> String {
-    let title = format!("{} {subject}", kind.title_prefix());
-    let body = format!(
-                       "{description}\n\n\
-        ---\n\
-        **Version:** {}\n\
-        **Commit:** {}\n\
-        **Build Date:** {}\n\
-        **Target:** {}\n",
-                       env!("CARGO_PKG_VERSION"),
-                       build_info::GIT_HASH,
-                       build_info::BUILD_DATE,
-                       build_info::TARGET
-    );
-    format!("{ISSUE_URL_BASE}?title={}&body={}",
-            encode(&title),
-            encode(&body))
+/// What the Report button gathered, ready to hand to a background thread.
+struct Request {
+    title:       String,
+    description: String,
+    attach_log:  bool,
+    screenshots: Vec<PathBuf>,
 }
 
-/// Minimal percent-encoder for a URL query parameter value: keeps ASCII
-/// alphanumerics, percent-encodes everything else (including `-_.~`, unlike
-/// the standard "unreserved" set) — simple and unambiguous rather than
-/// pulling in the `percent-encoding` crate for one call site.
-fn encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.as_bytes() {
-        if byte.is_ascii_alphanumeric() {
-            out.push(*byte as char);
-        }
-        else {
-            out.push_str(&format!("%{byte:02X}"));
-        }
-    }
-    out
+/// Files the report off the UI thread (`gh` and the log read both block) and
+/// closes the window, or shows why `gh` could not file it and keeps it open.
+fn start_submit(window: &mut Window, cx: &mut App, request: Request, status: Rc<RefCell<Status>>) {
+    window.to_async(cx)
+          .spawn(async move |cx| {
+              let outcome = cx.background_executor()
+                              .spawn(async move { file_report(request) })
+                              .await;
+              cx.update(|window, _cx| {
+                    if let Outcome::FileFailed(error) = outcome {
+                        *status.borrow_mut() = Status::Failed(error);
+                        window.refresh();
+                    }
+                    else {
+                        window.remove_window();
+                    }
+                })
+                .ok();
+          })
+          .detach();
+}
+
+/// Builds the report and submits it. Blocks.
+fn file_report(request: Request) -> Outcome {
+    let diagnostics = format!("**Version:** {}\n**Commit:** {}\n**Build Date:** {}\n**Target:** {}",
+                              env!("CARGO_PKG_VERSION"),
+                              build_info::GIT_HASH,
+                              build_info::BUILD_DATE,
+                              build_info::TARGET);
+    let log_tail =
+        request.attach_log
+               .then(|| report::read_log().unwrap_or_else(|| "(no log found)".to_owned()));
+    let report = Report { title: request.title,
+                          description: request.description,
+                          diagnostics,
+                          log_tail,
+                          screenshots: request.screenshots };
+    report::submit(&report,
+                   &SystemGh::locate(),
+                   |url| open::that(url).is_ok(),
+                   |path| Platform.reveal(path).is_ok())
+}
+
+/// Lets the user pick image files and adds them to `screenshots`. Async, for
+/// the reason given on `settings_file_openers_view::pick_app_and_begin_add`.
+fn pick_screenshots(window: &mut Window, cx: &mut App, screenshots: Rc<RefCell<Vec<PathBuf>>>) {
+    window.to_async(cx)
+          .spawn(async move |cx| {
+              let picked = rfd::AsyncFileDialog::new()
+                .add_filter(
+                    t!("report.screenshot_filter").to_string(),
+                    dtrpg_core::constants::REPORT_SCREENSHOT_EXTENSIONS,
+                )
+                .pick_files()
+                .await
+                .unwrap_or_default();
+              report::add_screenshots(&mut screenshots.borrow_mut(),
+                                      picked.into_iter().map(|handle| handle.path().to_path_buf()));
+              cx.update(|window, _cx| window.refresh()).ok();
+          })
+          .detach();
 }
 
 #[cfg(test)]
@@ -328,55 +448,8 @@ mod tests {
     }
 
     #[test]
-    fn the_url_targets_the_app_repos_new_issue_page() {
-        let url = build_github_issue_url(ReportKind::Bug,
-                                         "Catalog shows duplicates",
-                                         "Steps: open the app, wait for sync.");
-        assert!(url.starts_with(ISSUE_URL_BASE));
-    }
-
-    #[test]
-    fn the_title_carries_the_kind_prefix_and_subject() {
-        let url = build_github_issue_url(ReportKind::Bug,
-                                         "Catalog shows duplicates",
-                                         "Steps: open the app, wait for sync.");
-        assert!(url.contains("title=%5BBug%5D%20Catalog"),
-                "missing kind-prefixed title: {url}");
-
-        let url = build_github_issue_url(ReportKind::Feature, "Dark mode", "Please add it.");
-        assert!(url.contains("title=%5BFeature%20Request%5D%20Dark"),
-                "missing feature-kind-prefixed title: {url}");
-    }
-
-    #[test]
-    fn the_body_carries_the_description_and_diagnostics() {
-        let url =
-            build_github_issue_url(ReportKind::Bug, "Subject", "Steps: open a cluster, retry.");
-        assert!(url.contains("Steps%3A%20open"),
-                "the description is missing: {url}");
-        assert!(url.contains(&encode(env!("CARGO_PKG_VERSION"))),
-                "the version is missing: {url}");
-        assert!(url.contains(&encode(build_info::GIT_HASH)),
-                "the commit is missing: {url}");
-        assert!(url.contains(&encode(build_info::TARGET)),
-                "the target is missing: {url}");
-    }
-
-    #[test]
-    fn the_url_never_contains_a_raw_space_or_newline() {
-        let url = build_github_issue_url(ReportKind::Bug,
-                                         "A subject with spaces",
-                                         "A description\nwith a newline.");
-        assert!(!url.contains(' '),
-                "a raw space breaks the query string: {url}");
-        assert!(!url.contains('\n'),
-                "a raw newline breaks the query string: {url}");
-    }
-
-    #[test]
-    fn encode_keeps_alphanumerics_and_escapes_everything_else() {
-        assert_eq!(encode("abc123"), "abc123");
-        assert_eq!(encode("a b"), "a%20b");
-        assert_eq!(encode("1.0.0"), "1%2E0%2E0");
+    fn each_kind_has_its_own_title_prefix() {
+        assert_eq!(ReportKind::Bug.title_prefix(), "[Bug]");
+        assert_eq!(ReportKind::Feature.title_prefix(), "[Feature Request]");
     }
 }

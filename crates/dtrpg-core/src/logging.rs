@@ -220,7 +220,8 @@ fn build_filter() -> EnvFilter {
         .unwrap_or_else(|_| EnvFilter::new("warn,gpui=info"))
 }
 
-fn platform_log_dir() -> PathBuf {
+/// The directory the application's rolling `libri.log.*` files are written to.
+pub fn platform_log_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
         dirs::home_dir().map(|h| h.join("Library/Logs/com.pilgrimagesoftware.dtrpg"))

@@ -620,6 +620,12 @@ report:
   diagnostics_platform: "Plattform %{target}"
   cancel: "Abbrechen"
   submit: "Melden"
+  attach_log: "Anwendungsprotokoll anhängen"
+  attach_screenshots: "Screenshots anhängen…"
+  screenshots_chosen: "%{count} Screenshot(s) ausgewählt"
+  submitting: "Meldung wird abgeschickt…"
+  failed: "Die Meldung konnte nicht abgeschickt werden: %{error}"
+  screenshot_filter: "Bilder"
 
 status_bar:
   titles_of: "%{shown} von %{total}"
