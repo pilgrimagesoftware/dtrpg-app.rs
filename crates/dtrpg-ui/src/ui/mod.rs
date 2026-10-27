@@ -8,3 +8,4 @@ pub mod views;
 pub mod data;
 pub mod state;
 pub mod theme;
+pub mod windows;

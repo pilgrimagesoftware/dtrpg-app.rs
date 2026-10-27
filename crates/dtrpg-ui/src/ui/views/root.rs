@@ -1,0 +1,349 @@
+//! Root view: composes sidebar, toolbar, catalog, and detail panel.
+//!
+//! Construction wiring is split out by concern into `wiring_inputs` (text
+//! inputs and font pickers) and `wiring_subscriptions` (controller/event
+//! subscriptions); window-opening actions live in `actions`; the render tree
+//! lives in `render`. Each does `use super::*;` to reach this file's struct,
+//! imports, and helpers.
+
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
+use dtrpg_core::{
+    credentials::{CredentialStore, KeyringCredentialStore},
+    data::{
+        auth_state::AuthState,
+        constants::{
+            INSPECTOR_PANE_DEFAULT_WIDTH, INSPECTOR_PANE_MAX_WIDTH, INSPECTOR_PANE_MIN_WIDTH,
+            KEYRING_API_KEY, KEYRING_SERVICE,
+        },
+        enums::{CatalogPresentation, GroupBy, SelectionField},
+        ui_state::{InspectorWindowPref, UiState},
+    },
+    services::{LibraryService, collections::CollectionsService},
+    util::sort::{SortDirection, SortMethod},
+};
+use gpui::{
+    AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Render, Styled,
+    WindowHandle, div, px,
+};
+use gpui_kit::component::Root;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::dialog::{
+    DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle,
+};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::AppMenuBar;
+use gpui_kit::component::notification::{Notification, NotificationType};
+use gpui_kit::component::resizable::{ResizableState, h_resizable, resizable_panel};
+use gpui_kit::component::{IconName, Sizable as _};
+use rust_i18n::t;
+
+use self::inspector_pane::render_inspector_pane;
+use self::panel_widths::{restored_inspector_width, restored_sidebar_width, save_panel_widths};
+use self::wiring_subscriptions::RootViewEntities;
+use crate::ui::actions::{
+    About, AddCollection, CheckItemAvailability, FocusSearch, NewSmartCollection,
+    RefreshThumbnails, ReloadCatalog, ReportFeatureBug, ShowActivity, ShowAlertHistory,
+    ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher, SortByTitle,
+    SortDescending, ToggleGroupByPublisher, ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
+};
+use crate::ui::app::{
+    CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
+    install_menus, open_about_window, open_inspector_window, open_settings_window,
+    save_library_window_bounds_soon,
+};
+use crate::ui::views::dialog::smart_collection::editor::open_smart_collection_editor;
+use crate::ui::views::{
+    bulk_action_bar::render_bulk_action_bar,
+    catalog::view::CatalogView,
+    detail_panel::view::render_item_inspector,
+    filters::pane_view::FiltersPaneView,
+    notification_banner::render_notification_banner,
+    sidebar::render::render_sidebar,
+    status_bar::{ActivityBarData, StatusBarSnapshot, render_status_bar},
+    title_bar::render_title_bar,
+    toolbar::render_toolbar,
+};
+use crate::ui::windows::report_feature_bug::open_report_feature_bug_window;
+use crate::util::debounce::{Debounce, SAVE_DELAY};
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
+use crate::{
+    controllers::{
+        activity::ActivityController,
+        auth_state::AuthStateController,
+        inspector::{InspectorController, InspectorPlacement},
+        library::LibraryController,
+        settings::SettingsController,
+    },
+    data::{
+        events::{
+            ActivityChanged, AgentAccessChanged, AuthStateChanged, CacheCleared,
+            CollectionCreateFailed, CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
+            CollectionMemberRemoveFailed, DownloadComplete, DownloadError, InspectorCloseRequested,
+            InspectorPopOutRequested, InspectorShowRequested, LibraryChanged, LogoutRequested,
+            LowDiskSpaceWarning, PlacementRulesChanged, SettingsChanged, SignInSucceeded,
+            StartupAuthBegun, StartupAuthFailed, ThumbnailRefreshCompleted, ThumbnailRefreshNoOp,
+            ThumbnailRefreshStarted,
+        },
+        theme::LibriTheme,
+    },
+};
+
+/// Type-tag used to identify the startup-auth toast notification.
+struct AuthPendingNotif;
+
+/// Builds an error toast with a copy-to-clipboard action for the message
+/// text, so the user can grab the full error (URLs, status codes, decode
+/// errors) for a bug report without needing to open the alert history panel.
+fn error_notification(message: impl Into<String>) -> Notification {
+    let message = message.into();
+    Notification::new().message(message.clone())
+                       .with_type(NotificationType::Error)
+                       .autohide(false)
+                       .action(move |_notification, _window, _cx| {
+                           let message = message.clone();
+                           Button::new("copy-error-message")
+                .icon(IconName::Copy)
+                .ghost()
+                .xsmall()
+                .tooltip(t!("notification.copy_tooltip"))
+                .on_click(move |_, _, cx| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(message.clone()));
+                })
+                       })
+}
+
+/// Builds a low-severity, auto-hiding toast for expected/non-fatal outcomes
+/// (e.g. adding an item that is already a member of the target collection),
+/// as opposed to [`error_notification`]'s persistent error styling.
+fn warning_notification(message: impl Into<String>) -> Notification {
+    Notification::new().message(message.into())
+                       .with_type(NotificationType::Warning)
+}
+
+/// Top-level GPUI view for the Libri library window.
+pub struct LibraryRootView {
+    controller:                  Entity<LibraryController>,
+    settings:                    Entity<SettingsController>,
+    activity:                    Entity<ActivityController>,
+    auth_state:                  Entity<AuthStateController>,
+    /// State of the inspector pane docked beside the catalog, and where its
+    /// requests (pop out, close, show an item) are heard. The pane is shown
+    /// while an item is selected.
+    inspector:                   Entity<InspectorController>,
+    /// Restored or default inspector pane initial width.
+    inspector_width:             f32,
+    /// Whether the filters column beside the catalog is shown. Session-only.
+    filters_open:                bool,
+    /// The filters column and the catalog beside it, which redraw by
+    /// themselves while the divider between them is dragged.
+    filters_pane:                Entity<FiltersPaneView>,
+    /// Resizable state for the two-column main layout (sidebar / catalog).
+    resize_state:                Entity<ResizableState>,
+    /// Restored or default sidebar panel initial width.
+    sidebar_width:               f32,
+    /// Waits for a drag or a window resize to stop before saving sizes.
+    save_debounce:               Debounce,
+    /// Waits for a window move or resize to stop before saving its bounds.
+    bounds_debounce:             Debounce,
+    /// Default focus handle for the root div, ensuring menu-triggered actions
+    /// always have a dispatch path even before any child element grabs focus.
+    root_focus:                  FocusHandle,
+    /// Handle to the currently-open settings window, if any. Used by the
+    /// `ShowSettings` action to bring an already-open window to front instead
+    /// of opening a duplicate; `None` when no settings window is open.
+    settings_window:             Option<WindowHandle<Root>>,
+    /// Handle to the currently-open "Report a Feature/Bug" window, if any.
+    /// Used by the `ReportFeatureBug` action to bring an already-open window
+    /// to front instead of opening a duplicate; `None` when no report window
+    /// is open.
+    report_feature_bug_window:   Option<WindowHandle<Root>>,
+    /// Handle to the currently-open About window, if any. Used by the
+    /// `About` action to bring an already-open window to front instead of
+    /// opening a duplicate; `None` when no About window is open.
+    about_window:                Option<WindowHandle<Root>>,
+    /// Handles to the open popped-out inspector windows, by item id. Used to
+    /// bring an item's existing window to front instead of opening a second
+    /// one.
+    inspector_windows:           HashMap<Arc<str>, WindowHandle<Root>>,
+    /// Popped-out inspectors remembered from the last session whose item has
+    /// not reached the catalog yet. Each reopens as soon as its item
+    /// arrives.
+    pending_inspector_restores:  Vec<InspectorWindowPref>,
+    /// Editable search input wired to the library controller's search query.
+    search_input:                Entity<InputState>,
+    /// Draft name input for the "Create Collection" dialog.
+    collection_name_input:       Entity<InputState>,
+    /// Inline search input for the sidebar's Publishers section.
+    publisher_search_input:      Entity<InputState>,
+    /// Inline search input for the sidebar's Collections section.
+    collection_search_input:     Entity<InputState>,
+    /// Draft extension input for the in-progress "add file opener" row in the
+    /// File Openers settings list (inline, not a modal — see the subscription
+    /// wired up in `new()` for the Enter/Blur commit behavior).
+    file_opener_extension_input: Entity<InputState>,
+    /// Pattern text input for the bulk-selection bar's "Select Matches"
+    /// control.
+    bulk_pattern_input:          Entity<InputState>,
+    /// Field the bulk-selection pattern match is applied against, selected
+    /// via the bulk-action bar's field dropdown.
+    bulk_pattern_field:          Rc<Cell<SelectionField>>,
+    /// Last `ViewMenuState` passed to `cx.set_menus`.
+    ///
+    /// `cx.set_menus` replaces the whole native menu bar and, on macOS, tears
+    /// down any menu currently tracking a click — rebuilding it on every
+    /// `LibraryChanged` (which also fires per-thumbnail during a catalog
+    /// load) closes an open menu out from under the user and reads as
+    /// flicker. Skip the rebuild when the checkmark-relevant state hasn't
+    /// actually changed.
+    last_menu_state:             Option<ViewMenuState>,
+    /// The in-window menu bar shown in the title bar on Windows and Linux,
+    /// which have no native menu bar. `None` on macOS.
+    menu_bar:                    Option<Entity<AppMenuBar>>,
+}
+
+impl LibraryRootView {
+    /// Constructs the root view and wires up the controller subscriptions.
+    ///
+    /// If `startup_api_key` is `Some`, a background re-authentication is
+    /// started immediately. The window always opens in the unauthenticated
+    /// state and transitions once auth completes.
+    pub fn new(window: &mut gpui::Window, cx: &mut Context<Self>,
+               service: Box<dyn LibraryService>,
+               collections_service: Box<dyn CollectionsService>, startup_api_key: Option<String>)
+               -> Self {
+        let activity = cx.new(|_| ActivityController::new());
+        let inspector = cx.new(|_| InspectorController::new(InspectorPlacement::Docked));
+        let controller =
+            cx.new(|cx| LibraryController::new(service, collections_service, activity.clone(), cx));
+        let login_service = cx.global::<LoginServiceFactory>().0();
+        let settings = cx.new(|cx| SettingsController::new(login_service, cx));
+
+        wiring_inputs::wire_settings_inputs(window, cx, &settings);
+        wiring_number_inputs::wire_text_scale_input(window, cx, &controller, &settings);
+
+        let catalog_view = cx.new(|cx| {
+                                 CatalogView::new(window,
+                                                  cx,
+                                                  controller.clone(),
+                                                  settings.clone(),
+                                                  inspector.clone())
+                             });
+        let auth_state = cx.new(|_| AuthStateController::new(AuthState::Unauthenticated));
+        let root_focus = cx.focus_handle();
+        root_focus.focus(window, cx);
+
+        let misc = wiring_inputs::build_misc_inputs(window, cx, &controller, &settings);
+        let filters_pane = cx.new(|cx| {
+                                 FiltersPaneView::new(cx,
+                                                      controller.clone(),
+                                                      misc.search_input.clone(),
+                                                      catalog_view)
+                             });
+
+        let entities = RootViewEntities { controller: controller.clone(),
+                                          inspector:  inspector.clone(),
+                                          activity:   activity.clone(),
+                                          settings:   settings.clone(),
+                                          auth_state: auth_state.clone(), };
+        wiring_subscriptions::wire_controller_subscriptions(window, cx, &entities, startup_api_key);
+
+        let ui_state = UiState::load();
+        let sidebar_width = restored_sidebar_width(ui_state.sidebar_width(), 250.0);
+        let inspector_width =
+            restored_inspector_width(ui_state.detail_width(), INSPECTOR_PANE_DEFAULT_WIDTH);
+        let resize_state = cx.new(|_| ResizableState::default());
+
+        // Dragging a divider (or squeezing the window) reports sizes on every
+        // frame, so they are saved once the drag has stopped.
+        cx.subscribe(&resize_state, move |this, state, _event, cx| {
+              let sizes = state.read(cx).sizes().clone();
+              let Some(sidebar) = sizes.first().map(|size| size.as_f32())
+              else {
+                  return;
+              };
+              // A hidden pane keeps its last width, so only a shown one is
+              // saved.
+              let pane_shown = this.controller.read(cx).selected_item().is_some();
+              let pane = sizes.get(2)
+                              .map(|size| size.as_f32())
+                              .filter(|_| pane_shown);
+              this.save_debounce
+                  .run(cx.background_executor(), SAVE_DELAY, move || {
+                      save_panel_widths(sidebar, pane);
+                  });
+          })
+          .detach();
+
+        // Save the window's position/size on every live resize/move, not
+        // just at close time — some quit paths (e.g. Cmd+Q) don't reliably
+        // fire `on_window_should_close`, which left the saved bounds stale.
+        cx.observe_window_bounds(window, |this, window, cx| {
+              save_library_window_bounds_soon(window, &this.bounds_debounce, cx);
+          })
+          .detach();
+
+        // Windows and Linux have no native menu bar, so the title bar draws one
+        // from the menus `install_menus` hands to the application.
+        let menu_bar = (Platform.kind() != PlatformKind::MacOs).then(|| {
+                           let bar = AppMenuBar::new(cx);
+                           cx.set_global(MenuBarHandle(bar.clone()));
+                           bar
+                       });
+
+        Self { controller,
+               settings,
+               activity,
+               auth_state,
+               inspector,
+               inspector_width,
+               filters_open: false,
+               filters_pane,
+               resize_state,
+               sidebar_width,
+               save_debounce: Debounce::new(),
+               bounds_debounce: Debounce::new(),
+               root_focus,
+               settings_window: None,
+               report_feature_bug_window: None,
+               about_window: None,
+               inspector_windows: HashMap::new(),
+               pending_inspector_restores: inspector_windows::windows_to_reopen(),
+               search_input: misc.search_input,
+               collection_name_input: misc.collection_name_input,
+               file_opener_extension_input: misc.file_opener_extension_input,
+               publisher_search_input: misc.publisher_search_input,
+               collection_search_input: misc.collection_search_input,
+               bulk_pattern_input: misc.bulk_pattern_input,
+               bulk_pattern_field: misc.bulk_pattern_field,
+               last_menu_state: None,
+               menu_bar }
+    }
+}
+
+impl Focusable for LibraryRootView {
+    fn focus_handle(&self, _cx: &gpui::App) -> FocusHandle {
+        self.root_focus.clone()
+    }
+}
+
+impl Render for LibraryRootView {
+    fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
+        render::render_root_view(self, window, cx)
+    }
+}
+
+mod actions;
+mod inspector_pane;
+mod inspector_windows;
+mod panel_widths;
+mod render;
+mod wiring_inputs;
+mod wiring_number_inputs;
+mod wiring_subscriptions;

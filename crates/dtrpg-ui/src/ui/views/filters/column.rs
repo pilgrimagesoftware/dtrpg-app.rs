@@ -1,0 +1,305 @@
+//! The filters column beside the catalog and the search box with its chips.
+//!
+//! Both only edit the search. A checked facet is a `field:value` term in the
+//! search query, so the search box, its chips and the column always agree, and
+//! a search typed by hand shows up as checked boxes. The box holds the free
+//! text; the terms show as chips inside it.
+
+use dtrpg_core::data::filter_value_choices::FilterValueChoices;
+use dtrpg_core::data::index::FacetCount;
+use dtrpg_core::library::Facets;
+use dtrpg_core::util::search::{Field, SearchQuery, Term, join};
+use gpui::{
+    App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window, div,
+    px,
+};
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::scroll::ScrollableElement as _;
+use rust_i18n::t;
+
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
+use crate::ui::views::dialog::smart_collection::editor::open_smart_collection_editor;
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
+
+/// The facets the column lists, in order, with the heading of each.
+const FACET_SECTIONS: [(Field, &str); 7] = [(Field::Availability, "filters.availability"),
+                                            (Field::System, "filters.system"),
+                                            (Field::Type, "filters.type"),
+                                            (Field::Location, "filters.location"),
+                                            (Field::Format, "filters.format"),
+                                            (Field::Genre, "filters.genre"),
+                                            (Field::Tag, "filters.tags")];
+
+/// Replaces the search box text with the free text of `query`, whose terms
+/// show as chips, and pushes the whole query into the controller. `set_value`
+/// does not emit `InputEvent::Change`.
+fn set_search_text(input: &Entity<InputState>, controller: &Entity<LibraryController>,
+                   query: &SearchQuery, window: &mut Window, cx: &mut App) {
+    input.update(cx, |state, cx| {
+             state.set_value(query.free_text(), window, cx)
+         });
+    let next = query.to_string();
+    controller.update(cx, |ctrl, cx| ctrl.set_search_query(next, cx));
+}
+
+/// How a facet value is shown. Availability values are words the user did not
+/// choose, so they are translated; the rest are shown as the catalog has them.
+fn facet_label(field: Field, count: &FacetCount) -> SharedString {
+    if field != Field::Availability {
+        return count.value.clone().into();
+    }
+    match count.value.as_str() {
+        "downloaded" => t!("filters.downloaded").to_string().into(),
+        "cloud" => t!("filters.cloud").to_string().into(),
+        other => other.to_owned().into(),
+    }
+}
+
+/// The counts of `field` in `facets`.
+/// Publishers and collections have no facet; they are chosen in the sidebar.
+fn counts_for(facets: &Facets, field: Field) -> &[FacetCount] {
+    match field {
+        Field::Availability => &facets.availability,
+        Field::Type => &facets.types,
+        Field::Format => &facets.formats,
+        Field::Genre => &facets.genres,
+        Field::System => &facets.systems,
+        Field::Location => &facets.locations,
+        Field::Tag => &facets.tags,
+        Field::Publisher | Field::Collection => &[],
+    }
+}
+
+/// The facets without the values the user hides. A hidden value still works
+/// in a search and still shows as a chip when it is applied; it is only left
+/// out of the column.
+#[must_use]
+pub fn without_hidden_values(facets: &Facets, choices: &FilterValueChoices) -> Facets {
+    let kept = |field: Field, counts: &[FacetCount]| -> Vec<FacetCount> {
+        counts.iter()
+              .filter(|count| {
+                  field.category()
+                       .is_none_or(|category| choices.is_shown(category, &count.value))
+              })
+              .cloned()
+              .collect()
+    };
+    Facets { availability: facets.availability.clone(),
+             systems:      kept(Field::System, &facets.systems),
+             types:        kept(Field::Type, &facets.types),
+             formats:      kept(Field::Format, &facets.formats),
+             genres:       kept(Field::Genre, &facets.genres),
+             locations:    facets.locations.clone(),
+             tags:         facets.tags.clone(), }
+}
+
+/// Renders one facet: a heading and a checkbox with a count for each value.
+fn render_facet_section(field: Field, heading_key: &str, facets: &Facets, query: &SearchQuery,
+                        search_input: &Entity<InputState>,
+                        controller: &Entity<LibraryController>, colors: &ColorTokens)
+                        -> Option<impl IntoElement + use<>> {
+    let counts = counts_for(facets, field);
+    if counts.is_empty() {
+        return None;
+    }
+    let largest = counts.iter()
+                        .map(|count| count.count)
+                        .max()
+                        .unwrap_or(1)
+                        .max(1);
+    let rows = counts.iter().enumerate().map(|(ix, count)| {
+        let value = count.value.clone();
+        let query = query.clone();
+        let input = search_input.clone();
+        let controller = controller.clone();
+        // The bar is a share of the largest count in this list.
+        let share = count.count as f32 / largest as f32;
+        div().flex()
+             .flex_col()
+             .gap(px(2.0))
+             .child(div().flex()
+                         .items_center()
+                         .justify_between()
+                         .gap(px(8.0))
+                         .child(Checkbox::new((field.keyword(), ix)).label(facet_label(field, count))
+                                                                    .checked(query.asks_for(field, &value))
+                                                                    .on_click(move |_, window, cx| {
+                                                                        let next = query.toggled(field, &value);
+                                                                        set_search_text(&input, &controller, &next, window, cx);
+                                                                    }))
+                         .child(div().text_xs()
+                                     .text_color(colors.text_tertiary)
+                                     .child(count.count.to_string())))
+             .child(div().h(px(3.0))
+                         .w_full()
+                         .rounded(px(2.0))
+                         .bg(colors.surface_alt)
+                         .child(div().h_full()
+                                     .w(gpui::relative(share))
+                                     .rounded(px(2.0))
+                                     .bg(colors.accent_soft)))
+    });
+    Some(div().flex()
+              .flex_col()
+              .gap(px(6.0))
+              .child(div().text_xs()
+                          .text_color(colors.text_secondary)
+                          .child(t!(heading_key).to_string().to_uppercase()))
+              .children(rows))
+}
+
+/// Renders the filters column: the facets of the items on show, each with a
+/// count, ready to be checked.
+pub fn render_filters_column(facets: &Facets, query: &SearchQuery,
+                             search_input: &Entity<InputState>,
+                             controller: &Entity<LibraryController>, colors: &ColorTokens)
+                             -> impl IntoElement + use<> {
+    let sections = FACET_SECTIONS.iter().filter_map(|(field, heading_key)| {
+                                            render_facet_section(*field,
+                                                                 heading_key,
+                                                                 facets,
+                                                                 query,
+                                                                 search_input,
+                                                                 controller,
+                                                                 colors)
+                                        });
+    div().id("filters-column")
+         .w_full()
+         .flex_none()
+         .h_full()
+         .border_r_1()
+         .border_color(colors.border)
+         .bg(colors.surface)
+         .child(div().id("filters-column-body")
+                     .size_full()
+                     .overflow_y_scrollbar()
+                     .child(div().flex()
+                                 .flex_col()
+                                 .gap(px(16.0))
+                                 .p(px(14.0))
+                                 .children(sections)))
+}
+
+/// Renders the row under the toolbar that holds the search box: the entry for
+/// the free text with a chip inside it for each committed `field:value` term
+/// of `chips`, each of which takes its term out of the search when pressed, and
+/// a button to save the search as a smart collection while there are chips.
+pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
+                         controller: &Entity<LibraryController>, colors: &ColorTokens)
+                         -> impl IntoElement + use<> {
+    let mut input = Input::new(search_input).w_full().cleanable(true);
+    if !chips.is_empty() {
+        let buttons = chips.iter().enumerate().map(|(ix, term)| {
+            let term = term.clone();
+            let all = chips.to_vec();
+            let input = search_input.clone();
+            let controller = controller.clone();
+            Button::new(("filter-chip", ix)).outline()
+                                            .compact()
+                                            .label(term.to_string())
+                                            .icon(IconName::Close)
+                                            .tooltip(t!("filters.remove_chip_tooltip"))
+                                            .on_click(move |_, _, cx| {
+                                                let kept: Vec<Term> =
+                                                    all.iter().filter(|other| **other != term)
+                                                       .cloned()
+                                                       .collect();
+                                                let typed = input.read(cx).value().to_string();
+                                                controller.update(cx, |ctrl, cx| {
+                                                              ctrl.set_search_chips(kept, &typed, cx)
+                                                          });
+                                            })
+        });
+        let (save_chips, save_input, save_controller) =
+            (chips.to_vec(), search_input.clone(), controller.clone());
+        let save = Button::new("filter-chips-save").ghost()
+                                                   .compact()
+                                                   .icon(IconName::Plus)
+                                                   .tooltip(t!("filters.save_as_smart_collection_tooltip"))
+                                                   .on_click(move |_, window, cx| {
+                                                       let typed =
+                                                           save_input.read(cx).value().to_string();
+                                                       let query = SearchQuery::parse(&join(&save_chips,
+                                                                                            &typed));
+                                                       open_smart_collection_editor(window,
+                                                                                    cx,
+                                                                                    save_controller.clone(),
+                                                                                    SmartCollectionDraft::from_search(&query));
+                                                   });
+        input = input.prefix(div().flex()
+                                  .items_center()
+                                  .gap(px(4.0))
+                                  .pl(px(4.0))
+                                  .children(buttons))
+                     .suffix(save);
+    }
+    div().flex_none()
+         .px(px(18.0))
+         .py(px(8.0))
+         .border_b_1()
+         .border_color(colors.border)
+         .bg(colors.surface)
+         .child(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_translated_texts_resolve() {
+        for key in ["filters.toggle_tooltip",
+                    "filters.remove_chip_tooltip",
+                    "filters.downloaded",
+                    "filters.cloud",
+                    "filters.availability",
+                    "filters.type",
+                    "filters.system",
+                    "filters.format",
+                    "filters.genre",
+                    "filters.tags"]
+        {
+            assert_ne!(t!(key).to_string(), key, "{key} has no text");
+        }
+    }
+
+    #[test]
+    fn hidden_values_are_left_out_of_the_column() {
+        let counts = |names: &[&str]| -> Vec<FacetCount> {
+            names.iter()
+                 .map(|name| FacetCount { value: (*name).to_owned(),
+                                          count: 1, })
+                 .collect()
+        };
+        let facets = Facets { formats: counts(&["PDF", "Creation Method"]),
+                              genres: counts(&["Horror"]),
+                              ..Facets::default() };
+        let mut choices = FilterValueChoices::default();
+        choices.set_shown("Genre", "Horror", false);
+
+        let shown = without_hidden_values(&facets, &choices);
+
+        assert_eq!(shown.formats,
+                   counts(&["PDF"]),
+                   "the app hides Creation Method by default");
+        assert!(shown.genres.is_empty());
+        choices.set_shown("Format", "Creation Method", true);
+        assert_eq!(without_hidden_values(&facets, &choices).formats.len(), 2);
+    }
+
+    #[test]
+    fn availability_values_are_translated_and_others_are_kept() {
+        let cloud = FacetCount { value: "cloud".to_owned(),
+                                 count: 1, };
+        let adventure = FacetCount { value: "Adventure".to_owned(),
+                                     count: 1, };
+        assert_ne!(facet_label(Field::Availability, &cloud).to_string(),
+                   "cloud");
+        assert_eq!(facet_label(Field::Type, &adventure).to_string(),
+                   "Adventure");
+    }
+}

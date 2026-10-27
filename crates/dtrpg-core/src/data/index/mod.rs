@@ -23,7 +23,6 @@ mod tags;
 #[cfg(test)]
 // Index fixtures use unwrap for known-good in-memory database operations.
 #[allow(clippy::unwrap_used)]
-#[path = "summary_tests.rs"]
 mod summary_tests;
 
 use std::path::Path;

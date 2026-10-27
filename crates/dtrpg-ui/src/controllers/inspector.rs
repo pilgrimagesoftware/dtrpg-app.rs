@@ -17,7 +17,7 @@ use crate::data::events::{
     InspectorCloseRequested, InspectorPopBackRequested, InspectorPopOutRequested,
     InspectorShowRequested,
 };
-use crate::ui::views::detail_panel_view::{ItemListDelegate, item_list_columns};
+use crate::ui::views::detail_panel::view::{ItemListDelegate, item_list_columns};
 use crate::view_models::inspector::InspectorTab;
 
 /// Where an inspector is shown.

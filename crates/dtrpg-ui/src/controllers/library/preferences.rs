@@ -49,10 +49,10 @@ impl LibraryController {
     /// Switches the active locale (updates `rust_i18n`'s global state) and
     /// persists it via [`dtrpg_core::data::ui_preferences::UiPreferences`] so
     /// it takes precedence over OS-locale detection on the next launch.
-    pub fn set_locale(&self, locale: crate::i18n::Locale, cx: &mut Context<Self>) {
+    pub fn set_locale(&self, locale: crate::i18n::locale::Locale, cx: &mut Context<Self>) {
         rust_i18n::set_locale(locale.code());
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_locale(locale.code());
-        cx.set_global(crate::i18n::ActiveLocale(locale));
+        cx.set_global(crate::i18n::locale::ActiveLocale(locale));
         cx.notify();
     }
 

@@ -8,7 +8,7 @@ use gpui::{
 use gpui_kit::component::Root;
 
 use crate::controllers::library::LibraryController;
-use crate::ui::views::cover_viewer_view::CoverViewerView;
+use crate::ui::views::cover_viewer::CoverViewerView;
 
 /// The smallest the viewer can be resized to.
 const MIN_SIZE: Size<Pixels> = Size { width:  px(240.),
