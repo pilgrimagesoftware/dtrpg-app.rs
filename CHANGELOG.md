@@ -1,4 +1,76 @@
 
+## 1.1.0 - 2026-10-27
+
+### Added
+- Use NumberInput for the text scale and handle step events (#503)
+- Run the on-match actions of smart collections (#387)
+- Guard the render path against catalog scans
+- Settle catalog search after a burst of keystrokes
+- Finish the Agent & MCP page's remaining rows
+- Update appearance page to match mockups
+- Remove the dot from grid view thumbnails
+- Add harness selector to the agent connect block (#522)
+- Hint how to commit a file opener and let one change its application
+- File reports through gh, attach the log and name screenshots
+
+
+### Changed
+- Change name of MCP crate from `dtrpg-mcp` to `libri-mcp`
+- Split the smart collection editor's rule widgets into their own file
+
+
+### Documentation
+- Record remaining UI v2 items in NOTES.md
+
+
+### Fixed
+- Include dtrpg-mcp binary in release packages
+- Keep System when a detail fetch cannot resolve it
+- Add the tag when Enter is pressed in the manage-tags dialog
+- Propagate filter toggles to controller and make filter column resizable
+- Anchor status bar to bottom and span full width (issue #470)
+- Keep add-file-opener button enabled and show full app path (#475)
+- Reveal downloaded item dir in file manager (#481)
+- Prevent filter-values scroll from passing through (#487)
+- Limit window text selection to presses on selectable text
+- Cap the text scale field at the settings field width
+- Build the mirror tests on Windows
+- Drop the PathBuf import only unix uses
+- Stop materializing the catalog on every keystroke
+- Allow adding multiple file openers and show full app paths
+- Remove unused imports and dead code
+- Keep inspector hidden when resizing sidebar; move library index to app data dir
+- Use the correct nightly version, use 'make fmt-check'
+- Add app dir path
+- Change 'catalog' to 'library' and 'cache' to 'local_db'
+- Update cache filenames
+- Constant names that use the 'catalog' terminology
+- Update more file and struct names
+- Update paths, etc.
+- Inception
+- More paths and names
+- Compilation errors
+- Example code
+- Clippy error
+- Open the smart collection editor from the Catalog menu
+- Keep the collections on show while signing in at startup
+- Count the pages of downloaded files for the footer total and Pages column
+- Open Report a Feature/Bug and About when the Settings window has focus
+- Rebuild the menus and redraw Settings when the language changes
+- Refresh a location's volume space after changing the default folder
+- Show filter terms as chips inside the search box
+- Make a search chip only when its term is committed
+- Rearrange the files
+- Mod and use references
+
+
+### Performance
+- Count smart collection matches once typing pauses
+- Count smart collection matches off the UI thread
+- Redraw only the filters pane while its divider is dragged
+
+
+
 ## 1.0.0 - 2026-10-22
 
 ### Added
