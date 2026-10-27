@@ -41,3 +41,16 @@ pub const DOWNLOAD_RETRY_MAX_DELAY_SECS: u64 = 30;
 
 /// How many matching titles the smart collection editor lists as a preview.
 pub const SMART_PREVIEW_TITLE_LIMIT: usize = 50;
+
+/// Repository bug and feature reports are filed against, as `owner/name`.
+pub const REPORT_REPO: &str = "pilgrimagesoftware/dtrpg-app.rs";
+/// Most lines of the application log a report carries.
+pub const REPORT_LOG_TAIL_LINES: usize = 200;
+/// Most bytes read from the end of the application log for a report.
+pub const REPORT_LOG_TAIL_BYTES: usize = 24 * 1024;
+/// Most screenshots a report can name.
+pub const REPORT_MAX_SCREENSHOTS: usize = 5;
+/// Image extensions GitHub renders inline, which a report accepts.
+pub const REPORT_SCREENSHOT_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif"];
+/// Where a `gh` installed outside the PATH of a Finder-launched app lives.
+pub const GH_FALLBACK_PATHS: &[&str] = &["/opt/homebrew/bin/gh", "/usr/local/bin/gh"];

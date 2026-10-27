@@ -639,6 +639,12 @@ report:
   diagnostics_platform: "Platform %{target}"
   cancel: "Cancel"
   submit: "Report"
+  attach_log: "Attach application log"
+  attach_screenshots: "Attach screenshots…"
+  screenshots_chosen: "%{count} screenshot(s) chosen"
+  submitting: "Filing the report…"
+  failed: "Could not file the report: %{error}"
+  screenshot_filter: "Images"
 
 status_bar:
   titles_of: "%{shown} of %{total}"

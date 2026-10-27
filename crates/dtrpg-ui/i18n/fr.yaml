@@ -620,6 +620,12 @@ report:
   diagnostics_platform: "Plateforme %{target}"
   cancel: "Annuler"
   submit: "Signaler"
+  attach_log: "Joindre le journal de l'application"
+  attach_screenshots: "Joindre des captures d'écran…"
+  screenshots_chosen: "%{count} capture(s) d'écran choisie(s)"
+  submitting: "Envoi du signalement…"
+  failed: "Impossible d'envoyer le signalement : %{error}"
+  screenshot_filter: "Images"
 
 status_bar:
   titles_of: "%{shown} sur %{total}"
