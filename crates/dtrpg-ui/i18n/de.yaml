@@ -191,6 +191,7 @@ count:
 search:
   placeholder: "Suchen…"
   complete_hint: "Tab zum Vervollständigen, Esc zum Verwerfen"
+  clear_all_tooltip: "Suche löschen"
   publishers_placeholder: "Verlage suchen…"
   collections_placeholder: "Sammlungen suchen…"
 

@@ -215,7 +215,8 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
                          controller: &Entity<LibraryController>,
                          suggestion: &Entity<SearchSuggestion>, colors: &ColorTokens, cx: &App)
                          -> impl IntoElement + use<> {
-    let mut input = Input::new(search_input).w_full().cleanable(true);
+    let mut input = Input::new(search_input).w_full();
+    let mut save_button = None;
     if !chips.is_empty() {
         let buttons = chips.iter().enumerate().map(|(ix, term)| {
             let term = term.clone();
@@ -258,9 +259,41 @@ pub fn render_search_box(chips: &[Term], search_input: &Entity<InputState>,
                                   .items_center()
                                   .gap(px(4.0))
                                   .pl(px(4.0))
-                                  .children(buttons))
-                     .suffix(save);
+                                  .children(buttons));
+        save_button = Some(save);
     }
+    // Clear all takes the chips and the text, which the input's own clear
+    // button (text only) would leave half done, so that one is not used.
+    let has_text = !search_input.read(cx).value().is_empty();
+    let clear_all =
+        (has_text || !chips.is_empty()).then(|| {
+                                           let (clear_input, clear_controller, clear_suggestion) =
+                                               (search_input.clone(),
+                                                controller.clone(),
+                                                suggestion.clone());
+                                           Button::new("search-clear-all").ghost()
+                                           .compact()
+                                           .icon(IconName::Close)
+                                           .tooltip(t!("search.clear_all_tooltip"))
+                                           .on_click(move |_, window, cx| {
+                                               clear_input.update(cx, |state, cx| {
+                                                              state.set_value("", window, cx)
+                                                          });
+                                               clear_controller.update(cx, |ctrl, cx| {
+                                                                   ctrl.set_search_chips(Vec::new(),
+                                                                                         "",
+                                                                                         cx)
+                                                               });
+                                               clear_suggestion.update(cx, |state, cx| {
+                                                                   state.set(None, cx)
+                                                               });
+                                           })
+                                       });
+    input = input.suffix(div().flex()
+                              .items_center()
+                              .gap(px(4.0))
+                              .children(clear_all)
+                              .children(save_button));
     let suggested = suggestion.read(cx).field();
     let (key_input, key_chips, key_controller, key_suggestion) =
         (search_input.clone(), chips.to_vec(), controller.clone(), suggestion.clone());
