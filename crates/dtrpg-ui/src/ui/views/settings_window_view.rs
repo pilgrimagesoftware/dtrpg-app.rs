@@ -60,6 +60,10 @@ impl SettingsWindowView {
               this.load_theme_editor(window, cx);
           })
           .detach();
+        // Every label here is looked up per render, so a language change only
+        // needs a redraw.
+        cx.observe_global::<crate::i18n::ActiveLocale>(|_, cx| cx.notify())
+          .detach();
         let view = Self { settings,
                           library,
                           file_opener_extension_input,
@@ -161,6 +165,7 @@ impl Render for SettingsWindowView {
                                                   command_path: snap.mcp_command_path.clone(),
                                                   bind_display: snap.mcp_bind_display.clone(),
                                                   log_path:     snap.mcp_log_path.clone(),
+                                                  harness:      snap.mcp_harness,
                                                   summaries:    snap.summaries.clone(),
                                                   summary_page: snap.summary_page.clone(), },
                                   theme_editor,

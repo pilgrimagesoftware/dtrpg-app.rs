@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::library::LibraryItem;
 
 // ── Sorting

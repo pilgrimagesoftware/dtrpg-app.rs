@@ -2,7 +2,7 @@
 //! outside this crate. See
 //! `docs/adr/0002-invert-crate-graph-and-add-library-facade.md`.
 //!
-//! Both the desktop UI (`dtrpg-desktop`) and the MCP server (`dtrpg-mcp`) go
+//! Both the desktop UI (`dtrpg-desktop`) and the MCP server (`libri-mcp`) go
 //! through this facade rather than reaching into `services`, `data`, or
 //! `credentials` directly, which is what keeps the two from drifting apart.
 //! This is an initial, minimal surface -- it grows as the goals that need it
@@ -11,7 +11,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;

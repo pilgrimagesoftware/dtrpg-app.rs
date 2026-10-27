@@ -1,6 +1,6 @@
 //! The vocabulary `Library::start_load` and its stages emit and read.
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::library::LibraryItem;
 
 /// The receiving end of a [`crate::library::Library`]'s catalog-sync event

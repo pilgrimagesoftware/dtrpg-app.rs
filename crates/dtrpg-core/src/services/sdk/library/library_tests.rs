@@ -126,7 +126,7 @@ impl SdkLibraryGateway for TwoPageGateway {
 
 #[test]
 fn sdk_service_maps_order_products_to_library_items() {
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
 
     let items = service.list_items().expect("list items");
 
@@ -138,7 +138,7 @@ fn sdk_service_maps_order_products_to_library_items() {
 
 #[test]
 fn get_item_resolves_publisher_from_included() {
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
 
     let item = service.get_item(42).expect("get item");
 
@@ -151,7 +151,7 @@ fn a_filterless_detail_response_leaves_the_system_the_list_fetch_resolved() {
     // so its `filters` come back empty and `line`/`kind` do not resolve — where
     // the list fetch, with `getFilters=1`, resolved both. The merge is what
     // keeps the inspector's System from blanking when an item is selected.
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
     let mut listed = service.list_items().expect("list items").remove(0);
     assert_eq!(listed.line.as_ref(), "Pathfinder", "the list resolves it");
     assert_eq!(listed.kind.as_ref(), "Adventure");
@@ -185,7 +185,7 @@ fn count_items_uses_last_page_number_when_link_present() {
         data: vec![order_product_item(1, "First Item")],
         included: None,
     });
-    let service = RustSdkLibraryService::new(Box::new(gateway));
+    let service = SdkLibraryService::new(Box::new(gateway));
 
     let count = service.count_items().expect("count supported");
 
@@ -194,7 +194,7 @@ fn count_items_uses_last_page_number_when_link_present() {
 
 #[test]
 fn count_items_falls_back_to_page_length_without_last_link() {
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded()));
 
     let count = service.count_items().expect("count supported");
 
@@ -219,7 +219,7 @@ fn count_items_is_unknown_when_more_pages_exist_but_no_last_link_is_given() {
         data: vec![order_product_item(1, "First Item")],
         included: None,
     });
-    let service = RustSdkLibraryService::new(Box::new(gateway));
+    let service = SdkLibraryService::new(Box::new(gateway));
 
     let count = service.count_items().expect("count supported");
 
@@ -228,7 +228,7 @@ fn count_items_is_unknown_when_more_pages_exist_but_no_last_link_is_given() {
 
 #[test]
 fn count_items_propagates_gateway_error() {
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
 
     let count = service.count_items().expect("count supported");
 
@@ -238,7 +238,7 @@ fn count_items_propagates_gateway_error() {
 
 #[test]
 fn sdk_service_preserves_session_error_classification() {
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::session_error()));
 
     let error = service.list_items().expect_err("session error");
 
@@ -248,7 +248,7 @@ fn sdk_service_preserves_session_error_classification() {
 #[test]
 fn sdk_service_fetches_all_pages_via_pagination() {
     let gateway = TwoPageGateway { call_count: AtomicU32::new(0), };
-    let service = RustSdkLibraryService::new(Box::new(gateway));
+    let service = SdkLibraryService::new(Box::new(gateway));
 
     let items = service.list_items().expect("list items");
 

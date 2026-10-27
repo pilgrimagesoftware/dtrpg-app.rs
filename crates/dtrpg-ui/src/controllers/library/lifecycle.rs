@@ -46,22 +46,22 @@ impl LibraryController {
                         collections_service: Box<dyn CollectionsService>,
                         activity: Entity<ActivityController>)
                         -> (Self, JobEvents, LibraryEvents) {
-        Self::build_with_cache_root(service,
-                                    collections_service,
-                                    activity,
-                                    cache_dir(),
-                                    SmartCollectionStore::load())
+        Self::build_with_roots(service,
+                               collections_service,
+                               activity,
+                               dtrpg_core::data::paths::index_dir(),
+                               dtrpg_core::data::paths::app_cache_dir(),
+                               SmartCollectionStore::load())
     }
 
     /// Builds the controller against `cache_root` instead of the real cache
     /// directory, so tests get an isolated library index instead of the
     /// user's real one.
-    pub(super) fn build_with_cache_root(service: Box<dyn LibraryService>,
-                                        collections_service: Box<dyn CollectionsService>,
-                                        activity: Entity<ActivityController>,
-                                        cache_root: PathBuf,
-                                        smart_collections: SmartCollectionStore)
-                                        -> (Self, JobEvents, LibraryEvents) {
+    pub(super) fn build_with_roots(service: Box<dyn LibraryService>,
+                                   collections_service: Box<dyn CollectionsService>,
+                                   activity: Entity<ActivityController>, app_dir_root: PathBuf,
+                                   cache_root: PathBuf, smart_collections: SmartCollectionStore)
+                                   -> (Self, JobEvents, LibraryEvents) {
         let vm = LibraryViewModel::new(service);
         let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
         let view_prefs = dtrpg_core::data::file_openers::CatalogViewPrefs::load();
@@ -71,7 +71,7 @@ impl LibraryController {
         // without one.
         #[allow(clippy::expect_used)]
         let (library, work_events, sync_events) =
-            Library::open(cache_root, &storage).expect("failed to open the library session");
+            Library::open(app_dir_root, cache_root, &storage).expect("failed to open the library session");
         let library = Arc::new(library);
 
         let ctrl = Self { vm,
@@ -79,6 +79,7 @@ impl LibraryController {
                           filter: view_prefs.to_filter(),
                           search_query: String::new(),
                           search_epoch: 0,
+                          search_chips: Vec::new(),
                           sort: view_prefs.to_sort(),
                           sort_direction: SortDirection::default(),
                           collection_sort: prefs.collection_sort(),
@@ -333,6 +334,7 @@ impl LibraryController {
                 // stored, and the views have to be built from it either way.
                 self.react_to_prepopulated_items(&items, cx);
                 self.enqueue_stored_thumbnails(cx);
+                self.count_pages(cx);
                 self.begin_tag_sync(force_reload, cx);
             }
             LibraryEvent::CollectionsChanged(entries) => self.apply_collections(entries, cx),

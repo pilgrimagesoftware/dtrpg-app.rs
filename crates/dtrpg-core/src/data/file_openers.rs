@@ -148,10 +148,12 @@ impl CatalogViewPrefs {
             None if self.grouped == Some(true) => GroupBy::Publisher,
             None => GroupBy::default(),
             Some(name) => name.parse().unwrap_or_else(|_| {
-                                          tracing::warn!(value = name,
-                                                         "unrecognized catalog grouping preference; using default");
-                                          GroupBy::default()
-                                      }),
+                tracing::warn!(
+                    value = name,
+                    "unrecognized catalog grouping preference; using default"
+                );
+                GroupBy::default()
+            }),
         }
     }
 
@@ -343,15 +345,10 @@ fn normalize_ext(ext: &str) -> String {
     ext.trim().trim_start_matches('.').to_lowercase()
 }
 
-/// Returns the path to `~/.config/dtrpg/app_config.toml` (macOS/Linux) or
-/// `%APPDATA%\dtrpg\app_config.toml` (Windows).
+/// Returns the path to the shared app config file under the platform
+/// preferences directory.
 pub(crate) fn config_path() -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
-    let base = std::env::var("APPDATA").ok().map(PathBuf::from)?;
-    #[cfg(not(target_os = "windows"))]
-    let base = std::env::var("HOME").ok()
-                                    .map(|h| PathBuf::from(h).join(".config"))?;
-    Some(base.join("dtrpg").join("app_config.toml"))
+    Some(crate::data::paths::app_preferences_dir().join("app_config.toml"))
 }
 
 #[cfg(test)]

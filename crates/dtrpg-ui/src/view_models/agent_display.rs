@@ -11,7 +11,7 @@ use rust_i18n::t;
 use crate::view_models::summary_display::SummaryPage;
 
 /// The name of the MCP server program, as the build produces it.
-const SERVER_PROGRAM: &str = "dtrpg-mcp";
+const SERVER_PROGRAM: &str = "libri-mcp";
 
 /// Where the MCP server program is, given the folder the app runs from: the
 /// program next to the app. The server is built alongside the app, so it is
@@ -40,12 +40,78 @@ pub fn locate_mcp_server(app_dir: &Path) -> PathBuf {
 /// ```
 /// use dtrpg_ui::view_models::agent_display::agent_config_json;
 ///
-/// assert!(agent_config_json("/opt/libri/dtrpg-mcp").contains("\"command\": \"/opt/libri/dtrpg-mcp\""));
+/// assert!(agent_config_json("/opt/libri/libri-mcp").contains("\"command\": \"/opt/libri/libri-mcp\""));
 /// ```
 #[must_use]
 pub fn agent_config_json(command: &str) -> String {
     let command = command.replace('\\', "\\\\").replace('"', "\\\"");
     format!("{{\n  \"mcpServers\": {{\n    \"libri\": {{\n      \"command\": \"{command}\"\n    }}\n  }}\n}}")
+}
+
+/// An agent the Connect block can show the setup command for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AgentHarness {
+    /// Anthropic's Claude Code.
+    #[default]
+    ClaudeCode,
+    /// OpenAI's Codex.
+    Codex,
+    /// Google's Gemini CLI.
+    Gemini,
+    /// OpenCode.
+    OpenCode,
+    /// Any other agent: the JSON config, for its MCP settings file.
+    Other,
+}
+
+impl AgentHarness {
+    /// Every harness, in the order the selector lists them.
+    pub const ALL: [Self; 5] = [Self::ClaudeCode,
+                                Self::Codex,
+                                Self::Gemini,
+                                Self::OpenCode,
+                                Self::Other];
+
+    /// The label on the selector.
+    #[must_use]
+    pub fn label(self) -> String {
+        match self {
+            Self::ClaudeCode => t!("agent.harness_claude_code"),
+            Self::Codex => t!("agent.harness_codex"),
+            Self::Gemini => t!("agent.harness_gemini"),
+            Self::OpenCode => t!("agent.harness_opencode"),
+            Self::Other => t!("agent.harness_other"),
+        }.to_string()
+    }
+
+    /// What to copy to connect this agent to the server at `command`: a
+    /// terminal command, or the JSON config for [`Self::Other`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_ui::view_models::agent_display::AgentHarness;
+    ///
+    /// assert_eq!(AgentHarness::ClaudeCode.setup_text("/opt/libri/libri-mcp"),
+    ///            "claude mcp add libri -- '/opt/libri/libri-mcp'");
+    /// ```
+    #[must_use]
+    pub fn setup_text(self, command: &str) -> String {
+        let quoted = shell_quote(command);
+        match self {
+            Self::ClaudeCode => format!("claude mcp add libri -- {quoted}"),
+            Self::Codex => format!("codex mcp add libri -- {quoted}"),
+            Self::Gemini => format!("gemini mcp add libri {quoted}"),
+            Self::OpenCode => format!("opencode mcp add libri --global -- {quoted}"),
+            Self::Other => agent_config_json(command),
+        }
+    }
+}
+
+/// `text` as one POSIX shell word: in single quotes, with any single quote in
+/// it closed, escaped and reopened.
+fn shell_quote(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "'\\''"))
 }
 
 /// What the page shows about everything it lists: the settings, and the
@@ -63,6 +129,8 @@ pub struct AgentPageData {
     pub bind_display: String,
     /// Where the log of calls is kept.
     pub log_path:     String,
+    /// Which agent the Connect block shows the setup command for.
+    pub harness:      AgentHarness,
     /// How summaries are made.
     pub summaries:    SummarySettingsFile,
     /// What the Summaries card reads besides the settings.

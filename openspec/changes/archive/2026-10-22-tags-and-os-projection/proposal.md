@@ -61,6 +61,6 @@ Settled with the project owner on 2026-10-18.
 - `dtrpg-core`: `data/index` (tag queries), `api` (tag methods), a new `platform` tag projection, and the
   `xattr` dependency under `[target.'cfg(unix)'.dependencies]`.
 - `dtrpg-ui`: detail panel tag editor, catalog tag filter, reconciliation on launch.
-- `dtrpg-mcp`: the tag methods are available to expose as tools, not part of this change.
+- `libri-mcp`: the tag methods are available to expose as tools, not part of this change.
 - Documentation: a page in `docs/site/` on tags, including that edits made outside Libri are overwritten on
   launch, and which platforms project them.

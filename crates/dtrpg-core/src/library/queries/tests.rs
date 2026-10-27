@@ -43,9 +43,10 @@ fn test_storage_config() -> StorageConfig {
 }
 
 fn open_library() -> Arc<Library> {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let datadir = tempfile::tempdir().expect("tempdatadir");
+    let cachedir = tempfile::tempdir().expect("tempcachedir");
     let (library, _work_events, _sync_events) =
-        Library::open(dir.keep(), &test_storage_config()).expect("open library");
+        Library::open(datadir.keep(), cachedir.keep(), &test_storage_config()).expect("open library");
     Arc::new(library)
 }
 
@@ -210,7 +211,7 @@ fn the_filter_values_of_a_field_are_listed_once_across_the_whole_catalog() {
 
 #[test]
 fn a_collection_counts_the_members_that_are_only_in_the_cloud() {
-    use crate::data::collection::CollectionEntry;
+    use crate::data::collection::entry::CollectionEntry;
 
     let library = open_library();
     let mut downloaded = item("a", "Paizo");
@@ -239,7 +240,7 @@ fn a_collection_counts_the_members_that_are_only_in_the_cloud() {
 
 #[test]
 fn a_collection_search_finds_the_members_and_an_item_lists_its_collections() {
-    use crate::data::collection::CollectionEntry;
+    use crate::data::collection::entry::CollectionEntry;
 
     let library = open_library();
     let mut member = item("a", "Paizo");

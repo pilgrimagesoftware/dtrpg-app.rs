@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::storage::{StorageConfig, sanitize_path_component};
 use crate::util::icloud_status;

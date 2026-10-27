@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::LibraryEvent;
-use crate::data::collection::CollectionEntry;
+use crate::data::collection::entry::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::storage::StorageConfig;
@@ -96,9 +96,10 @@ fn test_storage_config() -> StorageConfig {
 }
 
 fn open_library() -> (Arc<Library>, super::LibraryEvents) {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let datadir = tempfile::tempdir().expect("tempdatadir");
+    let cachedir = tempfile::tempdir().expect("tempcachedir");
     let (mut library, _work_events, sync_events) =
-        Library::open(dir.keep(), &test_storage_config()).expect("open library");
+        Library::open(datadir.keep(), cachedir.keep(), &test_storage_config()).expect("open library");
     // The real monitor probes the DriveThruRPG host, which would make these
     // tests depend on the machine's internet access.
     library.network_monitor = Arc::new(NetworkMonitor::fixed(true));

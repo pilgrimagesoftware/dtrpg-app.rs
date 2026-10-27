@@ -7,9 +7,7 @@ use gpui_kit::component::{ActiveTheme as _, Selectable as _};
 
 use super::panel_widths::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use super::*;
-use crate::ui::views::filters_column::{
-    render_filter_chips, render_filters_column, without_hidden_values,
-};
+use crate::ui::views::filters_column::render_search_box;
 use crate::ui::views::insights_view::render_insights;
 use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
 use crate::ui::views::sidebar_smart::SmartCollectionRow;
@@ -141,12 +139,15 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let search_query = dtrpg_core::util::search::SearchQuery::parse(&snap.search_query);
     let filters_toggle =
         render_filters_toggle(view.filters_open, search_query.terms().len(), cx.entity());
+    let search_row = render_search_box(view.controller.read(cx).search_chips(),
+                                       &view.search_input,
+                                       &lib_entity,
+                                       colors);
     let toolbar = render_toolbar(&filter,
                                  snap.filter_count,
                                  matched_count,
                                  total_count,
                                  &snap.search_query,
-                                 view.search_input.clone(),
                                  sort,
                                  sort_direction,
                                  group_by,
@@ -155,17 +156,6 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                  lib_entity.clone(),
                                  filters_toggle,
                                  colors);
-    let chips = render_filter_chips(&search_query, &view.search_input, &lib_entity, colors);
-    let filters_column = view.filters_open.then(|| {
-                                              let ctrl = view.controller.read(cx);
-                                              render_filters_column(
-            &without_hidden_values(&ctrl.visible_facets(), ctrl.filter_value_choices()),
-            &search_query,
-            &view.search_input,
-            &view.controller,
-            colors,
-        )
-                                          });
     let title_bar = render_title_bar(&settings_snap.auth,
                                      settings_entity.clone(),
                                      colors,
@@ -225,39 +215,15 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                                       .items_center()
                                       .child(status_bar));
 
-    let catalog_content = div()
-        .flex_1()
-        .min_h_0()
-        .flex()
-        .flex_col()
-        .child(toolbar)
-        .children(chips)
-        .children(bulk_action_bar)
-        .child(banner)
-        .child(
-            div().flex_1().min_h_0().flex().child(
-                h_resizable("filters-layout")
-                    .child(
-                        resizable_panel()
-                            .visible(view.filters_open)
-                            .size(px(220.))
-                            .size_range(px(160.)..px(420.))
-                            .flex_none()
-                            .children(filters_column),
-                    )
-                    .child(
-                        resizable_panel().child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .min_h_0()
-                                .flex()
-                                .flex_col()
-                                .child(view.catalog_view.clone()),
-                        ),
-                    ),
-            ),
-        );
+    let catalog_content = div().flex_1()
+                               .min_h_0()
+                               .flex()
+                               .flex_col()
+                               .child(toolbar)
+                               .child(search_row)
+                               .children(bulk_action_bar)
+                               .child(banner)
+                               .child(view.filters_pane.clone());
 
     let surface = colors.surface;
     let text_primary = colors.text_primary;
@@ -286,6 +252,7 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let this_entity = cx.entity();
     let this_entity_for_about = this_entity.clone();
     let this_entity_for_add = this_entity.clone();
+    let this_entity_for_smart = this_entity.clone();
     let this_entity_for_activity = this_entity.clone();
     let this_entity_for_alert_history = this_entity.clone();
     let this_entity_for_report_bug = this_entity.clone();
@@ -309,131 +276,140 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
     let inspector_pane = selected_item.as_ref()
                                       .map(|item| render_inspector_pane(view, item, window, cx));
 
-    div()
-        .size_full()
-        .bg(surface)
-        .text_color(text_primary)
-        .relative()
-        .track_focus(&view.root_focus)
-        .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
-        .on_action(move |_: &ShowSettings, _, cx| {
-            this_entity.update(cx, |view, cx| view.show_settings(cx));
-        })
-        .on_action(move |_: &About, _, cx| {
-            this_entity_for_about.update(cx, |view, cx| view.show_about(cx));
-        })
-        .on_action(move |_: &ReportFeatureBug, _, cx| {
-            this_entity_for_report_bug.update(cx, |view, cx| view.show_report_feature_bug(cx));
-        })
-        .on_action(move |_: &ReloadCatalog, _, cx| {
-            controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));
-        })
-        .on_action(move |_: &RefreshThumbnails, _, cx| {
-            controller_for_refresh_thumbnails
-                .update(cx, |ctrl, cx| ctrl.refresh_all_thumbnails(cx));
-        })
-        .on_action(move |_: &CheckItemAvailability, _, cx| {
-            controller_for_check_availability
-                .update(cx, |ctrl, cx| ctrl.request_manual_check_batch(cx));
-        })
-        .on_action(move |_: &ViewAsList, _, cx| {
-            controller_for_view_list.update(cx, |ctrl, cx| {
-                ctrl.set_presentation(CatalogPresentation::List, cx)
-            });
-        })
-        .on_action(move |_: &ViewAsThumbs, _, cx| {
-            controller_for_view_thumbs.update(cx, |ctrl, cx| {
-                ctrl.set_presentation(CatalogPresentation::Thumbs, cx);
-            });
-        })
-        .on_action(move |_: &ViewAsGrid, _, cx| {
-            controller_for_view_grid.update(cx, |ctrl, cx| {
-                ctrl.set_presentation(CatalogPresentation::Grid, cx)
-            });
-        })
-        .on_action(move |_: &SortByTitle, _, cx| {
-            controller_for_sort_title.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
-        })
-        .on_action(move |_: &SortByPublisher, _, cx| {
-            controller_for_sort_publisher
-                .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
-        })
-        .on_action(move |_: &SortByDateAdded, _, cx| {
-            controller_for_sort_date_added
-                .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
-        })
-        .on_action(move |_: &SortByPages, _, cx| {
-            controller_for_sort_pages
-                .update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
-        })
-        .on_action(move |_: &SortAscending, _, cx| {
-            controller_for_sort_asc.update(cx, |ctrl, cx| {
-                ctrl.set_sort_direction(SortDirection::Ascending, cx);
-            });
-        })
-        .on_action(move |_: &SortDescending, _, cx| {
-            controller_for_sort_desc.update(cx, |ctrl, cx| {
-                ctrl.set_sort_direction(SortDirection::Descending, cx);
-            });
-        })
-        .on_action(move |_: &ToggleGroupByPublisher, _, cx| {
-            controller_for_group_toggle.update(cx, |ctrl, cx| {
-                ctrl.toggle_group_by(GroupBy::Publisher, cx);
-            });
-        })
-        .on_action(move |_: &ToggleGroupByTag, _, cx| {
-            controller_for_group_by_tag.update(cx, |ctrl, cx| {
-                ctrl.toggle_group_by(GroupBy::Tag, cx);
-            });
-        })
-        .on_action(move |_: &FocusSearch, window, cx| {
-            search_input_for_focus.update(cx, |input, cx| input.focus(window, cx));
-        })
-        .on_action(move |_: &AddCollection, window, cx| {
-            this_entity_for_add.update(cx, |view, cx| {
-                view.show_add_collection_dialog(window, cx);
-            });
-        })
-        .on_action(move |_: &ShowActivity, _, cx| {
-            this_entity_for_activity.update(cx, |view, cx| view.show_activity(cx));
-        })
-        .on_action(move |_: &ShowAlertHistory, _, cx| {
-            this_entity_for_alert_history.update(cx, |view, cx| view.show_alert_history(cx));
-        })
-        .child(
-            div()
-                .size_full()
-                .flex()
-                .flex_col()
-                .child(title_bar)
-                .child(
-                    div().flex_1().min_h_0().child(
-                        h_resizable("main-layout")
-                            .with_state(&view.resize_state)
-                            .child(
-                                resizable_panel()
-                                    .size(px(sidebar_initial))
-                                    .size_range(px(SIDEBAR_MIN_WIDTH)..px(SIDEBAR_MAX_WIDTH))
-                                    .child(sidebar_col),
-                            )
-                            .child(
-                                resizable_panel()
-                                    .size_range(px(280.)..Pixels::MAX)
-                                    .child(main_content),
-                            )
-                            .child(
-                                resizable_panel()
-                                    .visible(inspector_pane.is_some())
-                                    .size(px(view.inspector_width))
-                                    .size_range(
-                                        px(INSPECTOR_PANE_MIN_WIDTH)..px(INSPECTOR_PANE_MAX_WIDTH),
-                                    )
-                                    .children(inspector_pane),
-                            ),
-                    ),
-                )
-                .child(bottom_row),
-        )
+    div().size_full()
+         .bg(surface)
+         .text_color(text_primary)
+         .relative()
+         .track_focus(&view.root_focus)
+         .on_mouse_down(MouseButton::Left, suppress_selection_outside_text)
+         .on_action(move |_: &ShowSettings, _, cx| {
+             this_entity.update(cx, |view, cx| view.show_settings(cx));
+         })
+         .on_action(move |_: &About, _, cx| {
+             this_entity_for_about.update(cx, |view, cx| view.show_about(cx));
+         })
+         .on_action(move |_: &ReportFeatureBug, _, cx| {
+             this_entity_for_report_bug.update(cx, |view, cx| view.show_report_feature_bug(cx));
+         })
+         .on_action(move |_: &ReloadCatalog, _, cx| {
+             controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_library(cx));
+         })
+         .on_action(move |_: &RefreshThumbnails, _, cx| {
+             controller_for_refresh_thumbnails.update(cx, |ctrl, cx| {
+                                                  ctrl.refresh_all_thumbnails(cx)
+                                              });
+         })
+         .on_action(move |_: &CheckItemAvailability, _, cx| {
+             controller_for_check_availability.update(cx, |ctrl, cx| {
+                                                  ctrl.request_manual_check_batch(cx)
+                                              });
+         })
+         .on_action(move |_: &ViewAsList, _, cx| {
+             controller_for_view_list.update(cx, |ctrl, cx| {
+                                         ctrl.set_presentation(CatalogPresentation::List, cx)
+                                     });
+         })
+         .on_action(move |_: &ViewAsThumbs, _, cx| {
+             controller_for_view_thumbs.update(cx, |ctrl, cx| {
+                                           ctrl.set_presentation(CatalogPresentation::Thumbs, cx);
+                                       });
+         })
+         .on_action(move |_: &ViewAsGrid, _, cx| {
+             controller_for_view_grid.update(cx, |ctrl, cx| {
+                                         ctrl.set_presentation(CatalogPresentation::Grid, cx)
+                                     });
+         })
+         .on_action(move |_: &SortByTitle, _, cx| {
+             controller_for_sort_title.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
+         })
+         .on_action(move |_: &SortByPublisher, _, cx| {
+             controller_for_sort_publisher.update(cx, |ctrl, cx| {
+                                              ctrl.set_sort(SortMethod::Publisher, cx)
+                                          });
+         })
+         .on_action(move |_: &SortByDateAdded, _, cx| {
+             controller_for_sort_date_added.update(cx, |ctrl, cx| {
+                                               ctrl.set_sort(SortMethod::DateAdded, cx)
+                                           });
+         })
+         .on_action(move |_: &SortByPages, _, cx| {
+             controller_for_sort_pages.update(cx, |ctrl, cx| {
+                                          ctrl.set_sort(SortMethod::PageCount, cx)
+                                      });
+         })
+         .on_action(move |_: &SortAscending, _, cx| {
+             controller_for_sort_asc.update(cx, |ctrl, cx| {
+                                        ctrl.set_sort_direction(SortDirection::Ascending, cx);
+                                    });
+         })
+         .on_action(move |_: &SortDescending, _, cx| {
+             controller_for_sort_desc.update(cx, |ctrl, cx| {
+                                         ctrl.set_sort_direction(SortDirection::Descending, cx);
+                                     });
+         })
+         .on_action(move |_: &ToggleGroupByPublisher, _, cx| {
+             controller_for_group_toggle.update(cx, |ctrl, cx| {
+                                            ctrl.toggle_group_by(GroupBy::Publisher, cx);
+                                        });
+         })
+         .on_action(move |_: &ToggleGroupByTag, _, cx| {
+             controller_for_group_by_tag.update(cx, |ctrl, cx| {
+                                            ctrl.toggle_group_by(GroupBy::Tag, cx);
+                                        });
+         })
+         .on_action(move |_: &FocusSearch, window, cx| {
+             search_input_for_focus.update(cx, |input, cx| input.focus(window, cx));
+         })
+         .on_action(move |_: &AddCollection, window, cx| {
+             this_entity_for_add.update(cx, |view, cx| {
+                                    view.show_add_collection_dialog(window, cx);
+                                });
+         })
+         // Handled here, inside the window's dispatch path: the app-level
+         // fallback runs while the window is already borrowed, so its own
+         // `window.update` fails and the menu item silently does nothing.
+         .on_action(move |_: &NewSmartCollection, window, cx| {
+             this_entity_for_smart.update(cx, |view, cx| {
+                                      view.show_smart_collection_editor(window, cx);
+                                  });
+         })
+         .on_action(move |_: &ShowActivity, _, cx| {
+             this_entity_for_activity.update(cx, |view, cx| view.show_activity(cx));
+         })
+         .on_action(move |_: &ShowAlertHistory, _, cx| {
+             this_entity_for_alert_history.update(cx, |view, cx| view.show_alert_history(cx));
+         })
+         .child(div().size_full()
+                     .flex()
+                     .flex_col()
+                     .child(title_bar)
+                     .child(div().flex_1().min_h_0().child({
+                         let mut layout = h_resizable("main-layout")
+                        .with_state(&view.resize_state)
+                        .child(
+                            resizable_panel()
+                                .size(px(sidebar_initial))
+                                .size_range(px(SIDEBAR_MIN_WIDTH)..px(SIDEBAR_MAX_WIDTH))
+                                .child(sidebar_col),
+                        )
+                        .child(
+                            resizable_panel()
+                                .size_range(px(280.)..Pixels::MAX)
+                                .child(main_content),
+                        );
+                         if let Some(pane) = inspector_pane {
+                             layout = layout.child(
+                            resizable_panel()
+                                .size(px(view.inspector_width))
+                                .size_range(
+                                    px(INSPECTOR_PANE_MIN_WIDTH)..px(INSPECTOR_PANE_MAX_WIDTH),
+                                )
+                                .child(pane),
+                        );
+                         }
+                         layout
+                     }))
+                     .child(bottom_row))
 }
 
 /// Renders the toolbar button that shows or hides the filters column. A number
@@ -453,6 +429,8 @@ fn render_filters_toggle(open: bool, applied: usize, root: Entity<LibraryRootVie
         .on_click(move |_, _, cx| {
             root.update(cx, |view, cx| {
                 view.filters_open = !view.filters_open;
+                let open = view.filters_open;
+                view.filters_pane.update(cx, |pane, cx| pane.set_open(open, cx));
                 cx.notify();
             });
         });

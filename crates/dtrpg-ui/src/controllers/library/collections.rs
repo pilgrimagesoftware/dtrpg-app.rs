@@ -8,7 +8,7 @@ impl LibraryController {
     /// them.
     pub fn load_collections(&mut self, cx: &mut Context<Self>) {
         let collections_service = Arc::clone(&self.collections_service);
-        let cache_root = cache_dir();
+        let index_root = dtrpg_core::data::paths::index_dir();
         let weak_activity = self.activity.downgrade();
         let activity_id = self.activity.update(cx, |a, cx| {
                                            a.start(&t!("activity.loading_collections"), None, cx)
@@ -24,11 +24,11 @@ impl LibraryController {
                                       "load_collections: fetched {} entries",
                                       entries.len());
                       let to_save = entries.clone();
-                      let save_root = cache_root.clone();
+                      let save_root = index_root.clone();
                       async_cx
                         .background_executor()
                         .spawn(async move {
-                            if let Err(e) = save_collections_cache(&save_root, &to_save) {
+                            if let Err(e) = save_collections_to_db(&save_root, &to_save) {
                                 tracing::warn!(error = %e, "failed to save collections cache");
                             }
                         })
@@ -152,8 +152,10 @@ impl LibraryController {
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
-        self.library.clear_collections();
-        self.collection_members.clear();
+        // The collections stay on show, like the catalog: the load that
+        // follows replaces them. Clearing them here emptied the sidebar for a
+        // moment on every launch, because the quiet sign-in comes through this
+        // method after the cached list has already been shown.
         self.selection = Selection::default();
         self.invalidate_cache();
         self.activity.update(cx, |a, cx| a.clear(cx));

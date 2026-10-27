@@ -52,6 +52,7 @@ impl LibraryController {
     pub fn set_locale(&self, locale: crate::i18n::Locale, cx: &mut Context<Self>) {
         rust_i18n::set_locale(locale.code());
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_locale(locale.code());
+        cx.set_global(crate::i18n::ActiveLocale(locale));
         cx.notify();
     }
 

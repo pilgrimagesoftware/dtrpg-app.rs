@@ -2,7 +2,7 @@
 
 use dtrpg_sdk::{OrderProductOrder, OrderProductRelationships, RelationshipData, RelationshipRef};
 
-use super::super::RustSdkLibraryService;
+use super::super::SdkLibraryService;
 use super::mapping_test_support::*;
 use super::*;
 use crate::services::LibraryService;
@@ -102,7 +102,7 @@ fn map_order_product_derives_format_from_file_extension_not_title() {
                                 size_mb:                   "1.0".to_string(),
                                 checksums:                 vec![], }];
 
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
     let items = service.list_items().expect("list items");
 
     assert_eq!(items[0].format.as_ref(), "EPUB");
@@ -127,7 +127,7 @@ fn map_order_product_joins_multiple_distinct_extensions() {
                                 size_mb:                   "1.0".to_string(),
                                 checksums:                 vec![], },];
 
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
     let items = service.list_items().expect("list items");
 
     assert_eq!(items[0].format.as_ref(), "EPUB + PDF");
@@ -152,7 +152,7 @@ fn map_order_product_populates_per_item_files_for_multi_item_entries() {
                                 size_mb:                   "0.5".to_string(),
                                 checksums:                 vec![], },];
 
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
     let items = service.list_items().expect("list items");
 
     assert!(items[0].is_multi_item());
@@ -184,7 +184,7 @@ fn map_order_product_dedupes_repeated_download_ids() {
                                 size_mb:                   "1.0".to_string(),
                                 checksums:                 vec![], },];
 
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
     let items = service.list_items().expect("list items");
 
     assert_eq!(items[0].files.len(), 1);
@@ -215,7 +215,7 @@ fn map_order_product_keeps_distinct_files_that_share_a_download_id() {
                                 size_mb:                   "0.5".to_string(),
                                 checksums:                 vec![], },];
 
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
     let items = service.list_items().expect("list items");
 
     assert_eq!(items[0].files.len(), 2);
@@ -234,7 +234,7 @@ fn map_order_product_single_file_is_not_multi_item() {
                                 size_mb:                   "1.0".to_string(),
                                 checksums:                 vec![], }];
 
-    let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
     let items = service.list_items().expect("list items");
 
     assert!(!items[0].is_multi_item());

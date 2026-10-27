@@ -2,10 +2,10 @@
 //! asked for that in Settings > Agent & MCP.
 
 use dtrpg_core::api::{LibraryApi, SummarizeError, provider_for};
-use dtrpg_core::data::paths::cache_dir;
+use dtrpg_core::data::paths::app_data_dir;
 use dtrpg_core::data::summary::ContentSummary;
 use dtrpg_core::data::summary_settings::{SummarySettings, SummarySettingsFile};
-use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
+use dtrpg_core::services::sdk::{SdkCollectionsService, SdkLibraryService};
 
 use super::*;
 
@@ -15,9 +15,9 @@ use super::*;
 fn summarize(item_id: &str, settings: &SummarySettingsFile)
              -> Result<ContentSummary, SummarizeError> {
     let provider = provider_for(settings)?;
-    let api = LibraryApi::new(Box::new(RustSdkLibraryService::unauthenticated()),
-                              Box::new(RustSdkCollectionsService::unauthenticated()),
-                              cache_dir());
+    let api = LibraryApi::new(Box::new(SdkLibraryService::unauthenticated()),
+                              Box::new(SdkCollectionsService::unauthenticated()),
+                              app_data_dir());
     api.summarize_item(item_id, &StorageConfig::load(), settings, &*provider)
 }
 

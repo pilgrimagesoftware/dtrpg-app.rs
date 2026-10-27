@@ -18,7 +18,7 @@ mockup), **Missing** (nothing found). The app was not run; see the proposal.
 | `settings-appearance-1/2` | Built (verify) | Theme gallery with duplicate, import, reveal folder and reload; themes as data files (ADR 0005) | Unverified: the live theme-file (TOML) preview and the typography and density controls |
 | `settings-storage` | Partial | Multiple roots and placement rules (publisher, collection, size); concurrency setting; collection symlink option | Per-location **capacity and title counts**, EXTERNAL and CLOUD badges, human-readable rules ("Paizo → Archive Vault, 1 title moved on next sync") instead of "root N", **Default location**, and the behaviour toggles (check free space, move files when a rule changes, keep a manifest in each location) |
 | `settings-native` | Partial | Native integration page; tag projection and cloud-placeholder handling in core | The **capability matrix** by platform (macOS, Windows, Linux) and the cloud-placeholder toggles (treat as present, materialize before opening, warn before an agent materializes). Unverified: which toggles exist |
-| `settings-agent-1/2` | Missing | `dtrpg-mcp` crate; summary settings in core | The whole **Agent & MCP** page: enable, transport, bind address, permission scopes (Read, Change, Download and spend), tools table, connect-an-agent config with Copy and Rotate token, recent activity log, and summaries (provider, model, monthly token ceiling, summarize on download) |
+| `settings-agent-1/2` | Missing | `libri-mcp` crate; summary settings in core | The whole **Agent & MCP** page: enable, transport, bind address, permission scopes (Read, Change, Download and spend), tools table, connect-an-agent config with Copy and Rotate token, recent activity log, and summaries (provider, model, monthly token ceiling, summarize on download) |
 | `windows-linux-chrome` | Missing | A title bar with account menu | The Windows and Linux **chrome**: an in-window menu bar (File, Edit, View, Library, Window, Help) and right-hand caption buttons |
 
 ## Foundations that several screens share
@@ -49,7 +49,7 @@ before its foundation means building it twice.
 
 ## MCP surface against the design
 
-The design lists 11 tools and three scopes. `dtrpg-mcp` has 9 tools and a single
+The design lists 11 tools and three scopes. `libri-mcp` has 9 tools and a single
 "writes allowed" switch.
 
 - Present: list items, get item, list tags, get tags, set tags, set tag color,

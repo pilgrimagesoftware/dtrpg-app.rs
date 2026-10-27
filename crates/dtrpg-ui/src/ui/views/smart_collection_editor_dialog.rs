@@ -8,41 +8,51 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
-use dtrpg_core::data::smart_collection::{MatchMode, Operator};
+use dtrpg_core::data::smart_collection::{MatchMode, Rule};
 use dtrpg_core::library::SmartPreview;
-use dtrpg_core::util::search::Field;
 use gpui::prelude::*;
-use gpui::{App, Entity, SharedString, Window, div, px};
+use gpui::{AnyElement, App, Entity, SharedString, Window, div, px};
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::dialog::{DialogContent, DialogFooter, DialogHeader, DialogTitle};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{Disableable, IconName, WindowExt as _, v_flex};
 use rust_i18n::t;
 
+use super::smart_collection_editor_rules::{mode_menu, render_rule_row};
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, LibriTheme};
-use crate::view_models::smart_collection_editor::{RULE_FIELDS, SmartCollectionDraft};
+use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// Everything the editor keeps while it is open.
-struct EditorState {
+pub(super) struct EditorState {
     /// The collection being edited.
-    draft:        SmartCollectionDraft,
+    pub(super) draft:        SmartCollectionDraft,
     /// The box for the name.
-    name_input:   Entity<InputState>,
+    name_input:              Entity<InputState>,
     /// The box for each rule's value, in the same order as the rules.
-    value_inputs: Vec<Entity<InputState>>,
+    pub(super) value_inputs: Vec<Entity<InputState>>,
     /// What matches now: the counts and the first few titles.
-    preview:      SmartPreview,
+    preview:                 Option<SmartPreview>,
+    /// The mode and rules `preview` was worked out for; the count is only
+    /// redone when they change, not for a new name or an on-match switch.
+    previewed:               (MatchMode, Vec<Rule>),
+    /// Counts the requests for a new preview, so a waiting one can tell a
+    /// newer one came.
+    generation:              u64,
 }
+
+/// How long typing has to pause before the matches are counted again; the
+/// count reads the whole catalog, so doing it per keystroke stalls the window.
+const PREVIEW_DELAY: Duration = Duration::from_millis(250);
 
 /// The tallest the list of matching titles grows before it scrolls.
 const PREVIEW_LIST_HEIGHT: f32 = 140.0;
 
 /// The editor's state, shared by the dialog and the callbacks that change it.
-type SharedState = Rc<RefCell<EditorState>>;
+pub(super) type SharedState = Rc<RefCell<EditorState>>;
 
 /// Opens the editor on `draft`. Saving adds the collection, or replaces the
 /// one with the draft's id.
@@ -58,16 +68,21 @@ pub fn open_smart_collection_editor(window: &mut Window, cx: &mut App,
                             .iter()
                             .map(|rule| new_value_input(window, cx, &rule.value))
                             .collect();
+    let collection = draft.collection().clone();
     let state = Rc::new(RefCell::new(EditorState { draft,
                                                    name_input: name_input.clone(),
                                                    value_inputs,
-                                                   preview: SmartPreview::default() }));
+                                                   preview: None,
+                                                   previewed: (collection.mode,
+                                                               collection.rules),
+                                                   generation: 0 }));
     watch_input(cx, &name_input, &state, &controller);
     let inputs = state.borrow().value_inputs.clone();
     for input in &inputs {
         watch_input(cx, input, &state, &controller);
     }
-    update(cx, &state, &controller);
+    // The first count starts at once; the box stays empty until it lands.
+    schedule_preview(cx, &state, &controller, 0, Duration::ZERO);
 
     window.open_dialog(cx, move |dialog, _window, _cx| {
               let (state, controller) = (state.clone(), controller.clone());
@@ -101,10 +116,10 @@ fn watch_input(cx: &mut App, input: &Entity<InputState>, state: &SharedState,
       .detach();
 }
 
-/// Copies the text of the boxes into the draft, recounts the matches, and
-/// redraws the editor.
-fn update(cx: &mut App, state: &SharedState, controller: &Entity<LibraryController>) {
-    {
+/// Copies the text of the boxes into the draft, counts the matches again if
+/// the rules changed, and redraws the editor.
+pub(super) fn update(cx: &mut App, state: &SharedState, controller: &Entity<LibraryController>) {
+    let generation = {
         let mut editor = state.borrow_mut();
         let name = editor.name_input.read(cx).value().to_string();
         editor.draft.set_name(&name);
@@ -115,25 +130,51 @@ fn update(cx: &mut App, state: &SharedState, controller: &Entity<LibraryControll
         for (index, value) in values.iter().enumerate() {
             editor.draft.set_value(index, value);
         }
-        let collection = editor.draft.collection().clone();
-        editor.preview = controller.read(cx).smart_collection_preview(&collection);
+        let collection = editor.draft.collection();
+        let query = (collection.mode, collection.rules.clone());
+        if editor.previewed == query {
+            None
+        }
+        else {
+            editor.previewed = query;
+            editor.generation += 1;
+            Some(editor.generation)
+        }
+    };
+    if let Some(generation) = generation {
+        schedule_preview(cx, state, controller, generation, PREVIEW_DELAY);
     }
     cx.refresh_windows();
 }
 
-/// The label of a rule field in the field menu.
-fn field_label(field: Field) -> String {
-    match field {
-        Field::Tag => t!("smart_collections.editor.field_tag"),
-        Field::Publisher => t!("smart_collections.editor.field_publisher"),
-        Field::System => t!("smart_collections.editor.field_system"),
-        Field::Type => t!("smart_collections.editor.field_type"),
-        Field::Format => t!("smart_collections.editor.field_format"),
-        Field::Genre => t!("smart_collections.editor.field_genre"),
-        Field::Availability => t!("smart_collections.editor.field_availability"),
-        Field::Location => t!("smart_collections.editor.field_location"),
-        Field::Collection => t!("smart_collections.editor.field_collection"),
-    }.to_string()
+/// Counts the matches on a background thread once typing has paused for
+/// `delay`, unless a newer request came, then stores the result and redraws.
+fn schedule_preview(cx: &mut App, state: &SharedState, controller: &Entity<LibraryController>,
+                    generation: u64, delay: Duration) {
+    let (state, controller) = (state.clone(), controller.clone());
+    cx.spawn(async move |cx| {
+          cx.background_executor().timer(delay).await;
+          let Some((library, collection)) = cx.update(|cx| {
+                                                  let current = state.borrow();
+                                                  (current.generation == generation).then(|| {
+                                                      (controller.read(cx).library_handle(),
+                                                       current.draft.collection().clone())
+                                                  })
+                                              })
+          else {
+              return;
+          };
+          let preview = cx.background_executor()
+                          .spawn(async move { library.smart_collection_preview(&collection) })
+                          .await;
+          cx.update(|cx| {
+                if state.borrow().generation == generation {
+                    state.borrow_mut().preview = Some(preview);
+                    cx.refresh_windows();
+                }
+            });
+      })
+      .detach();
 }
 
 fn section_heading(label: String, colors: &ColorTokens) -> impl IntoElement {
@@ -143,112 +184,13 @@ fn section_heading(label: String, colors: &ColorTokens) -> impl IntoElement {
          .child(label.to_uppercase())
 }
 
-/// The menu button that picks what a rule tests.
-fn field_menu(index: usize, current: Field, state: &SharedState,
-              controller: &Entity<LibraryController>)
-              -> impl IntoElement {
-    let (state, controller) = (state.clone(), controller.clone());
-    Button::new(("smart-rule-field", index)).outline()
-                                            .label(field_label(current))
-                                            .dropdown_caret(true)
-                                            .dropdown_menu(move |menu, _, _| {
-                                                RULE_FIELDS.into_iter().fold(menu, |menu, field| {
-                let (state, controller) = (state.clone(), controller.clone());
-                menu.item(PopupMenuItem::new(field_label(field)).checked(field == current)
-                                                                .on_click(move |_, _, cx| {
-                                                                    state.borrow_mut()
-                                                                         .draft
-                                                                         .set_field(index, field);
-                                                                    update(cx, &state, &controller);
-                                                                }))
-            })
-                                            })
-}
-
-/// The menu button that picks "is" or "is not".
-fn operator_menu(index: usize, current: Operator, state: &SharedState,
-                 controller: &Entity<LibraryController>)
-                 -> impl IntoElement {
-    let label = |operator| match operator {
-        Operator::Is => t!("smart_collections.editor.op_is").to_string(),
-        Operator::IsNot => t!("smart_collections.editor.op_is_not").to_string(),
-    };
-    let (state, controller) = (state.clone(), controller.clone());
-    Button::new(("smart-rule-operator", index)).outline()
-                                               .label(label(current))
-                                               .dropdown_caret(true)
-                                               .dropdown_menu(move |menu, _, _| {
-                                                   [Operator::Is, Operator::IsNot].into_iter()
-                                                                                  .fold(menu, |menu, operator| {
-                let (state, controller) = (state.clone(), controller.clone());
-                menu.item(PopupMenuItem::new(label(operator)).checked(operator == current)
-                                                             .on_click(move |_, _, cx| {
-                                                                 state.borrow_mut()
-                                                                      .draft
-                                                                      .set_operator(index, operator);
-                                                                 update(cx, &state, &controller);
-                                                             }))
-            })
-                                               })
-}
-
-/// The menu button that picks "all of" or "any of".
-fn mode_menu(current: MatchMode, state: &SharedState, controller: &Entity<LibraryController>)
-             -> impl IntoElement {
-    let label = |mode| match mode {
-        MatchMode::All => t!("smart_collections.editor.match_all").to_string(),
-        MatchMode::Any => t!("smart_collections.editor.match_any").to_string(),
-    };
-    let (state, controller) = (state.clone(), controller.clone());
-    Button::new("smart-rule-mode").outline()
-                                  .label(label(current))
-                                  .dropdown_caret(true)
-                                  .dropdown_menu(move |menu, _, _| {
-                                      [MatchMode::All, MatchMode::Any].into_iter().fold(menu, |menu, mode| {
-                let (state, controller) = (state.clone(), controller.clone());
-                menu.item(PopupMenuItem::new(label(mode)).checked(mode == current)
-                                                         .on_click(move |_, _, cx| {
-                                                             state.borrow_mut().draft.set_mode(mode);
-                                                             update(cx, &state, &controller);
-                                                         }))
-            })
-                                  })
-}
-
-/// One rule: what it tests, how, the value, and a button to remove it.
-fn render_rule_row(index: usize, state: &SharedState, controller: &Entity<LibraryController>)
-                   -> impl IntoElement {
-    let editor = state.borrow();
-    let rule = &editor.draft.rules()[index];
-    let value_input = editor.value_inputs[index].clone();
-    let (remove_state, remove_controller) = (state.clone(), controller.clone());
-    div().flex()
-         .items_center()
-         .gap(px(8.0))
-         .child(field_menu(index, rule.field, state, controller))
-         .child(operator_menu(index, rule.operator, state, controller))
-         .child(div().flex_1().child(Input::new(&value_input)))
-         .child(Button::new(("smart-rule-remove", index)).ghost()
-                                                         .compact()
-                                                         .icon(IconName::Close)
-                                                         .tooltip(t!("smart_collections.editor.remove_rule_tooltip")
-                                                                      .to_string())
-                                                         .on_click(move |_, window, cx| {
-                                                             {
-                                                                 let mut editor =
-                                                                     remove_state.borrow_mut();
-                                                                 editor.draft.remove_rule(index);
-                                                                 editor.value_inputs.remove(index);
-                                                             }
-                                                             update(cx, &remove_state, &remove_controller);
-                                                             window.refresh();
-                                                         }))
-}
-
 /// The box that says how many titles match now, with the first few of them
 /// in a list that scrolls.
-fn render_preview(state: &SharedState, colors: &ColorTokens) -> impl IntoElement {
-    let preview = state.borrow().preview.clone();
+fn render_preview(state: &SharedState, colors: &ColorTokens) -> AnyElement {
+    let Some(preview) = state.borrow().preview.clone()
+    else {
+        return div().into_any_element();
+    };
     let hidden = preview.matching.saturating_sub(preview.titles.len());
     v_flex().p(px(12.0))
             .gap(px(8.0))
@@ -275,6 +217,7 @@ fn render_preview(state: &SharedState, colors: &ColorTokens) -> impl IntoElement
                                                        count = hidden).to_string())
                                      }))
             })
+            .into_any_element()
 }
 
 /// A switch for an on-match action, which `on_change` turns on or off in the
@@ -444,14 +387,6 @@ mod tests {
                     "menu.catalog_new_smart_collection"]
         {
             assert_ne!(t!(key).to_string(), key, "{key} has no text");
-        }
-    }
-
-    #[test]
-    fn every_rule_field_has_a_label() {
-        for field in RULE_FIELDS {
-            assert!(!field_label(field).starts_with("smart_collections."),
-                    "{field:?} has no text");
         }
     }
 }

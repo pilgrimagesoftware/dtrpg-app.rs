@@ -48,10 +48,10 @@ use self::inspector_pane::render_inspector_pane;
 use self::panel_widths::{restored_inspector_width, restored_sidebar_width, save_panel_widths};
 use self::wiring_subscriptions::RootViewEntities;
 use crate::ui::actions::{
-    About, AddCollection, CheckItemAvailability, FocusSearch, RefreshThumbnails, ReloadCatalog,
-    ReportFeatureBug, ShowActivity, ShowAlertHistory, ShowSettings, SortAscending, SortByDateAdded,
-    SortByPages, SortByPublisher, SortByTitle, SortDescending, ToggleGroupByPublisher,
-    ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
+    About, AddCollection, CheckItemAvailability, FocusSearch, NewSmartCollection,
+    RefreshThumbnails, ReloadCatalog, ReportFeatureBug, ShowActivity, ShowAlertHistory,
+    ShowSettings, SortAscending, SortByDateAdded, SortByPages, SortByPublisher, SortByTitle,
+    SortDescending, ToggleGroupByPublisher, ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, MenuBarHandle, ServiceFactory, ViewMenuState,
@@ -64,6 +64,7 @@ use crate::ui::views::{
     bulk_action_bar_view::render_bulk_action_bar,
     catalog_view::CatalogView,
     detail_panel_view::render_item_inspector,
+    filters_pane_view::FiltersPaneView,
     notification_banner_view::render_notification_banner,
     sidebar_view::render_sidebar,
     status_bar_view::{ActivityBarData, StatusBarSnapshot, render_status_bar},
@@ -132,7 +133,6 @@ pub struct LibraryRootView {
     settings:                    Entity<SettingsController>,
     activity:                    Entity<ActivityController>,
     auth_state:                  Entity<AuthStateController>,
-    catalog_view:                Entity<CatalogView>,
     /// State of the inspector pane docked beside the catalog, and where its
     /// requests (pop out, close, show an item) are heard. The pane is shown
     /// while an item is selected.
@@ -141,6 +141,9 @@ pub struct LibraryRootView {
     inspector_width:             f32,
     /// Whether the filters column beside the catalog is shown. Session-only.
     filters_open:                bool,
+    /// The filters column and the catalog beside it, which redraw by
+    /// themselves while the divider between them is dragged.
+    filters_pane:                Entity<FiltersPaneView>,
     /// Resizable state for the two-column main layout (sidebar / catalog).
     resize_state:                Entity<ResizableState>,
     /// Restored or default sidebar panel initial width.
@@ -237,6 +240,12 @@ impl LibraryRootView {
         root_focus.focus(window, cx);
 
         let misc = wiring_inputs::build_misc_inputs(window, cx, &controller, &settings);
+        let filters_pane = cx.new(|cx| {
+                                 FiltersPaneView::new(cx,
+                                                      controller.clone(),
+                                                      misc.search_input.clone(),
+                                                      catalog_view)
+                             });
 
         let entities = RootViewEntities { controller: controller.clone(),
                                           inspector:  inspector.clone(),
@@ -292,10 +301,10 @@ impl LibraryRootView {
                settings,
                activity,
                auth_state,
-               catalog_view,
                inspector,
                inspector_width,
                filters_open: false,
+               filters_pane,
                resize_state,
                sidebar_width,
                save_debounce: Debounce::new(),

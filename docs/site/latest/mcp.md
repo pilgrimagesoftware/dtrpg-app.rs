@@ -7,7 +7,7 @@ slug: mcp
 # Using Libri from an AI agent
 
 Libri has a small [Model Context Protocol](https://modelcontextprotocol.io/) (MCP)
-server, the `dtrpg-mcp` program in this repository, that lets an AI agent look at your
+server, the `libri-mcp` program in this repository, that lets an AI agent look at your
 library and, if you allow it, change it. It reads Libri's own copy of your library on
 your computer. It does not talk to DriveThruRPG, it never holds your sign-in, and it
 opens no network port: it talks to the agent over standard input and output only.
@@ -27,7 +27,7 @@ The server reads these settings on every call, so a change applies to the very n
 call. A call that is refused says which switch is off.
 
 Copy the config from the same page (the copy button inside the code block) into
-your agent's MCP settings. It names the full path of the `dtrpg-mcp` program that
+your agent's MCP settings. It names the full path of the `libri-mcp` program that
 sits next to Libri, so it works wherever Libri is installed. The same page shows
 where the activity log is kept.
 

@@ -3,7 +3,7 @@
 mod assets;
 
 use dtrpg_core::data::token_status::TokenStatusHandle;
-use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
+use dtrpg_core::services::sdk::{SdkCollectionsService, SdkLibraryService};
 use dtrpg_ui::data::token_status_global::TokenStatusGlobal;
 use dtrpg_ui::ui::app::{CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, setup};
 use gpui::*;
@@ -22,19 +22,19 @@ pub fn run() {
 
         let library_token_status = token_status.clone();
         cx.set_global(ServiceFactory(Box::new(move |tokens| match tokens {
-            Some(t) => Box::new(RustSdkLibraryService::from_keyring_with_tokens(
+            Some(t) => Box::new(SdkLibraryService::from_keyring_with_tokens(
                 t,
                 library_token_status.clone(),
             )),
-            None => Box::new(RustSdkLibraryService::unauthenticated()),
+            None => Box::new(SdkLibraryService::unauthenticated()),
         })));
 
         cx.set_global(CollectionsServiceFactory(Box::new(move |tokens| match tokens {
-            Some(t) => Box::new(RustSdkCollectionsService::from_keyring_with_tokens(
+            Some(t) => Box::new(SdkCollectionsService::from_keyring_with_tokens(
                 t,
                 token_status.clone(),
             )),
-            None => Box::new(RustSdkCollectionsService::unauthenticated()),
+            None => Box::new(SdkCollectionsService::unauthenticated()),
         })));
 
         cx.set_global(LoginServiceFactory(Box::new(

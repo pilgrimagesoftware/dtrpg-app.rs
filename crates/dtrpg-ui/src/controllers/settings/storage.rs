@@ -71,8 +71,10 @@ impl SettingsController {
         validate_writable(&path)?;
         self.storage.set_root_path(path.clone());
         self.storage_unavailable = false;
+        self.refresh_root_volumes();
         self.check_storage_path_exists(path, cx);
         cx.emit(SettingsChanged);
+        cx.notify();
         Ok(())
     }
 

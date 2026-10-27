@@ -56,29 +56,29 @@ jobs:
       # `rust-toolchain.toml`) stays in charge of the toolchain Clippy, Test
       # and Build run with below.
       - name: rustfmt toolchain (nightly)
-        run: rustup toolchain install nightly --profile minimal --component rustfmt
+        run: |
+            rustup toolchain install nightly-2026-09-21 --profile minimal --component rustfmt
 
       - name: Check formatting
-        # The repository's historical formatting uses rustfmt options that the
-        # current hosted nightly rejects. Keep reporting drift without masking
-        # the platform compile/test jobs; re-enable this as a required gate
-        # after the formatter baseline is migrated.
-        continue-on-error: true
-        run: cargo +nightly fmt --check
+        run: |
+            make fmt-check
 
       - name: Size check
         # OS-independent source-tree check; one leg is enough.
         if: runner.os == 'Linux'
         run: |
-          make size-check
+            make size-check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: |
+            make lint
 
       - name: Test
         # A hung test otherwise holds a runner for hours.
         timeout-minutes: 15
-        run: cargo test --workspace
+        run: |
+            make test
 
       - name: Build
-        run: cargo build --workspace
+        run: |
+            make build
