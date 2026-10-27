@@ -12,8 +12,8 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::insights_cache::cache_card;
-use crate::ui::views::insights_cards::{
+use crate::ui::views::insights::cache::cache_card;
+use crate::ui::views::insights::cards::{
     analyzed_label, availability_card, disk_card, glance_card, roots_card, time_card, top_card,
     type_card,
 };

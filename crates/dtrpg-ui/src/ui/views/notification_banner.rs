@@ -9,7 +9,7 @@ use rust_i18n::t;
 
 use crate::controllers::auth_state::AuthStateController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::root_view::LibraryRootView;
+use crate::ui::views::root::LibraryRootView;
 
 /// Renders the notification banner column.
 ///

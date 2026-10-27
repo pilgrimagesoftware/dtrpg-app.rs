@@ -11,8 +11,8 @@ use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use rust_i18n::t;
 
-use super::smart_collection_editor_dialog::{SharedState, update};
 use crate::controllers::library::LibraryController;
+use crate::ui::views::dialog::smart_collection::editor::{SharedState, update};
 use crate::view_models::smart_collection_editor::RULE_FIELDS;
 
 /// The label of a rule field in the field menu.

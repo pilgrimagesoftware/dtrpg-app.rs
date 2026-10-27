@@ -18,7 +18,7 @@ impl LibraryRootView {
                                          sort:           controller.sort,
                                          sort_direction: controller.sort_direction,
                                          group_by:       controller.group_by,
-                                         locale:         crate::i18n::Locale::from_code(&rust_i18n::locale()).unwrap_or_default(), };
+                                         locale:         crate::i18n::locale::Locale::from_code(&rust_i18n::locale()).unwrap_or_default(), };
         if self.last_menu_state != Some(menu_state) {
             install_menus(cx, &menu_state);
             self.last_menu_state = Some(menu_state);

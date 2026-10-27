@@ -24,7 +24,7 @@ use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
 use crate::data::theme_catalog::{ThemeCatalog, ThemeId, theme_label};
 use crate::data::theme_loader;
-use crate::ui::views::settings_card::section_heading;
+use crate::ui::views::settings::card::section_heading;
 
 // Card and preview dimensions from the design's `.theme-card`/`.theme-prev`
 // styles, in pixels.

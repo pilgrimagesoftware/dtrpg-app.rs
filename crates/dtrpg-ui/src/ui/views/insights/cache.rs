@@ -13,8 +13,8 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::v_flex;
 use rust_i18n::t;
 
-use super::insights_cards::card;
 use crate::data::theme::ColorTokens;
+use crate::ui::views::insights::cards::card;
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::pluralize::pluralize;
 

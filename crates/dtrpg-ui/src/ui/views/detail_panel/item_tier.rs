@@ -1,4 +1,20 @@
-use super::*;
+use std::path::Path;
+use std::sync::Arc;
+
+use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+use dtrpg_core::data::storage::StorageConfig;
+use gpui::{App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
+use gpui_kit::component::ElementExt as _;
+use gpui_kit::component::Size;
+use gpui_kit::component::table::DataTable;
+use rust_i18n::t;
+
+use super::metadata_table::*;
+use super::sections::*;
+use crate::controllers::inspector::{InspectorController, item_list_table};
+use crate::controllers::library::LibraryController;
+use crate::data::theme::{ColorTokens, LibriTheme};
+use crate::util::file_presence::resolved_item_dir;
 
 /// Renders the item tier for a multi-item entry: a persistent, selectable
 /// item list and an item metadata area that updates in place on selection.

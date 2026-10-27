@@ -1,8 +1,22 @@
-use dtrpg_core::util::filter::SidebarFilter;
-use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::{Icon, IconName};
+use std::sync::Arc;
 
-use super::*;
+use dtrpg_core::data::enums::GroupBy;
+use dtrpg_core::data::enums::*;
+use dtrpg_core::util::filter::SidebarFilter;
+use gpui::prelude::*;
+use gpui::{
+    AnyElement, Entity, FontWeight, Hsla, IntoElement, ParentElement, SharedString, Styled, div, px,
+};
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenuItem};
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{Icon, IconName};
+use gpui_kit::component::{Sizable, Size};
+use rust_i18n::t;
+
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
 
 /// The translation key of the line under "No titles match", which says what
 /// the user can change: the search, the section, or both.

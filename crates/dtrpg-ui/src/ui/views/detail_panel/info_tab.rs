@@ -1,4 +1,19 @@
-use super::*;
+use std::path::Path;
+
+use dtrpg_core::data::file_openers::FileOpenerEntry;
+use dtrpg_core::data::library::LibraryItem;
+use gpui::prelude::FluentBuilder as _;
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, div, px};
+use rust_i18n::t;
+
+use super::metadata_table::*;
+use super::other_details::*;
+use super::sections::*;
+use crate::controllers::library::LibraryController;
+use crate::controllers::settings::SettingsController;
+use crate::data::theme::{ColorTokens, LibriTheme};
+use crate::ui::views::tags_section::render_tags_section;
+use crate::ui::widgets::selectable_text;
 
 /// Renders the Info tab: the description, tags, collections, a details table,
 /// and what opens the file.

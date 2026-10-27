@@ -1,4 +1,27 @@
-use super::*;
+use std::path::Path;
+use std::sync::Arc;
+
+use dtrpg_core::data::library::LibraryItem;
+use gpui::{
+    AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, px,
+};
+use gpui_kit::component::Disableable;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::tooltip::Tooltip;
+use rust_i18n::t;
+
+use super::contents_tab::*;
+use super::cover::*;
+use super::item_tier::*;
+use super::other_details::*;
+use crate::controllers::inspector::InspectorController;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_text;
+use crate::util::datetime::{format_absolute, format_relative};
+use crate::view_models::inspector::{InspectorPreviewState, InspectorSummaryState, InspectorTab};
 
 /// Renders a stateful div showing a relative date label, with a tooltip that
 /// reveals the absolute human-readable date/time on hover.
@@ -278,7 +301,8 @@ pub(super) fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorT
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
+    use crate::ui::views::detail_panel::metadata_table::value_or_dash;
 
     #[test]
     fn value_or_dash_passes_through_non_empty_value() {

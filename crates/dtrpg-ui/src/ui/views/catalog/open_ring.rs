@@ -2,8 +2,9 @@
 //! so the selection can be found again in a grid of covers.
 
 use gpui::Div;
+use gpui::{Styled, div, px};
 
-use super::*;
+use crate::data::theme::ColorTokens;
 
 /// A ring and a faint wash over the card or row it is added to. It is laid over
 /// the item without taking any room, so the layout does not move when the item

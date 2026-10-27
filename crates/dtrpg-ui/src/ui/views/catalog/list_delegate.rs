@@ -1,4 +1,27 @@
-use super::*;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use dtrpg_core::data::enums::GroupBy;
+use dtrpg_core::data::enums::*;
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::util::sort::{SortDirection, SortMethod};
+use gpui::prelude::*;
+use gpui::{App, Context, Entity, FontWeight, IntoElement, ParentElement, Styled, Window, div};
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
+use gpui_kit::component::table::{Column, ColumnSort, TableDelegate, TableState};
+use rust_i18n::t;
+
+use super::list_cell::*;
+use super::thumb_row::*;
+use crate::controllers::inspector::InspectorController;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::LibriTheme;
+use crate::ui::views::dialog::download_sheet::request_download_with_sheet;
+use crate::ui::views::list_columns::{
+    ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
+};
+use crate::util::reveal::reveal_in_file_manager;
 
 // ── CatalogListDelegate
 // ───────────────────────────────────────────────────────

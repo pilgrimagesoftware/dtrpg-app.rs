@@ -1,6 +1,33 @@
 //! Sidebar layout rendering.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::Arc;
+
+use dtrpg_core::data::collection::entry::CollectionEntry;
+use dtrpg_core::data::library::SectionCounts;
+use dtrpg_core::data::tag_library::TagEntry;
+use dtrpg_core::util::filter::SidebarFilter;
+use dtrpg_core::util::matching::name_matches_query;
+use dtrpg_core::util::publisher::PublisherEntry;
+use dtrpg_core::util::sort::{CollectionSortMethod, SortDirection};
+use gpui::prelude::*;
+use gpui::{Entity, IntoElement, SharedString, div, px};
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::sidebar::{Sidebar, SidebarCollapsible, SidebarMenu, SidebarMenuItem};
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::{Icon, IconName};
+use gpui_kit::component::{Side, Sizable as _, Size};
+use rust_i18n::t;
+
+use super::helpers::{nav_item, render_collection_sort_control, render_section_search_suffix};
+use super::section::ControlledSection;
+use super::view::*;
+use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};
+use crate::ui::views::sidebar::smart::{SmartCollectionRow, smart_collections_menu};
+use crate::ui::views::sidebar::tags::tag_rows;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,

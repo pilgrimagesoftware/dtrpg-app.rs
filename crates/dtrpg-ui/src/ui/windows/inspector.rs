@@ -16,7 +16,7 @@ use crate::data::events::InspectorPopBackRequested;
 use crate::data::events::LibraryChanged;
 use crate::data::theme::LibriTheme;
 use crate::ui::app::{remember_window, show_library_window};
-use crate::ui::views::detail_panel_view::render_item_inspector;
+use crate::ui::views::detail_panel::view::render_item_inspector;
 use crate::ui::widgets::suppress_selection_outside_text;
 
 /// Root view for a popped-out inspector window.

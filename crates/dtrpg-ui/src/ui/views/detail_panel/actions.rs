@@ -1,4 +1,25 @@
-use super::*;
+use std::path::Path;
+use std::sync::Arc;
+
+use dtrpg_core::data::enums::ItemStatus;
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::data::storage::StorageConfig;
+use dtrpg_core::platform::{Platform, PlatformIntegration};
+use gpui::prelude::FluentBuilder as _;
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
+use gpui_kit::component::Disableable;
+use gpui_kit::component::IconName;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use rust_i18n::t;
+
+use super::metadata_table::*;
+use crate::controllers::library::LibraryController;
+use crate::ui::views::dialog::download_sheet::request_download_with_sheet;
+use crate::util::file_presence::resolved_item_dir;
+use crate::util::reveal::reveal_in_file_manager;
+use crate::view_models::inspector::InspectorTab;
 
 /// Renders the row of buttons under the header: Read, Download, Materialize
 /// where the file is a cloud placeholder, and a menu with the rest.

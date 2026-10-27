@@ -5,56 +5,23 @@
 //! It appears in the pane docked beside the catalog and, with the same layout,
 //! in the window an item can be popped out into.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use dtrpg_core::data::enums::ItemStatus;
 use dtrpg_core::data::file_openers::FileOpenerEntry;
-use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
-use dtrpg_core::data::storage::StorageConfig;
-use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
-use dtrpg_core::util::matching::{collection_member_id, member_ids_contain};
-use gpui::prelude::FluentBuilder as _;
+use dtrpg_core::data::library::LibraryItem;
 use gpui::{
-    AnyElement, App, Context, Entity, Image, InteractiveElement, IntoElement, ObjectFit,
-    ParentElement, Pixels, SharedString, StatefulInteractiveElement, Styled, StyledImage, Window,
-    div, img, px,
+    AnyElement, App, Entity, Image, InteractiveElement, IntoElement, ParentElement, Styled, Window,
+    div,
 };
-use gpui_kit::component::Disableable;
-use gpui_kit::component::ElementExt as _;
-use gpui_kit::component::IconName;
-use gpui_kit::component::Sizable;
-use gpui_kit::component::Size;
-use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::clipboard::Clipboard;
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::scroll::ScrollableElement as _;
-use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
-use gpui_kit::component::tooltip::Tooltip;
-use rust_i18n::t;
 
-use crate::controllers::inspector::{InspectorController, InspectorPlacement, item_list_table};
+use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::{FILE_OPENERS_PAGE_IX, SettingsController};
+use crate::controllers::settings::SettingsController;
 use crate::data::theme::{ColorTokens, LibriTheme};
-use crate::ui::actions::ShowSettings;
-use crate::ui::library::cover::{
-    CoverCache, cover_style, detail_cache_key, render_generative_cover,
-};
-use crate::ui::views::catalog_view::render_checking_indicator;
-use crate::ui::views::download_sheet_dialog::request_download_with_sheet;
-use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::ui::views::tags_section_view::render_tags_section;
-use crate::ui::widgets::{selectable_text, small_caps_text};
-use crate::util::datetime::{format_absolute, format_relative};
-use crate::util::file_presence::resolved_item_dir;
-use crate::util::reveal::reveal_in_file_manager;
-use crate::view_models::inspector::{
-    InspectorContentsState, InspectorPreviewState, InspectorSummaryState, InspectorTab,
-    InspectorViewModel,
-};
+use crate::ui::library::cover::{CoverCache, detail_cache_key};
+use crate::view_models::inspector::InspectorTab;
 
 /// Everything an inspector surface hands over to draw one item.
 pub struct InspectorContext<'a> {
@@ -163,27 +130,8 @@ pub fn render_inspector(context: InspectorContext<'_>, window: &mut Window, cx: 
          .into_any_element()
 }
 
-mod actions;
-mod contents_tab;
-mod cover;
-mod header;
-mod info_tab;
-
-mod inspector;
-mod item_list_delegate;
-mod item_tier;
-mod metadata_table;
-mod other_details;
-mod sections;
-
-use actions::*;
-use contents_tab::*;
-use cover::*;
-use header::*;
-use info_tab::*;
-use inspector::*;
-pub(crate) use item_list_delegate::*;
-use item_tier::*;
-use metadata_table::*;
-use other_details::*;
-use sections::*;
+use super::actions::*;
+use super::header::*;
+use super::info_tab::*;
+use super::inspector::*;
+pub(crate) use super::item_list_delegate::*;

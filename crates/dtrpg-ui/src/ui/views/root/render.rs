@@ -7,10 +7,10 @@ use gpui_kit::component::{ActiveTheme as _, Selectable as _};
 
 use super::panel_widths::{SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use super::*;
-use crate::ui::views::filters_column::render_search_box;
-use crate::ui::views::insights_view::render_insights;
-use crate::ui::views::sidebar_footer_view::{SidebarFooterData, render_sidebar_footer};
-use crate::ui::views::sidebar_smart::SmartCollectionRow;
+use crate::ui::views::filters::column::render_search_box;
+use crate::ui::views::insights::view::render_insights;
+use crate::ui::views::sidebar::footer::{SidebarFooterData, render_sidebar_footer};
+use crate::ui::views::sidebar::smart::SmartCollectionRow;
 use crate::ui::widgets::suppress_selection_outside_text;
 use crate::view_models::agent_display::exposed_tools;
 
@@ -99,15 +99,15 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
                            });
 
     let publisher_search =
-        crate::ui::views::sidebar_view::SidebarSectionSearch { open:  snap.publisher_search_open,
-                                                               query: snap.publisher_search_query,
-                                                               input: view.publisher_search_input
-                                                                          .clone(), };
+        crate::ui::views::sidebar::view::SidebarSectionSearch { open:  snap.publisher_search_open,
+                                                                query: snap.publisher_search_query,
+                                                                input: view.publisher_search_input
+                                                                           .clone(), };
     let collection_search =
-        crate::ui::views::sidebar_view::SidebarSectionSearch { open:  snap.collection_search_open,
-                                                               query: snap.collection_search_query,
-                                                               input: view.collection_search_input
-                                                                          .clone(), };
+        crate::ui::views::sidebar::view::SidebarSectionSearch { open:  snap.collection_search_open,
+                                                                query: snap.collection_search_query,
+                                                                input: view.collection_search_input
+                                                                           .clone(), };
     let smart_rows = {
         let ctrl = view.controller.read(cx);
         ctrl.smart_collections()
@@ -165,12 +165,12 @@ pub(super) fn render_root_view(view: &mut LibraryRootView, window: &mut gpui::Wi
 
     let alert_snap = view.activity.read(cx).alert_snapshot();
     let current_locale =
-        crate::i18n::Locale::from_code(&rust_i18n::locale()).unwrap_or(crate::i18n::Locale::En);
+        crate::i18n::locale::Locale::from_code(&rust_i18n::locale()).unwrap_or(crate::i18n::locale::Locale::En);
     let status_bar = render_status_bar(
         StatusBarSnapshot {
             total_count,
             total_mb,
-            section_label: crate::ui::views::toolbar_view::section_title_for(&filter),
+            section_label: crate::ui::views::toolbar::section_title_for(&filter),
             section_count: matched_count,
             theme_key: theme.id.clone(),
             current_locale,

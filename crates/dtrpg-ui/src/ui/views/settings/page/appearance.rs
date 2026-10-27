@@ -19,9 +19,9 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, Density, LibriTheme};
-use crate::ui::views::settings_card::{FIELD_WIDTH, card, card_row, section_heading};
-use crate::ui::views::settings_theme_editor::{ThemeEditorData, render_theme_editor};
-use crate::ui::views::settings_theme_gallery::render_theme_gallery;
+use crate::ui::views::settings::card::{FIELD_WIDTH, card, card_row, section_heading};
+use crate::ui::views::settings::theme_editor::{ThemeEditorData, render_theme_editor};
+use crate::ui::views::settings::theme_gallery::render_theme_gallery;
 
 /// The title and note of a row in the card, on the left.
 fn row_text(title: String, note: String, colors: &ColorTokens) -> impl IntoElement {

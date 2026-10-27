@@ -1,8 +1,10 @@
 //! The grey placeholders shown while the catalog loads for the first time.
 
+use dtrpg_core::data::enums::CatalogPresentation;
+use gpui::{AnyElement, IntoElement, ParentElement, Styled, div, px};
 use gpui_kit::component::skeleton::Skeleton;
 
-use super::*;
+use crate::data::theme::ColorTokens;
 
 /// How many placeholder rows or cards to draw.
 const PLACEHOLDER_COUNT: usize = 8;

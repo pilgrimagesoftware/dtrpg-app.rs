@@ -1,7 +1,28 @@
 //! The catalog view's render tree: list/grouped-list/thumbs/grid layouts
 //! composed from the controller's snapshot.
 
-use super::*;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use dtrpg_core::data::enums::CatalogPresentation;
+use dtrpg_core::data::enums::*;
+use gpui::{
+    AnyElement, Context, Image, IntoElement, ParentElement, Pixels, Styled, Window, div,
+    uniform_list,
+};
+use gpui_kit::component::ElementExt;
+use gpui_kit::component::Sizable;
+use gpui_kit::component::scroll::ScrollableElement;
+use gpui_kit::component::table::DataTable;
+
+use super::column_fit::set_list_table_width;
+use super::empty_status::*;
+use super::grid::*;
+use super::loading_skeleton::render_loading_skeleton;
+use super::thumb_row::*;
+use super::view::*;
+use crate::data::theme::LibriTheme;
+use crate::ui::library::cover::CoverCache;
 
 pub(super) fn render_catalog_view(view: &mut CatalogView, window: &mut Window,
                                   cx: &mut Context<CatalogView>)

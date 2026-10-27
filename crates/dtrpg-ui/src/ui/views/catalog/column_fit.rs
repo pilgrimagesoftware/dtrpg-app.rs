@@ -1,10 +1,16 @@
 //! Sizing the list's columns to their widest item.
 
+use std::sync::Arc;
+
 use dtrpg_core::data::enums::ListColumn;
 use dtrpg_core::data::library::LibraryItem;
-use gpui::Pixels;
+use gpui::{App, Context, Entity, FontWeight, Pixels, Window, px};
+use gpui_kit::component::table::TableState;
 
-use super::*;
+use super::grouped_delegate::*;
+use super::list_cell::*;
+use super::list_delegate::*;
+use super::view::*;
 use crate::ui::views::list_columns::{FIT_CANDIDATES, FIT_CELL_PADDING, widest_of_longest};
 
 /// Room the title cell keeps for the badges beside the title, in pixels.

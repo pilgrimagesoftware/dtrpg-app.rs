@@ -5,9 +5,15 @@
 //! it cannot save that it was collapsed. This section is told whether it is
 //! open, and reports each click on its header, as the Collections section does.
 
+use gpui::prelude::*;
+use gpui::{AnyElement, App, ElementId, IntoElement, SharedString, Window, div};
+use gpui_kit::component::sidebar::{SidebarItem, SidebarMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme, Collapsible, Sizable as _};
+use gpui_kit::component::{Icon, IconName};
+use rust_i18n::t;
 
-use super::*;
+use super::view::*;
 
 /// The caret at the right of a section header, which points down while the
 /// section is open and right while it is closed. The header itself takes the

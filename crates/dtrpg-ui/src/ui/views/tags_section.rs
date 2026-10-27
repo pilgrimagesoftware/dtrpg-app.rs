@@ -19,7 +19,7 @@ use rust_i18n::t;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
 use crate::ui::library::tag::{color_menu, tag_dot};
-use crate::ui::views::manage_tags_dialog::open_manage_tags_dialog;
+use crate::ui::views::dialog::manage_tags::open_manage_tags_dialog;
 
 /// Renders the item's tags and the button that changes them.
 pub fn render_tags_section(item: &LibraryItem, entity: Entity<LibraryController>,

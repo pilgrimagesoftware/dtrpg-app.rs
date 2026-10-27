@@ -12,7 +12,9 @@ use dtrpg_core::data::constants::{
 use gpui_kit::component::input::{NumberInputEvent, StepAction};
 
 use super::*;
-use crate::ui::views::settings_storage_view::{MAX_CONCURRENT_DOWNLOADS, MIN_CONCURRENT_DOWNLOADS};
+use crate::ui::views::settings::page::storage::{
+    MAX_CONCURRENT_DOWNLOADS, MIN_CONCURRENT_DOWNLOADS,
+};
 
 /// Decimal places the text scale is shown and stored with.
 const TEXT_SCALE_DECIMALS: usize = 1;

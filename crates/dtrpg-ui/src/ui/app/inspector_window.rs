@@ -9,7 +9,7 @@ use gpui_kit::component::Root;
 use super::window_bounds::{current_window_bounds, visible_window_bounds};
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
-use crate::ui::views::inspector_window_view::InspectorWindowView;
+use crate::ui::windows::inspector::InspectorWindowView;
 
 /// Set once the application starts shutting down.
 ///

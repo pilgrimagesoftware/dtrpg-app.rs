@@ -10,11 +10,11 @@ use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_card::{card, card_row, field_row, section_heading};
-use crate::ui::views::settings_native_view::switch_row;
+use crate::ui::views::settings::card::{card, card_row, field_row, section_heading};
+use crate::ui::views::settings::page::native::switch_row;
 
 /// What the Behavior section shows.
-pub(super) struct BehaviorData {
+pub(crate) struct BehaviorData {
     /// Whether a download that would not fit is refused.
     pub check_free_space:         bool,
     /// Whether collections are mirrored as folders of symlinks.
@@ -26,7 +26,7 @@ pub(super) struct BehaviorData {
 }
 
 /// Renders the Behavior heading and its card.
-pub(super) fn render_storage_behavior(data: BehaviorData, entity: Entity<SettingsController>,
+pub(crate) fn render_storage_behavior(data: BehaviorData, entity: Entity<SettingsController>,
                                       colors: &ColorTokens)
                                       -> impl IntoElement + 'static + use<> {
     let free_space_entity = entity.clone();

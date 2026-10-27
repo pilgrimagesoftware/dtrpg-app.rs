@@ -58,19 +58,19 @@ use crate::ui::app::{
     install_menus, open_about_window, open_inspector_window, open_settings_window,
     save_library_window_bounds_soon,
 };
-use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
-use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
+use crate::ui::views::dialog::smart_collection::editor::open_smart_collection_editor;
 use crate::ui::views::{
-    bulk_action_bar_view::render_bulk_action_bar,
-    catalog_view::CatalogView,
-    detail_panel_view::render_item_inspector,
-    filters_pane_view::FiltersPaneView,
-    notification_banner_view::render_notification_banner,
-    sidebar_view::render_sidebar,
-    status_bar_view::{ActivityBarData, StatusBarSnapshot, render_status_bar},
-    title_bar_view::render_title_bar,
-    toolbar_view::render_toolbar,
+    bulk_action_bar::render_bulk_action_bar,
+    catalog::view::CatalogView,
+    detail_panel::view::render_item_inspector,
+    filters::pane_view::FiltersPaneView,
+    notification_banner::render_notification_banner,
+    sidebar::render::render_sidebar,
+    status_bar::{ActivityBarData, StatusBarSnapshot, render_status_bar},
+    title_bar::render_title_bar,
+    toolbar::render_toolbar,
 };
+use crate::ui::windows::report_feature_bug::open_report_feature_bug_window;
 use crate::util::debounce::{Debounce, SAVE_DELAY};
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 use crate::{

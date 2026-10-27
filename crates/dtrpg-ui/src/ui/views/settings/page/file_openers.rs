@@ -17,7 +17,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_card::section_heading;
+use crate::ui::views::settings::card::section_heading;
 use crate::ui::widgets::{selectable_note, selectable_text};
 
 /// Renders the File Openers settings section.

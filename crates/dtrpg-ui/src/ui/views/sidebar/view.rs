@@ -3,39 +3,23 @@
 //! The app wordmark lives in `title_bar_view`, next to the macOS traffic
 //! lights — it is not repeated here.
 
-use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use dtrpg_core::data::collection::entry::CollectionEntry;
-use dtrpg_core::data::library::SectionCounts;
-use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::util::filter::SidebarFilter;
-use dtrpg_core::util::matching::name_matches_query;
-use dtrpg_core::util::publisher::PublisherEntry;
-use dtrpg_core::util::sort::{CollectionSortMethod, SortDirection};
 use gpui::prelude::*;
-use gpui::{
-    AnyElement, App, Context, ElementId, Entity, IntoElement, SharedString, Window, div, px,
-};
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
-use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
-use gpui_kit::component::sidebar::{
-    Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
-};
+use gpui::{AnyElement, App, ElementId, Entity, IntoElement, SharedString, Window, div, px};
+use gpui_kit::component::input::InputState;
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenuItem};
+use gpui_kit::component::sidebar::{SidebarItem, SidebarMenu};
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{
-    ActiveTheme, Collapsible, Side, Sizable as _, Size, StyledExt as _, WindowExt as _,
+    ActiveTheme, Collapsible, Sizable as _, Size, StyledExt as _, WindowExt as _,
 };
-use gpui_kit::component::{Icon, IconName};
 use rust_i18n::t;
 
-use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};
+use crate::controllers::library::LibraryController;
 use crate::ui::library::drag::DraggedLibraryItem;
-use crate::ui::views::sidebar_smart::{SmartCollectionRow, smart_collections_menu};
-use crate::ui::views::sidebar_tags::tag_rows;
 use crate::util::pluralize::pluralize;
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
@@ -56,7 +40,7 @@ pub struct SidebarSectionSearch {
 /// A sidebar child that is either a [`SidebarMenu`], the hand-rolled
 /// Collections section, or a thin horizontal divider.
 #[derive(Clone)]
-enum SidebarContent {
+pub(super) enum SidebarContent {
     Menu(Box<SidebarMenu>),
     Collections(Box<CollectionsSection>),
     Section(Box<ControlledSection>),
@@ -105,22 +89,22 @@ pub(super) const SIDEBAR_ROW_GAP: gpui::Pixels = px(2.);
 
 /// One collection nav row within the Collections section.
 #[derive(Clone)]
-struct CollectionRow {
-    id:        u64,
-    name:      Arc<str>,
-    count:     usize,
+pub(super) struct CollectionRow {
+    pub(super) id:        u64,
+    pub(super) name:      Arc<str>,
+    pub(super) count:     usize,
     /// How many of its titles are only in the cloud; a marker shows when any
     /// are.
-    in_cloud:  usize,
-    is_active: bool,
+    pub(super) in_cloud:  usize,
+    pub(super) is_active: bool,
 }
 
 /// Builds the Collections section header's trailing suffix element (item
 /// count, search toggle, add-collection dialog).
-type CollectionsSuffixFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
+pub(super) type CollectionsSuffixFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// Toggles the Collections section's persisted open/closed `UiState` state.
-type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
+pub(super) type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// The Collections section, rendered as plain `div`s rather than
 /// [`SidebarMenuItem`], because `SidebarMenuItem` has no `on_drop`/
@@ -134,17 +118,17 @@ type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 /// `SidebarMenuItem`, which tracks its own internal open state — no separate
 /// collapse-toggle plumbing is needed here.
 #[derive(Clone)]
-struct CollectionsSection {
-    title:     SharedString,
-    open:      bool,
-    suffix:    CollectionsSuffixFn,
-    on_toggle: CollectionsToggleFn,
-    rows:      Vec<CollectionRow>,
+pub(super) struct CollectionsSection {
+    pub(super) title:     SharedString,
+    pub(super) open:      bool,
+    pub(super) suffix:    CollectionsSuffixFn,
+    pub(super) on_toggle: CollectionsToggleFn,
+    pub(super) rows:      Vec<CollectionRow>,
     /// Whether the initial collections fetch is still in flight. While
     /// `true` and `rows` is empty, the section shows a loading indicator
     /// instead of a blank submenu.
-    loading:   bool,
-    entity:    Entity<LibraryController>,
+    pub(super) loading:   bool,
+    pub(super) entity:    Entity<LibraryController>,
 }
 
 impl Collapsible for CollectionsSection {
@@ -196,7 +180,7 @@ impl SidebarItem for CollectionsSection {
                              .overflow_x_hidden()
                              .child(div().flex_1().overflow_x_hidden().child(self.title.clone()))
                              .child(suffix))
-                 .child(sidebar_section::section_caret(&header_id, open));
+                 .child(super::section::section_caret(&header_id, open));
 
         let mut rows: Vec<AnyElement> =
             self.rows
@@ -244,9 +228,9 @@ impl SidebarItem for CollectionsSection {
 /// Renders a single collection nav row: click to filter, right-click to
 /// download all/reload/delete, and drop target for [`DraggedLibraryItem`]
 /// (adds the dragged catalog item as a member of this collection).
-fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
-                         entity: Entity<LibraryController>, cx: &mut App)
-                         -> AnyElement {
+pub(super) fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
+                                    entity: Entity<LibraryController>, cx: &mut App)
+                                    -> AnyElement {
     let is_active = row.is_active;
     let filter = SidebarFilter::Collection(row.id, Arc::clone(&row.name));
     let click_entity = entity.clone();
@@ -349,23 +333,11 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
          .into_any_element()
 }
 
-#[path = "sidebar_render.rs"]
-mod sidebar_render;
-
-#[path = "sidebar_section.rs"]
-mod sidebar_section;
-
-pub(super) use sidebar_render::render_sidebar;
-use sidebar_section::ControlledSection;
-
-#[path = "sidebar_helpers.rs"]
-mod sidebar_helpers;
-
-use sidebar_helpers::{nav_item, render_collection_sort_control, render_section_search_suffix};
+use super::section::ControlledSection;
 
 /// The marker on a collection row that says some of its titles are only in the
 /// cloud. A bare glyph, so it carries a tooltip with the number.
-fn cloud_marker(collection_id: u64, in_cloud: usize) -> impl IntoElement {
+pub(super) fn cloud_marker(collection_id: u64, in_cloud: usize) -> impl IntoElement {
     let tooltip = pluralize(in_cloud,
                             "sidebar.collection_cloud_one",
                             "sidebar.collection_cloud_many");

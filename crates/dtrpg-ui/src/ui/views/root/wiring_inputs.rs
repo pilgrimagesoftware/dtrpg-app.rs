@@ -177,7 +177,7 @@ pub(super) fn wire_settings_inputs(window: &mut gpui::Window, cx: &mut Context<L
         StorageConfig::load().max_concurrent_downloads()
     };
     let max_concurrent_downloads_input = cx.new(|cx| {
-                                               use crate::ui::views::settings_storage_view::{
+                                               use crate::ui::views::settings::page::storage::{
                                                    MAX_CONCURRENT_DOWNLOADS,
                                                    MIN_CONCURRENT_DOWNLOADS,
                                                };

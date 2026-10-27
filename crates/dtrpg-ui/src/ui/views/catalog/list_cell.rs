@@ -1,4 +1,24 @@
-use super::*;
+use std::path::Path;
+use std::sync::Arc;
+
+use dtrpg_core::data::enums::*;
+use dtrpg_core::data::library::LibraryItem;
+use gpui::prelude::*;
+use gpui::{
+    AnyElement, App, ClickEvent, Entity, FontWeight, Hsla, IntoElement, ParentElement, Pixels,
+    Styled, TextRun, Window, div, px, rems,
+};
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{Sizable, Size};
+use rust_i18n::t;
+
+use super::empty_status::*;
+use crate::controllers::inspector::InspectorController;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
+use crate::view_models::inspector::InspectorTab;
 
 /// Builds a catalog item's `on_click` handler: a single click selects the item,
 /// which shows it in the inspector pane; a double click also pops it out into

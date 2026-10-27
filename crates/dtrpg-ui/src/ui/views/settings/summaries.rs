@@ -11,8 +11,8 @@ use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_card::{card, card_row, section_heading};
-use crate::ui::views::settings_native_view::switch_row;
+use crate::ui::views::settings::card::{card, card_row, section_heading};
+use crate::ui::views::settings::page::native::switch_row;
 use crate::view_models::summary_display::{
     SummaryPage, ceiling_choices, ceiling_note, grouped, key_hint, model_choices,
 };

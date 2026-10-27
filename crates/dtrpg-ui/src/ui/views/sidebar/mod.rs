@@ -1,4 +1,3 @@
-pub mod collection_row;
 pub mod footer;
 pub mod helpers;
 pub mod render;

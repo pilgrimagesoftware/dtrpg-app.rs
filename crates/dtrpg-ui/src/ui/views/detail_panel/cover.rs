@@ -1,5 +1,15 @@
-use super::*;
+use dtrpg_core::data::library::LibraryItem;
+use gpui::{
+    AnyElement, App, Entity, InteractiveElement, IntoElement, ObjectFit, ParentElement,
+    StatefulInteractiveElement, Styled, StyledImage, div, img, px,
+};
+use gpui_kit::component::tooltip::Tooltip;
+use rust_i18n::t;
+
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
 use crate::ui::app::open_cover_viewer_window;
+use crate::ui::library::cover::{CoverCache, detail_cache_key, render_generative_cover};
 
 /// Width of the cover generated for an item that has no image, on the Cover
 /// tab, in pixels. The height follows the book proportions.

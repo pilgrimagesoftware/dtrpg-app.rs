@@ -12,9 +12,9 @@ use rust_i18n::t;
 use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_card::field_row;
-use crate::ui::views::settings_filter_values_view::render_filter_values_section;
-use crate::ui::views::settings_native_view::render_native_section;
+use crate::ui::views::settings::card::field_row;
+use crate::ui::views::settings::filter_values::render_filter_values_section;
+use crate::ui::views::settings::page::native::render_native_section;
 use crate::ui::widgets::selectable_note;
 
 /// Renders the "Recently Updated window" row: a label/note pair and an

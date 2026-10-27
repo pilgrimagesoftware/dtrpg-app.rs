@@ -26,14 +26,14 @@ use rust_i18n::t;
 use crate::controllers::library::{FilterValueSection, LibraryController};
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::{ColorTokens, LibriTheme};
-use crate::ui::views::{
-    settings_account_view::render_account_section,
-    settings_advanced_view::render_advanced_section,
-    settings_agent_view::render_agent_section,
-    settings_appearance_view::render_appearance_section,
-    settings_file_openers_view::render_file_openers_section,
-    settings_storage_view::{StoragePageData, render_storage_section},
-    settings_theme_editor::ThemeEditorData,
+use crate::ui::views::settings::{
+    page::account::render_account_section,
+    page::advanced::render_advanced_section,
+    page::agent::render_agent_section,
+    page::appearance::render_appearance_section,
+    page::file_openers::render_file_openers_section,
+    page::storage::{StoragePageData, render_storage_section},
+    theme_editor::ThemeEditorData,
 };
 use crate::ui::widgets::suppress_selection_outside_text;
 use crate::view_models::agent_display::AgentPageData;

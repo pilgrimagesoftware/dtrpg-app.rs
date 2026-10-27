@@ -1,4 +1,15 @@
-use super::*;
+use dtrpg_core::data::file_openers::FileOpenerEntry;
+use dtrpg_core::data::library::LibraryItem;
+use gpui::{
+    AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
+    Styled, div, px,
+};
+use rust_i18n::t;
+
+use crate::controllers::settings::{FILE_OPENERS_PAGE_IX, SettingsController};
+use crate::data::theme::ColorTokens;
+use crate::ui::actions::ShowSettings;
+use crate::ui::widgets::small_caps_text;
 
 /// One section of the Info tab: a small-caps heading with a rule beside it,
 /// and the section's body below.

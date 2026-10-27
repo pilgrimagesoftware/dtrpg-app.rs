@@ -1,4 +1,19 @@
-use super::*;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use gpui::{
+    App, Context, Entity, InteractiveElement, IntoElement, ParentElement, Pixels, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, px,
+};
+use gpui_kit::component::Sizable;
+use gpui_kit::component::Size;
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::table::{Column, TableDelegate, TableState};
+use gpui_kit::component::tooltip::Tooltip;
+use rust_i18n::t;
+
+use crate::controllers::library::LibraryController;
+use crate::data::theme::LibriTheme;
 
 /// Returns the column definitions used for the multi-item entry's item list.
 ///

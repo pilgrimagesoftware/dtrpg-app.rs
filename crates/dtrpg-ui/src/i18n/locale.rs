@@ -78,7 +78,7 @@ pub fn init() {
 
 /// Picks the locale code to activate: a persisted override if present and
 /// still supported, otherwise the OS-detected code.
-fn resolve_locale(persisted: Option<&str>, os_detected: &str) -> String {
+pub(crate) fn resolve_locale(persisted: Option<&str>, os_detected: &str) -> String {
     persisted.filter(|code| SUPPORTED.contains(code))
              .unwrap_or(os_detected)
              .to_owned()

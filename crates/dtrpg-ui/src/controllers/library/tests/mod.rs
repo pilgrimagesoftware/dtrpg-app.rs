@@ -26,7 +26,6 @@ mod sign_in;
 mod smart_collections;
 
 #[cfg(test)]
-#[path = "agent_requests.rs"]
 mod agent_requests;
 #[cfg(test)]
 mod startup;

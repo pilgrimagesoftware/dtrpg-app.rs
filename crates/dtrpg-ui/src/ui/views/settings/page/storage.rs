@@ -3,30 +3,17 @@
 
 use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
-use dtrpg_core::data::storage::validate_writable;
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
-use gpui::{Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
-use gpui_kit::component::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui::{Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_kit::component::input::InputState;
 use rust_i18n::t;
 
 use crate::controllers::settings::{RuleEditor, SettingsController};
 use crate::data::theme::ColorTokens;
+use crate::ui::views::storage::behavior::{BehaviorData, render_storage_behavior};
+use crate::ui::views::storage::roots::render_storage_roots;
+use crate::ui::views::storage::rules::{RulesData, render_storage_rules};
 use crate::view_models::storage_display::StorageDisplay;
-
-#[path = "storage_behavior_view.rs"]
-mod storage_behavior_view;
-#[path = "storage_roots_view.rs"]
-mod storage_roots_view;
-#[path = "storage_rule_editor_view.rs"]
-mod storage_rule_editor_view;
-#[path = "storage_rules_view.rs"]
-mod storage_rules_view;
-
-use storage_behavior_view::{BehaviorData, render_storage_behavior};
-use storage_roots_view::render_storage_roots;
-use storage_rules_view::{RulesData, render_storage_rules};
 
 /// Lower bound for the concurrency field: 0 would mean thumbnails and
 /// downloads never start.
@@ -98,7 +85,7 @@ pub fn render_storage_section(entity: Entity<SettingsController>, colors: &Color
 }
 
 /// The label for showing a folder in this platform's file manager.
-fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
+pub(crate) fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
     match Platform.kind() {
         PlatformKind::MacOs => t!("detail.show_in_finder"),
         PlatformKind::Windows => t!("detail.show_in_explorer"),

@@ -5,19 +5,34 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use dtrpg_core::data::storage::placement::PlacementRule;
+use dtrpg_core::data::storage::roots::StorageRoot;
+use gpui::Entity;
+use gpui::IntoElement;
+use gpui::ParentElement;
+use gpui::SharedString;
+use gpui::Styled;
 use gpui::Window;
+use gpui::div;
 use gpui::prelude::*;
+use gpui::px;
 use gpui_kit::component::Icon;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::Button;
+use gpui_kit::component::button::ButtonVariants;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use rust_i18n::t;
 
-use super::storage_rule_editor_view::{rule_editor_row, value_placeholder};
-use super::*;
 use crate::controllers::settings::RuleEditor;
-use crate::ui::views::settings_card::{card, card_row, section_heading};
+use crate::controllers::settings::SettingsController;
+use crate::data::theme::ColorTokens;
+use crate::ui::views::settings::card::{card, card_row, section_heading};
+use crate::ui::views::storage::rule_editor::{rule_editor_row, value_placeholder};
+use crate::view_models::storage_display::StorageDisplay;
 use crate::view_models::storage_display::describe_rule;
 
 /// Everything the rules section needs to draw itself.
-pub(super) struct RulesData {
+pub(crate) struct RulesData {
     /// The placement rules, in the order they are tried.
     pub rules:           Vec<PlacementRule>,
     /// The locations a rule can send a download to.
@@ -32,7 +47,7 @@ pub(super) struct RulesData {
 
 /// Renders the Placement rules heading, the rules card, and the button that
 /// adds a rule.
-pub(super) fn render_storage_rules(data: RulesData, entity: Entity<SettingsController>,
+pub(crate) fn render_storage_rules(data: RulesData, entity: Entity<SettingsController>,
                                    colors: &ColorTokens)
                                    -> impl IntoElement + 'static + use<> {
     let editor_open = data.editor.open;

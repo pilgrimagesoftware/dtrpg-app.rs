@@ -13,7 +13,7 @@ use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
 use crate::data::theme_catalog::{ThemeId, theme_label};
 use crate::data::{theme_loader, theme_source};
-use crate::ui::views::settings_card::section_heading;
+use crate::ui::views::settings::card::section_heading;
 use crate::ui::widgets::selectable_note;
 
 /// How tall the editor box is, in pixels.

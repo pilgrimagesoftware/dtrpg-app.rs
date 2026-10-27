@@ -1,6 +1,23 @@
-use dtrpg_core::data::constants::INSPECTOR_THUMBNAIL_WIDTH;
+use std::sync::Arc;
 
-use super::*;
+use dtrpg_core::data::constants::INSPECTOR_THUMBNAIL_WIDTH;
+use dtrpg_core::data::library::LibraryItem;
+use gpui::{
+    AnyElement, App, Entity, Image, IntoElement, ObjectFit, ParentElement, Styled, StyledImage,
+    div, img, px,
+};
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use rust_i18n::t;
+
+use super::cover::*;
+use crate::controllers::inspector::{InspectorController, InspectorPlacement};
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
+use crate::ui::library::cover::render_generative_cover;
+use crate::ui::views::catalog::view::render_checking_indicator;
+use crate::ui::widgets::selectable_text;
+use crate::view_models::inspector::InspectorViewModel;
 
 /// Renders the inspector's header: the cover thumbnail beside the title,
 /// publisher and "System · Type" line, and the buttons at the top right. The

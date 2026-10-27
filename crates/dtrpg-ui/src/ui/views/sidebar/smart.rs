@@ -17,8 +17,8 @@ use gpui_kit::component::sidebar::{SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
-use crate::ui::views::sidebar_view::SIDEBAR_ROW_GAP;
-use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
+use crate::ui::views::dialog::smart_collection::editor::open_smart_collection_editor;
+use crate::ui::views::sidebar::view::SIDEBAR_ROW_GAP;
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// What the sidebar needs to draw one smart collection.

@@ -1,55 +1,23 @@
 //! Catalog view: list, thumbs, and grid layouts with grouping and empty state.
 
 use std::cell::Cell;
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use dtrpg_core::data::enums::*;
-use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
-use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
-use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
-use dtrpg_core::util::matching::collection_member_id;
+use dtrpg_core::data::library::LibraryItem;
 use dtrpg_core::util::publisher::ItemGroup;
-use dtrpg_core::util::sort::{SortDirection, SortMethod};
 use gpui::prelude::*;
-use gpui::{
-    AnyElement, App, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement, ObjectFit,
-    ParentElement, Pixels, Render, SharedString, Styled, StyledImage, TextRun,
-    UniformListScrollHandle, Window, div, img, px, rems, uniform_list,
-};
-use gpui_kit::component::ElementExt;
-use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::badge::Badge;
-use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
-use gpui_kit::component::scroll::ScrollableElement;
-use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::table::{
-    Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState,
-};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{Sizable, Size};
-use rust_i18n::t;
+use gpui::{Context, Entity, IntoElement, Pixels, Render, UniformListScrollHandle, Window};
+use gpui_kit::component::table::{TableEvent, TableState};
 
 use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::events::LibraryChanged;
-use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
-use crate::ui::library::cover::{CoverCache, render_generative_cover};
-use crate::ui::library::drag::DraggedLibraryItem;
-use crate::ui::views::download_sheet_dialog::request_download_with_sheet;
-use crate::ui::views::list_columns::{
-    ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
-};
-use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::util::reveal::reveal_in_file_manager;
-use crate::view_models::inspector::InspectorTab;
+use crate::ui::views::list_columns::ListColumnSet;
 
 #[derive(Clone, Copy)]
-enum EmptyReason {
+pub(super) enum EmptyReason {
     LibraryEmpty,
     NoMatches,
 }
@@ -60,34 +28,34 @@ enum EmptyReason {
 /// GPUI view for the catalog area. Holds scroll state and delegates to
 /// `DataTable` for list layout and `uniform_list` for thumbs/grid layouts.
 pub struct CatalogView {
-    controller:                 Entity<LibraryController>,
-    settings:                   Entity<SettingsController>,
-    inspector:                  Entity<InspectorController>,
-    scroll_handle:              UniformListScrollHandle,
-    catalog_list_table:         Entity<TableState<CatalogListDelegate>>,
+    pub(super) controller:                 Entity<LibraryController>,
+    pub(super) settings:                   Entity<SettingsController>,
+    pub(super) inspector:                  Entity<InspectorController>,
+    pub(super) scroll_handle:              UniformListScrollHandle,
+    pub(super) catalog_list_table:         Entity<TableState<CatalogListDelegate>>,
     /// Backs the grouped list presentation. Rows are a flattened list of
     /// group headers and items (see `GroupedRow`), rebuilt only when
     /// `grouped_cache` is refreshed — this is what lets the grouped list
     /// reuse `DataTable`'s row virtualization instead of hand-rolling and
     /// fully materializing its own rows.
-    catalog_grouped_list_table: Entity<TableState<GroupedCatalogListDelegate>>,
+    pub(super) catalog_grouped_list_table: Entity<TableState<GroupedCatalogListDelegate>>,
     /// Cached items-per-row for the grid layout; updated each render from
     /// the window viewport width. Initialized to 4 as a safe default.
-    items_per_row:              usize,
+    pub(super) items_per_row:              usize,
     /// The width the catalog area was last drawn at, which is what is left
     /// beside the sidebar, the filters column and the inspector. Written as
     /// the area is laid out and read by the next render.
-    drawn_width:                Rc<Cell<Option<Pixels>>>,
+    pub(super) drawn_width:                Rc<Cell<Option<Pixels>>>,
     /// Cached reference to the controller's grouped items. Compared by Arc
     /// pointer so the grouped list only rebuilds its flattened rows when the
     /// controller cache actually changes, not on every hover-triggered
     /// re-render. Also drives the flattened rows pushed into
     /// `catalog_grouped_list_table`.
-    grouped_cache:              Option<Arc<Vec<ItemGroup>>>,
+    pub(super) grouped_cache:              Option<Arc<Vec<ItemGroup>>>,
     /// The items the list columns were last sized to fit. Compared by Arc
     /// pointer, like `grouped_cache`, so the columns are measured again only
     /// when the items on show change.
-    fitted_items:               Option<Arc<Vec<LibraryItem>>>,
+    pub(super) fitted_items:               Option<Arc<Vec<LibraryItem>>>,
 }
 
 impl CatalogView {
@@ -251,7 +219,7 @@ impl CatalogView {
     /// Returns the controller's grouped items, rebuilding the flattened rows
     /// for `catalog_grouped_list_table` only when the controller's cache has
     /// changed.
-    fn grouped_items(&mut self, cx: &mut Context<Self>) -> Vec<ItemGroup> {
+    pub(super) fn grouped_items(&mut self, cx: &mut Context<Self>) -> Vec<ItemGroup> {
         let controller = self.controller.read(cx);
         let groups = controller.visible_items_grouped();
         let rebuild = self.grouped_cache
@@ -281,27 +249,10 @@ impl CatalogView {
 
 impl Render for CatalogView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        render::render_catalog_view(self, window, cx)
+        super::render::render_catalog_view(self, window, cx)
     }
 }
 
-mod column_fit;
-mod empty_status;
-mod grid;
-mod grouped_delegate;
-mod list_cell;
-mod list_delegate;
-mod loading_skeleton;
-mod open_ring;
-mod render;
-mod thumb_row;
-
-use column_fit::set_list_table_width;
-use empty_status::*;
-use grid::*;
-use grouped_delegate::*;
-pub(crate) use list_cell::*;
-use list_delegate::*;
-use loading_skeleton::render_loading_skeleton;
-use open_ring::open_ring;
-use thumb_row::*;
+use super::grouped_delegate::*;
+pub(crate) use super::list_cell::*;
+use super::list_delegate::*;

@@ -1,4 +1,33 @@
-use super::*;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use dtrpg_core::data::enums::*;
+use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
+use dtrpg_core::util::matching::collection_member_id;
+use gpui::prelude::*;
+use gpui::{
+    AnyElement, App, Entity, FontWeight, Image, IntoElement, ObjectFit, ParentElement, Styled,
+    StyledImage, Window, div, img, px,
+};
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::badge::Badge;
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
+use gpui_kit::component::tooltip::Tooltip;
+use rust_i18n::t;
+
+use super::empty_status::*;
+use super::list_cell::*;
+use super::open_ring::open_ring;
+use crate::controllers::inspector::InspectorController;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::{ColorTokens, DensityConstants};
+use crate::ui::library::cover::render_generative_cover;
+use crate::ui::library::drag::DraggedLibraryItem;
+use crate::ui::views::dialog::download_sheet::request_download_with_sheet;
+use crate::ui::views::dialog::manage_collections::open_manage_collections_dialog;
+use crate::util::reveal::reveal_in_file_manager;
 
 // ── Thumbnail context menu item
 // ─────────────────────────────────────────────────

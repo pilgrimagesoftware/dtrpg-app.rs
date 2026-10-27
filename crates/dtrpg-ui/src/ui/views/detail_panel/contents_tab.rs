@@ -1,12 +1,25 @@
 //! The inspector's Contents tab: which archive is shown, and a scrolling list
 //! of what is in it.
 
+use std::sync::Arc;
+
 use dtrpg_core::util::container::ContainerEntry;
 use gpui::uniform_list;
+use gpui::{
+    AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, div, px,
+};
+use gpui_kit::component::Disableable;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use rust_i18n::t;
 
-use super::*;
+use super::inspector::*;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::ColorTokens;
 use crate::util::file_size::format_bytes;
 use crate::util::pluralize::pluralize;
+use crate::view_models::inspector::InspectorContentsState;
 
 /// The height of the entry list, in pixels. The list scrolls inside it.
 const ENTRY_LIST_HEIGHT: f32 = 340.0;

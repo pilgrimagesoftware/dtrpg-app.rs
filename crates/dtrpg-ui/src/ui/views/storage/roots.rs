@@ -1,21 +1,36 @@
 //! The Locations section of the Storage page: one card per location.
 
 use dtrpg_core::data::storage::DEFAULT_ROOT_ID;
+use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::roots::{RootKind, root_kind};
+use dtrpg_core::data::storage::validate_writable;
+use gpui::Entity;
+use gpui::IntoElement;
+use gpui::ParentElement;
+use gpui::SharedString;
+use gpui::Styled;
+use gpui::div;
 use gpui::prelude::*;
+use gpui::px;
 use gpui_kit::component::Icon;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::Button;
+use gpui_kit::component::button::ButtonVariants;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
+use rust_i18n::t;
 
-use super::*;
-use crate::ui::views::settings_card::section_heading;
+use crate::controllers::settings::SettingsController;
+use crate::data::theme::ColorTokens;
+use crate::ui::views::settings::card::section_heading;
+use crate::ui::views::settings::page::storage::platform_reveal_label;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::view_models::storage_display::{StorageDisplay, free_space_label, titles_here_label};
 
 /// Renders the Locations heading, a card for each location, and the button
 /// that adds another.
-pub(super) fn render_storage_roots(roots: Vec<StorageRoot>, display: &StorageDisplay,
+pub(crate) fn render_storage_roots(roots: Vec<StorageRoot>, display: &StorageDisplay,
                                    entity: Entity<SettingsController>, colors: &ColorTokens)
                                    -> impl IntoElement + 'static + use<> {
     div().flex()

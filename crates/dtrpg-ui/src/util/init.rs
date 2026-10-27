@@ -23,7 +23,7 @@ use crate::ui::library::cover::CoverCache;
 ///
 /// Must be called before any view renders.
 pub fn init_globals(cx: &mut App) {
-    i18n::init();
+    i18n::locale::init();
     // Discovers user themes first so `initial_theme` can resolve a persisted
     // user-theme id, and so the render path never reads the themes directory.
     ThemeCatalog::refresh();

@@ -1,6 +1,19 @@
 //! Sidebar helper controls.
 
-use super::*;
+use dtrpg_core::util::filter::SidebarFilter;
+use dtrpg_core::util::sort::{CollectionSortMethod, SortDirection};
+use gpui::prelude::*;
+use gpui::{AnyElement, App, Context, Entity, IntoElement, SharedString, Window, div, px};
+use gpui_kit::component::IconName;
+use gpui_kit::component::Sizable as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::Input;
+use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::sidebar::SidebarMenuItem;
+use rust_i18n::t;
+
+use super::view::*;
+use crate::controllers::library::LibraryController;
 
 pub(super) fn render_collection_sort_control(current: CollectionSortMethod,
                                              direction: SortDirection,

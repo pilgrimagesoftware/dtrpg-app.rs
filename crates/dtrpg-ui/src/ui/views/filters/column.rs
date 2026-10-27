@@ -22,7 +22,7 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::smart_collection_editor_dialog::open_smart_collection_editor;
+use crate::ui::views::dialog::smart_collection::editor::open_smart_collection_editor;
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// The facets the column lists, in order, with the heading of each.

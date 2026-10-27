@@ -1,0 +1,12 @@
+pub mod actions;
+pub mod contents_tab;
+pub mod cover;
+pub mod header;
+pub mod info_tab;
+pub mod inspector;
+pub mod item_list_delegate;
+pub mod item_tier;
+pub mod metadata_table;
+pub mod other_details;
+pub mod sections;
+pub mod view;

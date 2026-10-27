@@ -14,9 +14,9 @@ use tracing::{debug, warn};
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::ui::actions::*;
-use crate::ui::views::about_window_view::AboutWindowView;
-use crate::ui::views::root_view::LibraryRootView;
-use crate::ui::views::settings_window_view::SettingsWindowView;
+use crate::ui::views::root::LibraryRootView;
+use crate::ui::windows::about::AboutWindowView;
+use crate::ui::windows::settings::SettingsWindowView;
 use crate::util::init::init_globals;
 
 /// Snapshot of catalog view state needed to render checkmarks in the native
@@ -32,7 +32,7 @@ pub struct ViewMenuState {
     pub sort:           SortMethod,
     pub sort_direction: SortDirection,
     pub group_by:       GroupBy,
-    pub locale:         crate::i18n::Locale,
+    pub locale:         crate::i18n::locale::Locale,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
@@ -238,13 +238,9 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
 ///
 /// Panics if the window cannot be opened.
 #[allow(clippy::expect_used)]
-#[path = "about.rs"]
 mod about;
-#[path = "cover_viewer.rs"]
 mod cover_viewer;
-#[path = "inspector_window.rs"]
 mod inspector_window;
-#[path = "window_bounds.rs"]
 mod window_bounds;
 
 pub use about::open_about_window;
@@ -473,7 +469,6 @@ fn update_library(cx: &mut App,
     controller.update(cx, change);
 }
 
-#[path = "menus.rs"]
 mod menus;
 
 pub use menus::{MenuBarHandle, build_menus, build_menus_for, install_menus};

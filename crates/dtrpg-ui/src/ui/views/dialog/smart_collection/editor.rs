@@ -21,9 +21,9 @@ use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{Disableable, IconName, WindowExt as _, v_flex};
 use rust_i18n::t;
 
-use super::smart_collection_editor_rules::{mode_menu, render_rule_row};
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, LibriTheme};
+use crate::ui::views::dialog::smart_collection::rules::{mode_menu, render_rule_row};
 use crate::view_models::smart_collection_editor::SmartCollectionDraft;
 
 /// Everything the editor keeps while it is open.

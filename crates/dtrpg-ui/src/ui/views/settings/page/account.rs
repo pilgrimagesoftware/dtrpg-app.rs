@@ -16,7 +16,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_card::{card, card_row, section_heading};
+use crate::ui::views::settings::card::{card, card_row, section_heading};
 use crate::ui::widgets::selectable_text;
 use crate::util::datetime::format_absolute;
 

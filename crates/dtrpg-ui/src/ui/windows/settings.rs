@@ -12,9 +12,9 @@ use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{ADVANCED_PAGE_IX, STORAGE_PAGE_IX, SettingsController};
 use crate::data::theme::LibriTheme;
 use crate::ui::app::save_settings_window_bounds_soon;
-use crate::ui::views::settings_storage_view::StoragePageData;
-use crate::ui::views::settings_theme_editor::{ThemeEditorData, load_theme_editor};
-use crate::ui::views::settings_view::render_settings_panel;
+use crate::ui::views::settings::page::storage::StoragePageData;
+use crate::ui::views::settings::theme_editor::{ThemeEditorData, load_theme_editor};
+use crate::ui::views::settings::view::render_settings_panel;
 use crate::util::debounce::Debounce;
 use crate::view_models::agent_display::AgentPageData;
 use crate::view_models::storage_display::StorageDisplay;
@@ -22,7 +22,7 @@ use crate::view_models::storage_display::StorageDisplay;
 /// Root view for the settings window.
 ///
 /// Shares the same [`SettingsController`] entity as
-/// [`super::root_view::LibraryRootView`] so drafts, active tab, and other
+/// [`crate::ui::views::root::LibraryRootView`] so drafts, active tab, and other
 /// settings state persist across close/reopen within the app session — the
 /// entity isn't recreated per window open. Also shares the same
 /// [`LibraryController`] entity so the Appearance page's font/theme setters
@@ -62,7 +62,7 @@ impl SettingsWindowView {
           .detach();
         // Every label here is looked up per render, so a language change only
         // needs a redraw.
-        cx.observe_global::<crate::i18n::ActiveLocale>(|_, cx| cx.notify())
+        cx.observe_global::<crate::i18n::locale::ActiveLocale>(|_, cx| cx.notify())
           .detach();
         let view = Self { settings,
                           library,

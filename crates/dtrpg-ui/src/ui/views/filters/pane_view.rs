@@ -17,8 +17,8 @@ use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use crate::controllers::library::LibraryController;
 use crate::data::events::LibraryChanged;
 use crate::data::theme::LibriTheme;
-use crate::ui::views::catalog_view::CatalogView;
-use crate::ui::views::filters_column::{render_filters_column, without_hidden_values};
+use crate::ui::views::catalog::view::CatalogView;
+use crate::ui::views::filters::column::{render_filters_column, without_hidden_values};
 
 /// The narrowest the filters column can be dragged to.
 const FILTERS_MIN_WIDTH: f32 = 160.0;

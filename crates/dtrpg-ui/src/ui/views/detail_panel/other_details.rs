@@ -1,4 +1,18 @@
-use super::*;
+use std::sync::Arc;
+
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::util::matching::{collection_member_id, member_ids_contain};
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use rust_i18n::t;
+
+use super::metadata_table::*;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::{ColorTokens, LibriTheme};
+use crate::ui::library::cover::cover_style;
+use crate::ui::views::dialog::manage_collections::open_manage_collections_dialog;
+use crate::ui::widgets::selectable_text;
 
 /// Renders the Other details tab: the ids and other fields not shown in the
 /// Details table (stable id, numeric id, order product id, product id,

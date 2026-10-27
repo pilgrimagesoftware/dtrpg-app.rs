@@ -1,4 +1,32 @@
-use super::*;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use dtrpg_core::data::enums::*;
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::util::matching::collection_member_id;
+use gpui::prelude::*;
+use gpui::{
+    AnyElement, Entity, FontWeight, Image, IntoElement, ObjectFit, ParentElement, Styled,
+    StyledImage, Window, div, img, px,
+};
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenuItem};
+use gpui_kit::component::tooltip::Tooltip;
+use rust_i18n::t;
+
+use super::empty_status::*;
+use super::list_cell::*;
+use super::open_ring::open_ring;
+use super::thumb_row::*;
+use crate::controllers::inspector::InspectorController;
+use crate::controllers::library::LibraryController;
+use crate::data::theme::{ColorTokens, DensityConstants};
+use crate::ui::library::cover::render_generative_cover;
+use crate::ui::library::drag::DraggedLibraryItem;
+use crate::ui::views::dialog::download_sheet::request_download_with_sheet;
+use crate::util::reveal::reveal_in_file_manager;
 
 // ── Grid layout
 // ───────────────────────────────────────────────────────────────

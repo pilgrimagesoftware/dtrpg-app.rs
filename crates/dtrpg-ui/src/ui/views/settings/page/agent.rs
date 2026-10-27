@@ -18,8 +18,8 @@ use rust_i18n::t;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::data::theme::ColorTokens;
-use crate::ui::views::settings_native_view::switch_row;
-use crate::ui::views::settings_summaries_view::render_summaries;
+use crate::ui::views::settings::page::native::switch_row;
+use crate::ui::views::settings::summaries::render_summaries;
 use crate::ui::widgets::{selectable_note, selectable_text, small_caps_text};
 use crate::util::item_opener::ItemOpener;
 use crate::view_models::agent_display::{
@@ -268,7 +268,7 @@ fn log_location(log_path: &str, colors: &ColorTokens) -> impl IntoElement {
 
 /// An info row: a title and a note on the left, a fixed value on the right.
 /// Hand-rolled because
-/// [`crate::ui::views::settings_card::field_row`]'s 140-pixel field would
+/// [`crate::ui::views::settings::card::field_row`]'s 140-pixel field would
 /// cut a socket path in half.
 fn info_row(id: &str, title: String, note: &'static str, value: AnyElement, colors: &ColorTokens)
             -> AnyElement {

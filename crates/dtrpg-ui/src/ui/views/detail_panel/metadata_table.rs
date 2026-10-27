@@ -1,4 +1,16 @@
-use super::*;
+use std::path::Path;
+
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
+use gpui::{
+    AnyElement, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, div, px,
+};
+use gpui_kit::component::clipboard::Clipboard;
+use rust_i18n::t;
+
+use super::inspector::*;
+use crate::data::theme::ColorTokens;
+use crate::ui::widgets::selectable_text;
 
 /// Renders a text value with an appear-on-hover copy button, in the app's
 /// dedicated value font.

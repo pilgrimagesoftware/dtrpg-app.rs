@@ -6,6 +6,10 @@
 //! offered in a popup under the value field. The popup floats over what is
 //! below it, so nothing moves; it shows six names and scrolls to the rest.
 
+use gpui::Entity;
+use gpui::IntoElement;
+use gpui::ParentElement;
+use gpui::Styled;
 use gpui::prelude::*;
 use gpui::{AnyElement, ClickEvent, Window, deferred, div, px};
 use gpui_kit::component::Disableable;
@@ -15,15 +19,16 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use rust_i18n::t;
 
-use super::storage_rules_view::RulesData;
-use super::*;
-use crate::ui::views::settings_card::card_row;
+use crate::controllers::settings::SettingsController;
+use crate::data::theme::ColorTokens;
+use crate::ui::views::settings::card::card_row;
+use crate::ui::views::storage::rules::RulesData;
 use crate::view_models::rule_editor::{
     RuleEditorType, VISIBLE_SUGGESTIONS, condition_from_text, suggestions,
 };
 
 /// How the kind of rule reads on the type menu.
-pub(super) fn kind_label(kind: RuleEditorType) -> String {
+pub(crate) fn kind_label(kind: RuleEditorType) -> String {
     match kind {
         RuleEditorType::Publisher => t!("settings.storage_rule_kind_publisher"),
         RuleEditorType::Collection => t!("settings.storage_rule_kind_collection"),
@@ -32,7 +37,7 @@ pub(super) fn kind_label(kind: RuleEditorType) -> String {
 }
 
 /// What the value field asks for, for the kind of rule.
-pub(super) fn value_placeholder(kind: RuleEditorType) -> String {
+pub(crate) fn value_placeholder(kind: RuleEditorType) -> String {
     match kind {
         RuleEditorType::Publisher => t!("settings.storage_rule_value_publisher"),
         RuleEditorType::Collection => t!("settings.storage_rule_value_collection"),
@@ -41,7 +46,7 @@ pub(super) fn value_placeholder(kind: RuleEditorType) -> String {
 }
 
 /// The editor row, with the matching names under it.
-pub(super) fn rule_editor_row(data: &RulesData, entity: &Entity<SettingsController>,
+pub(crate) fn rule_editor_row(data: &RulesData, entity: &Entity<SettingsController>,
                               colors: &ColorTokens)
                               -> impl IntoElement + 'static + use<> {
     let editor = &data.editor;
