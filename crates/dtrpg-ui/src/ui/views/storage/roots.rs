@@ -38,21 +38,20 @@ pub(crate) fn render_storage_roots(roots: Vec<StorageRoot>, display: &StorageDis
          .flex_col()
          .gap(px(10.0))
          .child(section_heading(t!("settings.storage_roots_title").to_string(), colors))
-        .child(div().flex_1()
-            .text_xs()
-            .text_color(colors.text_secondary)
-            .child(create_location_root_note_string())
-        )
+         .child(div().flex_1()
+                     .text_xs()
+                     .text_color(colors.text_secondary)
+                     .child(create_location_root_note_string()))
          .children(roots.into_iter()
                         .map(|root| render_location(&root, display, &entity, colors)))
          .child(div().flex().child(add_location_button(entity)))
 }
 
 /// Create a note telling the user that files will be stored in a subfolder of
-/// the chosen location, so they aren't surprised to find downloaded files are not
-/// in the root of the location.
+/// the chosen location, so they aren't surprised to find downloaded files are
+/// not in the root of the location.
 fn create_location_root_note_string() -> String {
-     t!("settings.storage_roots_note", folder = ITEMS_SUB_PATH).to_string()
+    t!("settings.storage_roots_note", folder = ITEMS_SUB_PATH).to_string()
 }
 
 /// One location: its name and kind, where it is, how many titles it holds, and
@@ -90,7 +89,9 @@ fn render_location(root: &StorageRoot, display: &StorageDisplay,
                                  .font_family("monospace")
                                  .text_color(colors.text_secondary)
                                  .truncate()
-                                 .child(create_path_string(root.path.to_string_lossy().into_owned())))
+                                 .child(create_path_string(root.path
+                                                               .to_string_lossy()
+                                                               .into_owned())))
                      .child(div().text_xs()
                                  .text_color(colors.text_secondary)
                                  .child(titles)))

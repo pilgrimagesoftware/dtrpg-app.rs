@@ -66,16 +66,10 @@ pub(crate) fn render_storage_behavior(data: BehaviorData, entity: Entity<Setting
 /// for the host platform.
 fn create_collections_note() -> String {
     match Platform.kind() {
-    PlatformKind::Windows => {
-                t!("settings.create_collections_note_windows").to_string()
-        }
-        PlatformKind::Linux => {
-            t!("settings.create_collections_note_linux")            .to_string()
-        }
-    PlatformKind::MacOs => {
-        t!("settings.create_collections_note_mac").to_string()
+        PlatformKind::Windows => t!("settings.create_collections_note_windows").to_string(),
+        PlatformKind::Linux => t!("settings.create_collections_note_linux").to_string(),
+        PlatformKind::MacOs => t!("settings.create_collections_note_mac").to_string(),
     }
-}
 }
 
 /// The "Max concurrent downloads" row: a title and a note, with the stepper

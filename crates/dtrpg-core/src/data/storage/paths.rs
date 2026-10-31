@@ -3,9 +3,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::constants::{COLLECTIONS_SUB_PATH, ITEMS_SUB_PATH};
-
 use super::config::{StorageConfig, StorageError};
+use crate::constants::{COLLECTIONS_SUB_PATH, ITEMS_SUB_PATH};
 
 static PROBE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -50,7 +49,8 @@ pub fn available_space_mb_at(path: &Path) -> Option<f64> {
 
 /// Derives the directory a downloaded item's files live in under `root`.
 pub fn publisher_dir(root: &Path, publisher: &str) -> PathBuf {
-    root.join(ITEMS_SUB_PATH).join(sanitize_path_component(publisher))
+    root.join(ITEMS_SUB_PATH)
+        .join(sanitize_path_component(publisher))
 }
 
 /// Derives the directory a collection's symlinked files live in under `root`.
