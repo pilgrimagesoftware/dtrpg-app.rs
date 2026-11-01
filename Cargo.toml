@@ -50,9 +50,9 @@ uuid = { version = "1", features = ["v4"] }
 # version gpui-kit 0.8.0 itself depends on, so our Context/Window/App/Global
 # types are the *same* types gpui-kit's widgets use, not merely
 # structurally similar ones. See docs/adr/0001-migrate-to-gpui-kit.md.
-gpui = { package = "gpui-pre", version = "=0.3.9" }
-gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["font-kit", "wayland", "x11"] }
-gpui-kit = "0.8"
+gpui = { package = "gpui-pre", version = "=0.3.10" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10", features = ["font-kit", "wayland", "x11"] }
+gpui-kit = "0.8.1"
 cocoa = "=0.27.0"
 cocoa-foundation = "=0.2.1"
 core-foundation = "=0.10.1"
@@ -60,7 +60,7 @@ core-foundation-sys = "0.8.6"
 core-video = { version = "0.6.1", features = ["metal"] }
 metal = "0.33"
 md5 = "0.8"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "blocking", "json"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 rust-i18n = "4"
