@@ -242,8 +242,8 @@ pub struct LibraryItemFile {
     /// alongside the entry's `order_product_id` — see
     /// `real-file-download-transfer`.
     pub index:      u32,
-    /// Display name of the file (the SDK file's `title`, e.g.
-    /// `"Player's Handbook.pdf"`).
+    /// File name including its extension (the SDK file's `filename`, e.g.
+    /// `"players-handbook.pdf"`); also the on-disk name of the download.
     pub name:       Arc<str>,
     /// Uppercase format label derived from the filename extension (e.g.
     /// `"PDF"`).

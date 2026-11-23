@@ -200,13 +200,25 @@ fn resolve_format(files: &[OrderProductFile]) -> String {
 // entry down to one and hide its item-count badge. Keying on
 // `(order_product_download_id, title)` catches true verbatim repeats while
 // never merging two files with different titles.
+/// The name a file is stored and shown under: the API's `filename` (which
+/// carries the extension), or the title when the API sent none.
+fn file_name(file: &OrderProductFile) -> &str {
+    let filename = file.filename.trim();
+    if filename.is_empty() {
+        file.title.as_str()
+    }
+    else {
+        filename
+    }
+}
+
 fn map_files(files: &[OrderProductFile]) -> Vec<LibraryItemFile> {
     let mut seen_files: HashSet<(u64, &str)> = HashSet::new();
     files.iter()
          .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
          .map(|f| LibraryItemFile { id:         f.order_product_download_id.to_string().into(),
                                     index:      f.index,
-                                    name:       f.title.as_str().into(),
+                                    name:       file_name(f).into(),
                                     format:
                                         file_extension_label(&f.filename).unwrap_or_else(|| {
                                                                              "FILE".to_string()

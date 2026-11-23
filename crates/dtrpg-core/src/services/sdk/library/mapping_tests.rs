@@ -157,9 +157,37 @@ fn map_order_product_populates_per_item_files_for_multi_item_entries() {
 
     assert!(items[0].is_multi_item());
     assert_eq!(items[0].files.len(), 2);
-    assert_eq!(items[0].files[0].name.as_ref(), "Moria Rulebook");
+    assert_eq!(items[0].files[0].name.as_ref(), "moria-rulebook.pdf");
     assert_eq!(items[0].files[0].id.as_ref(), "1234");
-    assert_eq!(items[0].files[1].name.as_ref(), "Moria Map Sheet");
+    assert_eq!(items[0].files[1].name.as_ref(), "moria-map.pdf");
+}
+
+#[test]
+fn map_order_product_names_files_by_filename_not_title() {
+    let mut item = order_product_item(515_276, "Moria");
+    item.attributes.files = vec![OrderProductFile { index:                     0,
+                                                    order_product_download_id: 1234,
+                                                    title:                     "PDF".to_string(),
+                                                    filename:
+                                                        "moria.pdf".to_string(),
+                                                    size:                      1_048_576,
+                                                    size_mb:                   "1.0".to_string(),
+                                                    checksums:                 vec![], },
+                                 OrderProductFile { index:                     1,
+                                                    order_product_download_id: 1235,
+                                                    title:                     "Map".to_string(),
+                                                    filename:                  String::new(),
+                                                    size:                      524_288,
+                                                    size_mb:                   "0.5".to_string(),
+                                                    checksums:                 vec![], },];
+
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let items = service.list_items().expect("list items");
+
+    assert_eq!(items[0].files[0].name.as_ref(), "moria.pdf");
+    // An empty filename falls back to the title rather than an empty path
+    // component.
+    assert_eq!(items[0].files[1].name.as_ref(), "Map");
 }
 
 #[test]
