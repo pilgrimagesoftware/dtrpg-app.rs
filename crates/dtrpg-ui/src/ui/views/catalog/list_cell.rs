@@ -15,6 +15,7 @@ use gpui_kit::component::{Sizable, Size};
 use rust_i18n::t;
 
 use super::empty_status::*;
+use super::title_hover_card::{TitleCardInfo, title_hover_card};
 use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::ColorTokens;
@@ -228,16 +229,22 @@ pub(super) fn render_list_item_cell(item: &LibraryItem, column: ListColumn,
                                                      FontWeight::default(),
                                                      title_available_w);
             let title_el_id: Arc<str> = Arc::from(format!("title-list-{}", &*item.id));
-            let mut title_el = div().id(title_el_id)
-                                    .text_sm()
-                                    .text_color(colors.text_primary)
-                                    .truncate()
-                                    .child(title.clone());
-            if title_truncated {
-                title_el = title_el.tooltip(move |window, cx| {
-                                       Tooltip::new(title.clone()).build(window, cx)
-                                   });
+            let title_el = div().id(title_el_id.clone())
+                                .text_sm()
+                                .text_color(colors.text_primary)
+                                .truncate()
+                                .child(title.clone());
+            let title_el: AnyElement = if title_truncated {
+                let info = TitleCardInfo { title,
+                                           publisher: item.publisher.to_string(),
+                                           status: item.status,
+                                           offloaded: item.is_offloaded() };
+                title_hover_card(format!("{title_el_id}-card"), title_el, info, colors)
+                    .into_any_element()
             }
+            else {
+                title_el.into_any_element()
+            };
             let checkbox: Option<AnyElement> = if selection_mode {
                 let checkbox_id = Arc::clone(&item.id);
                 let checkbox_entity = controller.clone();
