@@ -14,12 +14,12 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::badge::Badge;
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
-use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use super::empty_status::*;
 use super::list_cell::*;
 use super::open_ring::open_ring;
+use super::title_hover_card::{TitleCardInfo, title_hover_card};
 use crate::controllers::inspector::InspectorController;
 use crate::controllers::library::LibraryController;
 use crate::data::theme::{ColorTokens, DensityConstants};
@@ -183,19 +183,27 @@ pub(super) fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image
          })
          .child(cover_cell)
          .child({
-             let title_tooltip = title.clone();
              let title_el_id: Arc<str> = Arc::from(format!("title-thumb-{}", &*id));
-             let mut title_el = div().id(title_el_id)
-                                     .text_sm()
-                                     .font_weight(FontWeight::MEDIUM)
-                                     .text_color(colors.text_primary)
-                                     .truncate()
-                                     .child(title);
-             if title_truncated {
-                 title_el = title_el.tooltip(move |window, cx| {
-                                        Tooltip::new(title_tooltip.clone()).build(window, cx)
-                                    });
+             let title_el = div().id(Arc::clone(&title_el_id))
+                                 .text_sm()
+                                 .font_weight(FontWeight::MEDIUM)
+                                 .text_color(colors.text_primary)
+                                 .truncate()
+                                 .child(title.clone());
+             let title_el: AnyElement = if title_truncated {
+                 let info = TitleCardInfo { title: title.clone(),
+                                            publisher: publisher.clone(),
+                                            status,
+                                            offloaded: item.is_offloaded() };
+                 title_hover_card(format!("{title_el_id}-card"),
+                                  title_el,
+                                  info,
+                                  title_available_w,
+                                  &colors).into_any_element()
              }
+             else {
+                 title_el.into_any_element()
+             };
              div().flex_1()
                   .min_w_0()
                   .flex()

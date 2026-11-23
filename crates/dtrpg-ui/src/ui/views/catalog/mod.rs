@@ -8,4 +8,5 @@ pub mod loading_skeleton;
 pub mod open_ring;
 pub mod render;
 pub mod thumb_row;
+pub mod title_hover_card;
 pub mod view;
