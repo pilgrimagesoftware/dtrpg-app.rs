@@ -195,8 +195,11 @@ pub(super) fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image
                                             publisher: publisher.clone(),
                                             status,
                                             offloaded: item.is_offloaded() };
-                 title_hover_card(format!("{title_el_id}-card"), title_el, info, &colors)
-                     .into_any_element()
+                 title_hover_card(format!("{title_el_id}-card"),
+                                  title_el,
+                                  info,
+                                  title_available_w,
+                                  &colors).into_any_element()
              }
              else {
                  title_el.into_any_element()

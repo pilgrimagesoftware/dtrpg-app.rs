@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use dtrpg_core::data::enums::ItemStatus;
 use gpui::prelude::*;
-use gpui::{ElementId, IntoElement, Styled, div, px};
+use gpui::{ElementId, IntoElement, Pixels, Styled, div, px};
 use gpui_kit::component::hover_card::HoverCard;
 use rust_i18n::t;
 
@@ -30,32 +30,42 @@ pub(super) struct TitleCardInfo {
 ///
 /// The status text is looked up inside the content closure, which only runs
 /// while the card is open, so rows that are merely rendered pay nothing.
+///
+/// `HoverCard` wraps its trigger in an unstyleable div, so the trigger is given
+/// `available_width` explicitly (the width the title was measured against) and
+/// the wrapper may shrink (`min_w_0`); that keeps `.truncate()` working
+/// whatever the parent's flex rules do.
 pub(super) fn title_hover_card(id: impl Into<ElementId>, title_el: impl IntoElement + 'static,
-                               info: TitleCardInfo, colors: &ColorTokens)
+                               info: TitleCardInfo, available_width: Pixels,
+                               colors: &ColorTokens)
                                -> impl IntoElement {
     let primary = colors.text_primary;
     let secondary = colors.text_secondary;
-    HoverCard::new(id).open_delay(OPEN_DELAY)
-                      .close_delay(CLOSE_DELAY)
-                      .trigger(div().w_full().min_w_0().child(title_el))
-                      .content(move |_, _, _| {
-                          let status = match (info.status, info.offloaded) {
-                              (ItemStatus::Downloaded, true) => t!("detail.item_status_offloaded"),
-                              (ItemStatus::Downloaded, false) => t!("detail.status_on_device"),
-                              (ItemStatus::Cloud, _) => t!("detail.status_in_cloud"),
-                          };
-                          div().max_w(px(CARD_MAX_WIDTH))
-                               .flex()
-                               .flex_col()
-                               .gap(px(2.0))
-                               .child(div().text_sm()
-                                           .text_color(primary)
-                                           .child(info.title.clone()))
-                               .child(div().text_xs()
-                                           .text_color(secondary)
-                                           .child(info.publisher.clone()))
-                               .child(div().text_xs()
-                                           .text_color(secondary)
-                                           .child(status.to_string()))
-                      })
+    let card =
+        HoverCard::new(id).open_delay(OPEN_DELAY)
+                          .close_delay(CLOSE_DELAY)
+                          .trigger(div().w(available_width).child(title_el))
+                          .content(move |_, _, _| {
+                              let status = match (info.status, info.offloaded) {
+                                  (ItemStatus::Downloaded, true) => {
+                                      t!("detail.item_status_offloaded")
+                                  }
+                                  (ItemStatus::Downloaded, false) => t!("detail.status_on_device"),
+                                  (ItemStatus::Cloud, _) => t!("detail.status_in_cloud"),
+                              };
+                              div().max_w(px(CARD_MAX_WIDTH))
+                                   .flex()
+                                   .flex_col()
+                                   .gap(px(2.0))
+                                   .child(div().text_sm()
+                                               .text_color(primary)
+                                               .child(info.title.clone()))
+                                   .child(div().text_xs()
+                                               .text_color(secondary)
+                                               .child(info.publisher.clone()))
+                                   .child(div().text_xs()
+                                               .text_color(secondary)
+                                               .child(status.to_string()))
+                          });
+    div().min_w_0().child(card)
 }
