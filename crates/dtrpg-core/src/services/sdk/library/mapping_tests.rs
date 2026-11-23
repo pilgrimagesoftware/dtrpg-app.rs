@@ -520,3 +520,40 @@ fn map_order_product_without_filters_has_no_system_and_a_placeholder_type() {
     assert_eq!(mapped.line.as_ref(), "");
     assert_eq!(mapped.kind.as_ref(), "Library item");
 }
+
+fn download(id: u64, title: &str, filename: &str) -> OrderProductFile {
+    OrderProductFile { index:                     0,
+                       order_product_download_id: id,
+                       title:                     title.to_string(),
+                       filename:                  filename.to_string(),
+                       size:                      1,
+                       size_mb:                   "0.0".to_string(),
+                       checksums:                 vec![], }
+}
+
+#[test]
+fn map_order_product_keeps_files_that_share_a_filename_but_not_a_name_key() {
+    let mut item = order_product_item(515_277, "Dupes");
+    item.attributes.files = vec![download(7, "A", "same.pdf"),
+                                 download(7, "B", "same.pdf"),
+                                 download(7, "C", "other.pdf"),];
+
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let items = service.list_items().expect("list items");
+
+    // Same id + same filename is one file; a different filename is another.
+    let names: Vec<&str> = items[0].files.iter().map(|f| f.name.as_ref()).collect();
+    assert_eq!(names, ["same.pdf", "other.pdf"]);
+}
+
+#[test]
+fn map_order_product_treats_a_whitespace_filename_as_missing() {
+    let mut item = order_product_item(515_278, "Blank");
+    item.attributes.files = vec![download(9, "Handbook", "   ")];
+
+    let service = SdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
+    let items = service.list_items().expect("list items");
+
+    assert_eq!(items[0].files[0].name.as_ref(), "Handbook");
+    assert_eq!(items[0].files[0].format.as_ref(), "FILE");
+}
