@@ -325,6 +325,10 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
 mod mapping_test_support;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "mapping_file_tests.rs"]
+mod mapping_file_tests;
+#[cfg(test)]
 // Mapping tests keep the original fixture assertions and setup style.
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 #[path = "mapping_tests.rs"]
