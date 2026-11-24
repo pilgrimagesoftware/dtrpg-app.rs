@@ -108,3 +108,59 @@ jobs:
       - name: Note skipped registration
         if: steps.sentry_auth.outputs.present != 'true'
         run: echo "::warning::SENTRY_AUTH_TOKEN not set - skipping Sentry release registration"
+
+  # Writes the released version and the DMG's checksum into the Homebrew tap's
+  # `Casks/libri.rb`, rendered from packaging/homebrew/libri.rb.in. The release
+  # publishes no SHA256SUMS, so the checksum comes from the downloaded DMG. Needs
+  # the PSW CI GitHub App installed on `pilgrimagesoftware/homebrew-tap` with
+  # contents: write.
+  homebrew:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+
+      - name: Tap token
+        id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.PSW_CI_APP_ID }}
+          private-key: ${{ secrets.PSW_CI_PRIVATE_KEY }}
+          owner: pilgrimagesoftware
+          repositories: homebrew-tap
+
+      - name: Render the cask
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          dmg="Libri_${version}_aarch64.dmg"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$dmg"
+          sha=$(sha256sum "$dmg" | awk '{ print $1 }')
+          [ -n "$sha" ] || { echo "::error::could not checksum $dmg"; exit 1; }
+          mkdir -p tap/Casks
+          sed -e "s/@VERSION@/$version/" -e "s/@SHA256@/$sha/" \
+            packaging/homebrew/libri.rb.in > tap/Casks/libri.rb
+          cat tap/Casks/libri.rb
+
+      - name: Push to the tap
+        env:
+          TOKEN: ${{ steps.token.outputs.token }}
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:${TOKEN}@github.com/pilgrimagesoftware/homebrew-tap.git" tap-repo
+          mkdir -p tap-repo/Casks
+          cp tap/Casks/libri.rb tap-repo/Casks/libri.rb
+          cd tap-repo
+          git config user.name "psw-ci[bot]"
+          git config user.email "psw-ci[bot]@users.noreply.github.com"
+          git add Casks/libri.rb
+          git diff --cached --quiet && { echo "cask already current"; exit 0; }
+          git commit -m "chore(libri): update to ${TAG#v}"
+          git push
