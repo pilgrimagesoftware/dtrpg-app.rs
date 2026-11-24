@@ -1,4 +1,11 @@
 
+## 1.2.1 - 2026-11-24
+
+### Fixed
+- Link xz statically so the macOS app launches
+
+
+
 ## 1.2.0 - 2026-11-24
 
 ### Added
