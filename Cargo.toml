@@ -14,7 +14,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.2.0"
+version = "1.2.1"
 edition = "2024"
 description = "DriveThruRPG desktop frontend in Rust"
 license = "MIT"
@@ -74,7 +74,10 @@ sentry-tracing = "0.49"
 tar = "0.4.46"
 flate2 = "1.1.10"
 bzip2 = "0.6.1"
-xz2 = "0.1.7"
+# `static` builds xz from source. Without it lzma-sys links whatever liblzma
+# pkg-config finds (Homebrew's on the macOS CI runner), and the shipped .app then
+# fails to launch: the dylib is absent, or rejected by library validation.
+xz2 = { version = "0.1.7", features = ["static"] }
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 lopdf = { version = "0.46.0", default-features = false }
 tempfile = "3.27.0"

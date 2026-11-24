@@ -190,6 +190,13 @@ jobs:
             codesign -dvv "$f" 2>&1 | grep -E '^(Authority=|Signature=adhoc)' | head -1
           done | sort -u | wc -l)
           [ "$ids" -eq 1 ] || { echo "::error::app and its binaries are signed with different identities"; exit 1; }
+          # A dylib outside the OS (e.g. Homebrew's liblzma) is absent on user
+          # machines, or rejected by the hardened runtime when present. Nothing
+          # is bundled in Contents/Frameworks, so any such link is a bug.
+          for bin in "$app"/Contents/MacOS/*; do
+            extra=$(otool -L "$bin" | tail -n +2 | awk '{ print $1 }' | grep -vE '^(/usr/lib/|/System/)' || true)
+            [ -z "$extra" ] || { echo "::error::$bin links non-system libraries: $extra"; exit 1; }
+          done
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
