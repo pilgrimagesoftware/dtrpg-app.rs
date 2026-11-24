@@ -79,7 +79,7 @@ bzip2 = "0.6.1"
 # fails to launch: the dylib is absent, or rejected by library validation.
 xz2 = { version = "0.1.7", features = ["static"] }
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
-lopdf = { version = "0.46.0", default-features = false }
+lopdf = { version = "0.47.0", default-features = false }
 tempfile = "3.27.0"
 # File-system tags: extended attributes (macOS and Linux) and the binary
 # property list macOS stores user tags in.
