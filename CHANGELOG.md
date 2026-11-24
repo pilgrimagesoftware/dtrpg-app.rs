@@ -1,4 +1,18 @@
 
+## 1.2.0 - 2026-11-24
+
+### Added
+- Show a hover card on truncated catalog titles
+
+
+### Fixed
+- Add notes for download paths
+- Name downloaded files by their filename
+- Keep legacy names for downloaded files and dedupe by file name
+- Keep title ellipsis working inside the hover card
+
+
+
 ## 1.1.0 - 2026-10-27
 
 ### Added
