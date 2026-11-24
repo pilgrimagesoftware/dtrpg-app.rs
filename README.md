@@ -9,7 +9,7 @@ DriveThruRPG desktop frontend in Rust, built with [gpui-kit](https://gpui-kit.co
 
 ```bash
 cargo build
-cargo run -p dtrpg-core
+cargo run --bin Libri
 ```
 
 ## Platform Requirements

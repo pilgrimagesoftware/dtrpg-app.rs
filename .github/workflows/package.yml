@@ -179,8 +179,17 @@ jobs:
           # hdiutil stops reading, which `pipefail` would report as a failure.
           PAGER=cat hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" < <(yes) >/dev/null
           trap 'hdiutil detach "$mnt" -quiet || true' EXIT
-          codesign --verify --deep --strict --verbose=2 "$mnt/Libri.app"
-          codesign --verbose=2 --force --deep --sign - "$mnt/Libri.app"
+          # Each binary must carry its own valid signature (cargo-packager signs
+          # them individually, then the bundle), and all must share one identity.
+          app="$mnt/Libri.app"
+          for bin in "$app/Contents/MacOS/Libri" "$app/Contents/MacOS/libri-mcp"; do
+            codesign --verify --strict --verbose=2 "$bin"
+          done
+          codesign --verify --deep --strict --verbose=2 "$app"
+          ids=$(for f in "$app" "$app"/Contents/MacOS/*; do
+            codesign -dvv "$f" 2>&1 | grep -E '^(Authority=|Signature=adhoc)' | head -1
+          done | sort -u | wc -l)
+          [ "$ids" -eq 1 ] || { echo "::error::app and its binaries are signed with different identities"; exit 1; }
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
@@ -191,7 +200,7 @@ jobs:
             target/${{ matrix.target }}/release/*.AppImage
             target/${{ matrix.target }}/release/*.deb
             target/${{ matrix.target }}/release/*.msi
-            target/${{ matrix.target }}/release/*.exe
+            target/${{ matrix.target }}/release/*-setup.exe
           if-no-files-found: error
           retention-days: 30
 
@@ -207,5 +216,5 @@ jobs:
             target/${{ matrix.target }}/release/*.AppImage \
             target/${{ matrix.target }}/release/*.deb \
             target/${{ matrix.target }}/release/*.msi \
-            target/${{ matrix.target }}/release/*.exe \
+            target/${{ matrix.target }}/release/*-setup.exe \
             --clobber

@@ -68,14 +68,23 @@ pub(super) fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryIte
                     };
 
                     if let Some(mut live_item) = matched_id.and_then(|id| live_by_id.remove(&id)) {
-                        let downloaded_by_id: HashMap<Arc<str>, bool> =
+                        let known_by_id: HashMap<Arc<str>, (bool, Arc<str>)> =
                             item.files
                                 .iter()
-                                .map(|f| (Arc::clone(&f.id), f.downloaded))
+                                .map(|f| (Arc::clone(&f.id), (f.downloaded, Arc::clone(&f.name))))
                                 .collect();
                         for file in &mut live_item.files {
-                            if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
-                                file.downloaded = downloaded;
+                            if let Some((downloaded, name)) = known_by_id.get(&file.id) {
+                                file.downloaded = *downloaded;
+                                // Files downloaded before names followed the
+                                // API
+                                // `filename` sit on disk under the old name;
+                                // keep it
+                                // so presence checks still find them instead of
+                                // marking them missing and re-downloading.
+                                if *downloaded {
+                                    file.name = Arc::clone(name);
+                                }
                             }
                         }
                         item = live_item;

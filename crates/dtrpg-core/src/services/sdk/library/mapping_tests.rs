@@ -157,9 +157,9 @@ fn map_order_product_populates_per_item_files_for_multi_item_entries() {
 
     assert!(items[0].is_multi_item());
     assert_eq!(items[0].files.len(), 2);
-    assert_eq!(items[0].files[0].name.as_ref(), "Moria Rulebook");
+    assert_eq!(items[0].files[0].name.as_ref(), "moria-rulebook.pdf");
     assert_eq!(items[0].files[0].id.as_ref(), "1234");
-    assert_eq!(items[0].files[1].name.as_ref(), "Moria Map Sheet");
+    assert_eq!(items[0].files[1].name.as_ref(), "moria-map.pdf");
 }
 
 #[test]

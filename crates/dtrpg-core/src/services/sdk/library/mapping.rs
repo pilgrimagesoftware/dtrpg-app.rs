@@ -173,7 +173,7 @@ fn resolve_kind(filters: &[ProductFilter]) -> String {
 // a format type — derive the format from the file extension instead.
 fn resolve_format(files: &[OrderProductFile]) -> String {
     let mut format_parts: Vec<String> = files.iter()
-                                             .filter_map(|f| file_extension_label(&f.filename))
+                                             .filter_map(|f| file_extension_label(file_name(f)))
                                              .collect::<HashSet<_>>()
                                              .into_iter()
                                              .collect();
@@ -183,6 +183,18 @@ fn resolve_format(files: &[OrderProductFile]) -> String {
     }
     else {
         format_parts.join(" + ")
+    }
+}
+
+/// The name a file is stored and shown under: the API's `filename` (which
+/// carries the extension), or the title when the API sent none.
+fn file_name(file: &OrderProductFile) -> &str {
+    let filename = file.filename.trim();
+    if filename.is_empty() {
+        file.title.as_str()
+    }
+    else {
+        filename
     }
 }
 
@@ -198,20 +210,20 @@ fn resolve_format(files: &[OrderProductFile]) -> String {
 // download id across genuinely distinct files within a bundle, so
 // deduplicating on the id alone would incorrectly collapse a real multi-file
 // entry down to one and hide its item-count badge. Keying on
-// `(order_product_download_id, title)` catches true verbatim repeats while
-// never merging two files with different titles.
+// `(order_product_download_id, file name)` catches true verbatim repeats while
+// never merging two files with different names.
 fn map_files(files: &[OrderProductFile]) -> Vec<LibraryItemFile> {
     let mut seen_files: HashSet<(u64, &str)> = HashSet::new();
     files.iter()
-         .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
+         .filter(|f| seen_files.insert((f.order_product_download_id, file_name(f))))
          .map(|f| LibraryItemFile { id:         f.order_product_download_id.to_string().into(),
                                     index:      f.index,
-                                    name:       f.title.as_str().into(),
+                                    name:       file_name(f).into(),
                                     format:
-                                        file_extension_label(&f.filename).unwrap_or_else(|| {
-                                                                             "FILE".to_string()
-                                                                         })
-                                                                         .into(),
+                                        file_extension_label(file_name(f)).unwrap_or_else(|| {
+                                                                              "FILE".to_string()
+                                                                          })
+                                                                          .into(),
                                     size_mb:    f.size as f64 / BYTES_PER_MB,
                                     downloaded: false,
                                     offloaded:  false, })
@@ -312,6 +324,10 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
 #[path = "mapping_test_support.rs"]
 mod mapping_test_support;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "mapping_file_tests.rs"]
+mod mapping_file_tests;
 #[cfg(test)]
 // Mapping tests keep the original fixture assertions and setup style.
 #[allow(clippy::unwrap_used, clippy::expect_used)]

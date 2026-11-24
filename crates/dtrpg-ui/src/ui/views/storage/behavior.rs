@@ -62,16 +62,13 @@ pub(crate) fn render_storage_behavior(data: BehaviorData, entity: Entity<Setting
             )))))
 }
 
-/// The note under the collections switch, with the Windows Developer Mode
-/// caveat only on Windows, where symlinks need it.
+/// The note under the collections switch, using the appropriate text
+/// for the host platform.
 fn create_collections_note() -> String {
-    if Platform.kind() == PlatformKind::Windows {
-        format!("{} {}",
-                t!("settings.create_collections_note"),
-                t!("settings.create_collections_note_windows"))
-    }
-    else {
-        t!("settings.create_collections_note").to_string()
+    match Platform.kind() {
+        PlatformKind::Windows => t!("settings.create_collections_note_windows").to_string(),
+        PlatformKind::Linux => t!("settings.create_collections_note_linux").to_string(),
+        PlatformKind::MacOs => t!("settings.create_collections_note_mac").to_string(),
     }
 }
 

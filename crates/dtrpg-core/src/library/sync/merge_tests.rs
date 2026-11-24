@@ -129,6 +129,29 @@ mod reconcile_catalog_tests {
     }
 
     #[test]
+    fn downloaded_file_keeps_its_legacy_name_and_undownloaded_file_takes_the_new_one() {
+        let named = |id: &str, name: &str, downloaded| {
+            let mut f = file(id, downloaded);
+            f.name = name.into();
+            f
+        };
+        let mut local = item("b1", "Title");
+        local.files = vec![named("f1", "Player's Handbook", true),
+                           named("f2", "Map", false)];
+
+        let mut live = item("b1", "Title");
+        live.files = vec![named("f1", "phb.pdf", false), named("f2", "map.pdf", false)];
+
+        let reconciled = reconcile_catalog(vec![local], vec![live]);
+
+        let names: Vec<&str> = reconciled[0].files
+                                            .iter()
+                                            .map(|f| f.name.as_ref())
+                                            .collect();
+        assert_eq!(names, ["Player's Handbook", "map.pdf"]);
+    }
+
+    #[test]
     fn partially_downloaded_item_keeps_its_per_file_state() {
         let mut local = item("b1", "Title");
         local.files = vec![file("f1", true), file("f2", false)];

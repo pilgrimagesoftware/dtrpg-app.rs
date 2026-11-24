@@ -31,6 +31,11 @@ pub const BYTES_PER_MB: f64 = 1_048_576.0;
 /// URL.
 pub const DTRPG_IMAGES_BASE_URL: &str = "https://api.drivethrurpg.com/images/";
 
+/// Sub-path where downloaded documents are stored
+pub const ITEMS_SUB_PATH: &str = "items";
+/// Sub-path where collection symlinks/aliases are created
+pub const COLLECTIONS_SUB_PATH: &str = "collections";
+
 /// Total attempts (including the first, non-retry attempt) `download_item`
 /// makes before giving up on a retryable transfer failure.
 pub const MAX_DOWNLOAD_ATTEMPTS: u32 = 4;
