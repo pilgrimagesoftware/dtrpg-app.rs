@@ -29,7 +29,7 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 toml = "1"
 # Already in the dependency tree via gpui/gpui-kit (notify 8.2.0, futures
 # 0.3.x); declared directly because themes hot reload uses both.
-notify = "8.2.0"
+notify = "9.0.0"
 futures = "0.3"
 
 [dev-dependencies]
